@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS modules (
+    id   TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    enabled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
