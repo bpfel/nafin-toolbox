@@ -54,6 +54,19 @@ Three asset sub-types with different valuation strategies:
 - **Data import/export** (CSV at minimum)
 - **Authentication** (single-user or simple auth, self-hosted)
 
+## Development
+
+Run the full stack locally via the dev compose override:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+- Frontend (Vite dev server): http://localhost:5173
+- API: http://localhost:8081
+
+> **Note:** The frontend Vite dev server proxies `/api` requests to the `api` Docker service. Running the frontend outside of Docker Compose is not supported — always use the dev compose setup.
+
 ## Tech Stack
 
 - **Frontend:** Svelte 5 + Vite (SPA, talks to Go API)
