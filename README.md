@@ -73,3 +73,29 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 - **Backend:** Go (REST API)
 - **Database:** PostgreSQL
 - **Deployment:** Docker Compose (3 containers: frontend, API, Postgres)
+
+## Future Ideas
+
+### Bank API Integration (Open Banking)
+
+Swiss banks don't yet offer personal API keys in e-banking. Instead, the ecosystem centers on **SIX bLink**, a platform that brokers data access between banks and licensed third-party apps.
+
+**Current state (as of Nov 2025):**
+
+- bLink multibanking launched for retail customers with UBS, ZKB, PostFinance, Valiant, BEKB, Aargauische KB, Luzerner KB, Hypi Lenzburg, and Banque CIC. 30+ banks support the data interface.
+- Raiffeisen is **not yet participating** in the multibanking initiative. Their open banking offering is business-customer only.
+- Becoming a bLink "Service User" requires a legal entity, commercial register entry, IT security audit, and an admission test — not feasible for a personal self-hosted project.
+
+**Practical path for nafin-toolbox:**
+
+1. **Short term: CSV/file import** — All Swiss banks allow transaction export from e-banking. Support the common formats (CSV, MT940) per bank.
+2. **Medium term: Aggregator API** — Services like Salt Edge cover Swiss banks and offer a commercial API. This avoids bLink admission but requires a paid relationship.
+3. **Long term: Direct API access** — The Swiss Federal Council has demanded measurable open banking progress by end of 2025, with regulatory intervention as fallback. If PSD2-style regulation arrives, banks may be required to offer direct customer-authorized API access.
+
+**Per-bank notes:**
+
+| Bank | Developer Portal | Retail API | bLink Multibanking |
+|---|---|---|---|
+| UBS | [developer.ubs.com](https://developer.ubs.com) | Via bLink only | Yes |
+| ZKB | [zkb.ch API portal](https://www.zkb.ch/de/lps/unternehmen/digitales-banking/api-developer-portal.html) (sandbox available) | Via bLink only | Yes |
+| Raiffeisen | None for CH (only AT/International) | Not available | Not yet |
