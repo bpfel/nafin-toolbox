@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/bpfel/nafin-toolbox/internal/budget"
+	"github.com/bpfel/nafin-toolbox/internal/module"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -36,11 +38,11 @@ func (s *Server) routes() {
 
 	s.router.Route("/api", func(r chi.Router) {
 		r.Get("/health", s.handleHealth)
-		r.Get("/modules", s.handleListModules)
+		r.Route("/modules", module.Routes(s.db))
+		r.Route("/budget", budget.Routes(s.db))
 
 		// Module routes are registered here as they are implemented:
 		// r.Route("/accounts", account.Routes(s.db))
-		// r.Route("/budget", budget.Routes(s.db))
 		// r.Route("/allocations", allocation.Routes(s.db))
 		// r.Route("/provision", provision.Routes(s.db))
 		// r.Route("/investments", investment.Routes(s.db))
@@ -56,30 +58,3 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleListModules(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.QueryContext(r.Context(), "SELECT id, name, enabled_at FROM modules ORDER BY enabled_at")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	type moduleInfo struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		EnabledAt string `json:"enabled_at"`
-	}
-
-	modules := []moduleInfo{}
-	for rows.Next() {
-		var m moduleInfo
-		if err := rows.Scan(&m.ID, &m.Name, &m.EnabledAt); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		modules = append(modules, m)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(modules)
-}
