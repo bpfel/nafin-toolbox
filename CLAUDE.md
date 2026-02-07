@@ -78,6 +78,33 @@ nafin-toolbox/
 - `Valuation` — investment_id, date, price (for manual entries)
 - `Snapshot` — date, total_net_worth, breakdown by domain
 
+## Development Workflow Conventions
+
+### Git Worktrees — CRITICAL
+**Always check which worktree you are working in before making any changes.**
+
+Active worktrees:
+| Worktree path | Branch | Purpose |
+|---|---|---|
+| `/home/bpfel/nafin-toolbox/` | `develop` (main repo) | Base code, shared infrastructure |
+| `/home/bpfel/nafin-toolbox-budget/` | `feature/budget` | Budget module development |
+
+**Rules:**
+- **Before writing or editing any file**, verify the file path starts with the correct worktree root for the feature you are working on.
+- Feature work (e.g. budget module) MUST go in the feature worktree, NOT the main repo.
+- If the user asks you to implement a feature that has an associated worktree, make all changes in that worktree.
+- When in doubt, run `git branch --show-current` in the target directory to confirm.
+
+### Creating new worktrees
+When creating git worktrees for parallel feature development:
+1. Create the worktree from the appropriate base branch (usually `main`)
+2. **Always create a symlink for the `.claude/` directory** to ensure all worktrees share the same Claude Code configuration:
+   ```bash
+   ln -s /home/bpfel/nafin-toolbox/.claude <new-worktree-path>/.claude
+   ```
+3. This ensures consistent agent memory, settings, and permissions across all feature branches
+4. Update the worktree table above when adding or removing worktrees
+
 ## Open Questions
 - Single-user auth or multi-user?
 - Which financial data API for stock/ETF prices?
