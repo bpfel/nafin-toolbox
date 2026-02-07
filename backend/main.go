@@ -15,6 +15,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := database.Migrate(db, "migrations"); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
+
 	srv := server.New(db)
 
 	port := os.Getenv("PORT")
