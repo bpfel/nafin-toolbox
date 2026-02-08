@@ -3,27 +3,50 @@
 
   interface Props {
     entry: BudgetEntry
-    onsave: (categoryId: number, amount: string) => void
+    onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
   }
 
   let { entry, onsave }: Props = $props()
 
-  let editing = $state(false)
-  let editValue = $state(entry.amount)
+  let editingPlanned = $state(false)
+  let editingActual = $state(false)
+  let editPlannedValue = $state(entry.planned_amount)
+  let editActualValue = $state(entry.actual_amount)
 
-  function startEdit() {
-    editValue = entry.amount
-    editing = true
+  let variance = $derived(Number(entry.variance))
+
+  function startEditPlanned() {
+    editPlannedValue = entry.planned_amount
+    editingPlanned = true
   }
 
-  function save() {
-    onsave(entry.category_id, editValue)
-    editing = false
+  function startEditActual() {
+    editActualValue = entry.actual_amount
+    editingActual = true
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') save()
-    if (e.key === 'Escape') editing = false
+  function savePlanned() {
+    onsave(entry.category_id, 'planned', editPlannedValue)
+    editingPlanned = false
+  }
+
+  function saveActual() {
+    onsave(entry.category_id, 'actual', editActualValue)
+    editingActual = false
+  }
+
+  function handlePlannedKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') savePlanned()
+    if (e.key === 'Escape') editingPlanned = false
+  }
+
+  function handleActualKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') saveActual()
+    if (e.key === 'Escape') editingActual = false
+  }
+
+  function fmt(val: string): string {
+    return Number(val).toLocaleString('de-CH', { minimumFractionDigits: 2 })
   }
 </script>
 
@@ -35,22 +58,40 @@
     {/if}
   </td>
   <td class="amount-cell">
-    {#if editing}
+    {#if editingPlanned}
       <input
         type="text"
-        bind:value={editValue}
-        onkeydown={handleKeydown}
-        onblur={save}
+        bind:value={editPlannedValue}
+        onkeydown={handlePlannedKeydown}
+        onblur={savePlanned}
         class="amount-input"
       />
     {:else}
-      <button class="amount-display" onclick={startEdit}>
-        {Number(entry.amount).toLocaleString('de-CH', { minimumFractionDigits: 2 })}
+      <button class="amount-display" onclick={startEditPlanned}>
+        {fmt(entry.planned_amount)}
       </button>
     {/if}
   </td>
+  <td class="amount-cell">
+    {#if editingActual}
+      <input
+        type="text"
+        bind:value={editActualValue}
+        onkeydown={handleActualKeydown}
+        onblur={saveActual}
+        class="amount-input"
+      />
+    {:else}
+      <button class="amount-display" onclick={startEditActual}>
+        {fmt(entry.actual_amount)}
+      </button>
+    {/if}
+  </td>
+  <td class="amount-cell variance" class:positive={variance >= 0} class:negative={variance < 0}>
+    {fmt(entry.variance)}
+  </td>
   <td class="monthly-cell">
-    {Number(entry.monthly_equivalent).toLocaleString('de-CH', { minimumFractionDigits: 2 })}
+    {fmt(entry.planned_monthly_equivalent)}
   </td>
 </tr>
 
@@ -75,6 +116,12 @@
   .amount-cell, .monthly-cell {
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .variance.positive {
+    color: #2d6a4f;
+  }
+  .variance.negative {
+    color: #c0392b;
   }
   .amount-display {
     background: none;
