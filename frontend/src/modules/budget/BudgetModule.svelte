@@ -127,7 +127,7 @@
     </div>
   {:else if summary}
     <BudgetSummary {summary} />
-    <BudgetTable entries={summary.entries} onsave={handleSave} />
+    <BudgetTable entries={summary.entries} onsave={handleSave} oncategorycreated={loadData} oncategorydeleted={loadData} />
   {/if}
 </div>
 

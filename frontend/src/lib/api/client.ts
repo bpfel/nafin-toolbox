@@ -12,6 +12,9 @@ export interface BudgetCategory {
   type: string
   sort_order: number
   archived: boolean
+  group_name: string
+  group_sort_order: number
+  fixed: boolean
   created_at: string
   updated_at: string
 }
@@ -22,6 +25,8 @@ export interface BudgetEntry {
   category_id: number
   category_name: string
   category_type: string
+  category_group_name: string
+  category_fixed: boolean
   planned_amount: string
   actual_amount: string
 }
@@ -121,4 +126,46 @@ export async function seedBudgetDefaults(): Promise<{
   period_created: boolean
 }> {
   return request('/budget/seed-defaults', { method: 'POST' })
+}
+
+export async function createBudgetCategory(cat: {
+  name: string
+  type: string
+  group_name: string
+  group_sort_order: number
+  fixed?: boolean
+}): Promise<BudgetCategory> {
+  return request<BudgetCategory>('/budget/categories', {
+    method: 'POST',
+    body: JSON.stringify(cat),
+  })
+}
+
+export async function updateBudgetCategory(
+  id: number,
+  update: Partial<Pick<BudgetCategory, 'name' | 'type' | 'sort_order' | 'archived' | 'group_name' | 'group_sort_order' | 'fixed'>>,
+): Promise<BudgetCategory> {
+  return request<BudgetCategory>(`/budget/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(update),
+  })
+}
+
+export async function deleteBudgetCategory(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/budget/categories/${id}`, { method: 'DELETE' })
+  if (!res.ok) {
+    let msg = `API error: ${res.status}`
+    try {
+      const body = await res.json()
+      if (body.error) msg = body.error
+    } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+}
+
+export async function reorderBudgetCategories(categoryIds: number[]): Promise<void> {
+  await request('/budget/categories/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ category_ids: categoryIds }),
+  })
 }
