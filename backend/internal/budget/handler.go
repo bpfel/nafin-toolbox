@@ -3,6 +3,7 @@ package budget
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -37,6 +38,8 @@ func Routes(db *sql.DB) func(r chi.Router) {
 		r.Post("/categories", handleCreateCategory(store))
 		r.Put("/categories/{id}", handleUpdateCategory(store))
 		r.Delete("/categories/{id}", handleDeleteCategory(store))
+
+		r.Post("/categories/reorder", handleReorderCategories(store))
 
 		r.Get("/periods", handleListPeriods(store))
 		r.Post("/periods", handleCreatePeriod(store))
@@ -99,10 +102,13 @@ func handleUpdateCategory(store *Store) http.HandlerFunc {
 		}
 
 		var update struct {
-			Name      *string `json:"name"`
-			Type      *string `json:"type"`
-			SortOrder *int    `json:"sort_order"`
-			Archived  *bool   `json:"archived"`
+			Name           *string `json:"name"`
+			Type           *string `json:"type"`
+			SortOrder      *int    `json:"sort_order"`
+			Archived       *bool   `json:"archived"`
+			GroupName      *string `json:"group_name"`
+			GroupSortOrder *int    `json:"group_sort_order"`
+			Fixed          *bool   `json:"fixed"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
@@ -121,6 +127,15 @@ func handleUpdateCategory(store *Store) http.HandlerFunc {
 		if update.Archived != nil {
 			existing.Archived = *update.Archived
 		}
+		if update.GroupName != nil {
+			existing.GroupName = *update.GroupName
+		}
+		if update.GroupSortOrder != nil {
+			existing.GroupSortOrder = *update.GroupSortOrder
+		}
+		if update.Fixed != nil {
+			existing.Fixed = *update.Fixed
+		}
 
 		if err := store.UpdateCategory(r.Context(), existing); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -138,7 +153,28 @@ func handleDeleteCategory(store *Store) http.HandlerFunc {
 			return
 		}
 		if err := store.DeleteCategory(r.Context(), id); err != nil {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleReorderCategories(store *Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			CategoryIDs []int `json:"category_ids"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if len(req.CategoryIDs) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "category_ids required"})
+			return
+		}
+		if err := store.ReorderCategories(r.Context(), req.CategoryIDs); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -241,6 +277,11 @@ func handleUpsertEntry(store *Store) http.HandlerFunc {
 
 		entry, err := store.UpsertEntry(r.Context(), period.ID, req.CategoryID, req.PlannedAmount, req.ActualAmount)
 		if err != nil {
+			var fixedErr *FixedCategoryError
+			if errors.As(err, &fixedErr) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": fixedErr.Error()})
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

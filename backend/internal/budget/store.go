@@ -21,11 +21,12 @@ func NewStore(db *sql.DB) *Store {
 // Categories
 
 func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Category, error) {
-	query := "SELECT id, name, type, sort_order, archived, created_at, updated_at FROM budget_categories"
+	query := `SELECT id, name, type, sort_order, archived, group_name, group_sort_order, fixed, created_at, updated_at
+	          FROM budget_categories`
 	if !includeArchived {
 		query += " WHERE archived = FALSE"
 	}
-	query += " ORDER BY sort_order, id"
+	query += " ORDER BY group_sort_order, sort_order, id"
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
@@ -36,7 +37,7 @@ func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Cat
 	var cats []Category
 	for rows.Next() {
 		var c Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.GroupName, &c.GroupSortOrder, &c.Fixed, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		cats = append(cats, c)
@@ -45,41 +46,87 @@ func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Cat
 }
 
 func (s *Store) CreateCategory(ctx context.Context, c *Category) error {
+	// Auto-assign sort_order if not set
+	if c.SortOrder == 0 {
+		var maxSort sql.NullInt64
+		err := s.db.QueryRowContext(ctx,
+			`SELECT MAX(sort_order) FROM budget_categories WHERE type = $1 AND group_name = $2`,
+			c.Type, c.GroupName,
+		).Scan(&maxSort)
+		if err != nil {
+			return err
+		}
+		if maxSort.Valid {
+			c.SortOrder = int(maxSort.Int64) + 10
+		} else {
+			c.SortOrder = 10
+		}
+	}
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO budget_categories (name, type, sort_order)
-		 VALUES ($1, $2, $3)
+		`INSERT INTO budget_categories (name, type, sort_order, group_name, group_sort_order, fixed)
+		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id, created_at, updated_at`,
-		c.Name, c.Type, c.SortOrder,
+		c.Name, c.Type, c.SortOrder, c.GroupName, c.GroupSortOrder, c.Fixed,
 	).Scan(&c.ID, &c.CreatedAt, &c.UpdatedAt)
 }
 
 func (s *Store) UpdateCategory(ctx context.Context, c *Category) error {
 	return s.db.QueryRowContext(ctx,
 		`UPDATE budget_categories
-		 SET name = $2, type = $3, sort_order = $4, archived = $5, updated_at = NOW()
+		 SET name = $2, type = $3, sort_order = $4, archived = $5,
+		     group_name = $6, group_sort_order = $7, fixed = $8, updated_at = NOW()
 		 WHERE id = $1
 		 RETURNING updated_at`,
-		c.ID, c.Name, c.Type, c.SortOrder, c.Archived,
+		c.ID, c.Name, c.Type, c.SortOrder, c.Archived, c.GroupName, c.GroupSortOrder, c.Fixed,
 	).Scan(&c.UpdatedAt)
 }
 
 func (s *Store) DeleteCategory(ctx context.Context, id int) error {
-	var count int
-	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM budget_entries WHERE category_id = $1", id).Scan(&count); err != nil {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
-	if count > 0 {
-		return fmt.Errorf("category is in use by %d entries", count)
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM budget_entries WHERE category_id = $1", id); err != nil {
+		return err
 	}
-	_, err := s.db.ExecContext(ctx, "DELETE FROM budget_categories WHERE id = $1", id)
-	return err
+	result, err := tx.ExecContext(ctx, "DELETE FROM budget_categories WHERE id = $1", id)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("category not found")
+	}
+	return tx.Commit()
+}
+
+func (s *Store) ReorderCategories(ctx context.Context, categoryIDs []int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for i, id := range categoryIDs {
+		_, err := tx.ExecContext(ctx,
+			"UPDATE budget_categories SET sort_order = $1, updated_at = NOW() WHERE id = $2",
+			(i+1)*10, id,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) GetCategory(ctx context.Context, id int) (*Category, error) {
 	var c Category
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, name, type, sort_order, archived, created_at, updated_at FROM budget_categories WHERE id = $1", id,
-	).Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.CreatedAt, &c.UpdatedAt)
+		`SELECT id, name, type, sort_order, archived, group_name, group_sort_order, fixed, created_at, updated_at
+		 FROM budget_categories WHERE id = $1`, id,
+	).Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.GroupName, &c.GroupSortOrder, &c.Fixed, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -131,12 +178,12 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT e.id, e.period_id, e.category_id, c.name, c.type,
-		        e.planned_amount, e.actual_amount
-		 FROM budget_entries e
-		 JOIN budget_categories c ON c.id = e.category_id
-		 WHERE e.period_id = $1
-		 ORDER BY c.sort_order, c.id`, p.ID,
+		`SELECT COALESCE(e.id, 0), $1, c.id, c.name, c.type, c.group_name, c.fixed,
+		        COALESCE(e.planned_amount, 0), COALESCE(e.actual_amount, 0)
+		 FROM budget_categories c
+		 LEFT JOIN budget_entries e ON e.category_id = c.id AND e.period_id = $1
+		 WHERE c.archived = FALSE
+		 ORDER BY c.group_sort_order, c.sort_order, c.id`, p.ID,
 	)
 	if err != nil {
 		return nil, err
@@ -152,6 +199,7 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 	for rows.Next() {
 		var e Entry
 		if err := rows.Scan(&e.ID, &e.PeriodID, &e.CategoryID, &e.CategoryName, &e.CategoryType,
+			&e.CategoryGroupName, &e.CategoryFixed,
 			&e.PlannedAmount, &e.ActualAmount); err != nil {
 			return nil, err
 		}
@@ -191,6 +239,25 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 // Entries
 
 func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plannedAmount *string, actualAmount *string) (*Entry, error) {
+	// Check if category is fixed
+	var fixed bool
+	err := s.db.QueryRowContext(ctx,
+		"SELECT fixed FROM budget_categories WHERE id = $1", categoryID,
+	).Scan(&fixed)
+	if err != nil {
+		return nil, err
+	}
+
+	if fixed {
+		if plannedAmount == nil && actualAmount != nil {
+			return nil, &FixedCategoryError{msg: "cannot set actual_amount directly on a fixed category; update planned_amount instead"}
+		}
+		// For fixed categories, actual always equals planned
+		if plannedAmount != nil {
+			actualAmount = plannedAmount
+		}
+	}
+
 	var e Entry
 
 	if plannedAmount != nil && actualAmount != nil {
@@ -205,6 +272,8 @@ func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plann
 			return nil, err
 		}
 	} else if plannedAmount != nil {
+		// For fixed categories this branch won't be reached (actualAmount was set above),
+		// but keep it for non-fixed planned-only updates.
 		err := s.db.QueryRowContext(ctx,
 			`INSERT INTO budget_entries (period_id, category_id, planned_amount)
 			 VALUES ($1, $2, $3)
@@ -230,14 +299,23 @@ func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plann
 		return nil, fmt.Errorf("at least one of planned_amount or actual_amount must be provided")
 	}
 
-	err := s.db.QueryRowContext(ctx,
-		"SELECT name, type FROM budget_categories WHERE id = $1", categoryID,
-	).Scan(&e.CategoryName, &e.CategoryType)
+	err = s.db.QueryRowContext(ctx,
+		"SELECT name, type, group_name, fixed FROM budget_categories WHERE id = $1", categoryID,
+	).Scan(&e.CategoryName, &e.CategoryType, &e.CategoryGroupName, &e.CategoryFixed)
 	if err != nil {
 		return nil, err
 	}
 
 	return &e, nil
+}
+
+// FixedCategoryError is returned when trying to directly set actual on a fixed category.
+type FixedCategoryError struct {
+	msg string
+}
+
+func (e *FixedCategoryError) Error() string {
+	return e.msg
 }
 
 func (s *Store) DeleteEntry(ctx context.Context, id int) error {
@@ -267,8 +345,14 @@ func (s *Store) GetPeriodByYearMonth(ctx context.Context, year, month int) (*Per
 func (s *Store) CopyPeriodEntries(ctx context.Context, fromPeriodID, toPeriodID int) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO budget_entries (period_id, category_id, planned_amount, actual_amount)
-		 SELECT $2, category_id, planned_amount, 0 FROM budget_entries WHERE period_id = $1
-		 ON CONFLICT (period_id, category_id) DO UPDATE SET planned_amount = EXCLUDED.planned_amount`,
+		 SELECT $2, e.category_id, e.planned_amount,
+		        CASE WHEN c.fixed THEN e.planned_amount ELSE 0 END
+		 FROM budget_entries e
+		 JOIN budget_categories c ON c.id = e.category_id
+		 WHERE e.period_id = $1
+		 ON CONFLICT (period_id, category_id) DO UPDATE
+		   SET planned_amount = EXCLUDED.planned_amount,
+		       actual_amount = EXCLUDED.actual_amount`,
 		fromPeriodID, toPeriodID,
 	)
 	return err
