@@ -4,9 +4,10 @@
   interface Props {
     entry: BudgetEntry
     onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
+    ondelete: (categoryId: number, categoryName: string) => void
   }
 
-  let { entry, onsave }: Props = $props()
+  let { entry, onsave, ondelete }: Props = $props()
 
   const MAX_MONTHLY = 9_999_999_999.99
 
@@ -32,7 +33,6 @@
       return
     }
 
-    // Convert to monthly value for range check
     const monthly = editingField.endsWith('_yr') ? val / 12 : val
     if (Math.abs(monthly) > MAX_MONTHLY) {
       inputError = true
@@ -60,8 +60,31 @@
   }
 </script>
 
-<tr class="entry-row" class:income={entry.category_type === 'income'}>
-  <td class="name-cell">{entry.category_name}</td>
+<tr
+  class="entry-row"
+  class:income={entry.category_type === 'income'}
+  class:fixed={entry.category_fixed}
+  data-category-id={entry.category_id}
+>
+  <td class="name-cell">
+    <span class="drag-handle" aria-label="Drag to reorder">⠿</span>
+    <span class="name-text">
+      {entry.category_name}
+      {#if entry.category_fixed}
+        <span class="fixed-badge">fixed</span>
+      {/if}
+    </span>
+    <button
+      class="trash-btn"
+      onclick={() => ondelete(entry.category_id, entry.category_name)}
+      aria-label="Delete {entry.category_name}"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    </button>
+  </td>
   <td class="amount-cell">
     {#if editingField === 'planned_mo'}
       <input
@@ -93,7 +116,9 @@
     {/if}
   </td>
   <td class="amount-cell">
-    {#if editingField === 'actual_mo'}
+    {#if entry.category_fixed}
+      <span class="amount-fixed">{fmt(actualMonthly)}</span>
+    {:else if editingField === 'actual_mo'}
       <input
         type="text"
         bind:value={editValue}
@@ -118,10 +143,60 @@
     background: #f0fdf4;
   }
   .name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .drag-handle {
+    cursor: grab;
+    color: #ccc;
+    font-size: 1rem;
+    line-height: 1;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .drag-handle:hover {
+    color: #888;
+  }
+  .name-text {
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+  .fixed-badge {
+    font-size: 0.7rem;
+    color: #888;
+    font-style: italic;
+    font-weight: 400;
+    margin-left: 0.35rem;
+  }
+  .trash-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    padding: 0.15rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .entry-row:hover .trash-btn {
+    opacity: 1;
+  }
+  .trash-btn:hover {
+    color: #c0392b;
+  }
+  /* Always visible on touch devices */
+  @media (hover: none) {
+    .trash-btn {
+      opacity: 0.6;
+    }
   }
   .amount-cell {
     text-align: right;
@@ -131,6 +206,14 @@
   }
   .amount-cell.yearly {
     color: #888;
+  }
+  .amount-fixed {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    color: #888;
+    font-style: italic;
+    text-align: right;
+    width: 100%;
   }
   .amount-display {
     background: none;
@@ -164,5 +247,11 @@
   .amount-input.input-error {
     border-color: #c0392b;
     background: #fdecea;
+  }
+
+  /* Drag ghost styling */
+  :global(.drag-ghost) {
+    opacity: 0.5;
+    background: #e3f2fd !important;
   }
 </style>
