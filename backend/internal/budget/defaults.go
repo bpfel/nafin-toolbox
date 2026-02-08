@@ -32,17 +32,16 @@ func BFSDefaults() []DefaultCategory {
 	}
 }
 
-// SeedDefaults creates the BFS default categories, an initial plan with default amounts,
-// and a period for the current month initialized from that plan.
-// Returns (categoriesCreated, planCreated, periodCreated, error).
-func SeedDefaults(ctx context.Context, store *Store) (int, bool, bool, error) {
+// SeedDefaults creates the BFS default categories and a period for the current month
+// with pre-filled entries. Returns the number of categories created and whether a period was created.
+func SeedDefaults(ctx context.Context, store *Store) (int, bool, error) {
 	defaults := BFSDefaults()
 	categoriesCreated := 0
 
 	// Check if categories already exist
 	existingCount, err := store.CategoryCount(ctx)
 	if err != nil {
-		return 0, false, false, err
+		return 0, false, err
 	}
 
 	// Only seed categories if none exist
@@ -55,75 +54,43 @@ func SeedDefaults(ctx context.Context, store *Store) (int, bool, bool, error) {
 				SortOrder: d.SortOrder,
 			}
 			if err := store.CreateCategory(ctx, c); err != nil {
-				return categoriesCreated, false, false, err
+				return categoriesCreated, false, err
 			}
 			categoriesCreated++
 		}
 	}
 
+	// Create current month period if it doesn't exist
 	now := time.Now()
 	year, m, _ := now.Date()
 	month := int(m)
 
-	// Create an initial plan if none exists
-	planCreated := false
-	plans, err := store.ListPlans(ctx)
-	if err != nil {
-		return categoriesCreated, false, false, err
-	}
-
-	var planID int
-	if len(plans) == 0 && categoriesCreated > 0 {
-		plan := &Plan{
-			Name:               "Swiss BFS Defaults",
-			EffectiveFromYear:  year,
-			EffectiveFromMonth: month,
-			Notes:              "Default plan based on BFS HABE 2023 survey data",
-		}
-		if err := store.CreatePlan(ctx, plan); err != nil {
-			return categoriesCreated, false, false, err
-		}
-		planCreated = true
-		planID = plan.ID
-
-		// Populate plan entries with default amounts
-		cats, err := store.ListCategories(ctx, false)
-		if err != nil {
-			return categoriesCreated, planCreated, false, err
-		}
-		for i, cat := range cats {
-			if i < len(defaults) {
-				if _, err := store.UpsertPlanEntry(ctx, planID, cat.ID, defaults[i].Amount); err != nil {
-					return categoriesCreated, planCreated, false, err
-				}
-			}
-		}
-	} else if len(plans) > 0 {
-		planID = plans[0].ID
-	}
-
-	// Create current month period if it doesn't exist
 	periodCreated := false
 	_, err = store.GetPeriodByYearMonth(ctx, year, month)
 	if err != nil {
-		// Period doesn't exist, create it linked to the plan
-		var pID *int
-		if planID > 0 {
-			pID = &planID
-		}
-		p := &Period{Year: year, Month: month, PlanID: pID}
+		// Period doesn't exist, create it
+		p := &Period{Year: year, Month: month}
 		if err := store.CreatePeriod(ctx, p); err != nil {
-			return categoriesCreated, planCreated, false, err
+			return categoriesCreated, false, err
 		}
 		periodCreated = true
 
-		// Initialize entries from plan
-		if planID > 0 {
-			if err := store.InitializePeriodFromPlan(ctx, p.ID, planID); err != nil {
-				return categoriesCreated, planCreated, periodCreated, err
+		// Pre-fill entries with default amounts
+		if categoriesCreated > 0 {
+			cats, err := store.ListCategories(ctx, false)
+			if err != nil {
+				return categoriesCreated, periodCreated, err
+			}
+			for i, cat := range cats {
+				if i < len(defaults) {
+					amt := defaults[i].Amount
+					if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &amt, nil); err != nil {
+						return categoriesCreated, periodCreated, err
+					}
+				}
 			}
 		}
 	}
 
-	return categoriesCreated, planCreated, periodCreated, nil
+	return categoriesCreated, periodCreated, nil
 }

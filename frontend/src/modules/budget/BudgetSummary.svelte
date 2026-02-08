@@ -16,11 +16,6 @@
 </script>
 
 <div class="summary-bar">
-  {#if summary.plan_name}
-    <div class="plan-indicator">
-      Plan: {summary.plan_name}
-    </div>
-  {/if}
   <div class="summary-grid">
     <div class="summary-column">
       <span class="column-header">Planned</span>
@@ -65,13 +60,6 @@
     background: white;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  .plan-indicator {
-    font-size: 0.8rem;
-    color: #666;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #eee;
   }
   .summary-grid {
     display: grid;

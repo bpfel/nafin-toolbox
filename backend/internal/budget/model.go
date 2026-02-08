@@ -18,7 +18,6 @@ type Period struct {
 	Year      int       `json:"year"`
 	Month     int       `json:"month"`
 	Notes     string    `json:"notes"`
-	PlanID    *int      `json:"plan_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -41,8 +40,6 @@ type PeriodSummary struct {
 	Year                 int     `json:"year"`
 	Month                int     `json:"month"`
 	Notes                string  `json:"notes"`
-	PlanID               *int    `json:"plan_id"`
-	PlanName             string  `json:"plan_name"`
 	Entries              []Entry `json:"entries"`
 	TotalPlannedIncome   string  `json:"total_planned_income"`
 	TotalActualIncome    string  `json:"total_actual_income"`
@@ -52,28 +49,4 @@ type PeriodSummary struct {
 	TotalActualMonthly   string  `json:"total_actual_monthly"`
 	PlannedBalance       string  `json:"planned_balance"`
 	ActualBalance        string  `json:"actual_balance"`
-}
-
-type Plan struct {
-	ID                 int       `json:"id"`
-	Name               string    `json:"name"`
-	EffectiveFromYear  int       `json:"effective_from_year"`
-	EffectiveFromMonth int       `json:"effective_from_month"`
-	Notes              string    `json:"notes"`
-	CreatedAt          time.Time `json:"created_at"`
-}
-
-type PlanEntry struct {
-	ID                int    `json:"id"`
-	PlanID            int    `json:"plan_id"`
-	CategoryID        int    `json:"category_id"`
-	CategoryName      string `json:"category_name"`
-	CategoryType      string `json:"category_type"`
-	CategoryFrequency string `json:"category_frequency"`
-	Amount            string `json:"amount"`
-}
-
-type PlanDetail struct {
-	Plan    Plan        `json:"plan"`
-	Entries []PlanEntry `json:"entries"`
 }

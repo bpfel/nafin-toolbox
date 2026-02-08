@@ -62,20 +62,12 @@ func (s *Store) UpdateCategory(ctx context.Context, c *Category) error {
 }
 
 func (s *Store) DeleteCategory(ctx context.Context, id int) error {
-	// Check budget_entries usage
 	var count int
 	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM budget_entries WHERE category_id = $1", id).Scan(&count); err != nil {
 		return err
 	}
 	if count > 0 {
-		return fmt.Errorf("category is in use by %d budget entries", count)
-	}
-	// Check budget_plan_entries usage
-	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM budget_plan_entries WHERE category_id = $1", id).Scan(&count); err != nil {
-		return err
-	}
-	if count > 0 {
-		return fmt.Errorf("category is in use by %d plan entries", count)
+		return fmt.Errorf("category is in use by %d entries", count)
 	}
 	_, err := s.db.ExecContext(ctx, "DELETE FROM budget_categories WHERE id = $1", id)
 	return err
@@ -98,174 +90,11 @@ func (s *Store) CategoryCount(ctx context.Context) (int, error) {
 	return count, err
 }
 
-// Plans
-
-func (s *Store) CreatePlan(ctx context.Context, p *Plan) error {
-	return s.db.QueryRowContext(ctx,
-		`INSERT INTO budget_plans (name, effective_from_year, effective_from_month, notes)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, created_at`,
-		p.Name, p.EffectiveFromYear, p.EffectiveFromMonth, p.Notes,
-	).Scan(&p.ID, &p.CreatedAt)
-}
-
-func (s *Store) GetPlan(ctx context.Context, id int) (*Plan, error) {
-	var p Plan
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, effective_from_year, effective_from_month, notes, created_at
-		 FROM budget_plans WHERE id = $1`, id,
-	).Scan(&p.ID, &p.Name, &p.EffectiveFromYear, &p.EffectiveFromMonth, &p.Notes, &p.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
-func (s *Store) ListPlans(ctx context.Context) ([]Plan, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, effective_from_year, effective_from_month, notes, created_at
-		 FROM budget_plans
-		 ORDER BY effective_from_year DESC, effective_from_month DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var plans []Plan
-	for rows.Next() {
-		var p Plan
-		if err := rows.Scan(&p.ID, &p.Name, &p.EffectiveFromYear, &p.EffectiveFromMonth, &p.Notes, &p.CreatedAt); err != nil {
-			return nil, err
-		}
-		plans = append(plans, p)
-	}
-	return plans, rows.Err()
-}
-
-func (s *Store) UpdatePlan(ctx context.Context, p *Plan) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE budget_plans
-		 SET name = $2, effective_from_year = $3, effective_from_month = $4, notes = $5
-		 WHERE id = $1`,
-		p.ID, p.Name, p.EffectiveFromYear, p.EffectiveFromMonth, p.Notes,
-	)
-	return err
-}
-
-func (s *Store) DeletePlan(ctx context.Context, id int) error {
-	// Check if any periods reference this plan
-	var count int
-	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM budget_periods WHERE plan_id = $1", id).Scan(&count); err != nil {
-		return err
-	}
-	if count > 0 {
-		return fmt.Errorf("plan is referenced by %d periods", count)
-	}
-	_, err := s.db.ExecContext(ctx, "DELETE FROM budget_plans WHERE id = $1", id)
-	return err
-}
-
-func (s *Store) GetPlanDetail(ctx context.Context, id int) (*PlanDetail, error) {
-	plan, err := s.GetPlan(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT pe.id, pe.plan_id, pe.category_id, c.name, c.type, c.frequency, pe.amount
-		 FROM budget_plan_entries pe
-		 JOIN budget_categories c ON c.id = pe.category_id
-		 WHERE pe.plan_id = $1
-		 ORDER BY c.sort_order, c.id`, id,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var entries []PlanEntry
-	for rows.Next() {
-		var e PlanEntry
-		if err := rows.Scan(&e.ID, &e.PlanID, &e.CategoryID, &e.CategoryName, &e.CategoryType, &e.CategoryFrequency, &e.Amount); err != nil {
-			return nil, err
-		}
-		entries = append(entries, e)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return &PlanDetail{Plan: *plan, Entries: entries}, nil
-}
-
-func (s *Store) UpsertPlanEntry(ctx context.Context, planID, categoryID int, amount string) (*PlanEntry, error) {
-	var e PlanEntry
-	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO budget_plan_entries (plan_id, category_id, amount)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (plan_id, category_id) DO UPDATE SET amount = EXCLUDED.amount
-		 RETURNING id, plan_id, category_id, amount`,
-		planID, categoryID, amount,
-	).Scan(&e.ID, &e.PlanID, &e.CategoryID, &e.Amount)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.db.QueryRowContext(ctx,
-		"SELECT name, type, frequency FROM budget_categories WHERE id = $1", categoryID,
-	).Scan(&e.CategoryName, &e.CategoryType, &e.CategoryFrequency)
-	if err != nil {
-		return nil, err
-	}
-
-	return &e, nil
-}
-
-func (s *Store) DeletePlanEntry(ctx context.Context, id int) error {
-	result, err := s.db.ExecContext(ctx, "DELETE FROM budget_plan_entries WHERE id = $1", id)
-	if err != nil {
-		return err
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return fmt.Errorf("plan entry not found")
-	}
-	return nil
-}
-
-func (s *Store) FindActivePlan(ctx context.Context, year, month int) (*Plan, error) {
-	var p Plan
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, effective_from_year, effective_from_month, notes, created_at
-		 FROM budget_plans
-		 WHERE (effective_from_year < $1) OR (effective_from_year = $1 AND effective_from_month <= $2)
-		 ORDER BY effective_from_year DESC, effective_from_month DESC
-		 LIMIT 1`,
-		year, month,
-	).Scan(&p.ID, &p.Name, &p.EffectiveFromYear, &p.EffectiveFromMonth, &p.Notes, &p.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
-func (s *Store) InitializePeriodFromPlan(ctx context.Context, periodID, planID int) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO budget_entries (period_id, category_id, planned_amount, actual_amount)
-		 SELECT $1, category_id, amount, 0
-		 FROM budget_plan_entries
-		 WHERE plan_id = $2
-		 ON CONFLICT (period_id, category_id) DO NOTHING`,
-		periodID, planID,
-	)
-	return err
-}
-
 // Periods
 
 func (s *Store) ListPeriods(ctx context.Context) ([]Period, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, year, month, notes, plan_id, created_at FROM budget_periods ORDER BY year DESC, month DESC")
+		"SELECT id, year, month, notes, created_at FROM budget_periods ORDER BY year DESC, month DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +103,7 @@ func (s *Store) ListPeriods(ctx context.Context) ([]Period, error) {
 	var periods []Period
 	for rows.Next() {
 		var p Period
-		if err := rows.Scan(&p.ID, &p.Year, &p.Month, &p.Notes, &p.PlanID, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Year, &p.Month, &p.Notes, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		periods = append(periods, p)
@@ -284,27 +113,19 @@ func (s *Store) ListPeriods(ctx context.Context) ([]Period, error) {
 
 func (s *Store) CreatePeriod(ctx context.Context, p *Period) error {
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO budget_periods (year, month, plan_id) VALUES ($1, $2, $3) RETURNING id, notes, created_at`,
-		p.Year, p.Month, p.PlanID,
+		`INSERT INTO budget_periods (year, month) VALUES ($1, $2) RETURNING id, notes, created_at`,
+		p.Year, p.Month,
 	).Scan(&p.ID, &p.Notes, &p.CreatedAt)
 }
 
 func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodSummary, error) {
 	var p Period
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, year, month, notes, plan_id, created_at FROM budget_periods WHERE year = $1 AND month = $2",
+		"SELECT id, year, month, notes, created_at FROM budget_periods WHERE year = $1 AND month = $2",
 		year, month,
-	).Scan(&p.ID, &p.Year, &p.Month, &p.Notes, &p.PlanID, &p.CreatedAt)
+	).Scan(&p.ID, &p.Year, &p.Month, &p.Notes, &p.CreatedAt)
 	if err != nil {
 		return nil, err
-	}
-
-	// Get plan name if linked
-	var planName string
-	if p.PlanID != nil {
-		_ = s.db.QueryRowContext(ctx,
-			"SELECT name FROM budget_plans WHERE id = $1", *p.PlanID,
-		).Scan(&planName)
 	}
 
 	rows, err := s.db.QueryContext(ctx,
@@ -371,8 +192,6 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 		Year:                 p.Year,
 		Month:                p.Month,
 		Notes:                p.Notes,
-		PlanID:               p.PlanID,
-		PlanName:             planName,
 		Entries:              entries,
 		TotalPlannedIncome:   formatAmount(totalPlannedIncome),
 		TotalActualIncome:    formatAmount(totalActualIncome),
@@ -390,7 +209,6 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plannedAmount *string, actualAmount *string) (*Entry, error) {
 	var e Entry
 
-	// Build dynamic upsert depending on which fields are provided
 	if plannedAmount != nil && actualAmount != nil {
 		err := s.db.QueryRowContext(ctx,
 			`INSERT INTO budget_entries (period_id, category_id, planned_amount, actual_amount)
@@ -428,7 +246,6 @@ func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plann
 		return nil, fmt.Errorf("at least one of planned_amount or actual_amount must be provided")
 	}
 
-	// Fetch category info
 	err := s.db.QueryRowContext(ctx,
 		"SELECT name, type, frequency FROM budget_categories WHERE id = $1", categoryID,
 	).Scan(&e.CategoryName, &e.CategoryType, &e.CategoryFrequency)
@@ -466,9 +283,9 @@ func (s *Store) DeleteEntry(ctx context.Context, id int) error {
 func (s *Store) GetPeriodByYearMonth(ctx context.Context, year, month int) (*Period, error) {
 	var p Period
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, year, month, notes, plan_id, created_at FROM budget_periods WHERE year = $1 AND month = $2",
+		"SELECT id, year, month, notes, created_at FROM budget_periods WHERE year = $1 AND month = $2",
 		year, month,
-	).Scan(&p.ID, &p.Year, &p.Month, &p.Notes, &p.PlanID, &p.CreatedAt)
+	).Scan(&p.ID, &p.Year, &p.Month, &p.Notes, &p.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
