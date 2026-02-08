@@ -5,9 +5,10 @@
     entry: BudgetEntry
     onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
     ondelete: (categoryId: number, categoryName: string) => void
+    onedit: (categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, groupSortOrder: number, fixed: boolean) => void
   }
 
-  let { entry, onsave, ondelete }: Props = $props()
+  let { entry, onsave, ondelete, onedit }: Props = $props()
 
   const MAX_MONTHLY = 9_999_999_999.99
 
@@ -68,12 +69,15 @@
 >
   <td class="name-cell">
     <span class="drag-handle" aria-label="Drag to reorder">⠿</span>
-    <span class="name-text">
+    <button
+      class="name-text"
+      onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, 0, entry.category_fixed)}
+    >
       {entry.category_name}
       {#if entry.category_fixed}
         <span class="fixed-badge">fixed</span>
       {/if}
-    </span>
+    </button>
     <button
       class="trash-btn"
       onclick={() => ondelete(entry.category_id, entry.category_name)}
@@ -166,6 +170,19 @@
     text-overflow: ellipsis;
     flex: 1;
     min-width: 0;
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    font-size: inherit;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  .name-text:hover {
+    text-decoration: underline;
+    text-decoration-color: #aaa;
+    text-underline-offset: 2px;
   }
   .fixed-badge {
     font-size: 0.7rem;
