@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/budget"
 	"github.com/bpfel/nafin-toolbox/internal/module"
 	"github.com/go-chi/chi/v5"
@@ -36,16 +37,31 @@ func (s *Server) routes() {
 		AllowCredentials: true,
 	}))
 
-	s.router.Route("/api", func(r chi.Router) {
-		r.Get("/health", s.handleHealth)
-		r.Route("/modules", module.Routes(s.db))
-		r.Route("/budget", budget.Routes(s.db))
+	authStore := auth.NewStore(s.db)
 
-		// Module routes are registered here as they are implemented:
-		// r.Route("/accounts", account.Routes(s.db))
-		// r.Route("/allocations", allocation.Routes(s.db))
-		// r.Route("/provision", provision.Routes(s.db))
-		// r.Route("/investments", investment.Routes(s.db))
+	s.router.Route("/api", func(r chi.Router) {
+		// Public routes (no auth required)
+		r.Get("/health", s.handleHealth)
+		r.Post("/auth/login", auth.HandleLogin(authStore))
+		r.Get("/auth/needs-setup", auth.HandleNeedsSetup(authStore))
+		r.Post("/auth/setup", auth.HandleSetup(authStore))
+
+		// Protected routes (require auth)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAuth(authStore))
+			r.Get("/auth/me", auth.HandleMe)
+			r.Post("/auth/logout", auth.HandleLogout(authStore))
+			r.Post("/auth/invite", auth.HandleInvite(authStore))
+			r.Get("/auth/users", auth.HandleListUsers(authStore))
+			r.Route("/modules", module.Routes(s.db))
+			r.Route("/budget", budget.Routes(s.db))
+
+			// Module routes are registered here as they are implemented:
+			// r.Route("/accounts", account.Routes(s.db))
+			// r.Route("/allocations", allocation.Routes(s.db))
+			// r.Route("/provision", provision.Routes(s.db))
+			// r.Route("/investments", investment.Routes(s.db))
+		})
 	})
 }
 
@@ -57,4 +73,3 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
-
