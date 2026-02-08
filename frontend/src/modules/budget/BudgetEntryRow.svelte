@@ -68,26 +68,28 @@
   data-category-id={entry.category_id}
 >
   <td class="name-cell">
-    <span class="drag-handle" aria-label="Drag to reorder">⠿</span>
-    <button
-      class="name-text"
-      onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, 0, entry.category_fixed)}
-    >
-      {entry.category_name}
-      {#if entry.category_fixed}
-        <span class="fixed-badge">fixed</span>
-      {/if}
-    </button>
-    <button
-      class="trash-btn"
-      onclick={() => ondelete(entry.category_id, entry.category_name)}
-      aria-label="Delete {entry.category_name}"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>
-    </button>
+    <div class="name-cell-inner">
+      <span class="drag-handle" aria-label="Drag to reorder">⠿</span>
+      <button
+        class="name-text"
+        onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, 0, entry.category_fixed)}
+      >
+        {entry.category_name}
+        {#if entry.category_fixed}
+          <span class="fixed-badge">fixed</span>
+        {/if}
+      </button>
+      <button
+        class="trash-btn"
+        onclick={() => ondelete(entry.category_id, entry.category_name)}
+        aria-label="Delete {entry.category_name}"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </button>
+    </div>
   </td>
   <td class="amount-cell">
     {#if editingField === 'planned_mo'}
@@ -147,11 +149,13 @@
     background: #f0fdf4;
   }
   .name-cell {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .name-cell-inner {
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    overflow: hidden;
-    white-space: nowrap;
   }
   .drag-handle {
     cursor: grab;
