@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -22,6 +23,7 @@ type enableRequest struct {
 }
 
 // Routes returns a chi router function for module management endpoints.
+// All routes require auth middleware to be applied upstream.
 func Routes(db *sql.DB) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Get("/", handleList(db))
@@ -32,7 +34,12 @@ func Routes(db *sql.DB) func(r chi.Router) {
 
 func handleList(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.QueryContext(r.Context(), "SELECT id, name, enabled_at FROM modules ORDER BY enabled_at")
+		userID := auth.UserFromContext(r.Context()).ID
+
+		rows, err := db.QueryContext(r.Context(),
+			"SELECT id, name, enabled_at FROM modules WHERE user_id = $1 ORDER BY enabled_at",
+			userID,
+		)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -56,6 +63,8 @@ func handleList(db *sql.DB) http.HandlerFunc {
 
 func handleEnable(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID := auth.UserFromContext(r.Context()).ID
+
 		var req enableRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
@@ -72,8 +81,10 @@ func handleEnable(db *sql.DB) http.HandlerFunc {
 
 		var m Module
 		err := db.QueryRowContext(r.Context(),
-			"INSERT INTO modules (id, name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id RETURNING id, name, enabled_at",
-			req.ID, name,
+			`INSERT INTO modules (user_id, id, name) VALUES ($1, $2, $3)
+			 ON CONFLICT (user_id, id) DO UPDATE SET id = EXCLUDED.id
+			 RETURNING id, name, enabled_at`,
+			userID, req.ID, name,
 		).Scan(&m.ID, &m.Name, &m.EnabledAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -88,9 +99,13 @@ func handleEnable(db *sql.DB) http.HandlerFunc {
 
 func handleDisable(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID := auth.UserFromContext(r.Context()).ID
 		id := chi.URLParam(r, "id")
 
-		result, err := db.ExecContext(r.Context(), "DELETE FROM modules WHERE id = $1", id)
+		result, err := db.ExecContext(r.Context(),
+			"DELETE FROM modules WHERE user_id = $1 AND id = $2",
+			userID, id,
+		)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

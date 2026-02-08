@@ -1,10 +1,16 @@
 <script lang="ts">
   import { fetchModules, enableModule, disableModule, type ModuleInfo } from './lib/api/client'
+  import { checkAuth, getAuthState, logout } from './lib/auth/authStore.svelte'
+  import LoginPage from './lib/auth/LoginPage.svelte'
+  import InvitePanel from './lib/auth/InvitePanel.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
+
+  const authState = getAuthState()
 
   let modules = $state<ModuleInfo[]>([])
   let error = $state<string | null>(null)
   let showConfig = $state(false)
+  let showUsers = $state(false)
   let toggling = $state<string | null>(null)
 
   const availableModules = [
@@ -52,83 +58,126 @@
   }
 
   $effect(() => {
-    loadModules()
+    checkAuth()
   })
+
+  // Load modules when user is authenticated
+  $effect(() => {
+    if (authState.currentUser) {
+      loadModules()
+    }
+  })
+
+  function handleLoginSuccess() {
+    loadModules()
+  }
+
+  async function handleLogout() {
+    await logout()
+    modules = []
+    error = null
+    showUsers = false
+    showConfig = false
+  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+{#if authState.loading}
+  <main>
+    <p class="loading">Loading...</p>
+  </main>
+{:else if !authState.currentUser}
+  <LoginPage onSuccess={handleLoginSuccess} />
+{:else}
+  <svelte:window onkeydown={handleKeydown} />
 
-<main>
-  <div class="top-bar">
-    <h1>Finance Tracker</h1>
-    <button class="config-btn" onclick={() => (showConfig = true)} aria-label="Configure modules">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
-    </button>
-  </div>
-
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
-
-  {#if modules.length === 0 && !error}
-    <div class="empty-state">
-      <p>No modules enabled yet.</p>
-      <button onclick={() => (showConfig = true)}>Configure modules</button>
-    </div>
-  {:else}
-    {#each modules as mod}
-      <section class="module-section">
-        <h2>{mod.name}</h2>
-        {#if mod.id === 'budget'}
-          <BudgetModule />
-        {:else}
-          <div class="module-card">
-            <span class="module-id">{mod.id}</span>
-            <p>Coming soon.</p>
-          </div>
+  <main>
+    <div class="top-bar">
+      <h1>Finance Tracker</h1>
+      <div class="user-info">
+        <span class="role-tag">{authState.currentUser.role}</span>
+        <span>{authState.currentUser.email}</span>
+        {#if authState.currentUser.role === 'admin'}
+          <button class="btn-secondary" onclick={() => { showUsers = !showUsers; showConfig = false }}>
+            {showUsers ? 'Back' : 'Users'}
+          </button>
         {/if}
-      </section>
-    {/each}
-  {/if}
-
-  {#if showConfig}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="backdrop" onclick={handleBackdrop}>
-      <div class="modal" role="dialog" aria-label="Configure modules">
-        <h3>Modules</h3>
-        <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
-        <div class="module-list">
-          {#each availableModules as mod}
-            <div class="module-row" class:enabled={isEnabled(mod.id)}>
-              <div class="module-info">
-                <span class="module-name">{mod.name}</span>
-                <span class="module-desc">{mod.description}</span>
-              </div>
-              <button
-                class="toggle"
-                class:active={isEnabled(mod.id)}
-                disabled={toggling === mod.id}
-                onclick={() => toggleModule(mod.id)}
-                aria-label="{isEnabled(mod.id) ? 'Disable' : 'Enable'} {mod.name}"
-              >
-                <span class="toggle-track">
-                  <span class="toggle-thumb"></span>
-                </span>
-              </button>
-            </div>
-          {/each}
-        </div>
-        <button class="close-btn" onclick={() => (showConfig = false)}>Done</button>
+        <button class="btn-secondary" onclick={handleLogout}>Logout</button>
+        <button class="config-btn" onclick={() => (showConfig = true)} aria-label="Configure modules">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
       </div>
     </div>
-  {/if}
-</main>
+
+    {#if showUsers}
+      <InvitePanel />
+    {:else if error}
+      <p class="error">{error}</p>
+    {:else if modules.length === 0}
+      <div class="empty-state">
+        <p>No modules enabled yet.</p>
+        <button onclick={() => (showConfig = true)}>Configure modules</button>
+      </div>
+    {:else}
+      {#each modules as mod}
+        <section class="module-section">
+          <h2>{mod.name}</h2>
+          {#if mod.id === 'budget'}
+            <BudgetModule />
+          {:else}
+            <div class="module-card">
+              <span class="module-id">{mod.id}</span>
+              <p>Coming soon.</p>
+            </div>
+          {/if}
+        </section>
+      {/each}
+    {/if}
+
+    {#if showConfig}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="backdrop" onclick={handleBackdrop}>
+        <div class="modal" role="dialog" aria-label="Configure modules">
+          <h3>Modules</h3>
+          <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
+          <div class="module-list">
+            {#each availableModules as mod}
+              <div class="module-row" class:enabled={isEnabled(mod.id)}>
+                <div class="module-info">
+                  <span class="module-name">{mod.name}</span>
+                  <span class="module-desc">{mod.description}</span>
+                </div>
+                <button
+                  class="toggle"
+                  class:active={isEnabled(mod.id)}
+                  disabled={toggling === mod.id}
+                  onclick={() => toggleModule(mod.id)}
+                  aria-label="{isEnabled(mod.id) ? 'Disable' : 'Enable'} {mod.name}"
+                >
+                  <span class="toggle-track">
+                    <span class="toggle-thumb"></span>
+                  </span>
+                </button>
+              </div>
+            {/each}
+          </div>
+          <button class="close-btn" onclick={() => (showConfig = false)}>Done</button>
+        </div>
+      </div>
+    {/if}
+  </main>
+{/if}
 
 <style>
+  .loading {
+    text-align: center;
+    padding: 4rem;
+    color: #666;
+  }
+
   .top-bar {
     display: flex;
     align-items: center;
@@ -138,6 +187,37 @@
   .top-bar h1 {
     margin: 0;
   }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+    color: #666;
+  }
+
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+    padding: 0.35rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-secondary:hover {
+    background: #ccc;
+  }
+
+  .role-tag {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #d4edda;
+    color: #155724;
+  }
+
   .config-btn {
     background: none;
     border: none;
