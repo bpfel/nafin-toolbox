@@ -11,7 +11,11 @@
   let actualBalancePositive = $derived(Number(summary.actual_balance) >= 0)
 
   function fmt(val: string): string {
-    return Number(val).toLocaleString('de-CH', { minimumFractionDigits: 2 })
+    return Number(val).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  function fmtYr(val: string): string {
+    return (Number(val) * 12).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 </script>
 
@@ -25,7 +29,11 @@
       </div>
       <div class="summary-item">
         <span class="label">Expenses /mo</span>
-        <span class="value expense">CHF {fmt(summary.total_planned_monthly)}</span>
+        <span class="value expense">CHF {fmt(summary.total_planned_expenses)}</span>
+      </div>
+      <div class="summary-item">
+        <span class="label">Expenses /yr</span>
+        <span class="value expense yearly">CHF {fmtYr(summary.total_planned_expenses)}</span>
       </div>
       <div class="summary-item">
         <span class="label">Balance</span>
@@ -42,7 +50,11 @@
       </div>
       <div class="summary-item">
         <span class="label">Expenses /mo</span>
-        <span class="value expense">CHF {fmt(summary.total_actual_monthly)}</span>
+        <span class="value expense">CHF {fmt(summary.total_actual_expenses)}</span>
+      </div>
+      <div class="summary-item">
+        <span class="label">Expenses /yr</span>
+        <span class="value expense yearly">CHF {fmtYr(summary.total_actual_expenses)}</span>
       </div>
       <div class="summary-item">
         <span class="label">Balance</span>
@@ -99,6 +111,7 @@
   }
   .income { color: #2d6a4f; }
   .expense { color: #c0392b; }
+  .expense.yearly { color: #d9896b; }
   .positive { color: #2d6a4f; }
   .negative { color: #c0392b; }
 </style>

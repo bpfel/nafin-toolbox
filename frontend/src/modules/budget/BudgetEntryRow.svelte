@@ -8,90 +8,93 @@
 
   let { entry, onsave }: Props = $props()
 
-  let editingPlanned = $state(false)
-  let editingActual = $state(false)
-  let editPlannedValue = $state(entry.planned_amount)
-  let editActualValue = $state(entry.actual_amount)
+  let editingField = $state<string | null>(null)
+  let editValue = $state('')
 
-  let variance = $derived(Number(entry.variance))
+  let plannedMonthly = $derived(Number(entry.planned_amount))
+  let plannedYearly = $derived(plannedMonthly * 12)
+  let actualMonthly = $derived(Number(entry.actual_amount))
 
-  function startEditPlanned() {
-    editPlannedValue = entry.planned_amount
-    editingPlanned = true
+
+  function startEdit(field: string, value: number) {
+    editValue = value.toFixed(2)
+    editingField = field
   }
 
-  function startEditActual() {
-    editActualValue = entry.actual_amount
-    editingActual = true
+  function save() {
+    if (!editingField) return
+    const val = Number(editValue)
+    if (isNaN(val)) {
+      editingField = null
+      return
+    }
+
+    if (editingField === 'planned_mo') {
+      onsave(entry.category_id, 'planned', val.toFixed(2))
+    } else if (editingField === 'planned_yr') {
+      onsave(entry.category_id, 'planned', (val / 12).toFixed(2))
+    } else if (editingField === 'actual_mo') {
+      onsave(entry.category_id, 'actual', val.toFixed(2))
+    }
+    editingField = null
   }
 
-  function savePlanned() {
-    onsave(entry.category_id, 'planned', editPlannedValue)
-    editingPlanned = false
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') save()
+    if (e.key === 'Escape') editingField = null
   }
 
-  function saveActual() {
-    onsave(entry.category_id, 'actual', editActualValue)
-    editingActual = false
-  }
-
-  function handlePlannedKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') savePlanned()
-    if (e.key === 'Escape') editingPlanned = false
-  }
-
-  function handleActualKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') saveActual()
-    if (e.key === 'Escape') editingActual = false
-  }
-
-  function fmt(val: string): string {
-    return Number(val).toLocaleString('de-CH', { minimumFractionDigits: 2 })
+  function fmt(val: number): string {
+    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 </script>
 
 <tr class="entry-row" class:income={entry.category_type === 'income'}>
   <td class="name-cell">{entry.category_name}</td>
-  <td class="freq-cell">
-    {#if entry.category_frequency === 'yearly'}
-      <span class="freq-badge">yearly</span>
-    {/if}
-  </td>
   <td class="amount-cell">
-    {#if editingPlanned}
+    {#if editingField === 'planned_mo'}
       <input
         type="text"
-        bind:value={editPlannedValue}
-        onkeydown={handlePlannedKeydown}
-        onblur={savePlanned}
+        bind:value={editValue}
+        onkeydown={handleKeydown}
+        onblur={save}
         class="amount-input"
       />
     {:else}
-      <button class="amount-display" onclick={startEditPlanned}>
-        {fmt(entry.planned_amount)}
+      <button class="amount-display" onclick={() => startEdit('planned_mo', plannedMonthly)}>
+        {fmt(plannedMonthly)}
+      </button>
+    {/if}
+  </td>
+  <td class="amount-cell yearly">
+    {#if editingField === 'planned_yr'}
+      <input
+        type="text"
+        bind:value={editValue}
+        onkeydown={handleKeydown}
+        onblur={save}
+        class="amount-input"
+      />
+    {:else}
+      <button class="amount-display" onclick={() => startEdit('planned_yr', plannedYearly)}>
+        {fmt(plannedYearly)}
       </button>
     {/if}
   </td>
   <td class="amount-cell">
-    {#if editingActual}
+    {#if editingField === 'actual_mo'}
       <input
         type="text"
-        bind:value={editActualValue}
-        onkeydown={handleActualKeydown}
-        onblur={saveActual}
+        bind:value={editValue}
+        onkeydown={handleKeydown}
+        onblur={save}
         class="amount-input"
       />
     {:else}
-      <button class="amount-display" onclick={startEditActual}>
-        {fmt(entry.actual_amount)}
+      <button class="amount-display" onclick={() => startEdit('actual_mo', actualMonthly)}>
+        {fmt(actualMonthly)}
       </button>
     {/if}
-  </td>
-  <td class="amount-cell variance" class:positive={variance >= 0} class:negative={variance < 0}>
-    {fmt(entry.variance)}
-  </td>
-  <td class="monthly-cell">
-    {fmt(entry.planned_monthly_equivalent)}
   </td>
 </tr>
 
@@ -106,22 +109,12 @@
   .name-cell {
     font-weight: 500;
   }
-  .freq-badge {
-    font-size: 0.7rem;
-    padding: 0.1rem 0.4rem;
-    background: #e9ecef;
-    border-radius: 4px;
-    color: #666;
-  }
-  .amount-cell, .monthly-cell {
+  .amount-cell {
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-  .variance.positive {
-    color: #2d6a4f;
-  }
-  .variance.negative {
-    color: #c0392b;
+  .amount-cell.yearly {
+    color: #888;
   }
   .amount-display {
     background: none;

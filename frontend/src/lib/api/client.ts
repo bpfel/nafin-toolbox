@@ -10,7 +10,6 @@ export interface BudgetCategory {
   id: number
   name: string
   type: string
-  frequency: string
   sort_order: number
   archived: boolean
   created_at: string
@@ -23,12 +22,8 @@ export interface BudgetEntry {
   category_id: number
   category_name: string
   category_type: string
-  category_frequency: string
   planned_amount: string
   actual_amount: string
-  variance: string
-  planned_monthly_equivalent: string
-  actual_monthly_equivalent: string
 }
 
 export interface BudgetPeriodSummary {
@@ -41,8 +36,6 @@ export interface BudgetPeriodSummary {
   total_actual_income: string
   total_planned_expenses: string
   total_actual_expenses: string
-  total_planned_monthly: string
-  total_actual_monthly: string
   planned_balance: string
   actual_balance: string
 }

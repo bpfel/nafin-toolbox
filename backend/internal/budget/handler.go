@@ -52,8 +52,8 @@ func handleCreateCategory(store *Store) http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 			return
 		}
-		if c.Name == "" || (c.Type != "income" && c.Type != "expense") || (c.Frequency != "monthly" && c.Frequency != "yearly") {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name, type (income/expense), and frequency (monthly/yearly) are required"})
+		if c.Name == "" || (c.Type != "income" && c.Type != "expense") {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name and type (income/expense) are required"})
 			return
 		}
 		if err := store.CreateCategory(r.Context(), &c); err != nil {
@@ -81,7 +81,6 @@ func handleUpdateCategory(store *Store) http.HandlerFunc {
 		var update struct {
 			Name      *string `json:"name"`
 			Type      *string `json:"type"`
-			Frequency *string `json:"frequency"`
 			SortOrder *int    `json:"sort_order"`
 			Archived  *bool   `json:"archived"`
 		}
@@ -95,9 +94,6 @@ func handleUpdateCategory(store *Store) http.HandlerFunc {
 		}
 		if update.Type != nil {
 			existing.Type = *update.Type
-		}
-		if update.Frequency != nil {
-			existing.Frequency = *update.Frequency
 		}
 		if update.SortOrder != nil {
 			existing.SortOrder = *update.SortOrder
