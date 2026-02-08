@@ -12,7 +12,6 @@
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
-  import BudgetPlanManager from './BudgetPlanManager.svelte'
 
   let now = new Date()
   let currentYear = now.getFullYear()
@@ -31,7 +30,6 @@
   let isPastMonth = $derived(year < currentYear || (year === currentYear && month < currentMonth))
   let error = $state<string | null>(null)
   let loading = $state(true)
-  let activeView = $state<'monthly' | 'plans'>('monthly')
 
   async function loadData() {
     loading = true
@@ -65,9 +63,7 @@
 
   $effect(() => {
     year; month;
-    if (activeView === 'monthly') {
-      loadData()
-    }
+    loadData()
   })
 
   async function handleSave(categoryId: number, field: 'planned' | 'actual', amount: string) {
@@ -98,7 +94,7 @@
           from_month: prevMonth,
         })
       } catch {
-        // No previous month — fall back to plan template
+        // No previous month — create empty period
         await createBudgetPeriod(year, month)
         summary = await fetchBudgetPeriod(year, month)
       }
@@ -110,49 +106,28 @@
 </script>
 
 <div class="budget-module">
-  <div class="view-toggle">
-    <button
-      class="toggle-btn"
-      class:active={activeView === 'monthly'}
-      onclick={() => { activeView = 'monthly'; loadData() }}
-    >
-      Monthly
-    </button>
-    <button
-      class="toggle-btn"
-      class:active={activeView === 'plans'}
-      onclick={() => { activeView = 'plans' }}
-    >
-      Plan Templates
-    </button>
-  </div>
+  <MonthSelector {year} {month} {maxYear} {maxMonth} onchange={changeMonth} />
 
-  {#if activeView === 'plans'}
-    <BudgetPlanManager />
-  {:else}
-    <MonthSelector {year} {month} {maxYear} {maxMonth} onchange={changeMonth} />
-
-    {#if loading}
-      <p class="loading">Loading...</p>
-    {:else if error}
-      <p class="error">{error}</p>
-    {:else if needsSetup}
-      <BudgetSetup onseeded={loadData} />
-    {:else if periodNotFound}
-      <div class="no-period">
-        {#if isPastMonth}
-          <p>No budget was recorded for this month.</p>
-        {:else}
-          <p>No budget for this month yet.</p>
-          <button class="create-btn" onclick={handleCreatePeriod}>
-            Create budget
-          </button>
-        {/if}
-      </div>
-    {:else if summary}
-      <BudgetSummary {summary} />
-      <BudgetTable entries={summary.entries} onsave={handleSave} />
-    {/if}
+  {#if loading}
+    <p class="loading">Loading...</p>
+  {:else if error}
+    <p class="error">{error}</p>
+  {:else if needsSetup}
+    <BudgetSetup onseeded={loadData} />
+  {:else if periodNotFound}
+    <div class="no-period">
+      {#if isPastMonth}
+        <p>No budget was recorded for this month.</p>
+      {:else}
+        <p>No budget for this month yet.</p>
+        <button class="create-btn" onclick={handleCreatePeriod}>
+          Create budget
+        </button>
+      {/if}
+    </div>
+  {:else if summary}
+    <BudgetSummary {summary} />
+    <BudgetTable entries={summary.entries} onsave={handleSave} />
   {/if}
 </div>
 
@@ -161,29 +136,6 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-  }
-  .view-toggle {
-    display: flex;
-    gap: 0;
-    background: #e9ecef;
-    border-radius: 6px;
-    padding: 2px;
-    width: fit-content;
-  }
-  .toggle-btn {
-    padding: 0.4rem 1rem;
-    border: none;
-    background: transparent;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    color: #666;
-    cursor: pointer;
-  }
-  .toggle-btn.active {
-    background: white;
-    color: #1a1a2e;
-    font-weight: 600;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
   .loading {
     color: #888;
