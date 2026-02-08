@@ -88,6 +88,15 @@
     loadData()
   })
 
+  async function refreshData() {
+    try {
+      categories = await fetchBudgetCategories()
+      summary = await fetchBudgetPeriod(year, month)
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to refresh'
+    }
+  }
+
   async function handleSave(categoryId: number, field: 'planned' | 'actual', amount: string) {
     try {
       const entry: { category_id: number; planned_amount?: string; actual_amount?: string } = {
@@ -124,7 +133,7 @@
     {#if summary.entries.length > 0}
       <BudgetSummary {summary} />
     {/if}
-    <BudgetTable entries={summary.entries} onsave={handleSave} oncategorycreated={loadData} oncategorydeleted={loadData} />
+    <BudgetTable entries={summary.entries} onsave={handleSave} oncategorycreated={refreshData} oncategorydeleted={refreshData} />
   {/if}
 </div>
 

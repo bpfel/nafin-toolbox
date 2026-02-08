@@ -359,6 +359,6 @@ func (s *Store) CopyPeriodEntries(ctx context.Context, fromPeriodID, toPeriodID 
 }
 
 func formatAmount(f float64) string {
-	rounded := math.Round(f*100) / 100
-	return strconv.FormatFloat(rounded, 'f', 2, 64)
+	rounded := math.Round(f*10000) / 10000
+	return strconv.FormatFloat(rounded, 'f', 4, 64)
 }
