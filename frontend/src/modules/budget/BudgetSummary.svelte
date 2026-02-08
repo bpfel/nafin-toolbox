@@ -7,8 +7,8 @@
 
   let { summary }: Props = $props()
 
-  let plannedBalancePositive = $derived(Number(summary.planned_balance) >= 0)
-  let actualBalancePositive = $derived(Number(summary.actual_balance) >= 0)
+  let plannedSavingsPositive = $derived(Number(summary.planned_balance) >= 0)
+  let actualSavingsPositive = $derived(Number(summary.actual_balance) >= 0)
 
   function fmt(val: string): string {
     return Number(val).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -24,42 +24,46 @@
     <div class="summary-column">
       <span class="column-header">Planned</span>
       <div class="summary-item">
-        <span class="label">Income</span>
-        <span class="value income">CHF {fmt(summary.total_planned_income)}</span>
-      </div>
-      <div class="summary-item">
-        <span class="label">Expenses /mo</span>
-        <span class="value expense">CHF {fmt(summary.total_planned_expenses)}</span>
+        <span class="label">Income /yr</span>
+        <span class="value income">CHF {fmtYr(summary.total_planned_income)}</span>
       </div>
       <div class="summary-item">
         <span class="label">Expenses /yr</span>
-        <span class="value expense yearly">CHF {fmtYr(summary.total_planned_expenses)}</span>
+        <span class="value expense">CHF {fmtYr(summary.total_planned_expenses)}</span>
       </div>
       <div class="summary-item">
-        <span class="label">Balance</span>
-        <span class="value" class:positive={plannedBalancePositive} class:negative={!plannedBalancePositive}>
+        <span class="label">Savings /mo</span>
+        <span class="value" class:savings-positive={plannedSavingsPositive} class:savings-negative={!plannedSavingsPositive}>
           CHF {fmt(summary.planned_balance)}
+        </span>
+      </div>
+      <div class="summary-item">
+        <span class="label">Savings /yr</span>
+        <span class="value" class:savings-positive={plannedSavingsPositive} class:savings-negative={!plannedSavingsPositive}>
+          CHF {fmtYr(summary.planned_balance)}
         </span>
       </div>
     </div>
     <div class="summary-column">
       <span class="column-header">Actual</span>
       <div class="summary-item">
-        <span class="label">Income</span>
-        <span class="value income">CHF {fmt(summary.total_actual_income)}</span>
-      </div>
-      <div class="summary-item">
-        <span class="label">Expenses /mo</span>
-        <span class="value expense">CHF {fmt(summary.total_actual_expenses)}</span>
+        <span class="label">Income /yr</span>
+        <span class="value income">CHF {fmtYr(summary.total_actual_income)}</span>
       </div>
       <div class="summary-item">
         <span class="label">Expenses /yr</span>
-        <span class="value expense yearly">CHF {fmtYr(summary.total_actual_expenses)}</span>
+        <span class="value expense">CHF {fmtYr(summary.total_actual_expenses)}</span>
       </div>
       <div class="summary-item">
-        <span class="label">Balance</span>
-        <span class="value" class:positive={actualBalancePositive} class:negative={!actualBalancePositive}>
+        <span class="label">Savings /mo</span>
+        <span class="value" class:savings-positive={actualSavingsPositive} class:savings-negative={!actualSavingsPositive}>
           CHF {fmt(summary.actual_balance)}
+        </span>
+      </div>
+      <div class="summary-item">
+        <span class="label">Savings /yr</span>
+        <span class="value" class:savings-positive={actualSavingsPositive} class:savings-negative={!actualSavingsPositive}>
+          CHF {fmtYr(summary.actual_balance)}
         </span>
       </div>
     </div>
@@ -111,7 +115,6 @@
   }
   .income { color: #2d6a4f; }
   .expense { color: #c0392b; }
-  .expense.yearly { color: #d9896b; }
-  .positive { color: #2d6a4f; }
-  .negative { color: #c0392b; }
+  .savings-positive { color: #2d6a4f; }
+  .savings-negative { color: #c0392b; }
 </style>

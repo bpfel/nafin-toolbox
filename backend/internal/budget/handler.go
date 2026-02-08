@@ -12,8 +12,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// maxAmount is the largest value that fits in NUMERIC(12,2): 10 digits + 2 decimals.
-const maxAmount = 9_999_999_999.99
+// maxAmount is the largest value that fits in NUMERIC(14,4): 10 digits + 4 decimals.
+const maxAmount = 9_999_999_999.9999
 
 // validateAmount checks that s is a valid decimal number within the DB column range.
 // Returns the parsed value or an error.

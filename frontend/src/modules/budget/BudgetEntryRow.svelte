@@ -150,7 +150,7 @@
     if (field === 'planned_mo') {
       onsave(entry.category_id, 'planned', val.toFixed(2))
     } else if (field === 'planned_yr') {
-      onsave(entry.category_id, 'planned', (val / 12).toFixed(2))
+      onsave(entry.category_id, 'planned', (val / 12).toFixed(4))
     } else if (field === 'actual_mo') {
       onsave(entry.category_id, 'actual', val.toFixed(2))
     }
