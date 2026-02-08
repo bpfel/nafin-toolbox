@@ -6,8 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"os"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/database"
 )
@@ -137,11 +140,11 @@ func TestFixedEnforcement_PlannedAutoSetsActual(t *testing.T) {
 		t.Fatalf("UpsertEntry: %v", err)
 	}
 
-	if entry.PlannedAmount != "1350.00" {
-		t.Errorf("planned = %q, want 1350.00", entry.PlannedAmount)
+	if entry.PlannedAmount != "1350.0000" {
+		t.Errorf("planned = %q, want 1350.0000", entry.PlannedAmount)
 	}
-	if entry.ActualAmount != "1350.00" {
-		t.Errorf("actual = %q, want 1350.00 (auto-set for fixed)", entry.ActualAmount)
+	if entry.ActualAmount != "1350.0000" {
+		t.Errorf("actual = %q, want 1350.0000 (auto-set for fixed)", entry.ActualAmount)
 	}
 }
 
@@ -192,8 +195,8 @@ func TestNonFixedAllowsActualOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpsertEntry: %v", err)
 	}
-	if entry.ActualAmount != "450.00" {
-		t.Errorf("actual = %q, want 450.00", entry.ActualAmount)
+	if entry.ActualAmount != "450.0000" {
+		t.Errorf("actual = %q, want 450.0000", entry.ActualAmount)
 	}
 }
 
@@ -375,18 +378,18 @@ func TestCopyPeriodFixedActualEqualsPlanned(t *testing.T) {
 	for _, e := range summary.Entries {
 		switch e.CategoryName {
 		case "Rent":
-			if e.PlannedAmount != "1350.00" {
-				t.Errorf("copied rent planned = %q, want 1350.00", e.PlannedAmount)
+			if e.PlannedAmount != "1350.0000" {
+				t.Errorf("copied rent planned = %q, want 1350.0000", e.PlannedAmount)
 			}
-			if e.ActualAmount != "1350.00" {
-				t.Errorf("copied rent actual = %q, want 1350.00 (fixed → actual=planned)", e.ActualAmount)
+			if e.ActualAmount != "1350.0000" {
+				t.Errorf("copied rent actual = %q, want 1350.0000 (fixed → actual=planned)", e.ActualAmount)
 			}
 		case "Food":
-			if e.PlannedAmount != "500.00" {
-				t.Errorf("copied food planned = %q, want 500.00", e.PlannedAmount)
+			if e.PlannedAmount != "500.0000" {
+				t.Errorf("copied food planned = %q, want 500.0000", e.PlannedAmount)
 			}
-			if e.ActualAmount != "0.00" {
-				t.Errorf("copied food actual = %q, want 0.00 (non-fixed → zeroed)", e.ActualAmount)
+			if e.ActualAmount != "0.0000" {
+				t.Errorf("copied food actual = %q, want 0.0000 (non-fixed → zeroed)", e.ActualAmount)
 			}
 		}
 	}
@@ -419,10 +422,12 @@ func TestLeftJoinNewCategoryAppearsInSummary(t *testing.T) {
 	for _, e := range summary.Entries {
 		if e.CategoryID == cat.ID {
 			found = true
-			if e.PlannedAmount != "0" && e.PlannedAmount != "0.00" {
+			pv, _ := strconv.ParseFloat(e.PlannedAmount, 64)
+			if pv != 0 {
 				t.Errorf("new category planned = %q, want 0", e.PlannedAmount)
 			}
-			if e.ActualAmount != "0" && e.ActualAmount != "0.00" {
+			av, _ := strconv.ParseFloat(e.ActualAmount, 64)
+			if av != 0 {
 				t.Errorf("new category actual = %q, want 0", e.ActualAmount)
 			}
 		}
@@ -464,5 +469,549 @@ func TestUpsertEntryFillsCategoryFields(t *testing.T) {
 	}
 	if !entry.CategoryFixed {
 		t.Error("CategoryFixed = false, want true")
+	}
+}
+
+// --- New tests: adversarial / edge-case / precision ---
+
+func TestUpsertEntry_NonexistentCategory(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	planned := "100.00"
+	_, err := store.UpsertEntry(ctx, p.ID, 99999, &planned, nil)
+	if err == nil {
+		t.Fatal("expected error for nonexistent category, got nil")
+	}
+}
+
+func TestUpsertEntry_PreservesActualWhenUpdatingPlanned(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Food", Type: "expense", GroupName: "Living", GroupSortOrder: 30}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	// Set both planned and actual
+	planned := "500.00"
+	actual := "480.00"
+	if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned, &actual); err != nil {
+		t.Fatalf("initial UpsertEntry: %v", err)
+	}
+
+	// Update only planned — actual should be preserved
+	newPlanned := "600.00"
+	entry, err := store.UpsertEntry(ctx, p.ID, cat.ID, &newPlanned, nil)
+	if err != nil {
+		t.Fatalf("update UpsertEntry: %v", err)
+	}
+
+	if entry.PlannedAmount != "600.0000" {
+		t.Errorf("planned = %q, want 600.0000", entry.PlannedAmount)
+	}
+	if entry.ActualAmount != "480.0000" {
+		t.Errorf("actual = %q, want 480.0000 (should be preserved)", entry.ActualAmount)
+	}
+}
+
+func TestUpsertEntry_PreservesPlannedWhenUpdatingActual(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Food", Type: "expense", GroupName: "Living", GroupSortOrder: 30}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	// Set both
+	planned := "500.00"
+	actual := "480.00"
+	if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned, &actual); err != nil {
+		t.Fatalf("initial UpsertEntry: %v", err)
+	}
+
+	// Update only actual — planned should be preserved
+	newActual := "520.00"
+	entry, err := store.UpsertEntry(ctx, p.ID, cat.ID, nil, &newActual)
+	if err != nil {
+		t.Fatalf("update UpsertEntry: %v", err)
+	}
+
+	if entry.PlannedAmount != "500.0000" {
+		t.Errorf("planned = %q, want 500.0000 (should be preserved)", entry.PlannedAmount)
+	}
+	if entry.ActualAmount != "520.0000" {
+		t.Errorf("actual = %q, want 520.0000", entry.ActualAmount)
+	}
+}
+
+func TestUpsertEntry_UpdateExistingEntry(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Food", Type: "expense", GroupName: "Living", GroupSortOrder: 30}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	// Create entry
+	planned1 := "500.00"
+	actual1 := "480.00"
+	entry1, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned1, &actual1)
+	if err != nil {
+		t.Fatalf("first UpsertEntry: %v", err)
+	}
+
+	// Update both values via ON CONFLICT
+	planned2 := "600.00"
+	actual2 := "590.00"
+	entry2, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned2, &actual2)
+	if err != nil {
+		t.Fatalf("second UpsertEntry: %v", err)
+	}
+
+	// Same entry ID (upsert, not insert)
+	if entry2.ID != entry1.ID {
+		t.Errorf("entry ID changed: %d → %d (expected same entry via upsert)", entry1.ID, entry2.ID)
+	}
+	if entry2.PlannedAmount != "600.0000" {
+		t.Errorf("planned = %q, want 600.0000", entry2.PlannedAmount)
+	}
+	if entry2.ActualAmount != "590.0000" {
+		t.Errorf("actual = %q, want 590.0000", entry2.ActualAmount)
+	}
+}
+
+func TestArchivedCategoryExcludedFromSummary(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "OldCat", Type: "expense", GroupName: "Test", GroupSortOrder: 1}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	planned := "100.00"
+	if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned, nil); err != nil {
+		t.Fatalf("UpsertEntry: %v", err)
+	}
+
+	// Archive the category
+	cat.Archived = true
+	if err := store.UpdateCategory(ctx, cat); err != nil {
+		t.Fatalf("UpdateCategory: %v", err)
+	}
+
+	summary, err := store.GetPeriodSummary(ctx, 2026, 1)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	for _, e := range summary.Entries {
+		if e.CategoryID == cat.ID {
+			t.Errorf("archived category %q should not appear in summary", cat.Name)
+		}
+	}
+}
+
+func TestSummary_OnlyIncome(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Salary", Type: "income", GroupName: "Employment", GroupSortOrder: 1}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	planned := "6000.00"
+	actual := "6000.00"
+	if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned, &actual); err != nil {
+		t.Fatalf("UpsertEntry: %v", err)
+	}
+
+	summary, err := store.GetPeriodSummary(ctx, 2026, 1)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	if summary.TotalPlannedIncome != "6000.0000" {
+		t.Errorf("TotalPlannedIncome = %q, want 6000.0000", summary.TotalPlannedIncome)
+	}
+	if summary.TotalPlannedExpenses != "0.0000" {
+		t.Errorf("TotalPlannedExpenses = %q, want 0.0000", summary.TotalPlannedExpenses)
+	}
+	if summary.PlannedBalance != "6000.0000" {
+		t.Errorf("PlannedBalance = %q, want 6000.0000", summary.PlannedBalance)
+	}
+}
+
+func TestSummary_OnlyExpenses(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Rent", Type: "expense", GroupName: "Housing", GroupSortOrder: 10}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	planned := "1350.00"
+	actual := "1350.00"
+	if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned, &actual); err != nil {
+		t.Fatalf("UpsertEntry: %v", err)
+	}
+
+	summary, err := store.GetPeriodSummary(ctx, 2026, 1)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	if summary.TotalPlannedIncome != "0.0000" {
+		t.Errorf("TotalPlannedIncome = %q, want 0.0000", summary.TotalPlannedIncome)
+	}
+	if summary.TotalPlannedExpenses != "1350.0000" {
+		t.Errorf("TotalPlannedExpenses = %q, want 1350.0000", summary.TotalPlannedExpenses)
+	}
+	if summary.PlannedBalance != "-1350.0000" {
+		t.Errorf("PlannedBalance = %q, want -1350.0000 (negative)", summary.PlannedBalance)
+	}
+}
+
+func TestSummary_NoCategoriesEmptyPeriod(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	summary, err := store.GetPeriodSummary(ctx, 2026, 1)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	if len(summary.Entries) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(summary.Entries))
+	}
+	if summary.TotalPlannedIncome != "0.0000" {
+		t.Errorf("TotalPlannedIncome = %q, want 0.0000", summary.TotalPlannedIncome)
+	}
+	if summary.TotalPlannedExpenses != "0.0000" {
+		t.Errorf("TotalPlannedExpenses = %q, want 0.0000", summary.TotalPlannedExpenses)
+	}
+	if summary.PlannedBalance != "0.0000" {
+		t.Errorf("PlannedBalance = %q, want 0.0000", summary.PlannedBalance)
+	}
+}
+
+func TestCopyPeriod_OntoSelf(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Food", Type: "expense", GroupName: "Living", GroupSortOrder: 30}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	planned := "500.00"
+	actual := "480.00"
+	if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &planned, &actual); err != nil {
+		t.Fatalf("UpsertEntry: %v", err)
+	}
+
+	// Copy onto self — ON CONFLICT overwrites actual with 0 (non-fixed)
+	if err := store.CopyPeriodEntries(ctx, p.ID, p.ID); err != nil {
+		t.Fatalf("CopyPeriodEntries onto self: %v", err)
+	}
+
+	summary, err := store.GetPeriodSummary(ctx, 2026, 1)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	for _, e := range summary.Entries {
+		if e.CategoryID == cat.ID {
+			if e.PlannedAmount != "500.0000" {
+				t.Errorf("planned after self-copy = %q, want 500.0000", e.PlannedAmount)
+			}
+			// actual gets overwritten to 0 because non-fixed
+			if e.ActualAmount != "0.0000" {
+				t.Errorf("actual after self-copy = %q, want 0.0000 (non-fixed zeroed)", e.ActualAmount)
+			}
+		}
+	}
+}
+
+func TestCopyPeriod_EmptySource(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Food", Type: "expense", GroupName: "Living", GroupSortOrder: 30}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	src := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, src); err != nil {
+		t.Fatalf("CreatePeriod(src): %v", err)
+	}
+	// No entries in source
+
+	dst := &Period{Year: 2026, Month: 2}
+	if err := store.CreatePeriod(ctx, dst); err != nil {
+		t.Fatalf("CreatePeriod(dst): %v", err)
+	}
+
+	err := store.CopyPeriodEntries(ctx, src.ID, dst.ID)
+	if err != nil {
+		t.Fatalf("CopyPeriodEntries from empty source: %v", err)
+	}
+
+	// Destination has category via LEFT JOIN but zero amounts (no entry row)
+	summary, err := store.GetPeriodSummary(ctx, 2026, 2)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	if len(summary.Entries) != 1 {
+		t.Fatalf("expected 1 entry (from LEFT JOIN), got %d", len(summary.Entries))
+	}
+	pv, _ := strconv.ParseFloat(summary.Entries[0].PlannedAmount, 64)
+	if pv != 0 {
+		t.Errorf("planned = %q, want 0", summary.Entries[0].PlannedAmount)
+	}
+}
+
+func TestReorder_DuplicateIDs(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	c1 := &Category{Name: "A", Type: "expense", SortOrder: 10, GroupName: "G", GroupSortOrder: 1}
+	c2 := &Category{Name: "B", Type: "expense", SortOrder: 20, GroupName: "G", GroupSortOrder: 1}
+	for _, c := range []*Category{c1, c2} {
+		if err := store.CreateCategory(ctx, c); err != nil {
+			t.Fatalf("CreateCategory(%s): %v", c.Name, err)
+		}
+	}
+
+	// Reorder with duplicate: [c1, c1, c2]
+	// c1 gets sort_order=10 then 20 (last wins), c2 gets 30
+	err := store.ReorderCategories(ctx, []int{c1.ID, c1.ID, c2.ID})
+	if err != nil {
+		t.Fatalf("ReorderCategories with duplicates: %v", err)
+	}
+
+	cats, err := store.ListCategories(ctx, false)
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
+
+	if len(cats) != 2 {
+		t.Fatalf("expected 2 categories, got %d", len(cats))
+	}
+	// c1 sort=20, c2 sort=30 → order: A, B
+	if cats[0].Name != "A" || cats[1].Name != "B" {
+		t.Errorf("order = [%s, %s], want [A, B]", cats[0].Name, cats[1].Name)
+	}
+}
+
+func TestReorder_NonexistentIDs(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	// Reorder with nonexistent ID — UPDATE affects 0 rows, no error
+	err := store.ReorderCategories(ctx, []int{99999})
+	if err != nil {
+		t.Fatalf("ReorderCategories with nonexistent ID: unexpected error: %v", err)
+	}
+}
+
+func TestPrecision_4dpRoundTrip(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Test", Type: "expense", GroupName: "Test", GroupSortOrder: 1}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	// Store a 4-decimal-place value
+	amount := "833.3333"
+	entry, err := store.UpsertEntry(ctx, p.ID, cat.ID, &amount, nil)
+	if err != nil {
+		t.Fatalf("UpsertEntry: %v", err)
+	}
+
+	if entry.PlannedAmount != "833.3333" {
+		t.Errorf("stored amount = %q, want 833.3333", entry.PlannedAmount)
+	}
+
+	// Verify through summary totals (uses formatAmount)
+	summary, err := store.GetPeriodSummary(ctx, 2026, 1)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+	if summary.TotalPlannedExpenses != "833.3333" {
+		t.Errorf("TotalPlannedExpenses = %q, want 833.3333", summary.TotalPlannedExpenses)
+	}
+}
+
+func TestPrecision_YearlyDivisionRoundTrip(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	cat := &Category{Name: "Test", Type: "expense", GroupName: "Test", GroupSortOrder: 1}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	p := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p); err != nil {
+		t.Fatalf("CreatePeriod: %v", err)
+	}
+
+	// Simulate: user enters 10000 yearly → frontend sends (10000/12).toFixed(4) = "833.3333"
+	amount := "833.3333"
+	if _, err := store.UpsertEntry(ctx, p.ID, cat.ID, &amount, nil); err != nil {
+		t.Fatalf("UpsertEntry: %v", err)
+	}
+
+	summary, err := store.GetPeriodSummary(ctx, 2026, 1)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	// Parse monthly total and multiply by 12 (simulating frontend fmtYr)
+	monthly, err := strconv.ParseFloat(summary.TotalPlannedExpenses, 64)
+	if err != nil {
+		t.Fatalf("cannot parse TotalPlannedExpenses %q: %v", summary.TotalPlannedExpenses, err)
+	}
+
+	yearly := monthly * 12
+	// 833.3333 * 12 = 9999.9996, rounds to 10000.00 at 2dp display
+	yearlyDisplay := math.Round(yearly*100) / 100
+	if yearlyDisplay != 10000.00 {
+		t.Errorf("yearly display = %.2f, want 10000.00 (monthly=%s × 12 = %.4f)", yearlyDisplay, summary.TotalPlannedExpenses, yearly)
+	}
+}
+
+func TestDuplicatePeriodCreation(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	p1 := &Period{Year: 2026, Month: 1}
+	if err := store.CreatePeriod(ctx, p1); err != nil {
+		t.Fatalf("first CreatePeriod: %v", err)
+	}
+
+	p2 := &Period{Year: 2026, Month: 1}
+	err := store.CreatePeriod(ctx, p2)
+	if err == nil {
+		t.Fatal("expected error creating duplicate period, got nil")
+	}
+}
+
+func TestSeedDefaults_ExistingCategoriesNoEntries(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	// Create one custom category (so existingCount > 0)
+	cat := &Category{Name: "Custom", Type: "expense", GroupName: "Custom", GroupSortOrder: 1}
+	if err := store.CreateCategory(ctx, cat); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	count, periodCreated, err := SeedDefaults(ctx, store)
+	if err != nil {
+		t.Fatalf("SeedDefaults: %v", err)
+	}
+
+	// Should skip category creation
+	if count != 0 {
+		t.Errorf("categories created = %d, want 0 (existing categories present)", count)
+	}
+
+	// Should still create period
+	if !periodCreated {
+		t.Error("expected period to be created")
+	}
+
+	// Period exists but has NO pre-filled entries
+	// (categoriesCreated == 0 → entry-filling loop skipped)
+	now := time.Now()
+	year, m, _ := now.Date()
+	month := int(m)
+
+	summary, err := store.GetPeriodSummary(ctx, year, month)
+	if err != nil {
+		t.Fatalf("GetPeriodSummary: %v", err)
+	}
+
+	// Only our custom category appears (via LEFT JOIN), with zero amounts
+	if len(summary.Entries) != 1 {
+		t.Errorf("expected 1 entry (custom cat via LEFT JOIN), got %d", len(summary.Entries))
 	}
 }
