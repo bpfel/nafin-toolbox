@@ -27,6 +27,20 @@
   let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; sortOrder: number }[]; editCategory?: { id: number; name: string; fixed: boolean; groupName: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: number; categoryName: string } | null>(null)
 
+  let collapsedGroups = $state(new Set<string>())
+
+  function toggleGroup(type: 'income' | 'expense', groupName: string) {
+    const key = `${type}:${groupName}`
+    const next = new Set(collapsedGroups)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    collapsedGroups = next
+  }
+
+  function isCollapsed(type: 'income' | 'expense', groupName: string): boolean {
+    return collapsedGroups.has(`${type}:${groupName}`)
+  }
+
   let incomeEntries = $derived(entries.filter(e => e.category_type === 'income'))
   let expenseEntries = $derived(entries.filter(e => e.category_type === 'expense'))
 
@@ -122,16 +136,29 @@
     {#each incomeGroups as group (group.groupName)}
       <tbody use:sortable>
         {#if incomeGroups.length > 1 || group.groupName}
-          <tr class="group-header">
-            <td>{group.groupName || 'Other'}</td>
+          <tr class="group-header" class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
+            <td>
+              <span class="group-chevron">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  {#if isCollapsed('income', group.groupName)}
+                    <path d="M4 2 L10 6 L4 10 Z" />
+                  {:else}
+                    <path d="M2 4 L6 10 L10 4 Z" />
+                  {/if}
+                </svg>
+              </span>
+              {group.groupName || 'Other'}
+            </td>
             <td class="right subtotal">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly">{fmt(group.plannedTotal * 12)}</td>
             <td class="right subtotal">{fmt(group.actualTotal)}</td>
           </tr>
         {/if}
-        {#each group.entries as entry (entry.category_id)}
-          <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
-        {/each}
+        {#if !isCollapsed('income', group.groupName)}
+          {#each group.entries as entry (entry.category_id)}
+            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
+          {/each}
+        {/if}
       </tbody>
     {/each}
     <tfoot>
@@ -157,16 +184,29 @@
     {#each expenseGroups as group (group.groupName)}
       <tbody use:sortable>
         {#if expenseGroups.length > 1 || group.groupName}
-          <tr class="group-header">
-            <td>{group.groupName || 'Other'}</td>
+          <tr class="group-header" class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
+            <td>
+              <span class="group-chevron">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  {#if isCollapsed('expense', group.groupName)}
+                    <path d="M4 2 L10 6 L4 10 Z" />
+                  {:else}
+                    <path d="M2 4 L6 10 L10 4 Z" />
+                  {/if}
+                </svg>
+              </span>
+              {group.groupName || 'Other'}
+            </td>
             <td class="right subtotal">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly">{fmt(group.plannedTotal * 12)}</td>
             <td class="right subtotal">{fmt(group.actualTotal)}</td>
           </tr>
         {/if}
-        {#each group.entries as entry (entry.category_id)}
-          <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
-        {/each}
+        {#if !isCollapsed('expense', group.groupName)}
+          {#each group.entries as entry (entry.category_id)}
+            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
+          {/each}
+        {/if}
       </tbody>
     {/each}
     <tfoot>
@@ -228,6 +268,10 @@
   th.right {
     text-align: right;
   }
+  :global(.group-header) {
+    cursor: pointer;
+    user-select: none;
+  }
   :global(.group-header) td {
     padding: 0.5rem 0.75rem;
     background: #f1f3f5;
@@ -236,11 +280,27 @@
     color: #495057;
     border-bottom: 1px solid #dee2e6;
   }
+  :global(.group-header.collapsed) td {
+    border-bottom: 2px solid #ced4da;
+  }
   :global(.group-header) .subtotal {
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
   :global(.group-header) .yearly {
     color: #888;
+  }
+  .group-chevron {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.35rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+    vertical-align: middle;
+    color: #868e96;
+  }
+  :global(.group-header:hover) .group-chevron,
+  :global(.group-header.collapsed) .group-chevron {
+    opacity: 1;
   }
 </style>

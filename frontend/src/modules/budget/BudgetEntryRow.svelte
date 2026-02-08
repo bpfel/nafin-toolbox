@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import type { BudgetEntry } from '../../lib/api/client'
+
+  type Field = 'planned_mo' | 'planned_yr' | 'actual_mo'
 
   interface Props {
     entry: BudgetEntry
@@ -12,52 +15,147 @@
 
   const MAX_MONTHLY = 9_999_999_999.99
 
-  let editingField = $state<string | null>(null)
-  let editValue = $state('')
-  let inputError = $state(false)
+  // Per-field state
+  let plannedMoValue = $state('')
+  let plannedYrValue = $state('')
+  let actualMoValue = $state('')
 
-  let plannedMonthly = $derived(Number(entry.planned_amount))
-  let plannedYearly = $derived(plannedMonthly * 12)
-  let actualMonthly = $derived(Number(entry.actual_amount))
+  let plannedMoOriginal = ''
+  let plannedYrOriginal = ''
+  let actualMoOriginal = ''
 
-  function startEdit(field: string, value: number) {
-    editValue = value.toFixed(2)
-    editingField = field
-    inputError = false
-  }
+  let plannedMoError = $state(false)
+  let plannedYrError = $state(false)
+  let actualMoError = $state(false)
 
-  function save() {
-    if (!editingField) return
-    const val = Number(editValue)
-    if (isNaN(val) || !isFinite(val)) {
-      inputError = true
-      return
+  let focusedField = $state<Field | null>(null)
+
+  // Sync from entry prop, skipping the currently focused field
+  $effect(() => {
+    const planned = Number(entry.planned_amount)
+    const actual = Number(entry.actual_amount)
+    const focused = untrack(() => focusedField)
+
+    if (focused !== 'planned_mo') {
+      plannedMoValue = fmt(planned)
     }
-
-    const monthly = editingField.endsWith('_yr') ? val / 12 : val
-    if (Math.abs(monthly) > MAX_MONTHLY) {
-      inputError = true
-      return
+    if (focused !== 'planned_yr') {
+      plannedYrValue = fmt(planned * 12)
     }
-
-    if (editingField === 'planned_mo') {
-      onsave(entry.category_id, 'planned', val.toFixed(2))
-    } else if (editingField === 'planned_yr') {
-      onsave(entry.category_id, 'planned', (val / 12).toFixed(2))
-    } else if (editingField === 'actual_mo') {
-      onsave(entry.category_id, 'actual', val.toFixed(2))
+    if (focused !== 'actual_mo') {
+      actualMoValue = fmt(actual)
     }
-    editingField = null
-    inputError = false
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') save()
-    if (e.key === 'Escape') editingField = null
-  }
+  })
 
   function fmt(val: number): string {
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  function handleFocus(field: Field, event: FocusEvent) {
+    focusedField = field
+    const input = event.target as HTMLInputElement
+    // Snapshot original for revert on Escape
+    if (field === 'planned_mo') plannedMoOriginal = plannedMoValue
+    else if (field === 'planned_yr') plannedYrOriginal = plannedYrValue
+    else if (field === 'actual_mo') actualMoOriginal = actualMoValue
+    // Select all text after the focus event completes
+    requestAnimationFrame(() => input.select())
+  }
+
+  function handleBlur(field: Field) {
+    focusedField = null
+    const current = getValue(field)
+    const original = getOriginal(field)
+    if (current !== original) {
+      saveField(field)
+    }
+    // Clear error on blur regardless
+    setError(field, false)
+  }
+
+  function handleKeydown(field: Field, event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      if (saveField(field)) {
+        const input = event.target as HTMLInputElement
+        navigateVertical(input, field, event.shiftKey ? -1 : 1)
+      }
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      revertField(field)
+      ;(event.target as HTMLInputElement).blur()
+    }
+  }
+
+  function navigateVertical(input: HTMLInputElement, field: Field, direction: 1 | -1) {
+    const table = input.closest('table')
+    if (!table) return
+    const allInputs = Array.from(table.querySelectorAll<HTMLInputElement>(`input[data-field="${field}"]`))
+    const currentIdx = allInputs.indexOf(input)
+    const nextIdx = currentIdx + direction
+    if (nextIdx >= 0 && nextIdx < allInputs.length) {
+      allInputs[nextIdx].focus()
+    } else {
+      input.blur()
+    }
+  }
+
+  function getValue(field: Field): string {
+    if (field === 'planned_mo') return plannedMoValue
+    if (field === 'planned_yr') return plannedYrValue
+    return actualMoValue
+  }
+
+  function getOriginal(field: Field): string {
+    if (field === 'planned_mo') return plannedMoOriginal
+    if (field === 'planned_yr') return plannedYrOriginal
+    return actualMoOriginal
+  }
+
+  function setError(field: Field, val: boolean) {
+    if (field === 'planned_mo') plannedMoError = val
+    else if (field === 'planned_yr') plannedYrError = val
+    else actualMoError = val
+  }
+
+  function revertField(field: Field) {
+    if (field === 'planned_mo') { plannedMoValue = plannedMoOriginal; plannedMoError = false }
+    else if (field === 'planned_yr') { plannedYrValue = plannedYrOriginal; plannedYrError = false }
+    else { actualMoValue = actualMoOriginal; actualMoError = false }
+  }
+
+  function parseInput(raw: string): number {
+    // Handle Swiss locale: 1'234.56 or 1'234,56
+    const cleaned = raw.replace(/'/g, '').replace(/,/g, '.')
+    return Number(cleaned)
+  }
+
+  function saveField(field: Field): boolean {
+    const raw = getValue(field)
+    const val = parseInput(raw)
+
+    if (isNaN(val) || !isFinite(val)) {
+      setError(field, true)
+      return false
+    }
+
+    const monthly = field === 'planned_yr' ? val / 12 : val
+    if (Math.abs(monthly) > MAX_MONTHLY) {
+      setError(field, true)
+      return false
+    }
+
+    setError(field, false)
+
+    if (field === 'planned_mo') {
+      onsave(entry.category_id, 'planned', val.toFixed(2))
+    } else if (field === 'planned_yr') {
+      onsave(entry.category_id, 'planned', (val / 12).toFixed(2))
+    } else if (field === 'actual_mo') {
+      onsave(entry.category_id, 'actual', val.toFixed(2))
+    }
+
+    return true
   }
 </script>
 
@@ -92,50 +190,46 @@
     </div>
   </td>
   <td class="amount-cell">
-    {#if editingField === 'planned_mo'}
-      <input
-        type="text"
-        bind:value={editValue}
-        onkeydown={handleKeydown}
-        onblur={save}
-        class="amount-input" class:input-error={inputError}
-      />
-    {:else}
-      <button class="amount-display" onclick={() => startEdit('planned_mo', plannedMonthly)}>
-        {fmt(plannedMonthly)}
-      </button>
-    {/if}
+    <input
+      type="text"
+      inputmode="decimal"
+      class="cell-input"
+      class:cell-error={plannedMoError}
+      data-field="planned_mo"
+      bind:value={plannedMoValue}
+      onfocus={(e) => handleFocus('planned_mo', e)}
+      onblur={() => handleBlur('planned_mo')}
+      onkeydown={(e) => handleKeydown('planned_mo', e)}
+    />
   </td>
   <td class="amount-cell yearly">
-    {#if editingField === 'planned_yr'}
-      <input
-        type="text"
-        bind:value={editValue}
-        onkeydown={handleKeydown}
-        onblur={save}
-        class="amount-input" class:input-error={inputError}
-      />
-    {:else}
-      <button class="amount-display" onclick={() => startEdit('planned_yr', plannedYearly)}>
-        {fmt(plannedYearly)}
-      </button>
-    {/if}
+    <input
+      type="text"
+      inputmode="decimal"
+      class="cell-input"
+      class:cell-error={plannedYrError}
+      data-field="planned_yr"
+      bind:value={plannedYrValue}
+      onfocus={(e) => handleFocus('planned_yr', e)}
+      onblur={() => handleBlur('planned_yr')}
+      onkeydown={(e) => handleKeydown('planned_yr', e)}
+    />
   </td>
   <td class="amount-cell">
     {#if entry.category_fixed}
-      <span class="amount-fixed">{fmt(actualMonthly)}</span>
-    {:else if editingField === 'actual_mo'}
+      <span class="amount-fixed">{fmt(Number(entry.actual_amount))}</span>
+    {:else}
       <input
         type="text"
-        bind:value={editValue}
-        onkeydown={handleKeydown}
-        onblur={save}
-        class="amount-input" class:input-error={inputError}
+        inputmode="decimal"
+        class="cell-input"
+        class:cell-error={actualMoError}
+        data-field="actual_mo"
+        bind:value={actualMoValue}
+        onfocus={(e) => handleFocus('actual_mo', e)}
+        onblur={() => handleBlur('actual_mo')}
+        onkeydown={(e) => handleKeydown('actual_mo', e)}
       />
-    {:else}
-      <button class="amount-display" onclick={() => startEdit('actual_mo', actualMonthly)}>
-        {fmt(actualMonthly)}
-      </button>
     {/if}
   </td>
 </tr>
@@ -224,8 +318,9 @@
     font-variant-numeric: tabular-nums;
     overflow: hidden;
     white-space: nowrap;
+    padding: 0.25rem 0.35rem;
   }
-  .amount-cell.yearly {
+  .amount-cell.yearly .cell-input {
     color: #888;
   }
   .amount-fixed {
@@ -236,36 +331,31 @@
     text-align: right;
     width: 100%;
   }
-  .amount-display {
-    background: none;
-    border: 1px solid transparent;
-    padding: 0.25rem 0.5rem;
-    text-align: right;
-    width: 100%;
-    color: inherit;
-    font-size: inherit;
-    cursor: pointer;
-    border-radius: 4px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .amount-display:hover {
-    border-color: #ccc;
-    background: #f8f9fa;
-  }
-  .amount-input {
+  .cell-input {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
     padding: 0.25rem 0.5rem;
-    border: 2px solid #2d6a4f;
+    border: 1px solid transparent;
     border-radius: 4px;
     text-align: right;
     font-size: inherit;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    background: transparent;
+    color: inherit;
     outline: none;
+    transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
   }
-  .amount-input.input-error {
+  .cell-input:hover {
+    border-color: #ddd;
+  }
+  .cell-input:focus {
+    border-color: #2d6a4f;
+    background: white;
+    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.15);
+  }
+  .cell-input.cell-error {
     border-color: #c0392b;
     background: #fdecea;
   }
