@@ -38,21 +38,43 @@
     needsSetup = false
     try {
       categories = await fetchBudgetCategories()
-      if (categories.length === 0) {
-        needsSetup = true
-        loading = false
-        return
-      }
       try {
         summary = await fetchBudgetPeriod(year, month)
       } catch {
-        periodNotFound = true
-        summary = null
+        // No period for this month
+        if (categories.length === 0) {
+          needsSetup = true
+          loading = false
+          return
+        }
+        // Past months: don't fabricate history
+        if (isPastMonth) {
+          periodNotFound = true
+          summary = null
+          return
+        }
+        // Current/future months: auto-create by copying from previous
+        await autoCreatePeriod()
       }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load budget'
     } finally {
       loading = false
+    }
+  }
+
+  async function autoCreatePeriod() {
+    let prevYear = month === 1 ? year - 1 : year
+    let prevMonth = month === 1 ? 12 : month - 1
+    try {
+      summary = await copyBudgetPeriod(year, month, {
+        from_year: prevYear,
+        from_month: prevMonth,
+      })
+    } catch {
+      // No previous month to copy — create empty period
+      await createBudgetPeriod(year, month)
+      summary = await fetchBudgetPeriod(year, month)
     }
   }
 
@@ -83,26 +105,6 @@
     }
   }
 
-  async function handleCreatePeriod() {
-    try {
-      // Try copying from previous month first
-      let prevYear = month === 1 ? year - 1 : year
-      let prevMonth = month === 1 ? 12 : month - 1
-      try {
-        summary = await copyBudgetPeriod(year, month, {
-          from_year: prevYear,
-          from_month: prevMonth,
-        })
-      } catch {
-        // No previous month — create empty period
-        await createBudgetPeriod(year, month)
-        summary = await fetchBudgetPeriod(year, month)
-      }
-      periodNotFound = false
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to create budget'
-    }
-  }
 </script>
 
 <div class="budget-module">
@@ -116,17 +118,12 @@
     <BudgetSetup onseeded={loadData} />
   {:else if periodNotFound}
     <div class="no-period">
-      {#if isPastMonth}
-        <p>No budget was recorded for this month.</p>
-      {:else}
-        <p>No budget for this month yet.</p>
-        <button class="create-btn" onclick={handleCreatePeriod}>
-          Create budget
-        </button>
-      {/if}
+      <p>No budget was recorded for this month.</p>
     </div>
   {:else if summary}
-    <BudgetSummary {summary} />
+    {#if summary.entries.length > 0}
+      <BudgetSummary {summary} />
+    {/if}
     <BudgetTable entries={summary.entries} onsave={handleSave} oncategorycreated={loadData} oncategorydeleted={loadData} />
   {/if}
 </div>
@@ -157,13 +154,5 @@
   }
   .no-period p {
     color: #666;
-    margin-bottom: 1rem;
-  }
-  .create-btn {
-    background: #2d6a4f;
-    color: white;
-  }
-  .create-btn:hover {
-    background: #245a42;
   }
 </style>
