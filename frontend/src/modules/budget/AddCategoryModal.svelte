@@ -1,18 +1,20 @@
 <script lang="ts">
-  import { createBudgetCategory } from '../../lib/api/client'
+  import { createBudgetCategory, updateBudgetCategory } from '../../lib/api/client'
 
   interface Props {
     type: 'income' | 'expense'
     groupName: string
     groupSortOrder: number
+    editCategory?: { id: number; name: string; fixed: boolean } | null
     oncreated: () => void
     onclose: () => void
   }
 
-  let { type, groupName, groupSortOrder, oncreated, onclose }: Props = $props()
+  let { type, groupName, groupSortOrder, editCategory = null, oncreated, onclose }: Props = $props()
 
-  let name = $state('')
-  let fixed = $state(false)
+  let isEdit = $derived(editCategory != null)
+  let name = $state(editCategory?.name ?? '')
+  let fixed = $state(editCategory?.fixed ?? false)
   let saving = $state(false)
   let error = $state<string | null>(null)
 
@@ -22,17 +24,21 @@
     saving = true
     error = null
     try {
-      await createBudgetCategory({
-        name: trimmed,
-        type,
-        group_name: groupName,
-        group_sort_order: groupSortOrder,
-        fixed,
-      })
+      if (isEdit && editCategory) {
+        await updateBudgetCategory(editCategory.id, { name: trimmed, fixed })
+      } else {
+        await createBudgetCategory({
+          name: trimmed,
+          type,
+          group_name: groupName,
+          group_sort_order: groupSortOrder,
+          fixed,
+        })
+      }
       oncreated()
       onclose()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to create category'
+      error = e instanceof Error ? e.message : isEdit ? 'Failed to update category' : 'Failed to create category'
     } finally {
       saving = false
     }
@@ -52,8 +58,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="backdrop" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Add category">
-    <h3>Add {type === 'income' ? 'income' : 'expense'} category</h3>
+  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit category' : 'Add category'}>
+    <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} category</h3>
     {#if groupName}
       <p class="group-context">Group: {groupName}</p>
     {/if}
@@ -82,7 +88,7 @@
     <div class="actions">
       <button class="btn cancel" onclick={onclose} disabled={saving}>Cancel</button>
       <button class="btn save" onclick={save} disabled={saving || !name.trim()}>
-        {saving ? 'Saving...' : 'Add'}
+        {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
       </button>
     </div>
   </div>

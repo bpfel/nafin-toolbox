@@ -24,7 +24,7 @@
 
   let { entries, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groupName: string; groupSortOrder: number } | null>(null)
+  let addModalContext = $state<{ type: 'income' | 'expense'; groupName: string; groupSortOrder: number; editCategory?: { id: number; name: string; fixed: boolean } } | null>(null)
   let deleteModalContext = $state<{ categoryId: number; categoryName: string } | null>(null)
 
   let incomeEntries = $derived(entries.filter(e => e.category_type === 'income'))
@@ -60,6 +60,10 @@
 
   function openAddModal(type: 'income' | 'expense', groupName: string, groupSortOrder: number) {
     addModalContext = { type, groupName, groupSortOrder }
+  }
+
+  function openEditModal(categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, groupSortOrder: number, fixed: boolean) {
+    addModalContext = { type: categoryType, groupName, groupSortOrder, editCategory: { id: categoryId, name: categoryName, fixed } }
   }
 
   function openDeleteModal(categoryId: number, categoryName: string) {
@@ -122,7 +126,7 @@
             </tr>
           {/if}
           {#each group.entries as entry (entry.category_id)}
-            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} />
+            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
           {/each}
           <AddCategoryRow onadd={() => openAddModal('income', group.groupName, group.groupSortOrder)} />
         </tbody>
@@ -157,7 +161,7 @@
             </tr>
           {/if}
           {#each group.entries as entry (entry.category_id)}
-            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} />
+            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
           {/each}
           <AddCategoryRow onadd={() => openAddModal('expense', group.groupName, group.groupSortOrder)} />
         </tbody>
@@ -171,6 +175,7 @@
     type={addModalContext.type}
     groupName={addModalContext.groupName}
     groupSortOrder={addModalContext.groupSortOrder}
+    editCategory={addModalContext.editCategory}
     oncreated={oncategorycreated}
     onclose={() => addModalContext = null}
   />
