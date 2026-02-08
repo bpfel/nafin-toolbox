@@ -6,7 +6,6 @@ type Category struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
-	Frequency string    `json:"frequency"`
 	SortOrder int       `json:"sort_order"`
 	Archived  bool      `json:"archived"`
 	CreatedAt time.Time `json:"created_at"`
@@ -22,17 +21,13 @@ type Period struct {
 }
 
 type Entry struct {
-	ID                       int    `json:"id"`
-	PeriodID                 int    `json:"period_id"`
-	CategoryID               int    `json:"category_id"`
-	CategoryName             string `json:"category_name"`
-	CategoryType             string `json:"category_type"`
-	CategoryFrequency        string `json:"category_frequency"`
-	PlannedAmount            string `json:"planned_amount"`
-	ActualAmount             string `json:"actual_amount"`
-	Variance                 string `json:"variance"`
-	PlannedMonthlyEquivalent string `json:"planned_monthly_equivalent"`
-	ActualMonthlyEquivalent  string `json:"actual_monthly_equivalent"`
+	ID            int    `json:"id"`
+	PeriodID      int    `json:"period_id"`
+	CategoryID    int    `json:"category_id"`
+	CategoryName  string `json:"category_name"`
+	CategoryType  string `json:"category_type"`
+	PlannedAmount string `json:"planned_amount"`
+	ActualAmount  string `json:"actual_amount"`
 }
 
 type PeriodSummary struct {
@@ -45,8 +40,6 @@ type PeriodSummary struct {
 	TotalActualIncome    string  `json:"total_actual_income"`
 	TotalPlannedExpenses string  `json:"total_planned_expenses"`
 	TotalActualExpenses  string  `json:"total_actual_expenses"`
-	TotalPlannedMonthly  string  `json:"total_planned_monthly"`
-	TotalActualMonthly   string  `json:"total_actual_monthly"`
 	PlannedBalance       string  `json:"planned_balance"`
 	ActualBalance        string  `json:"actual_balance"`
 }

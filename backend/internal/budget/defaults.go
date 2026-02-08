@@ -9,26 +9,26 @@ import (
 type DefaultCategory struct {
 	Name      string
 	Type      string
-	Frequency string
 	SortOrder int
-	Amount    string // default CHF amount
+	Amount    string // default monthly CHF amount
 }
 
 // BFSDefaults returns the default categories based on BFS HABE 2023 data.
+// All amounts are monthly values.
 func BFSDefaults() []DefaultCategory {
 	return []DefaultCategory{
-		{Name: "Salary (net)", Type: "income", Frequency: "monthly", SortOrder: 1, Amount: "6000.00"},
-		{Name: "Housing (rent + utilities)", Type: "expense", Frequency: "monthly", SortOrder: 10, Amount: "1500.00"},
-		{Name: "Health Insurance", Type: "expense", Frequency: "yearly", SortOrder: 20, Amount: "4700.00"},
-		{Name: "Food & Groceries", Type: "expense", Frequency: "monthly", SortOrder: 30, Amount: "500.00"},
-		{Name: "Transportation", Type: "expense", Frequency: "monthly", SortOrder: 40, Amount: "400.00"},
-		{Name: "Taxes", Type: "expense", Frequency: "yearly", SortOrder: 50, Amount: "10000.00"},
-		{Name: "Other Insurance", Type: "expense", Frequency: "yearly", SortOrder: 60, Amount: "2000.00"},
-		{Name: "Telecommunications", Type: "expense", Frequency: "monthly", SortOrder: 70, Amount: "80.00"},
-		{Name: "Clothing & Footwear", Type: "expense", Frequency: "monthly", SortOrder: 80, Amount: "100.00"},
-		{Name: "Entertainment & Recreation", Type: "expense", Frequency: "monthly", SortOrder: 90, Amount: "250.00"},
-		{Name: "Dining Out", Type: "expense", Frequency: "monthly", SortOrder: 100, Amount: "250.00"},
-		{Name: "Savings", Type: "expense", Frequency: "monthly", SortOrder: 110, Amount: "500.00"},
+		{Name: "Salary (net)", Type: "income", SortOrder: 1, Amount: "6000.00"},
+		{Name: "Housing (rent + utilities)", Type: "expense", SortOrder: 10, Amount: "1500.00"},
+		{Name: "Health Insurance", Type: "expense", SortOrder: 20, Amount: "391.67"},
+		{Name: "Food & Groceries", Type: "expense", SortOrder: 30, Amount: "500.00"},
+		{Name: "Transportation", Type: "expense", SortOrder: 40, Amount: "400.00"},
+		{Name: "Taxes", Type: "expense", SortOrder: 50, Amount: "833.33"},
+		{Name: "Other Insurance", Type: "expense", SortOrder: 60, Amount: "166.67"},
+		{Name: "Telecommunications", Type: "expense", SortOrder: 70, Amount: "80.00"},
+		{Name: "Clothing & Footwear", Type: "expense", SortOrder: 80, Amount: "100.00"},
+		{Name: "Entertainment & Recreation", Type: "expense", SortOrder: 90, Amount: "250.00"},
+		{Name: "Dining Out", Type: "expense", SortOrder: 100, Amount: "250.00"},
+		{Name: "Savings", Type: "expense", SortOrder: 110, Amount: "500.00"},
 	}
 }
 
@@ -50,7 +50,6 @@ func SeedDefaults(ctx context.Context, store *Store) (int, bool, error) {
 			c := &Category{
 				Name:      d.Name,
 				Type:      d.Type,
-				Frequency: d.Frequency,
 				SortOrder: d.SortOrder,
 			}
 			if err := store.CreateCategory(ctx, c); err != nil {

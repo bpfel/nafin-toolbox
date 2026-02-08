@@ -8,6 +8,8 @@ import (
 	"strconv"
 )
 
+// All amounts are stored as monthly values. Yearly display is frontend-only.
+
 type Store struct {
 	db *sql.DB
 }
@@ -19,7 +21,7 @@ func NewStore(db *sql.DB) *Store {
 // Categories
 
 func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Category, error) {
-	query := "SELECT id, name, type, frequency, sort_order, archived, created_at, updated_at FROM budget_categories"
+	query := "SELECT id, name, type, sort_order, archived, created_at, updated_at FROM budget_categories"
 	if !includeArchived {
 		query += " WHERE archived = FALSE"
 	}
@@ -34,7 +36,7 @@ func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Cat
 	var cats []Category
 	for rows.Next() {
 		var c Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.Frequency, &c.SortOrder, &c.Archived, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		cats = append(cats, c)
@@ -44,20 +46,20 @@ func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Cat
 
 func (s *Store) CreateCategory(ctx context.Context, c *Category) error {
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO budget_categories (name, type, frequency, sort_order)
-		 VALUES ($1, $2, $3, $4)
+		`INSERT INTO budget_categories (name, type, sort_order)
+		 VALUES ($1, $2, $3)
 		 RETURNING id, created_at, updated_at`,
-		c.Name, c.Type, c.Frequency, c.SortOrder,
+		c.Name, c.Type, c.SortOrder,
 	).Scan(&c.ID, &c.CreatedAt, &c.UpdatedAt)
 }
 
 func (s *Store) UpdateCategory(ctx context.Context, c *Category) error {
 	return s.db.QueryRowContext(ctx,
 		`UPDATE budget_categories
-		 SET name = $2, type = $3, frequency = $4, sort_order = $5, archived = $6, updated_at = NOW()
+		 SET name = $2, type = $3, sort_order = $4, archived = $5, updated_at = NOW()
 		 WHERE id = $1
 		 RETURNING updated_at`,
-		c.ID, c.Name, c.Type, c.Frequency, c.SortOrder, c.Archived,
+		c.ID, c.Name, c.Type, c.SortOrder, c.Archived,
 	).Scan(&c.UpdatedAt)
 }
 
@@ -76,8 +78,8 @@ func (s *Store) DeleteCategory(ctx context.Context, id int) error {
 func (s *Store) GetCategory(ctx context.Context, id int) (*Category, error) {
 	var c Category
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, name, type, frequency, sort_order, archived, created_at, updated_at FROM budget_categories WHERE id = $1", id,
-	).Scan(&c.ID, &c.Name, &c.Type, &c.Frequency, &c.SortOrder, &c.Archived, &c.CreatedAt, &c.UpdatedAt)
+		"SELECT id, name, type, sort_order, archived, created_at, updated_at FROM budget_categories WHERE id = $1", id,
+	).Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +131,7 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT e.id, e.period_id, e.category_id, c.name, c.type, c.frequency,
+		`SELECT e.id, e.period_id, e.category_id, c.name, c.type,
 		        e.planned_amount, e.actual_amount
 		 FROM budget_entries e
 		 JOIN budget_categories c ON c.id = e.category_id
@@ -146,39 +148,23 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 	totalActualIncome := 0.0
 	totalPlannedExpenses := 0.0
 	totalActualExpenses := 0.0
-	totalPlannedMonthly := 0.0
-	totalActualMonthly := 0.0
 
 	for rows.Next() {
 		var e Entry
-		if err := rows.Scan(&e.ID, &e.PeriodID, &e.CategoryID, &e.CategoryName, &e.CategoryType, &e.CategoryFrequency,
+		if err := rows.Scan(&e.ID, &e.PeriodID, &e.CategoryID, &e.CategoryName, &e.CategoryType,
 			&e.PlannedAmount, &e.ActualAmount); err != nil {
 			return nil, err
 		}
 
 		planned, _ := strconv.ParseFloat(e.PlannedAmount, 64)
 		actual, _ := strconv.ParseFloat(e.ActualAmount, 64)
-		e.Variance = formatAmount(planned - actual)
-
-		if e.CategoryFrequency == "yearly" {
-			e.PlannedMonthlyEquivalent = formatAmount(planned / 12)
-			e.ActualMonthlyEquivalent = formatAmount(actual / 12)
-		} else {
-			e.PlannedMonthlyEquivalent = e.PlannedAmount
-			e.ActualMonthlyEquivalent = e.ActualAmount
-		}
-
-		plannedMonthly, _ := strconv.ParseFloat(e.PlannedMonthlyEquivalent, 64)
-		actualMonthly, _ := strconv.ParseFloat(e.ActualMonthlyEquivalent, 64)
 
 		if e.CategoryType == "income" {
-			totalPlannedIncome += plannedMonthly
-			totalActualIncome += actualMonthly
+			totalPlannedIncome += planned
+			totalActualIncome += actual
 		} else {
 			totalPlannedExpenses += planned
 			totalActualExpenses += actual
-			totalPlannedMonthly += plannedMonthly
-			totalActualMonthly += actualMonthly
 		}
 
 		entries = append(entries, e)
@@ -197,10 +183,8 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 		TotalActualIncome:    formatAmount(totalActualIncome),
 		TotalPlannedExpenses: formatAmount(totalPlannedExpenses),
 		TotalActualExpenses:  formatAmount(totalActualExpenses),
-		TotalPlannedMonthly:  formatAmount(totalPlannedMonthly),
-		TotalActualMonthly:   formatAmount(totalActualMonthly),
-		PlannedBalance:       formatAmount(totalPlannedIncome - totalPlannedMonthly),
-		ActualBalance:        formatAmount(totalActualIncome - totalActualMonthly),
+		PlannedBalance:       formatAmount(totalPlannedIncome - totalPlannedExpenses),
+		ActualBalance:        formatAmount(totalActualIncome - totalActualExpenses),
 	}, nil
 }
 
@@ -247,22 +231,10 @@ func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plann
 	}
 
 	err := s.db.QueryRowContext(ctx,
-		"SELECT name, type, frequency FROM budget_categories WHERE id = $1", categoryID,
-	).Scan(&e.CategoryName, &e.CategoryType, &e.CategoryFrequency)
+		"SELECT name, type FROM budget_categories WHERE id = $1", categoryID,
+	).Scan(&e.CategoryName, &e.CategoryType)
 	if err != nil {
 		return nil, err
-	}
-
-	planned, _ := strconv.ParseFloat(e.PlannedAmount, 64)
-	actual, _ := strconv.ParseFloat(e.ActualAmount, 64)
-	e.Variance = formatAmount(planned - actual)
-
-	if e.CategoryFrequency == "yearly" {
-		e.PlannedMonthlyEquivalent = formatAmount(planned / 12)
-		e.ActualMonthlyEquivalent = formatAmount(actual / 12)
-	} else {
-		e.PlannedMonthlyEquivalent = e.PlannedAmount
-		e.ActualMonthlyEquivalent = e.ActualAmount
 	}
 
 	return &e, nil

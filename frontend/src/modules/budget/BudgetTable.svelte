@@ -19,11 +19,9 @@
       <thead>
         <tr>
           <th>Income</th>
-          <th></th>
-          <th class="right">Planned</th>
-          <th class="right">Actual</th>
-          <th class="right">Variance</th>
-          <th class="right">/month</th>
+          <th class="right">Planned/mo</th>
+          <th class="right">Planned/yr</th>
+          <th class="right">Actual/mo</th>
         </tr>
       </thead>
       <tbody>
@@ -39,11 +37,9 @@
       <thead>
         <tr>
           <th>Expenses</th>
-          <th></th>
-          <th class="right">Planned</th>
-          <th class="right">Actual</th>
-          <th class="right">Variance</th>
-          <th class="right">/month</th>
+          <th class="right">Planned/mo</th>
+          <th class="right">Planned/yr</th>
+          <th class="right">Actual/mo</th>
         </tr>
       </thead>
       <tbody>
