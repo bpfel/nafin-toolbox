@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { seedBudgetDefaults } from '../../lib/api/client'
+  import { seedBudgetDefaults, createBudgetPeriod } from '../../lib/api/client'
 
   interface Props {
     onseeded: () => void
@@ -22,6 +22,20 @@
       loading = false
     }
   }
+
+  async function startBlank() {
+    loading = true
+    error = null
+    try {
+      const now = new Date()
+      await createBudgetPeriod(now.getFullYear(), now.getMonth() + 1)
+      onseeded()
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to create budget'
+    } finally {
+      loading = false
+    }
+  }
 </script>
 
 <div class="setup">
@@ -30,9 +44,14 @@
   {#if error}
     <p class="error">{error}</p>
   {/if}
-  <button onclick={seed} disabled={loading}>
-    {loading ? 'Setting up...' : 'Load Swiss defaults'}
-  </button>
+  <div class="actions">
+    <button class="primary" onclick={seed} disabled={loading}>
+      {loading ? 'Setting up...' : 'Load Swiss defaults'}
+    </button>
+    <button class="secondary" onclick={startBlank} disabled={loading}>
+      Start blank
+    </button>
+  </div>
 </div>
 
 <style>
@@ -55,6 +74,27 @@
   }
   .error {
     color: #c0392b;
+  }
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .primary {
+    background: #2d6a4f;
+    color: white;
+  }
+  .primary:hover:not(:disabled) {
+    background: #245a42;
+  }
+  .secondary {
+    background: #f1f3f5;
+    border: 1px solid #dee2e6;
+    color: #333;
+  }
+  .secondary:hover:not(:disabled) {
+    background: #e9ecef;
   }
   button:disabled {
     opacity: 0.6;
