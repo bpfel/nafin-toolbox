@@ -4,11 +4,31 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
+
+// maxAmount is the largest value that fits in NUMERIC(12,2): 10 digits + 2 decimals.
+const maxAmount = 9_999_999_999.99
+
+// validateAmount checks that s is a valid decimal number within the DB column range.
+// Returns the parsed value or an error.
+func validateAmount(s string) (float64, error) {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid number: %s", s)
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0, fmt.Errorf("invalid number: %s", s)
+	}
+	if v < -maxAmount || v > maxAmount {
+		return 0, fmt.Errorf("amount out of range (max %.2f)", maxAmount)
+	}
+	return v, nil
+}
 
 func Routes(db *sql.DB) func(r chi.Router) {
 	store := NewStore(db)
@@ -185,12 +205,6 @@ func handleUpsertEntry(store *Store) http.HandlerFunc {
 			return
 		}
 
-		period, err := store.GetPeriodByYearMonth(r.Context(), year, month)
-		if err != nil {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "period not found"})
-			return
-		}
-
 		var req struct {
 			CategoryID    int     `json:"category_id"`
 			PlannedAmount *string `json:"planned_amount"`
@@ -203,6 +217,25 @@ func handleUpsertEntry(store *Store) http.HandlerFunc {
 
 		if req.PlannedAmount == nil && req.ActualAmount == nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "at least one of planned_amount or actual_amount must be provided"})
+			return
+		}
+
+		if req.PlannedAmount != nil {
+			if _, err := validateAmount(*req.PlannedAmount); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "planned_amount: " + err.Error()})
+				return
+			}
+		}
+		if req.ActualAmount != nil {
+			if _, err := validateAmount(*req.ActualAmount); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "actual_amount: " + err.Error()})
+				return
+			}
+		}
+
+		period, err := store.GetPeriodByYearMonth(r.Context(), year, month)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "period not found"})
 			return
 		}
 

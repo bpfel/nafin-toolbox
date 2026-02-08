@@ -16,6 +16,12 @@
 <div class="budget-table">
   {#if incomeEntries.length > 0}
     <table>
+      <colgroup>
+        <col class="col-name" />
+        <col class="col-amount" />
+        <col class="col-amount" />
+        <col class="col-amount" />
+      </colgroup>
       <thead>
         <tr>
           <th>Income</th>
@@ -34,6 +40,12 @@
 
   {#if expenseEntries.length > 0}
     <table>
+      <colgroup>
+        <col class="col-name" />
+        <col class="col-amount" />
+        <col class="col-amount" />
+        <col class="col-amount" />
+      </colgroup>
       <thead>
         <tr>
           <th>Expenses</th>
@@ -59,11 +71,18 @@
   }
   table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     background: white;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  .col-name {
+    width: 40%;
+  }
+  .col-amount {
+    width: 20%;
   }
   th {
     text-align: left;
