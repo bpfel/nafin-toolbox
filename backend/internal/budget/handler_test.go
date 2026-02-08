@@ -325,3 +325,231 @@ func TestBFSDefaultsHaveGroups(t *testing.T) {
 		t.Error("expected at least one fixed category in defaults")
 	}
 }
+
+// --- Adversarial / edge-case tests below ---
+
+func TestValidateAmount_Adversarial(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		wantVal float64
+	}{
+		// Scientific notation
+		{name: "sci notation 1e2", input: "1e2", wantErr: false, wantVal: 100},
+		{name: "sci notation 1e-4", input: "1e-4", wantErr: false, wantVal: 0.0001},
+		{name: "sci notation over max 1e10", input: "1e10", wantErr: true},
+		{name: "sci notation huge 1e308", input: "1e308", wantErr: true},
+
+		// Whitespace and control chars
+		{name: "leading space", input: " 100", wantErr: true},
+		{name: "trailing space", input: "100 ", wantErr: true},
+		{name: "tab padded", input: "\t100", wantErr: true},
+		{name: "newline padded", input: "100\n", wantErr: true},
+
+		// Malformed numbers
+		{name: "just a dot", input: ".", wantErr: true},
+		{name: "multiple dots", input: "1.2.3", wantErr: true},
+		{name: "comma thousands", input: "1,234.56", wantErr: true},
+		{name: "Swiss apostrophe", input: "1'234.56", wantErr: true},
+
+		// Edge cases that pass
+		{name: "leading zeros", input: "00100", wantErr: false, wantVal: 100},
+		{name: "negative zero", input: "-0", wantErr: false, wantVal: 0},
+		{name: "plus sign", input: "+100", wantErr: false, wantVal: 100},
+		{name: "new max 4dp boundary", input: "9999999999.9999", wantErr: false, wantVal: 9999999999.9999},
+		{name: "negative new max 4dp", input: "-9999999999.9999", wantErr: false, wantVal: -9999999999.9999},
+
+		// Unicode and injection
+		{name: "unicode digits", input: "\uff11\uff10\uff10", wantErr: true},
+		{name: "null byte", input: "100\x00", wantErr: true},
+		{name: "sql injection attempt", input: "100; DROP TABLE", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v, err := validateAmount(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateAmount(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if !tt.wantErr && v != tt.wantVal {
+				t.Errorf("validateAmount(%q) = %f, want %f", tt.input, v, tt.wantVal)
+			}
+		})
+	}
+}
+
+func TestUpsertEntry_TypeConfusion(t *testing.T) {
+	store := &Store{db: nil}
+	r := chi.NewRouter()
+	r.Put("/periods/{year}/{month}/entries", handleUpsertEntry(store))
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		{name: "amount as JSON number", body: `{"category_id":1,"planned_amount":100}`, wantStatus: http.StatusBadRequest},
+		{name: "amount as JSON boolean", body: `{"category_id":1,"planned_amount":true}`, wantStatus: http.StatusBadRequest},
+		{name: "amount as JSON array", body: `{"category_id":1,"planned_amount":[100]}`, wantStatus: http.StatusBadRequest},
+		{name: "amount as JSON object", body: `{"category_id":1,"planned_amount":{"v":1}}`, wantStatus: http.StatusBadRequest},
+		{name: "category_id as string", body: `{"category_id":"1","planned_amount":"100.00"}`, wantStatus: http.StatusBadRequest},
+		{name: "null amounts both nil", body: `{"category_id":1,"planned_amount":null}`, wantStatus: http.StatusBadRequest},
+		{name: "empty string amount", body: `{"category_id":1,"planned_amount":""}`, wantStatus: http.StatusBadRequest},
+		{name: "whitespace amount", body: `{"category_id":1,"planned_amount":" 100 "}`, wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/periods/2026/1/entries", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestCreatePeriod_Validation(t *testing.T) {
+	store := &Store{db: nil}
+	r := chi.NewRouter()
+	r.Post("/periods", handleCreatePeriod(store))
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		{name: "year too low", body: `{"year":1999,"month":1}`, wantStatus: http.StatusBadRequest},
+		{name: "year too high", body: `{"year":2101,"month":1}`, wantStatus: http.StatusBadRequest},
+		{name: "month zero", body: `{"year":2026,"month":0}`, wantStatus: http.StatusBadRequest},
+		{name: "month 13", body: `{"year":2026,"month":13}`, wantStatus: http.StatusBadRequest},
+		{name: "negative month", body: `{"year":2026,"month":-1}`, wantStatus: http.StatusBadRequest},
+		{name: "invalid JSON", body: `{bad`, wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/periods", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestGetPeriodSummary_InvalidPathParams(t *testing.T) {
+	store := &Store{db: nil}
+	r := chi.NewRouter()
+	r.Get("/periods/{year}/{month}", handleGetPeriodSummary(store))
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{name: "non-numeric year", path: "/periods/abc/1", wantStatus: http.StatusBadRequest},
+		{name: "non-numeric month", path: "/periods/2026/abc", wantStatus: http.StatusBadRequest},
+		{name: "month zero", path: "/periods/2026/0", wantStatus: http.StatusBadRequest},
+		{name: "month 13", path: "/periods/2026/13", wantStatus: http.StatusBadRequest},
+		{name: "negative month", path: "/periods/2026/-1", wantStatus: http.StatusBadRequest},
+		{name: "float year", path: "/periods/2026.5/1", wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestDeleteCategory_InvalidPathParam(t *testing.T) {
+	store := &Store{db: nil}
+	r := chi.NewRouter()
+	r.Delete("/categories/{id}", handleDeleteCategory(store))
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{name: "non-integer ID", path: "/categories/abc", wantStatus: http.StatusBadRequest},
+		{name: "float ID", path: "/categories/1.5", wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodDelete, tt.path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestDeleteEntry_InvalidPathParam(t *testing.T) {
+	store := &Store{db: nil}
+	r := chi.NewRouter()
+	r.Delete("/entries/{id}", handleDeleteEntry(store))
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{name: "non-integer ID", path: "/entries/abc", wantStatus: http.StatusBadRequest},
+		{name: "float ID", path: "/entries/1.5", wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodDelete, tt.path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestCopyPeriod_Validation(t *testing.T) {
+	store := &Store{db: nil}
+	r := chi.NewRouter()
+	r.Post("/periods/{year}/{month}/copy", handleCopyPeriod(store))
+
+	tests := []struct {
+		name       string
+		path       string
+		body       string
+		wantStatus int
+	}{
+		{name: "non-numeric year", path: "/periods/abc/1/copy", body: `{"from_year":2026,"from_month":1}`, wantStatus: http.StatusBadRequest},
+		{name: "month zero", path: "/periods/2026/0/copy", body: `{"from_year":2026,"from_month":1}`, wantStatus: http.StatusBadRequest},
+		{name: "invalid JSON body", path: "/periods/2026/1/copy", body: `{bad`, wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
+			}
+		})
+	}
+}
