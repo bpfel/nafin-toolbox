@@ -4,7 +4,7 @@
 
   interface Props {
     entries: BudgetEntry[]
-    onsave: (categoryId: number, amount: string) => void
+    onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
   }
 
   let { entries, onsave }: Props = $props()
@@ -20,7 +20,9 @@
         <tr>
           <th>Income</th>
           <th></th>
-          <th class="right">Amount</th>
+          <th class="right">Planned</th>
+          <th class="right">Actual</th>
+          <th class="right">Variance</th>
           <th class="right">/month</th>
         </tr>
       </thead>
@@ -38,7 +40,9 @@
         <tr>
           <th>Expenses</th>
           <th></th>
-          <th class="right">Amount</th>
+          <th class="right">Planned</th>
+          <th class="right">Actual</th>
+          <th class="right">Variance</th>
           <th class="right">/month</th>
         </tr>
       </thead>
