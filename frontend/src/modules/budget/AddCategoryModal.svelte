@@ -3,35 +3,50 @@
 
   interface Props {
     type: 'income' | 'expense'
-    groupName: string
-    groupSortOrder: number
-    editCategory?: { id: number; name: string; fixed: boolean } | null
+    groups: { name: string; sortOrder: number }[]
+    editCategory?: { id: number; name: string; fixed: boolean; groupName: string } | null
     oncreated: () => void
     onclose: () => void
   }
 
-  let { type, groupName, groupSortOrder, editCategory = null, oncreated, onclose }: Props = $props()
+  let { type, groups, editCategory = null, oncreated, onclose }: Props = $props()
 
   let isEdit = $derived(editCategory != null)
   let name = $state(editCategory?.name ?? '')
   let fixed = $state(editCategory?.fixed ?? false)
+  let selectedGroup = $state(editCategory?.groupName ?? groups[0]?.name ?? '')
+  let newGroupName = $state('')
+  let useNewGroup = $state(false)
   let saving = $state(false)
   let error = $state<string | null>(null)
+
+  let resolvedGroupName = $derived(useNewGroup ? newGroupName.trim() : selectedGroup)
+  let resolvedGroupSortOrder = $derived(() => {
+    if (useNewGroup) return (groups.length + 1) * 10
+    const g = groups.find(g => g.name === selectedGroup)
+    return g ? g.sortOrder : 0
+  })
 
   async function save() {
     const trimmed = name.trim()
     if (!trimmed) return
+    if (!isEdit && !resolvedGroupName) return
     saving = true
     error = null
     try {
       if (isEdit && editCategory) {
-        await updateBudgetCategory(editCategory.id, { name: trimmed, fixed })
+        await updateBudgetCategory(editCategory.id, {
+          name: trimmed,
+          fixed,
+          group_name: resolvedGroupName,
+          group_sort_order: resolvedGroupSortOrder(),
+        })
       } else {
         await createBudgetCategory({
           name: trimmed,
           type,
-          group_name: groupName,
-          group_sort_order: groupSortOrder,
+          group_name: resolvedGroupName,
+          group_sort_order: resolvedGroupSortOrder(),
           fixed,
         })
       }
@@ -60,9 +75,34 @@
 <div class="backdrop" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label={isEdit ? 'Edit category' : 'Add category'}>
     <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} category</h3>
-    {#if groupName}
-      <p class="group-context">Group: {groupName}</p>
-    {/if}
+
+    <label class="field">
+      <span class="label">Group</span>
+      {#if useNewGroup}
+        <div class="group-input-row">
+          <input
+            type="text"
+            bind:value={newGroupName}
+            placeholder="New group name"
+            disabled={saving}
+          />
+          <button class="link-btn" onclick={() => { useNewGroup = false; newGroupName = '' }} disabled={saving}>
+            existing
+          </button>
+        </div>
+      {:else}
+        <div class="group-input-row">
+          <select bind:value={selectedGroup} disabled={saving}>
+            {#each groups as g}
+              <option value={g.name}>{g.name || 'Other'}</option>
+            {/each}
+          </select>
+          <button class="link-btn" onclick={() => (useNewGroup = true)} disabled={saving}>
+            + new
+          </button>
+        </div>
+      {/if}
+    </label>
 
     <label class="field">
       <span class="label">Name</span>
@@ -87,7 +127,7 @@
 
     <div class="actions">
       <button class="btn cancel" onclick={onclose} disabled={saving}>Cancel</button>
-      <button class="btn save" onclick={save} disabled={saving || !name.trim()}>
+      <button class="btn save" onclick={save} disabled={saving || !name.trim() || !resolvedGroupName}>
         {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
       </button>
     </div>
@@ -117,10 +157,36 @@
     margin: 0 0 0.25rem;
     font-size: 1.1rem;
   }
-  .group-context {
-    margin: 0 0 1rem;
+  .group-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .group-input-row select,
+  .group-input-row input[type="text"] {
+    flex: 1;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    outline: none;
+  }
+  .group-input-row select:focus,
+  .group-input-row input[type="text"]:focus {
+    border-color: #2d6a4f;
+    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
+  }
+  .link-btn {
+    background: none;
+    border: none;
+    color: #2d6a4f;
+    cursor: pointer;
     font-size: 0.85rem;
-    color: #666;
+    white-space: nowrap;
+    padding: 0.25rem;
+  }
+  .link-btn:hover:not(:disabled) {
+    text-decoration: underline;
   }
   .field {
     display: flex;

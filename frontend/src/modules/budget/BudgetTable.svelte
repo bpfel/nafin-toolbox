@@ -24,7 +24,7 @@
 
   let { entries, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groupName: string; groupSortOrder: number; editCategory?: { id: number; name: string; fixed: boolean } } | null>(null)
+  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; sortOrder: number }[]; editCategory?: { id: number; name: string; fixed: boolean; groupName: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: number; categoryName: string } | null>(null)
 
   let incomeEntries = $derived(entries.filter(e => e.category_type === 'income'))
@@ -58,12 +58,17 @@
   let incomeGroups = $derived(groupEntries(incomeEntries))
   let expenseGroups = $derived(groupEntries(expenseEntries))
 
-  function openAddModal(type: 'income' | 'expense', groupName: string, groupSortOrder: number) {
-    addModalContext = { type, groupName, groupSortOrder }
+  function groupsForType(type: 'income' | 'expense'): { name: string; sortOrder: number }[] {
+    const groups = type === 'income' ? incomeGroups : expenseGroups
+    return groups.map(g => ({ name: g.groupName, sortOrder: g.groupSortOrder }))
+  }
+
+  function openAddModal(type: 'income' | 'expense') {
+    addModalContext = { type, groups: groupsForType(type) }
   }
 
   function openEditModal(categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, groupSortOrder: number, fixed: boolean) {
-    addModalContext = { type: categoryType, groupName, groupSortOrder, editCategory: { id: categoryId, name: categoryName, fixed } }
+    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, fixed, groupName } }
   }
 
   function openDeleteModal(categoryId: number, categoryName: string) {
@@ -99,82 +104,81 @@
 </script>
 
 <div class="budget-table">
-  {#if incomeEntries.length > 0}
-    <table>
-      <colgroup>
-        <col class="col-name" />
-        <col class="col-amount" />
-        <col class="col-amount" />
-        <col class="col-amount" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Income</th>
-          <th class="right">Planned/mo</th>
-          <th class="right">Planned/yr</th>
-          <th class="right">Actual/mo</th>
-        </tr>
-      </thead>
-      {#each incomeGroups as group (group.groupName)}
-        <tbody use:sortable>
-          {#if incomeGroups.length > 1 || group.groupName}
-            <tr class="group-header">
-              <td>{group.groupName || 'Other'}</td>
-              <td class="right subtotal">{fmt(group.plannedTotal)}</td>
-              <td class="right subtotal yearly">{fmt(group.plannedTotal * 12)}</td>
-              <td class="right subtotal">{fmt(group.actualTotal)}</td>
-            </tr>
-          {/if}
-          {#each group.entries as entry (entry.category_id)}
-            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
-          {/each}
-          <AddCategoryRow onadd={() => openAddModal('income', group.groupName, group.groupSortOrder)} />
-        </tbody>
-      {/each}
-    </table>
-  {/if}
+  <table>
+    <colgroup>
+      <col class="col-name" />
+      <col class="col-amount" />
+      <col class="col-amount" />
+      <col class="col-amount" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Income</th>
+        <th class="right">Planned/mo</th>
+        <th class="right">Planned/yr</th>
+        <th class="right">Actual/mo</th>
+      </tr>
+    </thead>
+    {#each incomeGroups as group (group.groupName)}
+      <tbody use:sortable>
+        {#if incomeGroups.length > 1 || group.groupName}
+          <tr class="group-header">
+            <td>{group.groupName || 'Other'}</td>
+            <td class="right subtotal">{fmt(group.plannedTotal)}</td>
+            <td class="right subtotal yearly">{fmt(group.plannedTotal * 12)}</td>
+            <td class="right subtotal">{fmt(group.actualTotal)}</td>
+          </tr>
+        {/if}
+        {#each group.entries as entry (entry.category_id)}
+          <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
+        {/each}
+      </tbody>
+    {/each}
+    <tfoot>
+      <AddCategoryRow onadd={() => openAddModal('income')} />
+    </tfoot>
+  </table>
 
-  {#if expenseEntries.length > 0}
-    <table>
-      <colgroup>
-        <col class="col-name" />
-        <col class="col-amount" />
-        <col class="col-amount" />
-        <col class="col-amount" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Expenses</th>
-          <th class="right">Planned/mo</th>
-          <th class="right">Planned/yr</th>
-          <th class="right">Actual/mo</th>
-        </tr>
-      </thead>
-      {#each expenseGroups as group (group.groupName)}
-        <tbody use:sortable>
-          {#if expenseGroups.length > 1 || group.groupName}
-            <tr class="group-header">
-              <td>{group.groupName || 'Other'}</td>
-              <td class="right subtotal">{fmt(group.plannedTotal)}</td>
-              <td class="right subtotal yearly">{fmt(group.plannedTotal * 12)}</td>
-              <td class="right subtotal">{fmt(group.actualTotal)}</td>
-            </tr>
-          {/if}
-          {#each group.entries as entry (entry.category_id)}
-            <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
-          {/each}
-          <AddCategoryRow onadd={() => openAddModal('expense', group.groupName, group.groupSortOrder)} />
-        </tbody>
-      {/each}
-    </table>
-  {/if}
+  <table>
+    <colgroup>
+      <col class="col-name" />
+      <col class="col-amount" />
+      <col class="col-amount" />
+      <col class="col-amount" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Expenses</th>
+        <th class="right">Planned/mo</th>
+        <th class="right">Planned/yr</th>
+        <th class="right">Actual/mo</th>
+      </tr>
+    </thead>
+    {#each expenseGroups as group (group.groupName)}
+      <tbody use:sortable>
+        {#if expenseGroups.length > 1 || group.groupName}
+          <tr class="group-header">
+            <td>{group.groupName || 'Other'}</td>
+            <td class="right subtotal">{fmt(group.plannedTotal)}</td>
+            <td class="right subtotal yearly">{fmt(group.plannedTotal * 12)}</td>
+            <td class="right subtotal">{fmt(group.actualTotal)}</td>
+          </tr>
+        {/if}
+        {#each group.entries as entry (entry.category_id)}
+          <BudgetEntryRow {entry} {onsave} ondelete={openDeleteModal} onedit={openEditModal} />
+        {/each}
+      </tbody>
+    {/each}
+    <tfoot>
+      <AddCategoryRow onadd={() => openAddModal('expense')} />
+    </tfoot>
+  </table>
 </div>
 
 {#if addModalContext}
   <AddCategoryModal
     type={addModalContext.type}
-    groupName={addModalContext.groupName}
-    groupSortOrder={addModalContext.groupSortOrder}
+    groups={addModalContext.groups}
     editCategory={addModalContext.editCategory}
     oncreated={oncategorycreated}
     onclose={() => addModalContext = null}
