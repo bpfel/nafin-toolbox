@@ -15,13 +15,20 @@
   import BudgetPlanManager from './BudgetPlanManager.svelte'
 
   let now = new Date()
-  let year = $state(now.getFullYear())
-  let month = $state(now.getMonth() + 1)
+  let currentYear = now.getFullYear()
+  let currentMonth = now.getMonth() + 1
+  // Max navigable: one month after current
+  let maxYear = currentMonth === 12 ? currentYear + 1 : currentYear
+  let maxMonth = currentMonth === 12 ? 1 : currentMonth + 1
+
+  let year = $state(currentYear)
+  let month = $state(currentMonth)
 
   let categories = $state<BudgetCategory[]>([])
   let summary = $state<BudgetPeriodSummary | null>(null)
   let needsSetup = $state(false)
   let periodNotFound = $state(false)
+  let isPastMonth = $derived(year < currentYear || (year === currentYear && month < currentMonth))
   let error = $state<string | null>(null)
   let loading = $state(true)
   let activeView = $state<'monthly' | 'plans'>('monthly')
@@ -82,25 +89,22 @@
 
   async function handleCreatePeriod() {
     try {
-      await createBudgetPeriod(year, month)
-      summary = await fetchBudgetPeriod(year, month)
-      periodNotFound = false
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to create period'
-    }
-  }
-
-  async function handleCopyFromPrevious() {
-    try {
+      // Try copying from previous month first
       let prevYear = month === 1 ? year - 1 : year
       let prevMonth = month === 1 ? 12 : month - 1
-      summary = await copyBudgetPeriod(year, month, {
-        from_year: prevYear,
-        from_month: prevMonth,
-      })
+      try {
+        summary = await copyBudgetPeriod(year, month, {
+          from_year: prevYear,
+          from_month: prevMonth,
+        })
+      } catch {
+        // No previous month — fall back to plan template
+        await createBudgetPeriod(year, month)
+        summary = await fetchBudgetPeriod(year, month)
+      }
       periodNotFound = false
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to copy from previous month'
+      error = e instanceof Error ? e.message : 'Failed to create budget'
     }
   }
 </script>
@@ -126,7 +130,7 @@
   {#if activeView === 'plans'}
     <BudgetPlanManager />
   {:else}
-    <MonthSelector {year} {month} onchange={changeMonth} />
+    <MonthSelector {year} {month} {maxYear} {maxMonth} onchange={changeMonth} />
 
     {#if loading}
       <p class="loading">Loading...</p>
@@ -136,15 +140,14 @@
       <BudgetSetup onseeded={loadData} />
     {:else if periodNotFound}
       <div class="no-period">
-        <p>No budget for this month yet.</p>
-        <div class="period-actions">
-          <button class="primary" onclick={handleCreatePeriod}>
-            Create from plan template
+        {#if isPastMonth}
+          <p>No budget was recorded for this month.</p>
+        {:else}
+          <p>No budget for this month yet.</p>
+          <button class="create-btn" onclick={handleCreatePeriod}>
+            Create budget
           </button>
-          <button class="secondary" onclick={handleCopyFromPrevious}>
-            Copy from previous month
-          </button>
-        </div>
+        {/if}
       </div>
     {:else if summary}
       <BudgetSummary {summary} />
@@ -204,23 +207,11 @@
     color: #666;
     margin-bottom: 1rem;
   }
-  .period-actions {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-  }
-  .period-actions button.primary {
+  .create-btn {
     background: #2d6a4f;
     color: white;
   }
-  .period-actions button.primary:hover {
+  .create-btn:hover {
     background: #245a42;
-  }
-  .period-actions button.secondary {
-    background: #e9ecef;
-    color: #1a1a2e;
-  }
-  .period-actions button.secondary:hover {
-    background: #dee2e6;
   }
 </style>

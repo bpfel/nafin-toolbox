@@ -2,10 +2,14 @@
   interface Props {
     year: number
     month: number
+    maxYear: number
+    maxMonth: number
     onchange: (year: number, month: number) => void
   }
 
-  let { year, month, onchange }: Props = $props()
+  let { year, month, maxYear, maxMonth, onchange }: Props = $props()
+
+  let atMax = $derived(year > maxYear || (year === maxYear && month >= maxMonth))
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -21,6 +25,7 @@
   }
 
   function next() {
+    if (atMax) return
     if (month === 12) {
       onchange(year + 1, 1)
     } else {
@@ -32,7 +37,7 @@
 <div class="month-selector">
   <button class="month-nav" onclick={prev}>&larr;</button>
   <span class="month-label">{monthNames[month - 1]} {year}</span>
-  <button class="month-nav" onclick={next}>&rarr;</button>
+  <button class="month-nav" onclick={next} disabled={atMax}>&rarr;</button>
 </div>
 
 <style>
@@ -53,7 +58,11 @@
     background: #e9ecef;
     color: #1a1a2e;
   }
-  .month-nav:hover {
+  .month-nav:hover:not(:disabled) {
     background: #dee2e6;
+  }
+  .month-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 </style>
