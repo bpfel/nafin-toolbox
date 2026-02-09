@@ -56,16 +56,37 @@ Three asset sub-types with different valuation strategies:
 
 ## Development
 
-Run the full stack locally via the dev compose override:
+Run the full stack locally:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker compose up -d --build
 ```
 
-- Frontend (Vite dev server): http://localhost:5173
+- Frontend: http://localhost:3000
 - API: http://localhost:8081
 
-> **Note:** The frontend Vite dev server proxies `/api` requests to the `api` Docker service. Running the frontend outside of Docker Compose is not supported — always use the dev compose setup.
+Rebuild after code changes with the same command. Go recompile takes ~10s, frontend ~3s.
+
+## Budget Defaults — Maintenance Notes
+
+The budget module ships with default categories and amounts based on **BFS HABE 2023** (Swiss Federal Statistical Office, Household Budget Survey). These live in `backend/internal/budget/defaults.go` and are only used when a user seeds their budget for the first time (`POST /api/budget/seed-defaults`). Changing the defaults does **not** affect existing user data.
+
+The following values should be reviewed periodically:
+
+| Default | Why it changes | Typical cadence |
+|---|---|---|
+| Health Insurance (`391.67`) | Premiums are set annually by the BAG | Every January |
+| Taxes (`833.33`) | Depends on canton, income bracket, deductions | Yearly or on life changes |
+| Rent (`1350.00`) | Regional market reference; not auto-updated | When BFS publishes new data |
+| Other Insurance (`166.67`) | Reflects an average across liability, household, etc. | Every few years |
+| Food & Groceries, Transportation, etc. | BFS HABE averages for a single-person household | When BFS publishes new HABE (every ~2 years) |
+| Salary (`6000.00`) | Placeholder net income for a single person | As needed |
+
+When BFS publishes a new HABE edition, update the `Amount` fields in `BFSDefaults()` and note the data source year in the function comment.
+
+## Category Archiving (not yet wired up)
+
+The backend supports archiving budget categories (soft-delete). The DB column, store filtering, and update endpoint are in place — but the frontend has no UI for it yet. Useful for categories that no longer apply (ended lease, stopped side hustle) while keeping historical period data intact. To finish: add an "archive" action to category management and a "show archived" toggle to the category list.
 
 ## Tech Stack
 
