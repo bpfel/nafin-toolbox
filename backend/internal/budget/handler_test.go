@@ -186,15 +186,16 @@ func TestCreateCategoryWithGroupFields(t *testing.T) {
 }
 
 func TestCategoryModelGroupFields(t *testing.T) {
-	// Verify that Category JSON marshaling includes new fields
+	// Verify that Category JSON marshaling includes group fields
+	groupID := 5
 	c := Category{
-		ID:             1,
-		Name:           "Rent",
-		Type:           "expense",
-		SortOrder:      10,
-		GroupName:      "Housing",
-		GroupSortOrder: 10,
-		Fixed:          true,
+		ID:        1,
+		Name:      "Rent",
+		Type:      "expense",
+		SortOrder: 10,
+		GroupID:   &groupID,
+		GroupName: "Housing",
+		Fixed:     true,
 	}
 
 	data, err := json.Marshal(c)
@@ -207,11 +208,11 @@ func TestCategoryModelGroupFields(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	if result["group_id"] != float64(5) {
+		t.Errorf("group_id = %v, want 5", result["group_id"])
+	}
 	if result["group_name"] != "Housing" {
 		t.Errorf("group_name = %v, want Housing", result["group_name"])
-	}
-	if result["group_sort_order"] != float64(10) {
-		t.Errorf("group_sort_order = %v, want 10", result["group_sort_order"])
 	}
 	if result["fixed"] != true {
 		t.Errorf("fixed = %v, want true", result["fixed"])
