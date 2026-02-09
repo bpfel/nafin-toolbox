@@ -67,6 +67,23 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 > **Note:** The frontend Vite dev server proxies `/api` requests to the `api` Docker service. Running the frontend outside of Docker Compose is not supported — always use the dev compose setup.
 
+## Budget Defaults — Maintenance Notes
+
+The budget module ships with default categories and amounts based on **BFS HABE 2023** (Swiss Federal Statistical Office, Household Budget Survey). These live in `backend/internal/budget/defaults.go` and are only used when a user seeds their budget for the first time (`POST /api/budget/seed-defaults`). Changing the defaults does **not** affect existing user data.
+
+The following values should be reviewed periodically:
+
+| Default | Why it changes | Typical cadence |
+|---|---|---|
+| Health Insurance (`391.67`) | Premiums are set annually by the BAG | Every January |
+| Taxes (`833.33`) | Depends on canton, income bracket, deductions | Yearly or on life changes |
+| Rent (`1350.00`) | Regional market reference; not auto-updated | When BFS publishes new data |
+| Other Insurance (`166.67`) | Reflects an average across liability, household, etc. | Every few years |
+| Food & Groceries, Transportation, etc. | BFS HABE averages for a single-person household | When BFS publishes new HABE (every ~2 years) |
+| Salary (`6000.00`) | Placeholder net income for a single person | As needed |
+
+When BFS publishes a new HABE edition, update the `Amount` fields in `BFSDefaults()` and note the data source year in the function comment.
+
 ## Tech Stack
 
 - **Frontend:** Svelte 5 + Vite (SPA, talks to Go API)
