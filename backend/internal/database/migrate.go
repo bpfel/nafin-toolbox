@@ -12,7 +12,14 @@ import (
 
 // Migrate runs all pending SQL migrations from the given directory.
 // It tracks applied migrations in a schema_migrations table.
+// An advisory lock serializes concurrent callers (e.g. parallel test packages).
 func Migrate(db *sql.DB, migrationsDir string) error {
+	// Serialize migrations across concurrent processes sharing the same DB.
+	if _, err := db.Exec("SELECT pg_advisory_lock(1)"); err != nil {
+		return fmt.Errorf("acquiring migration lock: %w", err)
+	}
+	defer db.Exec("SELECT pg_advisory_unlock(1)")
+
 	if err := ensureMigrationsTable(db); err != nil {
 		return fmt.Errorf("creating schema_migrations table: %w", err)
 	}
