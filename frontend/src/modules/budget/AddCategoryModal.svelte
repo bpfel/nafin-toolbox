@@ -3,7 +3,7 @@
 
   interface Props {
     type: 'income' | 'expense'
-    groups: { name: string; sortOrder: number }[]
+    groups: { name: string; id: number }[]
     editCategory?: { id: number; name: string; fixed: boolean; groupName: string } | null
     oncreated: () => void
     onclose: () => void
@@ -21,11 +21,6 @@
   let error = $state<string | null>(null)
 
   let resolvedGroupName = $derived(useNewGroup ? newGroupName.trim() : selectedGroup)
-  let resolvedGroupSortOrder = $derived(() => {
-    if (useNewGroup) return (groups.length + 1) * 10
-    const g = groups.find(g => g.name === selectedGroup)
-    return g ? g.sortOrder : 0
-  })
 
   async function save() {
     const trimmed = name.trim()
@@ -39,14 +34,12 @@
           name: trimmed,
           fixed,
           group_name: resolvedGroupName,
-          group_sort_order: resolvedGroupSortOrder(),
         })
       } else {
         await createBudgetCategory({
           name: trimmed,
           type,
           group_name: resolvedGroupName,
-          group_sort_order: resolvedGroupSortOrder(),
           fixed,
         })
       }

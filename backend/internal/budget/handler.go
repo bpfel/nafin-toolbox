@@ -41,6 +41,9 @@ func Routes(db *sql.DB) func(r chi.Router) {
 
 		r.Post("/categories/reorder", handleReorderCategories(store))
 
+		r.Get("/categories/groups", handleListGroups(store))
+		r.Post("/categories/groups", handleCreateGroup(store))
+
 		r.Get("/periods", handleListPeriods(store))
 		r.Post("/periods", handleCreatePeriod(store))
 		r.Get("/periods/{year}/{month}", handleGetPeriodSummary(store))
@@ -50,6 +53,39 @@ func Routes(db *sql.DB) func(r chi.Router) {
 		r.Delete("/entries/{id}", handleDeleteEntry(store))
 
 		r.Post("/seed-defaults", handleSeedDefaults(store))
+	}
+}
+
+func handleListGroups(store *Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		groups, err := store.ListGroups(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if groups == nil {
+			groups = []CategoryGroup{}
+		}
+		writeJSON(w, http.StatusOK, groups)
+	}
+}
+
+func handleCreateGroup(store *Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var g CategoryGroup
+		if err := json.NewDecoder(r.Body).Decode(&g); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if g.Name == "" || (g.Type != "income" && g.Type != "expense") {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name and type (income/expense) are required"})
+			return
+		}
+		if err := store.CreateGroup(r.Context(), &g); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusCreated, g)
 	}
 }
 
@@ -70,19 +106,54 @@ func handleListCategories(store *Store) http.HandlerFunc {
 
 func handleCreateCategory(store *Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var c Category
-		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+		var req struct {
+			Name      string `json:"name"`
+			Type      string `json:"type"`
+			GroupID   *int   `json:"group_id"`
+			GroupName string `json:"group_name"`
+			Fixed     bool   `json:"fixed"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 			return
 		}
-		if c.Name == "" || (c.Type != "income" && c.Type != "expense") {
+		if req.Name == "" || (req.Type != "income" && req.Type != "expense") {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name and type (income/expense) are required"})
 			return
+		}
+
+		// Resolve group: use group_id if provided, else auto-create from group_name
+		var groupID *int
+		if req.GroupID != nil {
+			groupID = req.GroupID
+		} else if req.GroupName != "" {
+			g, err := store.GetOrCreateGroup(r.Context(), req.GroupName, req.Type)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			groupID = &g.ID
+		}
+
+		c := Category{
+			Name:    req.Name,
+			Type:    req.Type,
+			GroupID: groupID,
+			Fixed:   req.Fixed,
 		}
 		if err := store.CreateCategory(r.Context(), &c); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Populate GroupName for the response
+		if groupID != nil {
+			cat, err := store.GetCategory(r.Context(), c.ID)
+			if err == nil {
+				c.GroupName = cat.GroupName
+			}
+		}
+
 		writeJSON(w, http.StatusCreated, c)
 	}
 }
@@ -102,13 +173,13 @@ func handleUpdateCategory(store *Store) http.HandlerFunc {
 		}
 
 		var update struct {
-			Name           *string `json:"name"`
-			Type           *string `json:"type"`
-			SortOrder      *int    `json:"sort_order"`
-			Archived       *bool   `json:"archived"`
-			GroupName      *string `json:"group_name"`
-			GroupSortOrder *int    `json:"group_sort_order"`
-			Fixed          *bool   `json:"fixed"`
+			Name      *string `json:"name"`
+			Type      *string `json:"type"`
+			SortOrder *int    `json:"sort_order"`
+			Archived  *bool   `json:"archived"`
+			GroupID   *int    `json:"group_id"`
+			GroupName *string `json:"group_name"`
+			Fixed     *bool   `json:"fixed"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
@@ -127,11 +198,15 @@ func handleUpdateCategory(store *Store) http.HandlerFunc {
 		if update.Archived != nil {
 			existing.Archived = *update.Archived
 		}
-		if update.GroupName != nil {
-			existing.GroupName = *update.GroupName
-		}
-		if update.GroupSortOrder != nil {
-			existing.GroupSortOrder = *update.GroupSortOrder
+		if update.GroupID != nil {
+			existing.GroupID = update.GroupID
+		} else if update.GroupName != nil && *update.GroupName != "" {
+			g, err := store.GetOrCreateGroup(r.Context(), *update.GroupName, existing.Type)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			existing.GroupID = &g.ID
 		}
 		if update.Fixed != nil {
 			existing.Fixed = *update.Fixed
@@ -141,6 +216,13 @@ func handleUpdateCategory(store *Store) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Re-fetch to populate GroupName from JOIN
+		refreshed, err := store.GetCategory(r.Context(), existing.ID)
+		if err == nil {
+			existing.GroupName = refreshed.GroupName
+		}
+
 		writeJSON(w, http.StatusOK, existing)
 	}
 }

@@ -18,15 +18,83 @@ func NewStore(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
+// Category Groups
+
+func (s *Store) ListGroups(ctx context.Context) ([]CategoryGroup, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, name, type, sort_order, created_at
+		 FROM budget_category_groups
+		 ORDER BY sort_order, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var groups []CategoryGroup
+	for rows.Next() {
+		var g CategoryGroup
+		if err := rows.Scan(&g.ID, &g.Name, &g.Type, &g.SortOrder, &g.CreatedAt); err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
+
+func (s *Store) CreateGroup(ctx context.Context, g *CategoryGroup) error {
+	return s.db.QueryRowContext(ctx,
+		`INSERT INTO budget_category_groups (name, type, sort_order)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, created_at`,
+		g.Name, g.Type, g.SortOrder,
+	).Scan(&g.ID, &g.CreatedAt)
+}
+
+func (s *Store) GetOrCreateGroup(ctx context.Context, name, typ string) (*CategoryGroup, error) {
+	var g CategoryGroup
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, name, type, sort_order, created_at
+		 FROM budget_category_groups
+		 WHERE name = $1 AND type = $2`,
+		name, typ,
+	).Scan(&g.ID, &g.Name, &g.Type, &g.SortOrder, &g.CreatedAt)
+	if err == nil {
+		return &g, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	// Auto-assign sort_order
+	var maxSort sql.NullInt64
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT MAX(sort_order) FROM budget_category_groups WHERE type = $1`, typ,
+	).Scan(&maxSort); err != nil {
+		return nil, err
+	}
+	sortOrder := 10
+	if maxSort.Valid {
+		sortOrder = int(maxSort.Int64) + 10
+	}
+
+	g = CategoryGroup{Name: name, Type: typ, SortOrder: sortOrder}
+	if err := s.CreateGroup(ctx, &g); err != nil {
+		return nil, err
+	}
+	return &g, nil
+}
+
 // Categories
 
 func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Category, error) {
-	query := `SELECT id, name, type, sort_order, archived, group_name, group_sort_order, fixed, created_at, updated_at
-	          FROM budget_categories`
+	query := `SELECT c.id, c.name, c.type, c.sort_order, c.archived, c.group_id,
+	                 COALESCE(g.name, ''), c.fixed, c.created_at, c.updated_at
+	          FROM budget_categories c
+	          LEFT JOIN budget_category_groups g ON g.id = c.group_id`
 	if !includeArchived {
-		query += " WHERE archived = FALSE"
+		query += " WHERE c.archived = FALSE"
 	}
-	query += " ORDER BY group_sort_order, sort_order, id"
+	query += " ORDER BY COALESCE(g.sort_order, 999999), c.sort_order, c.id"
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
@@ -37,7 +105,7 @@ func (s *Store) ListCategories(ctx context.Context, includeArchived bool) ([]Cat
 	var cats []Category
 	for rows.Next() {
 		var c Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.GroupName, &c.GroupSortOrder, &c.Fixed, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.GroupID, &c.GroupName, &c.Fixed, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		cats = append(cats, c)
@@ -49,9 +117,17 @@ func (s *Store) CreateCategory(ctx context.Context, c *Category) error {
 	// Auto-assign sort_order if not set
 	if c.SortOrder == 0 {
 		var maxSort sql.NullInt64
+		whereClause := `WHERE type = $1`
+		args := []interface{}{c.Type}
+		if c.GroupID != nil {
+			whereClause += ` AND group_id = $2`
+			args = append(args, *c.GroupID)
+		} else {
+			whereClause += ` AND group_id IS NULL`
+		}
 		err := s.db.QueryRowContext(ctx,
-			`SELECT MAX(sort_order) FROM budget_categories WHERE type = $1 AND group_name = $2`,
-			c.Type, c.GroupName,
+			`SELECT MAX(sort_order) FROM budget_categories `+whereClause,
+			args...,
 		).Scan(&maxSort)
 		if err != nil {
 			return err
@@ -63,10 +139,10 @@ func (s *Store) CreateCategory(ctx context.Context, c *Category) error {
 		}
 	}
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO budget_categories (name, type, sort_order, group_name, group_sort_order, fixed)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO budget_categories (name, type, sort_order, group_id, fixed)
+		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id, created_at, updated_at`,
-		c.Name, c.Type, c.SortOrder, c.GroupName, c.GroupSortOrder, c.Fixed,
+		c.Name, c.Type, c.SortOrder, c.GroupID, c.Fixed,
 	).Scan(&c.ID, &c.CreatedAt, &c.UpdatedAt)
 }
 
@@ -74,10 +150,10 @@ func (s *Store) UpdateCategory(ctx context.Context, c *Category) error {
 	return s.db.QueryRowContext(ctx,
 		`UPDATE budget_categories
 		 SET name = $2, type = $3, sort_order = $4, archived = $5,
-		     group_name = $6, group_sort_order = $7, fixed = $8, updated_at = NOW()
+		     group_id = $6, fixed = $7, updated_at = NOW()
 		 WHERE id = $1
 		 RETURNING updated_at`,
-		c.ID, c.Name, c.Type, c.SortOrder, c.Archived, c.GroupName, c.GroupSortOrder, c.Fixed,
+		c.ID, c.Name, c.Type, c.SortOrder, c.Archived, c.GroupID, c.Fixed,
 	).Scan(&c.UpdatedAt)
 }
 
@@ -124,9 +200,12 @@ func (s *Store) ReorderCategories(ctx context.Context, categoryIDs []int) error 
 func (s *Store) GetCategory(ctx context.Context, id int) (*Category, error) {
 	var c Category
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, type, sort_order, archived, group_name, group_sort_order, fixed, created_at, updated_at
-		 FROM budget_categories WHERE id = $1`, id,
-	).Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.GroupName, &c.GroupSortOrder, &c.Fixed, &c.CreatedAt, &c.UpdatedAt)
+		`SELECT c.id, c.name, c.type, c.sort_order, c.archived, c.group_id,
+		        COALESCE(g.name, ''), c.fixed, c.created_at, c.updated_at
+		 FROM budget_categories c
+		 LEFT JOIN budget_category_groups g ON g.id = c.group_id
+		 WHERE c.id = $1`, id,
+	).Scan(&c.ID, &c.Name, &c.Type, &c.SortOrder, &c.Archived, &c.GroupID, &c.GroupName, &c.Fixed, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -178,12 +257,13 @@ func (s *Store) GetPeriodSummary(ctx context.Context, year, month int) (*PeriodS
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT COALESCE(e.id, 0), $1, c.id, c.name, c.type, c.group_name, c.fixed,
+		`SELECT COALESCE(e.id, 0), $1, c.id, c.name, c.type, COALESCE(g.name, ''), c.fixed,
 		        COALESCE(e.planned_amount, 0), COALESCE(e.actual_amount, 0)
 		 FROM budget_categories c
+		 LEFT JOIN budget_category_groups g ON g.id = c.group_id
 		 LEFT JOIN budget_entries e ON e.category_id = c.id AND e.period_id = $1
 		 WHERE c.archived = FALSE
-		 ORDER BY c.group_sort_order, c.sort_order, c.id`, p.ID,
+		 ORDER BY COALESCE(g.sort_order, 999999), c.sort_order, c.id`, p.ID,
 	)
 	if err != nil {
 		return nil, err
@@ -272,8 +352,6 @@ func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plann
 			return nil, err
 		}
 	} else if plannedAmount != nil {
-		// For fixed categories this branch won't be reached (actualAmount was set above),
-		// but keep it for non-fixed planned-only updates.
 		err := s.db.QueryRowContext(ctx,
 			`INSERT INTO budget_entries (period_id, category_id, planned_amount)
 			 VALUES ($1, $2, $3)
@@ -300,7 +378,10 @@ func (s *Store) UpsertEntry(ctx context.Context, periodID, categoryID int, plann
 	}
 
 	err = s.db.QueryRowContext(ctx,
-		"SELECT name, type, group_name, fixed FROM budget_categories WHERE id = $1", categoryID,
+		`SELECT c.name, c.type, COALESCE(g.name, ''), c.fixed
+		 FROM budget_categories c
+		 LEFT JOIN budget_category_groups g ON g.id = c.group_id
+		 WHERE c.id = $1`, categoryID,
 	).Scan(&e.CategoryName, &e.CategoryType, &e.CategoryGroupName, &e.CategoryFixed)
 	if err != nil {
 		return nil, err

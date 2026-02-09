@@ -8,7 +8,7 @@
     entry: BudgetEntry
     onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
     ondelete: (categoryId: number, categoryName: string) => void
-    onedit: (categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, groupSortOrder: number, fixed: boolean) => void
+    onedit: (categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean) => void
   }
 
   let { entry, onsave, ondelete, onedit }: Props = $props()
@@ -170,7 +170,7 @@
       <span class="drag-handle" aria-label="Drag to reorder">⠿</span>
       <button
         class="name-text"
-        onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, 0, entry.category_fixed)}
+        onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, entry.category_fixed)}
       >
         {entry.category_name}
         {#if entry.category_fixed}

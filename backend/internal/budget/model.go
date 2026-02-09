@@ -2,17 +2,25 @@ package budget
 
 import "time"
 
+type CategoryGroup struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	SortOrder int       `json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Category struct {
-	ID             int       `json:"id"`
-	Name           string    `json:"name"`
-	Type           string    `json:"type"`
-	SortOrder      int       `json:"sort_order"`
-	Archived       bool      `json:"archived"`
-	GroupName      string    `json:"group_name"`
-	GroupSortOrder int       `json:"group_sort_order"`
-	Fixed          bool      `json:"fixed"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	SortOrder int       `json:"sort_order"`
+	Archived  bool      `json:"archived"`
+	GroupID   *int      `json:"group_id"`
+	GroupName string    `json:"group_name"`
+	Fixed     bool      `json:"fixed"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Period struct {
