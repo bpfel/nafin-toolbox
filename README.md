@@ -56,16 +56,16 @@ Three asset sub-types with different valuation strategies:
 
 ## Development
 
-Run the full stack locally via the dev compose override:
+Run the full stack locally:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker compose up -d --build
 ```
 
-- Frontend (Vite dev server): http://localhost:5173
+- Frontend: http://localhost:3000
 - API: http://localhost:8081
 
-> **Note:** The frontend Vite dev server proxies `/api` requests to the `api` Docker service. Running the frontend outside of Docker Compose is not supported — always use the dev compose setup.
+Rebuild after code changes with the same command. Go recompile takes ~10s, frontend ~3s.
 
 ## Budget Defaults — Maintenance Notes
 
