@@ -81,6 +81,8 @@
   }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
 {#if authState.loading}
   <main>
     <p class="loading">Loading...</p>
@@ -88,7 +90,6 @@
 {:else if !authState.currentUser}
   <LoginPage onSuccess={handleLoginSuccess} />
 {:else}
-  <svelte:window onkeydown={handleKeydown} />
 
   <main>
     <div class="top-bar">
