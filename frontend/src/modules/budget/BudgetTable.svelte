@@ -9,7 +9,6 @@
 
   interface EntryGroup {
     groupName: string
-    groupSortOrder: number
     entries: BudgetEntry[]
     plannedTotal: number
     actualTotal: number
@@ -24,7 +23,7 @@
 
   let { entries, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; sortOrder: number }[]; editCategory?: { id: number; name: string; fixed: boolean; groupName: string } } | null>(null)
+  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: number }[]; editCategory?: { id: number; name: string; fixed: boolean; groupName: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: number; categoryName: string } | null>(null)
 
   let collapsedGroups = $state(new Set<string>())
@@ -51,7 +50,6 @@
       if (!map.has(key)) {
         map.set(key, {
           groupName: key,
-          groupSortOrder: 0,
           entries: [],
           plannedTotal: 0,
           actualTotal: 0,
@@ -72,16 +70,18 @@
   let incomeGroups = $derived(groupEntries(incomeEntries))
   let expenseGroups = $derived(groupEntries(expenseEntries))
 
-  function groupsForType(type: 'income' | 'expense'): { name: string; sortOrder: number }[] {
+  function groupsForType(type: 'income' | 'expense'): { name: string; id: number }[] {
     const groups = type === 'income' ? incomeGroups : expenseGroups
-    return groups.map(g => ({ name: g.groupName, sortOrder: g.groupSortOrder }))
+    // We don't have group IDs from entries alone, so we use 0 as placeholder.
+    // The AddCategoryModal will use group_name for create/update.
+    return groups.map(g => ({ name: g.groupName, id: 0 }))
   }
 
   function openAddModal(type: 'income' | 'expense') {
     addModalContext = { type, groups: groupsForType(type) }
   }
 
-  function openEditModal(categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, groupSortOrder: number, fixed: boolean) {
+  function openEditModal(categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean) {
     addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, fixed, groupName } }
   }
 

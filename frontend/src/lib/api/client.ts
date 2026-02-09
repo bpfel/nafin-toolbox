@@ -6,14 +6,22 @@ export interface ModuleInfo {
   enabled_at: string
 }
 
+export interface BudgetCategoryGroup {
+  id: number
+  name: string
+  type: string
+  sort_order: number
+  created_at: string
+}
+
 export interface BudgetCategory {
   id: number
   name: string
   type: string
   sort_order: number
   archived: boolean
+  group_id: number | null
   group_name: string
-  group_sort_order: number
   fixed: boolean
   created_at: string
   updated_at: string
@@ -88,6 +96,21 @@ export async function fetchBudgetCategories(): Promise<BudgetCategory[]> {
   return request<BudgetCategory[]>('/budget/categories')
 }
 
+export async function fetchBudgetCategoryGroups(): Promise<BudgetCategoryGroup[]> {
+  return request<BudgetCategoryGroup[]>('/budget/categories/groups')
+}
+
+export async function createBudgetCategoryGroup(group: {
+  name: string
+  type: string
+  sort_order?: number
+}): Promise<BudgetCategoryGroup> {
+  return request<BudgetCategoryGroup>('/budget/categories/groups', {
+    method: 'POST',
+    body: JSON.stringify(group),
+  })
+}
+
 export async function fetchBudgetPeriod(year: number, month: number): Promise<BudgetPeriodSummary> {
   return request<BudgetPeriodSummary>(`/budget/periods/${year}/${month}`)
 }
@@ -131,8 +154,8 @@ export async function seedBudgetDefaults(): Promise<{
 export async function createBudgetCategory(cat: {
   name: string
   type: string
-  group_name: string
-  group_sort_order: number
+  group_id?: number
+  group_name?: string
   fixed?: boolean
 }): Promise<BudgetCategory> {
   return request<BudgetCategory>('/budget/categories', {
@@ -143,7 +166,7 @@ export async function createBudgetCategory(cat: {
 
 export async function updateBudgetCategory(
   id: number,
-  update: Partial<Pick<BudgetCategory, 'name' | 'type' | 'sort_order' | 'archived' | 'group_name' | 'group_sort_order' | 'fixed'>>,
+  update: Partial<Pick<BudgetCategory, 'name' | 'type' | 'sort_order' | 'archived' | 'group_id' | 'fixed'>> & { group_name?: string },
 ): Promise<BudgetCategory> {
   return request<BudgetCategory>(`/budget/categories/${id}`, {
     method: 'PUT',
