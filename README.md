@@ -84,6 +84,10 @@ The following values should be reviewed periodically:
 
 When BFS publishes a new HABE edition, update the `Amount` fields in `BFSDefaults()` and note the data source year in the function comment.
 
+## Category Archiving (not yet wired up)
+
+The backend supports archiving budget categories (soft-delete). The DB column, store filtering, and update endpoint are in place — but the frontend has no UI for it yet. Useful for categories that no longer apply (ended lease, stopped side hustle) while keeping historical period data intact. To finish: add an "archive" action to category management and a "show archived" toggle to the category list.
+
 ## Tech Stack
 
 - **Frontend:** Svelte 5 + Vite (SPA, talks to Go API)
