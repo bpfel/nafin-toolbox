@@ -69,6 +69,14 @@ func ensureMigrationsTable(db *sql.DB) error {
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)
 	`)
+	if err != nil {
+		// Handle race condition: concurrent CREATE TABLE IF NOT EXISTS can fail
+		// with a pg_type unique violation even though the table now exists.
+		var exists bool
+		if db.QueryRow("SELECT EXISTS (SELECT FROM pg_tables WHERE tablename = 'schema_migrations')").Scan(&exists) == nil && exists {
+			return nil
+		}
+	}
 	return err
 }
 
