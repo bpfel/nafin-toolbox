@@ -286,6 +286,40 @@ export async function resendVerification(id: number): Promise<string | null> {
   return data.error || 'Failed to resend'
 }
 
+export interface AuditLogEntry {
+  id: number
+  user_id: number | null
+  user_email: string | null
+  event: string
+  ip_address: string
+  user_agent: string
+  metadata: Record<string, any> | null
+  created_at: string
+}
+
+export interface AuditLogResponse {
+  entries: AuditLogEntry[]
+  total: number
+}
+
+export async function fetchAuditLogs(params: {
+  limit?: number
+  offset?: number
+  event?: string
+  user_id?: number
+} = {}): Promise<AuditLogResponse> {
+  const searchParams = new URLSearchParams()
+  if (params.limit) searchParams.set('limit', String(params.limit))
+  if (params.offset) searchParams.set('offset', String(params.offset))
+  if (params.event) searchParams.set('event', params.event)
+  if (params.user_id !== undefined) searchParams.set('user_id', String(params.user_id))
+
+  const qs = searchParams.toString()
+  const res = await fetch(`${API_BASE}/auth/audit-logs${qs ? '?' + qs : ''}`, { credentials: 'include' })
+  if (res.ok) return res.json()
+  return { entries: [], total: 0 }
+}
+
 export async function getSettings(): Promise<AppSettings> {
   const res = await fetch(`${API_BASE}/auth/settings`, { credentials: 'include' })
   if (res.ok) return res.json()

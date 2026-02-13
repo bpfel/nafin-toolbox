@@ -109,6 +109,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Delete("/auth/users/{id}", auth.HandleAdminDeleteUser(deps))
 			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
+			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))
 
 			r.Route("/modules", module.Routes(s.db))
 			r.Route("/budget", budget.Routes(s.db))

@@ -929,6 +929,43 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 	}
 }
 
+// HandleListAuditLogs returns paginated audit log entries. Requires admin role.
+func HandleListAuditLogs(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		caller := UserFromContext(r.Context())
+		if !caller.IsAdmin() {
+			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			return
+		}
+
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		eventFilter := r.URL.Query().Get("event")
+
+		var userIDFilter *int
+		if uidStr := r.URL.Query().Get("user_id"); uidStr != "" {
+			if uid, err := strconv.Atoi(uidStr); err == nil {
+				userIDFilter = &uid
+			}
+		}
+
+		entries, total, err := deps.Store.ListAuditLogs(r.Context(), limit, offset, eventFilter, userIDFilter)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		if entries == nil {
+			entries = []AuditLogEntry{}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"entries": entries,
+			"total":   total,
+		})
+	}
+}
+
 // ---- Helpers ----
 
 func sessionCookie(token string, expires time.Time) *http.Cookie {
