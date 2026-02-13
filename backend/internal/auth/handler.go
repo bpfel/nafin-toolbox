@@ -1,16 +1,35 @@
 package auth
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/bpfel/nafin-toolbox/internal/email"
+	"github.com/go-chi/chi/v5"
+	"github.com/pquerna/otp/totp"
 )
 
-func HandleLogin(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
+// HandlerDeps holds shared dependencies for auth handlers.
+type HandlerDeps struct {
+	Store         *Store
+	Limiter       *LoginRateLimiter
+	EmailSender   email.Sender
+	EncryptionKey []byte // 32-byte AES key, nil if 2FA not available
+	AppURL        string
+}
+
+func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !limiter.Allow(r) {
+		if !deps.Limiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
 			return
@@ -27,39 +46,67 @@ func HandleLogin(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 			return
 		}
 
-		user, err := store.GetUserByEmail(r.Context(), req.Email)
+		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}
 		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
+			uid := userIDPtr(user)
+			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
 			http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 			return
 		}
 
-		// Invalidate existing sessions before creating a new one
-		if err := store.DeleteUserSessions(r.Context(), user.ID); err != nil {
+		// Reject unverified email users
+		if !user.EmailVerified {
+			http.Error(w, `{"error":"email not verified"}`, http.StatusForbidden)
+			return
+		}
+
+		// If TOTP is enabled, issue MFA challenge instead of session
+		if user.TOTPEnabled {
+			mfaToken, err := deps.Store.CreateMFAChallenge(r.Context(), user.ID)
+			if err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"requires_2fa": true,
+				"mfa_token":    mfaToken,
+			})
+			return
+		}
+
+		// No 2FA — create session directly
+		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}
 
-		sess, err := store.CreateSession(r.Context(), user.ID)
+		sess, err := deps.Store.CreateSession(r.Context(), user.ID)
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}
 
+		deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginSuccess, r, nil)
 		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
 	}
 }
 
-func HandleLogout(store *Store) http.HandlerFunc {
+func HandleLogout(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
 		cookie, err := r.Cookie("session")
 		if err == nil {
-			store.DeleteSession(r.Context(), cookie.Value)
+			deps.Store.DeleteSession(r.Context(), cookie.Value)
+		}
+		if user != nil {
+			deps.Store.LogAudit(r.Context(), &user.ID, AuditLogout, r, nil)
 		}
 
 		http.SetCookie(w, &http.Cookie{
@@ -88,7 +135,9 @@ func HandleMe(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleInvite creates a new user. Requires admin role.
-func HandleInvite(store *Store) http.HandlerFunc {
+// With SMTP configured: sends verification email (user sets own password).
+// Without SMTP: falls back to admin-set password.
+func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
@@ -102,8 +151,8 @@ func HandleInvite(store *Store) http.HandlerFunc {
 			return
 		}
 
-		if req.Email == "" || req.Password == "" {
-			http.Error(w, `{"error":"email and password required"}`, http.StatusBadRequest)
+		if req.Email == "" {
+			http.Error(w, `{"error":"email required"}`, http.StatusBadRequest)
 			return
 		}
 
@@ -111,18 +160,29 @@ func HandleInvite(store *Store) http.HandlerFunc {
 			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
 			return
 		}
-		if err := ValidatePassword(req.Password); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
-			return
-		}
 
-		// Default to "user" role, only allow "admin" or "user"
 		role := RoleUser
 		if req.Role == RoleAdmin {
 			role = RoleAdmin
 		}
 
-		existing, err := store.GetUserByEmail(r.Context(), req.Email)
+		// Check if email sending is available
+		_, isLogSender := deps.EmailSender.(*email.LogSender)
+		smtpAvailable := !isLogSender
+
+		// Validate password early in fallback mode (before DB lookup)
+		if !smtpAvailable {
+			if req.Password == "" {
+				http.Error(w, `{"error":"password required (email not configured)"}`, http.StatusBadRequest)
+				return
+			}
+			if err := ValidatePassword(req.Password); err != nil {
+				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+				return
+			}
+		}
+
+		existing, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
@@ -132,26 +192,73 @@ func HandleInvite(store *Store) http.HandlerFunc {
 			return
 		}
 
-		hash, err := HashPassword(req.Password)
-		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-			return
-		}
+		if smtpAvailable {
+			// Email-based invite: create user with empty password, unverified
+			user, err := deps.Store.CreateUserFull(r.Context(), req.Email, "", role, false, false)
+			if err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
 
-		user, err := store.CreateUser(r.Context(), req.Email, hash, role, true)
-		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-			return
-		}
+			// Create verification token
+			rawToken, err := deps.Store.CreateVerificationToken(r.Context(), user.ID, "email_verify")
+			if err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(user)
+			// Send invite email
+			htmlBody, textBody, err := email.RenderInviteEmail(deps.AppURL, rawToken)
+			if err != nil {
+				log.Printf("rendering invite email: %v", err)
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
+
+			if err := deps.EmailSender.Send(r.Context(), req.Email, "You've been invited to Finance Tracker", htmlBody, textBody); err != nil {
+				log.Printf("sending invite email: %v", err)
+				http.Error(w, `{"error":"failed to send invite email"}`, http.StatusInternalServerError)
+				return
+			}
+
+			deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserInvited, r, map[string]any{
+				"invited_user_id": user.ID,
+				"invited_email":   user.Email,
+				"method":          "email",
+			})
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(user)
+		} else {
+			// Fallback: admin sets password (already validated above)
+			hash, err := HashPassword(req.Password)
+			if err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
+
+			user, err := deps.Store.CreateUser(r.Context(), req.Email, hash, role, true)
+			if err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
+
+			deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserInvited, r, map[string]any{
+				"invited_user_id": user.ID,
+				"invited_email":   user.Email,
+				"method":          "password",
+			})
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(user)
+		}
 	}
 }
 
 // HandleListUsers returns all users. Requires admin role.
-func HandleListUsers(store *Store) http.HandlerFunc {
+func HandleListUsers(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
@@ -159,7 +266,7 @@ func HandleListUsers(store *Store) http.HandlerFunc {
 			return
 		}
 
-		users, err := store.ListUsers(r.Context())
+		users, err := deps.Store.ListUsers(r.Context())
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
@@ -174,8 +281,7 @@ func HandleListUsers(store *Store) http.HandlerFunc {
 }
 
 // HandleChangePassword lets the authenticated user change their password.
-// Verifies current password, validates new password, updates hash, and invalidates all sessions.
-func HandleChangePassword(store *Store) http.HandlerFunc {
+func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
@@ -210,33 +316,31 @@ func HandleChangePassword(store *Store) http.HandlerFunc {
 			return
 		}
 
-		if err := store.UpdatePassword(r.Context(), user.ID, newHash); err != nil {
+		if err := deps.Store.UpdatePassword(r.Context(), user.ID, newHash); err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}
 
-		// Clear forced password change flag
-		if err := store.ClearMustChangePassword(r.Context(), user.ID); err != nil {
+		if err := deps.Store.ClearMustChangePassword(r.Context(), user.ID); err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}
 
-		// Invalidate all sessions (forces re-login everywhere)
-		if err := store.DeleteUserSessions(r.Context(), user.ID); err != nil {
+		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}
 
+		deps.Store.LogAudit(r.Context(), &user.ID, AuditPasswordChanged, r, nil)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
 }
 
 // HandleSetup creates the first user as admin. Only works when no users exist.
-// Uses an advisory lock to prevent race conditions on concurrent requests.
-func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
+func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !limiter.Allow(r) {
+		if !deps.Limiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return
@@ -268,7 +372,7 @@ func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 			return
 		}
 
-		user, err := store.CreateFirstUser(r.Context(), req.Email, hash)
+		user, err := deps.Store.CreateFirstUser(r.Context(), req.Email, hash)
 		if err == ErrSetupAlreadyDone {
 			http.Error(w, `{"error":"setup already completed"}`, http.StatusForbidden)
 			return
@@ -278,8 +382,7 @@ func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 			return
 		}
 
-		// Auto-login after setup
-		sess, err := store.CreateSession(r.Context(), user.ID)
+		sess, err := deps.Store.CreateSession(r.Context(), user.ID)
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
@@ -293,9 +396,9 @@ func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 }
 
 // HandleNeedsSetup checks if any users exist (public endpoint).
-func HandleNeedsSetup(store *Store) http.HandlerFunc {
+func HandleNeedsSetup(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		count, err := store.UserCount(r.Context())
+		count, err := deps.Store.UserCount(r.Context())
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
@@ -304,6 +407,526 @@ func HandleNeedsSetup(store *Store) http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]bool{"needs_setup": count == 0})
 	}
 }
+
+// HandleVerifyEmail accepts a verification token + password, verifies email, sets password, auto-logs in.
+func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !deps.Limiter.Allow(r) {
+			w.Header().Set("Retry-After", "900")
+			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			return
+		}
+
+		var req VerifyEmailRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Token == "" || req.Password == "" {
+			http.Error(w, `{"error":"token and password required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if err := ValidatePassword(req.Password); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+
+		userID, err := deps.Store.ValidateVerificationToken(r.Context(), req.Token, "email_verify")
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		if userID == 0 {
+			http.Error(w, `{"error":"invalid or expired token"}`, http.StatusBadRequest)
+			return
+		}
+
+		hash, err := HashPassword(req.Password)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.Store.UpdatePassword(r.Context(), userID, hash); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.Store.SetEmailVerified(r.Context(), userID); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Clean up tokens
+		deps.Store.DeleteVerificationTokens(r.Context(), userID, "email_verify")
+
+		// Auto-login
+		sess, err := deps.Store.CreateSession(r.Context(), userID)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		user, err := deps.Store.GetUserByID(r.Context(), userID)
+		if err != nil || user == nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		deps.Store.LogAudit(r.Context(), &userID, AuditEmailVerified, r, nil)
+		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(user)
+	}
+}
+
+// HandleVerify2FA validates a TOTP code or recovery code after password authentication.
+func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !deps.Limiter.Allow(r) {
+			w.Header().Set("Retry-After", "900")
+			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			return
+		}
+
+		var req Verify2FARequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.MFAToken == "" || req.Code == "" {
+			http.Error(w, `{"error":"mfa_token and code required"}`, http.StatusBadRequest)
+			return
+		}
+
+		userID, err := deps.Store.ValidateMFAChallenge(r.Context(), req.MFAToken)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		if userID == 0 {
+			http.Error(w, `{"error":"invalid or expired MFA token"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Try TOTP code first
+		valid, err := validateTOTPCode(r.Context(), deps, userID, req.Code)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if !valid {
+			// Try recovery code
+			valid, err = tryRecoveryCode(r.Context(), deps, userID, req.Code)
+			if err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if !valid {
+			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, nil)
+			http.Error(w, `{"error":"invalid code"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Create session
+		if err := deps.Store.DeleteUserSessions(r.Context(), userID); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		sess, err := deps.Store.CreateSession(r.Context(), userID)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		user, err := deps.Store.GetUserByID(r.Context(), userID)
+		if err != nil || user == nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		deps.Store.LogAudit(r.Context(), &userID, AuditLoginSuccess, r, map[string]any{"method": "2fa"})
+		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(user)
+	}
+}
+
+// HandleSetup2FA generates a TOTP secret and returns the otpauth:// URI.
+func HandleSetup2FA(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if user == nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if deps.EncryptionKey == nil {
+			http.Error(w, `{"error":"2FA not available (encryption key not configured)"}`, http.StatusServiceUnavailable)
+			return
+		}
+
+		if user.TOTPEnabled {
+			http.Error(w, `{"error":"2FA is already enabled"}`, http.StatusConflict)
+			return
+		}
+
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "Finance Tracker",
+			AccountName: user.Email,
+		})
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Encrypt and store the secret
+		encrypted, err := Encrypt([]byte(key.Secret()), deps.EncryptionKey)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.Store.SaveTOTPSecret(r.Context(), user.ID, encrypted); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(Enable2FAResponse{
+			Secret: key.Secret(),
+			URL:    key.URL(),
+		})
+	}
+}
+
+// HandleConfirm2FA verifies the TOTP code and enables 2FA, returning recovery codes.
+func HandleConfirm2FA(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if user == nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if user.TOTPEnabled {
+			http.Error(w, `{"error":"2FA is already enabled"}`, http.StatusConflict)
+			return
+		}
+
+		var req Confirm2FARequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Code == "" {
+			http.Error(w, `{"error":"code required"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Validate code against stored secret
+		valid, err := validateTOTPCode(r.Context(), deps, user.ID, req.Code)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		if !valid {
+			http.Error(w, `{"error":"invalid code"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Enable 2FA
+		if err := deps.Store.SetTOTPEnabled(r.Context(), user.ID, true); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Generate recovery codes
+		codes, hashes, err := generateRecoveryCodes(10)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.Store.SaveRecoveryCodes(r.Context(), user.ID, hashes); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		deps.Store.LogAudit(r.Context(), &user.ID, Audit2FAEnabled, r, nil)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(Confirm2FAResponse{RecoveryCodes: codes})
+	}
+}
+
+// HandleDisable2FA disables 2FA. Requires current password.
+func HandleDisable2FA(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if user == nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		var req Disable2FARequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Password == "" {
+			http.Error(w, `{"error":"password required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if !CheckPassword(user.PasswordHash, req.Password) {
+			http.Error(w, `{"error":"incorrect password"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if err := deps.Store.SetTOTPEnabled(r.Context(), user.ID, false); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		deps.Store.DeleteTOTPSecret(r.Context(), user.ID)
+		deps.Store.DeleteRecoveryCodes(r.Context(), user.ID)
+
+		deps.Store.LogAudit(r.Context(), &user.ID, Audit2FADisabled, r, nil)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// HandleRegenerateRecoveryCodes generates new recovery codes. Requires password.
+func HandleRegenerateRecoveryCodes(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if user == nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if !user.TOTPEnabled {
+			http.Error(w, `{"error":"2FA is not enabled"}`, http.StatusBadRequest)
+			return
+		}
+
+		var req RegenerateRecoveryCodesRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Password == "" {
+			http.Error(w, `{"error":"password required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if !CheckPassword(user.PasswordHash, req.Password) {
+			http.Error(w, `{"error":"incorrect password"}`, http.StatusUnauthorized)
+			return
+		}
+
+		codes, hashes, err := generateRecoveryCodes(10)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.Store.SaveRecoveryCodes(r.Context(), user.ID, hashes); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(Confirm2FAResponse{RecoveryCodes: codes})
+	}
+}
+
+// HandleDeleteAccount lets a user delete their own account. Requires password.
+func HandleDeleteAccount(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if user == nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		var req DeleteAccountRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Password == "" {
+			http.Error(w, `{"error":"password required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if !CheckPassword(user.PasswordHash, req.Password) {
+			http.Error(w, `{"error":"incorrect password"}`, http.StatusUnauthorized)
+			return
+		}
+
+		deps.Store.LogAudit(r.Context(), &user.ID, AuditUserDeleted, r, map[string]any{"self": true})
+
+		if err := deps.Store.DeleteUser(r.Context(), user.ID); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name: "session", Value: "", Path: "/",
+			HttpOnly: true, Secure: isSecureCookie(),
+			SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// HandleAdminDeleteUser lets an admin delete another user.
+func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		caller := UserFromContext(r.Context())
+		if !caller.IsAdmin() {
+			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			return
+		}
+
+		idStr := chi.URLParam(r, "id")
+		targetID, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, `{"error":"invalid user ID"}`, http.StatusBadRequest)
+			return
+		}
+
+		if targetID == caller.ID {
+			http.Error(w, `{"error":"cannot delete yourself via admin endpoint"}`, http.StatusBadRequest)
+			return
+		}
+
+		deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserDeleted, r, map[string]any{
+			"deleted_user_id": targetID,
+		})
+
+		if err := deps.Store.DeleteUser(r.Context(), targetID); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// HandleResendVerification regenerates and resends invite email for an unverified user.
+func HandleResendVerification(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		caller := UserFromContext(r.Context())
+		if !caller.IsAdmin() {
+			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			return
+		}
+
+		idStr := chi.URLParam(r, "id")
+		targetID, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, `{"error":"invalid user ID"}`, http.StatusBadRequest)
+			return
+		}
+
+		user, err := deps.Store.GetUserByID(r.Context(), targetID)
+		if err != nil || user == nil {
+			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+			return
+		}
+
+		if user.EmailVerified {
+			http.Error(w, `{"error":"user already verified"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Delete old tokens and create new one
+		deps.Store.DeleteVerificationTokens(r.Context(), user.ID, "email_verify")
+		rawToken, err := deps.Store.CreateVerificationToken(r.Context(), user.ID, "email_verify")
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		htmlBody, textBody, err := email.RenderInviteEmail(deps.AppURL, rawToken)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.EmailSender.Send(r.Context(), user.Email, "You've been invited to Finance Tracker", htmlBody, textBody); err != nil {
+			log.Printf("resending invite email: %v", err)
+			http.Error(w, `{"error":"failed to send email"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// HandleAdminRequire2FA sets or clears the require_2fa app setting.
+func HandleAdminRequire2FA(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		caller := UserFromContext(r.Context())
+		if !caller.IsAdmin() {
+			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			return
+		}
+
+		var req Require2FARequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Require {
+			if err := deps.Store.SetSetting(r.Context(), "require_2fa", "true"); err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
+		} else {
+			if err := deps.Store.DeleteSetting(r.Context(), "require_2fa"); err != nil {
+				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"require_2fa": req.Require})
+	}
+}
+
+// HandleGetSettings returns app settings relevant to the authenticated user.
+func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		require2fa, _ := deps.Store.GetSetting(r.Context(), "require_2fa")
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"require_2fa": require2fa == "true",
+		})
+	}
+}
+
+// ---- Helpers ----
 
 func sessionCookie(token string, expires time.Time) *http.Cookie {
 	return &http.Cookie{
@@ -353,4 +976,79 @@ type validationError struct {
 
 func (e *validationError) Error() string {
 	return e.msg
+}
+
+func userIDPtr(u *User) *int {
+	if u == nil {
+		return nil
+	}
+	return &u.ID
+}
+
+// validateTOTPCode decrypts the stored secret and validates a TOTP code.
+func validateTOTPCode(ctx context.Context, deps *HandlerDeps, userID int, code string) (bool, error) {
+	if deps.EncryptionKey == nil {
+		return false, nil
+	}
+
+	encrypted, err := deps.Store.GetTOTPSecret(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if encrypted == "" {
+		return false, nil
+	}
+
+	secret, err := Decrypt(encrypted, deps.EncryptionKey)
+	if err != nil {
+		return false, fmt.Errorf("decrypting TOTP secret: %w", err)
+	}
+
+	return totp.Validate(code, string(secret)), nil
+}
+
+// tryRecoveryCode checks if the code matches any unused recovery code.
+func tryRecoveryCode(ctx context.Context, deps *HandlerDeps, userID int, code string) (bool, error) {
+	codes, err := deps.Store.GetRecoveryCodes(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+
+	for _, rc := range codes {
+		if rc.Used {
+			continue
+		}
+		if CheckPassword(rc.CodeHash, code) {
+			if err := deps.Store.MarkRecoveryCodeUsed(ctx, rc.ID); err != nil {
+				return false, err
+			}
+			deps.Store.LogAudit(ctx, &userID, AuditRecoveryCodeUsed, nil, nil)
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// generateRecoveryCodes generates n recovery codes and their bcrypt hashes.
+func generateRecoveryCodes(n int) ([]string, []string, error) {
+	codes := make([]string, n)
+	hashes := make([]string, n)
+
+	for i := 0; i < n; i++ {
+		b := make([]byte, 4)
+		if _, err := rand.Read(b); err != nil {
+			return nil, nil, err
+		}
+		code := hex.EncodeToString(b) // 8-char hex codes
+		codes[i] = code
+
+		hash, err := HashPassword(code)
+		if err != nil {
+			return nil, nil, err
+		}
+		hashes[i] = hash
+	}
+
+	return codes, hashes, nil
 }
