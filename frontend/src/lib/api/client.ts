@@ -53,11 +53,22 @@ export interface BudgetPeriodSummary {
   actual_balance: string
 }
 
+let onUnauthorized: (() => void) | null = null
+
+export function setOnUnauthorized(callback: () => void) {
+  onUnauthorized = callback
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options,
   })
+  if (res.status === 401 && onUnauthorized) {
+    onUnauthorized()
+    throw new Error('Unauthorized')
+  }
   if (!res.ok) {
     let msg = `API error: ${res.status} ${res.statusText}`
     try {
@@ -83,7 +94,7 @@ export async function enableModule(id: string): Promise<ModuleInfo> {
 }
 
 export async function disableModule(id: string): Promise<void> {
-  await fetch(`${API_BASE}/modules/${id}`, { method: 'DELETE' })
+  await fetch(`${API_BASE}/modules/${id}`, { method: 'DELETE', credentials: 'include' })
 }
 
 export async function healthCheck(): Promise<{ status: string }> {
@@ -175,7 +186,10 @@ export async function updateBudgetCategory(
 }
 
 export async function deleteBudgetCategory(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/budget/categories/${id}`, { method: 'DELETE' })
+  const res = await fetch(`${API_BASE}/budget/categories/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
   if (!res.ok) {
     let msg = `API error: ${res.status}`
     try {

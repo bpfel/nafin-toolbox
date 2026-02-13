@@ -12,7 +12,14 @@ import (
 
 // Migrate runs all pending SQL migrations from the given directory.
 // It tracks applied migrations in a schema_migrations table.
+// An advisory lock serializes concurrent callers (e.g. parallel test packages).
 func Migrate(db *sql.DB, migrationsDir string) error {
+	// Serialize migrations across concurrent processes sharing the same DB.
+	if _, err := db.Exec("SELECT pg_advisory_lock(1)"); err != nil {
+		return fmt.Errorf("acquiring migration lock: %w", err)
+	}
+	defer db.Exec("SELECT pg_advisory_unlock(1)")
+
 	if err := ensureMigrationsTable(db); err != nil {
 		return fmt.Errorf("creating schema_migrations table: %w", err)
 	}
@@ -69,6 +76,14 @@ func ensureMigrationsTable(db *sql.DB) error {
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)
 	`)
+	if err != nil {
+		// Handle race condition: concurrent CREATE TABLE IF NOT EXISTS can fail
+		// with a pg_type unique violation even though the table now exists.
+		var exists bool
+		if db.QueryRow("SELECT EXISTS (SELECT FROM pg_tables WHERE tablename = 'schema_migrations')").Scan(&exists) == nil && exists {
+			return nil
+		}
+	}
 	return err
 }
 

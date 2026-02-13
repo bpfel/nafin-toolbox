@@ -88,6 +88,7 @@ Active worktrees:
 |---|---|---|
 | `/home/bpfel/nafin-toolbox/` | `develop` (main repo) | Base code, shared infrastructure |
 | `/home/bpfel/nafin-toolbox-budget/` | `feature/budget` | Budget module development |
+| `/home/bpfel/nafin-toolbox-auth/` | `feature/auth` | Multi-user authentication |
 
 **Rules:**
 - **Before writing or editing any file**, verify the file path starts with the correct worktree root for the feature you are working on.

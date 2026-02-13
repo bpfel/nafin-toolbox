@@ -1,11 +1,34 @@
 <script lang="ts">
-  import { fetchModules, enableModule, disableModule, type ModuleInfo } from './lib/api/client'
+  import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
+  import { checkAuth, getAuthState, logout, getSettings } from './lib/auth/authStore.svelte'
+  import LoginPage from './lib/auth/LoginPage.svelte'
+  import InvitePanel from './lib/auth/InvitePanel.svelte'
+  import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
+  import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
+  import SecuritySettings from './lib/auth/SecuritySettings.svelte'
+  import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
+
+  const authState = getAuthState()
+
+  // Clear auth state and redirect to login on 401
+  setOnUnauthorized(() => {
+    logout()
+  })
+
+  // URL-based routing
+  let isVerifyPage = $state(window.location.pathname === '/verify')
 
   let modules = $state<ModuleInfo[]>([])
   let error = $state<string | null>(null)
   let showConfig = $state(false)
+  let showUsers = $state(false)
+  let showSecurity = $state(false)
   let toggling = $state<string | null>(null)
+
+  // 2FA enforcement
+  let require2FA = $state(false)
+  let show2FAEnforcement = $state(false)
 
   const availableModules = [
     { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
@@ -52,83 +75,160 @@
   }
 
   $effect(() => {
-    loadModules()
+    checkAuth()
   })
+
+  // Load modules and check 2FA enforcement when user is authenticated
+  $effect(() => {
+    if (authState.currentUser) {
+      loadModules()
+      checkRequire2FA()
+    }
+  })
+
+  async function checkRequire2FA() {
+    const settings = await getSettings()
+    require2FA = settings.require_2fa
+    if (require2FA && authState.currentUser && !authState.currentUser.totp_enabled) {
+      show2FAEnforcement = true
+    }
+  }
+
+  function handleLoginSuccess() {
+    loadModules()
+    checkRequire2FA()
+  }
+
+  async function handleLogout() {
+    await logout()
+    modules = []
+    error = null
+    showUsers = false
+    showConfig = false
+    showSecurity = false
+    show2FAEnforcement = false
+  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
-<main>
-  <div class="top-bar">
-    <h1>Finance Tracker</h1>
-    <button class="config-btn" onclick={() => (showConfig = true)} aria-label="Configure modules">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
-    </button>
-  </div>
-
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
-
-  {#if modules.length === 0 && !error}
-    <div class="empty-state">
-      <p>No modules enabled yet.</p>
-      <button onclick={() => (showConfig = true)}>Configure modules</button>
-    </div>
-  {:else}
-    {#each modules as mod}
-      <section class="module-section">
-        <h2>{mod.name}</h2>
-        {#if mod.id === 'budget'}
-          <BudgetModule />
-        {:else}
-          <div class="module-card">
-            <span class="module-id">{mod.id}</span>
-            <p>Coming soon.</p>
-          </div>
-        {/if}
-      </section>
-    {/each}
-  {/if}
-
-  {#if showConfig}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="backdrop" onclick={handleBackdrop}>
-      <div class="modal" role="dialog" aria-label="Configure modules">
-        <h3>Modules</h3>
-        <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
-        <div class="module-list">
-          {#each availableModules as mod}
-            <div class="module-row" class:enabled={isEnabled(mod.id)}>
-              <div class="module-info">
-                <span class="module-name">{mod.name}</span>
-                <span class="module-desc">{mod.description}</span>
-              </div>
-              <button
-                class="toggle"
-                class:active={isEnabled(mod.id)}
-                disabled={toggling === mod.id}
-                onclick={() => toggleModule(mod.id)}
-                aria-label="{isEnabled(mod.id) ? 'Disable' : 'Enable'} {mod.name}"
-              >
-                <span class="toggle-track">
-                  <span class="toggle-thumb"></span>
-                </span>
-              </button>
-            </div>
-          {/each}
-        </div>
-        <button class="close-btn" onclick={() => (showConfig = false)}>Done</button>
+{#if isVerifyPage}
+  <VerifyEmailPage />
+{:else if authState.loading}
+  <main>
+    <p class="loading">Loading...</p>
+  </main>
+{:else if !authState.currentUser}
+  <LoginPage onSuccess={handleLoginSuccess} />
+{:else if authState.currentUser.must_change_password}
+  <ChangePasswordForm
+    message="Please set a new password to continue."
+  />
+{:else if show2FAEnforcement}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>Two-Factor Authentication Required</h1>
+        <p class="hint">Your administrator requires all users to enable two-factor authentication before continuing.</p>
+        <TwoFactorSetup onDone={() => { show2FAEnforcement = false; window.location.reload() }} />
       </div>
     </div>
-  {/if}
-</main>
+  </main>
+{:else}
+
+  <main>
+    <div class="top-bar">
+      <h1>Finance Tracker</h1>
+      <div class="user-info">
+        <span class="role-tag">{authState.currentUser.role}</span>
+        <span>{authState.currentUser.email}</span>
+        {#if authState.currentUser.role === 'admin'}
+          <button class="btn-secondary" onclick={() => { showUsers = !showUsers; showConfig = false; showSecurity = false }}>
+            {showUsers ? 'Back' : 'Users'}
+          </button>
+        {/if}
+        <button class="btn-secondary" onclick={() => { showSecurity = !showSecurity; showUsers = false; showConfig = false }}>
+          {showSecurity ? 'Back' : 'Security'}
+        </button>
+        <button class="btn-secondary" onclick={handleLogout}>Logout</button>
+        <button class="config-btn" onclick={() => (showConfig = true)} aria-label="Configure modules">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    {#if showSecurity}
+      <SecuritySettings onDone={() => { showSecurity = false }} />
+    {:else if showUsers}
+      <InvitePanel />
+    {:else if error}
+      <p class="error">{error}</p>
+    {:else if modules.length === 0}
+      <div class="empty-state">
+        <p>No modules enabled yet.</p>
+        <button onclick={() => (showConfig = true)}>Configure modules</button>
+      </div>
+    {:else}
+      {#each modules as mod}
+        <section class="module-section">
+          <h2>{mod.name}</h2>
+          {#if mod.id === 'budget'}
+            <BudgetModule />
+          {:else}
+            <div class="module-card">
+              <span class="module-id">{mod.id}</span>
+              <p>Coming soon.</p>
+            </div>
+          {/if}
+        </section>
+      {/each}
+    {/if}
+
+    {#if showConfig}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="backdrop" onclick={handleBackdrop}>
+        <div class="modal" role="dialog" aria-label="Configure modules">
+          <h3>Modules</h3>
+          <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
+          <div class="module-list">
+            {#each availableModules as mod}
+              <div class="module-row" class:enabled={isEnabled(mod.id)}>
+                <div class="module-info">
+                  <span class="module-name">{mod.name}</span>
+                  <span class="module-desc">{mod.description}</span>
+                </div>
+                <button
+                  class="toggle"
+                  class:active={isEnabled(mod.id)}
+                  disabled={toggling === mod.id}
+                  onclick={() => toggleModule(mod.id)}
+                  aria-label="{isEnabled(mod.id) ? 'Disable' : 'Enable'} {mod.name}"
+                >
+                  <span class="toggle-track">
+                    <span class="toggle-thumb"></span>
+                  </span>
+                </button>
+              </div>
+            {/each}
+          </div>
+          <button class="close-btn" onclick={() => (showConfig = false)}>Done</button>
+        </div>
+      </div>
+    {/if}
+  </main>
+{/if}
 
 <style>
+  .loading {
+    text-align: center;
+    padding: 4rem;
+    color: #666;
+  }
+
   .top-bar {
     display: flex;
     align-items: center;
@@ -138,6 +238,37 @@
   .top-bar h1 {
     margin: 0;
   }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+    color: #666;
+  }
+
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+    padding: 0.35rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-secondary:hover {
+    background: #ccc;
+  }
+
+  .role-tag {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #d4edda;
+    color: #155724;
+  }
+
   .config-btn {
     background: none;
     border: none;
@@ -167,6 +298,34 @@
   .module-id {
     color: #888;
     font-size: 0.85rem;
+  }
+
+  /* 2FA Enforcement */
+  .enforcement-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+  }
+
+  .enforcement-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px;
+  }
+
+  .enforcement-card h1 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .hint {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
   }
 
   /* Modal */
