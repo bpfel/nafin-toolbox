@@ -2,6 +2,7 @@ export interface User {
   id: number
   email: string
   role: 'admin' | 'user'
+  must_change_password: boolean
   created_at: string
 }
 
@@ -64,12 +65,38 @@ export async function login(email: string, password: string): Promise<string | n
   return data.error || 'Login failed'
 }
 
+let loggingOut = false
+
 export async function logout() {
-  await fetch(`${API_BASE}/auth/logout`, {
+  if (loggingOut) return
+  loggingOut = true
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+  } finally {
+    currentUser = null
+    loggingOut = false
+  }
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   })
-  currentUser = null
+
+  if (res.ok) {
+    // Password changed — sessions invalidated, force re-login
+    currentUser = null
+    return null
+  }
+
+  const data = await res.json().catch(() => ({ error: 'Password change failed' }))
+  return data.error || 'Password change failed'
 }
 
 export async function inviteUser(email: string, password: string, role: 'admin' | 'user' = 'user'): Promise<{ user?: User; error?: string }> {

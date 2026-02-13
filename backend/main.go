@@ -95,7 +95,7 @@ func createUser(db *sql.DB, email string) {
 		log.Fatalf("hashing password: %v", err)
 	}
 
-	user, err := store.CreateUser(context.Background(), email, hash, auth.RoleAdmin)
+	user, err := store.CreateUser(context.Background(), email, hash, auth.RoleAdmin, false)
 	if err != nil {
 		log.Fatalf("creating user: %v", err)
 	}

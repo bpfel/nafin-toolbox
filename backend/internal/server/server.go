@@ -71,6 +71,7 @@ func (s *Server) routes() {
 			r.Use(auth.RequireAuth(authStore))
 			r.Get("/auth/me", auth.HandleMe)
 			r.Post("/auth/logout", auth.HandleLogout(authStore))
+			r.Post("/auth/change-password", auth.HandleChangePassword(authStore))
 			r.Post("/auth/invite", auth.HandleInvite(authStore))
 			r.Get("/auth/users", auth.HandleListUsers(authStore))
 			r.Route("/modules", module.Routes(s.db))

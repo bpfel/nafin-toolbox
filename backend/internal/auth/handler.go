@@ -138,7 +138,7 @@ func HandleInvite(store *Store) http.HandlerFunc {
 			return
 		}
 
-		user, err := store.CreateUser(r.Context(), req.Email, hash, role)
+		user, err := store.CreateUser(r.Context(), req.Email, hash, role, true)
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
@@ -173,22 +173,72 @@ func HandleListUsers(store *Store) http.HandlerFunc {
 	}
 }
 
+// HandleChangePassword lets the authenticated user change their password.
+// Verifies current password, validates new password, updates hash, and invalidates all sessions.
+func HandleChangePassword(store *Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if user == nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		var req ChangePasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.CurrentPassword == "" || req.NewPassword == "" {
+			http.Error(w, `{"error":"current and new password required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if !CheckPassword(user.PasswordHash, req.CurrentPassword) {
+			http.Error(w, `{"error":"current password is incorrect"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if err := ValidatePassword(req.NewPassword); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+
+		newHash, err := HashPassword(req.NewPassword)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := store.UpdatePassword(r.Context(), user.ID, newHash); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Clear forced password change flag
+		if err := store.ClearMustChangePassword(r.Context(), user.ID); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Invalidate all sessions (forces re-login everywhere)
+		if err := store.DeleteUserSessions(r.Context(), user.ID); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
 // HandleSetup creates the first user as admin. Only works when no users exist.
+// Uses an advisory lock to prevent race conditions on concurrent requests.
 func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !limiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
-			return
-		}
-
-		count, err := store.UserCount(r.Context())
-		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-			return
-		}
-		if count > 0 {
-			http.Error(w, `{"error":"setup already completed"}`, http.StatusForbidden)
 			return
 		}
 
@@ -218,7 +268,11 @@ func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 			return
 		}
 
-		user, err := store.CreateUser(r.Context(), req.Email, hash, RoleAdmin)
+		user, err := store.CreateFirstUser(r.Context(), req.Email, hash)
+		if err == ErrSetupAlreadyDone {
+			http.Error(w, `{"error":"setup already completed"}`, http.StatusForbidden)
+			return
+		}
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return

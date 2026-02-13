@@ -1,11 +1,17 @@
 <script lang="ts">
-  import { fetchModules, enableModule, disableModule, type ModuleInfo } from './lib/api/client'
+  import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
   import { checkAuth, getAuthState, logout } from './lib/auth/authStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import InvitePanel from './lib/auth/InvitePanel.svelte'
+  import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
 
   const authState = getAuthState()
+
+  // Clear auth state and redirect to login on 401
+  setOnUnauthorized(() => {
+    logout()
+  })
 
   let modules = $state<ModuleInfo[]>([])
   let error = $state<string | null>(null)
@@ -89,6 +95,10 @@
   </main>
 {:else if !authState.currentUser}
   <LoginPage onSuccess={handleLoginSuccess} />
+{:else if authState.currentUser.must_change_password}
+  <ChangePasswordForm
+    message="Please set a new password to continue."
+  />
 {:else}
 
   <main>
