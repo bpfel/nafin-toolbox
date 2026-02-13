@@ -15,12 +15,23 @@ services:
       timeout: 3s
       retries: 10
 
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   api:
     build: ./backend
     environment:
       DATABASE_URL: postgres://finance:finance@db:5432/finance?sslmode=disable
       PORT: "8080"
       TRUSTED_PROXIES: "172.16.0.0/12,192.168.0.0/16,10.0.0.0/8"
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM: "noreply@nafin.local"
+      APP_URL: "http://localhost:3000"
+      ENCRYPTION_KEY: "bcbb68dd891f7a97bf3370ff8800ab3eb3cc4226efbb09fcc519791cb8a76174"
     ports:
       - "8081:8080"
     depends_on:
