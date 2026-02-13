@@ -3,8 +3,10 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"time"
 )
@@ -88,6 +90,12 @@ func (s *Store) UserCount(ctx context.Context) (int, error) {
 	return count, err
 }
 
+// hashToken returns the hex-encoded SHA-256 hash of a raw session token.
+func hashToken(raw string) string {
+	h := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(h[:])
+}
+
 func (s *Store) CreateSession(ctx context.Context, userID int) (*Session, error) {
 	token, err := generateToken()
 	if err != nil {
@@ -96,14 +104,15 @@ func (s *Store) CreateSession(ctx context.Context, userID int) (*Session, error)
 
 	sess := &Session{
 		Token:     token,
+		TokenHash: hashToken(token),
 		UserID:    userID,
 		ExpiresAt: time.Now().Add(sessionDuration),
 	}
 
 	err = s.db.QueryRowContext(ctx,
-		`INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)
+		`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)
 		 RETURNING created_at`,
-		sess.Token, sess.UserID, sess.ExpiresAt,
+		sess.TokenHash, sess.UserID, sess.ExpiresAt,
 	).Scan(&sess.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("creating session: %w", err)
@@ -113,11 +122,12 @@ func (s *Store) CreateSession(ctx context.Context, userID int) (*Session, error)
 
 func (s *Store) GetSession(ctx context.Context, token string) (*Session, error) {
 	var sess Session
+	h := hashToken(token)
 	err := s.db.QueryRowContext(ctx,
-		`SELECT token, user_id, expires_at, created_at FROM sessions
-		 WHERE token = $1 AND expires_at > NOW()`,
-		token,
-	).Scan(&sess.Token, &sess.UserID, &sess.ExpiresAt, &sess.CreatedAt)
+		`SELECT token_hash, user_id, expires_at, created_at FROM sessions
+		 WHERE token_hash = $1 AND expires_at > NOW()`,
+		h,
+	).Scan(&sess.TokenHash, &sess.UserID, &sess.ExpiresAt, &sess.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -128,7 +138,7 @@ func (s *Store) GetSession(ctx context.Context, token string) (*Session, error) 
 }
 
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token = $1`, token)
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = $1`, hashToken(token))
 	return err
 }
 
