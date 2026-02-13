@@ -10,7 +10,7 @@ import (
 
 func HandleLogin(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !limiter.Allow(clientIP(r)) {
+		if !limiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
 			return
@@ -176,7 +176,7 @@ func HandleListUsers(store *Store) http.HandlerFunc {
 // HandleSetup creates the first user as admin. Only works when no users exist.
 func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !limiter.Allow(clientIP(r)) {
+		if !limiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return

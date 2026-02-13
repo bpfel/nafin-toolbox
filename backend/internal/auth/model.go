@@ -20,7 +20,8 @@ func (u *User) IsAdmin() bool {
 }
 
 type Session struct {
-	Token     string
+	Token     string // raw token (only in memory / cookie, never stored)
+	TokenHash string // SHA-256 hex hash (stored in DB)
 	UserID    int
 	ExpiresAt time.Time
 	CreatedAt time.Time

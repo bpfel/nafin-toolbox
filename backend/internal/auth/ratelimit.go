@@ -3,16 +3,18 @@ package auth
 import (
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
 
 // LoginRateLimiter tracks login attempts per IP using an in-memory sliding window.
 type LoginRateLimiter struct {
-	mu       sync.Mutex
-	attempts map[string][]time.Time
-	max      int
-	window   time.Duration
+	mu             sync.Mutex
+	attempts       map[string][]time.Time
+	max            int
+	window         time.Duration
+	trustedProxies []*net.IPNet
 }
 
 func NewLoginRateLimiter(max int, window time.Duration) *LoginRateLimiter {
@@ -23,8 +25,24 @@ func NewLoginRateLimiter(max int, window time.Duration) *LoginRateLimiter {
 	}
 }
 
-// Allow records an attempt for the given key and returns true if under the limit.
-func (rl *LoginRateLimiter) Allow(key string) bool {
+// SetTrustedProxies configures CIDR ranges whose X-Forwarded-For / X-Real-IP
+// headers will be trusted. If empty, only RemoteAddr is used.
+func (rl *LoginRateLimiter) SetTrustedProxies(cidrs []string) {
+	var nets []*net.IPNet
+	for _, cidr := range cidrs {
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		nets = append(nets, n)
+	}
+	rl.trustedProxies = nets
+}
+
+// Allow records an attempt for the request's client IP and returns true if under the limit.
+func (rl *LoginRateLimiter) Allow(r *http.Request) bool {
+	key := rl.ClientIP(r)
+
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
@@ -49,23 +67,48 @@ func (rl *LoginRateLimiter) Allow(key string) bool {
 	return true
 }
 
-// clientIP extracts the client IP from the request, checking proxy headers first.
-func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
-	}
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		// Take the first IP (original client)
-		for i := 0; i < len(forwarded); i++ {
-			if forwarded[i] == ',' {
-				return forwarded[:i]
-			}
+// ClientIP extracts the client IP from the request.
+// Proxy headers (X-Real-IP, X-Forwarded-For) are only trusted when
+// RemoteAddr is in the configured trusted proxy CIDR ranges.
+func (rl *LoginRateLimiter) ClientIP(r *http.Request) string {
+	remoteIP := remoteAddrIP(r.RemoteAddr)
+
+	if rl.isTrustedProxy(remoteIP) {
+		if ip := r.Header.Get("X-Real-IP"); ip != "" {
+			return ip
 		}
-		return forwarded
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			// Take the first IP (original client)
+			if i := strings.IndexByte(forwarded, ','); i > 0 {
+				return strings.TrimSpace(forwarded[:i])
+			}
+			return strings.TrimSpace(forwarded)
+		}
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+
+	return remoteIP
+}
+
+func (rl *LoginRateLimiter) isTrustedProxy(ip string) bool {
+	if len(rl.trustedProxies) == 0 {
+		return false
+	}
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
+	for _, n := range rl.trustedProxies {
+		if n.Contains(parsed) {
+			return true
+		}
+	}
+	return false
+}
+
+func remoteAddrIP(addr string) string {
+	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		return r.RemoteAddr
+		return addr
 	}
 	return host
 }

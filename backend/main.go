@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/database"
@@ -34,6 +35,20 @@ func main() {
 		createUser(db, os.Args[2])
 		return
 	}
+
+	// Start background session cleanup (every hour)
+	authStore := auth.NewStore(db)
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := authStore.DeleteExpiredSessions(context.Background()); err != nil {
+				log.Printf("session cleanup error: %v", err)
+			} else {
+				log.Println("expired sessions cleaned up")
+			}
+		}
+	}()
 
 	srv := server.New(db)
 
