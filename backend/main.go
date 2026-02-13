@@ -68,6 +68,13 @@ func createUser(db *sql.DB, email string) {
 		log.Fatal("password cannot be empty")
 	}
 
+	if err := auth.ValidateEmail(email); err != nil {
+		log.Fatalf("invalid email: %v", err)
+	}
+	if err := auth.ValidatePassword(password); err != nil {
+		log.Fatalf("invalid password: %v", err)
+	}
+
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		log.Fatalf("hashing password: %v", err)

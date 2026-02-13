@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/budget"
@@ -38,13 +39,16 @@ func (s *Server) routes() {
 	}))
 
 	authStore := auth.NewStore(s.db)
+	loginLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 
 	s.router.Route("/api", func(r chi.Router) {
+		r.Use(maxBodySize(1 << 20)) // 1 MB
+
 		// Public routes (no auth required)
 		r.Get("/health", s.handleHealth)
-		r.Post("/auth/login", auth.HandleLogin(authStore))
+		r.Post("/auth/login", auth.HandleLogin(authStore, loginLimiter))
 		r.Get("/auth/needs-setup", auth.HandleNeedsSetup(authStore))
-		r.Post("/auth/setup", auth.HandleSetup(authStore))
+		r.Post("/auth/setup", auth.HandleSetup(authStore, loginLimiter))
 
 		// Protected routes (require auth)
 		r.Group(func(r chi.Router) {
@@ -72,4 +76,13 @@ func (s *Server) ListenAndServe(addr string) error {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func maxBodySize(n int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, n)
+			next.ServeHTTP(w, r)
+		})
+	}
 }

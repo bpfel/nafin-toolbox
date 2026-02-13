@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // --- Login handler tests ---
@@ -53,7 +54,8 @@ func TestHandleLogin_Validation(t *testing.T) {
 		},
 	}
 
-	handler := HandleLogin(store)
+	limiter := NewLoginRateLimiter(100, time.Minute)
+	handler := HandleLogin(store, limiter)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(tt.body))

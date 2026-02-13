@@ -3,11 +3,19 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 )
 
-func HandleLogin(store *Store) http.HandlerFunc {
+func HandleLogin(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !limiter.Allow(clientIP(r)) {
+			w.Header().Set("Retry-After", "900")
+			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
+			return
+		}
+
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -26,6 +34,12 @@ func HandleLogin(store *Store) http.HandlerFunc {
 		}
 		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
 			http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// Invalidate existing sessions before creating a new one
+		if err := store.DeleteUserSessions(r.Context(), user.ID); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}
 
@@ -53,6 +67,7 @@ func HandleLogout(store *Store) http.HandlerFunc {
 			Value:    "",
 			Path:     "/",
 			HttpOnly: true,
+			Secure:   isSecureCookie(),
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   -1,
 		})
@@ -89,6 +104,15 @@ func HandleInvite(store *Store) http.HandlerFunc {
 
 		if req.Email == "" || req.Password == "" {
 			http.Error(w, `{"error":"email and password required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if err := ValidateEmail(req.Email); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		if err := ValidatePassword(req.Password); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
 			return
 		}
 
@@ -150,8 +174,14 @@ func HandleListUsers(store *Store) http.HandlerFunc {
 }
 
 // HandleSetup creates the first user as admin. Only works when no users exist.
-func HandleSetup(store *Store) http.HandlerFunc {
+func HandleSetup(store *Store, limiter *LoginRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !limiter.Allow(clientIP(r)) {
+			w.Header().Set("Retry-After", "900")
+			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			return
+		}
+
 		count, err := store.UserCount(r.Context())
 		if err != nil {
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
@@ -170,6 +200,15 @@ func HandleSetup(store *Store) http.HandlerFunc {
 
 		if req.Email == "" || req.Password == "" {
 			http.Error(w, `{"error":"email and password required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if err := ValidateEmail(req.Email); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		if err := ValidatePassword(req.Password); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
 			return
 		}
 
@@ -218,7 +257,46 @@ func sessionCookie(token string, expires time.Time) *http.Cookie {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isSecureCookie(),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expires,
 	}
+}
+
+func isSecureCookie() bool {
+	return strings.EqualFold(os.Getenv("COOKIE_SECURE"), "true")
+}
+
+// ValidatePassword checks minimum password requirements.
+func ValidatePassword(pw string) error {
+	if len(pw) < 8 {
+		return errShortPassword
+	}
+	return nil
+}
+
+// ValidateEmail checks that the email has a basic valid format.
+func ValidateEmail(email string) error {
+	at := strings.Index(email, "@")
+	if at < 1 {
+		return errInvalidEmail
+	}
+	domain := email[at+1:]
+	if !strings.Contains(domain, ".") || strings.HasSuffix(domain, ".") {
+		return errInvalidEmail
+	}
+	return nil
+}
+
+var (
+	errShortPassword = &validationError{"password must be at least 8 characters"}
+	errInvalidEmail  = &validationError{"invalid email address"}
+)
+
+type validationError struct {
+	msg string
+}
+
+func (e *validationError) Error() string {
+	return e.msg
 }
