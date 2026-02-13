@@ -12,6 +12,7 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/database"
+	"github.com/bpfel/nafin-toolbox/internal/email"
 	"github.com/bpfel/nafin-toolbox/internal/server"
 )
 
@@ -36,21 +37,62 @@ func main() {
 		return
 	}
 
-	// Start background session cleanup (every hour)
+	// Initialize email sender
+	var emailSender email.Sender
+	smtpCfg := email.SMTPConfig{
+		Host:     os.Getenv("SMTP_HOST"),
+		Port:     os.Getenv("SMTP_PORT"),
+		Username: os.Getenv("SMTP_USERNAME"),
+		Password: os.Getenv("SMTP_PASSWORD"),
+		From:     os.Getenv("SMTP_FROM"),
+	}
+	if smtp := email.NewSMTPSender(smtpCfg); smtp != nil {
+		emailSender = smtp
+		log.Printf("SMTP configured: %s:%s", smtpCfg.Host, smtpCfg.Port)
+	} else {
+		emailSender = &email.LogSender{}
+		log.Println("SMTP not configured — invite emails will be logged only")
+	}
+
+	// Parse encryption key for 2FA
+	var encryptionKey []byte
+	if keyHex := os.Getenv("ENCRYPTION_KEY"); keyHex != "" {
+		key, err := auth.ParseEncryptionKey(keyHex)
+		if err != nil {
+			log.Fatalf("invalid ENCRYPTION_KEY: %v", err)
+		}
+		encryptionKey = key
+		log.Println("Encryption key loaded — 2FA available")
+	} else {
+		log.Println("ENCRYPTION_KEY not set — 2FA will not be available")
+	}
+
+	appURL := os.Getenv("APP_URL")
+	if appURL == "" {
+		appURL = "http://localhost:3000"
+	}
+
+	// Start background cleanup (every hour)
 	authStore := auth.NewStore(db)
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		for range ticker.C {
-			if err := authStore.DeleteExpiredSessions(context.Background()); err != nil {
+			ctx := context.Background()
+			if err := authStore.DeleteExpiredSessions(ctx); err != nil {
 				log.Printf("session cleanup error: %v", err)
-			} else {
-				log.Println("expired sessions cleaned up")
 			}
+			if err := authStore.DeleteExpiredVerificationTokens(ctx); err != nil {
+				log.Printf("verification token cleanup error: %v", err)
+			}
+			if err := authStore.DeleteExpiredMFAChallenges(ctx); err != nil {
+				log.Printf("MFA challenge cleanup error: %v", err)
+			}
+			log.Println("expired tokens cleaned up")
 		}
 	}()
 
-	srv := server.New(db)
+	srv := server.New(db, emailSender, encryptionKey, appURL)
 
 	port := os.Getenv("PORT")
 	if port == "" {

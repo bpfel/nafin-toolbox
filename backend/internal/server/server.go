@@ -10,6 +10,7 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/budget"
+	"github.com/bpfel/nafin-toolbox/internal/email"
 	"github.com/bpfel/nafin-toolbox/internal/module"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -21,16 +22,16 @@ type Server struct {
 	db     *sql.DB
 }
 
-func New(db *sql.DB) *Server {
+func New(db *sql.DB, emailSender email.Sender, encryptionKey []byte, appURL string) *Server {
 	s := &Server{
 		router: chi.NewRouter(),
 		db:     db,
 	}
-	s.routes()
+	s.routes(emailSender, encryptionKey, appURL)
 	return s
 }
 
-func (s *Server) routes() {
+func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL string) {
 	allowedOrigins := getAllowedOrigins()
 
 	s.router.Use(middleware.Logger)
@@ -57,31 +58,51 @@ func (s *Server) routes() {
 		loginLimiter.SetTrustedProxies(cidrs)
 	}
 
+	deps := &auth.HandlerDeps{
+		Store:         authStore,
+		Limiter:       loginLimiter,
+		EmailSender:   emailSender,
+		EncryptionKey: encryptionKey,
+		AppURL:        appURL,
+	}
+
 	s.router.Route("/api", func(r chi.Router) {
 		r.Use(maxBodySize(1 << 20)) // 1 MB
 
 		// Public routes (no auth required)
 		r.Get("/health", s.handleHealth)
-		r.Post("/auth/login", auth.HandleLogin(authStore, loginLimiter))
-		r.Get("/auth/needs-setup", auth.HandleNeedsSetup(authStore))
-		r.Post("/auth/setup", auth.HandleSetup(authStore, loginLimiter))
+		r.Post("/auth/login", auth.HandleLogin(deps))
+		r.Get("/auth/needs-setup", auth.HandleNeedsSetup(deps))
+		r.Post("/auth/setup", auth.HandleSetup(deps))
+		r.Post("/auth/verify-email", auth.HandleVerifyEmail(deps))
+		r.Post("/auth/verify-2fa", auth.HandleVerify2FA(deps))
 
 		// Protected routes (require auth)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(authStore))
 			r.Get("/auth/me", auth.HandleMe)
-			r.Post("/auth/logout", auth.HandleLogout(authStore))
-			r.Post("/auth/change-password", auth.HandleChangePassword(authStore))
-			r.Post("/auth/invite", auth.HandleInvite(authStore))
-			r.Get("/auth/users", auth.HandleListUsers(authStore))
+			r.Post("/auth/logout", auth.HandleLogout(deps))
+			r.Post("/auth/change-password", auth.HandleChangePassword(deps))
+			r.Get("/auth/settings", auth.HandleGetSettings(deps))
+
+			// 2FA management
+			r.Post("/auth/2fa/setup", auth.HandleSetup2FA(deps))
+			r.Post("/auth/2fa/confirm", auth.HandleConfirm2FA(deps))
+			r.Delete("/auth/2fa", auth.HandleDisable2FA(deps))
+			r.Post("/auth/2fa/recovery-codes", auth.HandleRegenerateRecoveryCodes(deps))
+
+			// Account management
+			r.Delete("/auth/account", auth.HandleDeleteAccount(deps))
+
+			// Admin routes
+			r.Post("/auth/invite", auth.HandleInvite(deps))
+			r.Get("/auth/users", auth.HandleListUsers(deps))
+			r.Delete("/auth/users/{id}", auth.HandleAdminDeleteUser(deps))
+			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
+			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
+
 			r.Route("/modules", module.Routes(s.db))
 			r.Route("/budget", budget.Routes(s.db))
-
-			// Module routes are registered here as they are implemented:
-			// r.Route("/accounts", account.Routes(s.db))
-			// r.Route("/allocations", allocation.Routes(s.db))
-			// r.Route("/provision", provision.Routes(s.db))
-			// r.Route("/investments", investment.Routes(s.db))
 		})
 	})
 }
