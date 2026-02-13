@@ -47,6 +47,9 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 
 	authStore := auth.NewStore(s.db)
 	loginLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	setupLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	verifyEmailLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	verify2FALimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
 	if proxies := os.Getenv("TRUSTED_PROXIES"); proxies != "" {
 		var cidrs []string
 		for _, c := range strings.Split(proxies, ",") {
@@ -56,14 +59,20 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			}
 		}
 		loginLimiter.SetTrustedProxies(cidrs)
+		setupLimiter.SetTrustedProxies(cidrs)
+		verifyEmailLimiter.SetTrustedProxies(cidrs)
+		verify2FALimiter.SetTrustedProxies(cidrs)
 	}
 
 	deps := &auth.HandlerDeps{
-		Store:         authStore,
-		Limiter:       loginLimiter,
-		EmailSender:   emailSender,
-		EncryptionKey: encryptionKey,
-		AppURL:        appURL,
+		Store:              authStore,
+		LoginLimiter:       loginLimiter,
+		SetupLimiter:       setupLimiter,
+		VerifyEmailLimiter: verifyEmailLimiter,
+		Verify2FALimiter:   verify2FALimiter,
+		EmailSender:        emailSender,
+		EncryptionKey:      encryptionKey,
+		AppURL:             appURL,
 	}
 
 	s.router.Route("/api", func(r chi.Router) {
