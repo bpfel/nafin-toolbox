@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -482,4 +483,81 @@ func (s *Store) SetSetting(ctx context.Context, key, value string) error {
 func (s *Store) DeleteSetting(ctx context.Context, key string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM app_settings WHERE key = $1`, key)
 	return err
+}
+
+// ---- Audit Log ----
+
+type AuditLogEntry struct {
+	ID        int64           `json:"id"`
+	UserID    *int            `json:"user_id"`
+	UserEmail *string         `json:"user_email"`
+	Event     string          `json:"event"`
+	IPAddress string          `json:"ip_address"`
+	UserAgent string          `json:"user_agent"`
+	Metadata  json.RawMessage `json:"metadata"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+func (s *Store) ListAuditLogs(ctx context.Context, limit, offset int, eventFilter string, userIDFilter *int) ([]AuditLogEntry, int, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Build WHERE clauses
+	where := ""
+	args := []any{}
+	argIdx := 1
+
+	if eventFilter != "" {
+		where += fmt.Sprintf(" AND a.event = $%d", argIdx)
+		args = append(args, eventFilter)
+		argIdx++
+	}
+	if userIDFilter != nil {
+		where += fmt.Sprintf(" AND a.user_id = $%d", argIdx)
+		args = append(args, *userIDFilter)
+		argIdx++
+	}
+
+	// Count total
+	countQuery := `SELECT COUNT(*) FROM audit_log a WHERE TRUE` + where
+	var total int
+	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("counting audit logs: %w", err)
+	}
+
+	// Fetch entries
+	query := fmt.Sprintf(
+		`SELECT a.id, a.user_id, u.email, a.event, COALESCE(a.ip_address,''), COALESCE(a.user_agent,''), a.metadata, a.created_at
+		 FROM audit_log a
+		 LEFT JOIN users u ON u.id = a.user_id
+		 WHERE TRUE%s
+		 ORDER BY a.id DESC
+		 LIMIT $%d OFFSET $%d`,
+		where, argIdx, argIdx+1,
+	)
+	args = append(args, limit, offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("listing audit logs: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []AuditLogEntry
+	for rows.Next() {
+		var e AuditLogEntry
+		if err := rows.Scan(&e.ID, &e.UserID, &e.UserEmail, &e.Event, &e.IPAddress, &e.UserAgent, &e.Metadata, &e.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scanning audit log: %w", err)
+		}
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterating audit logs: %w", err)
+	}
+
+	return entries, total, nil
 }
