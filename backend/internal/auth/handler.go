@@ -20,16 +20,19 @@ import (
 
 // HandlerDeps holds shared dependencies for auth handlers.
 type HandlerDeps struct {
-	Store         *Store
-	Limiter       *LoginRateLimiter
-	EmailSender   email.Sender
-	EncryptionKey []byte // 32-byte AES key, nil if 2FA not available
-	AppURL        string
+	Store              *Store
+	LoginLimiter       *LoginRateLimiter
+	SetupLimiter       *LoginRateLimiter
+	VerifyEmailLimiter *LoginRateLimiter
+	Verify2FALimiter   *LoginRateLimiter
+	EmailSender        email.Sender
+	EncryptionKey      []byte // 32-byte AES key, nil if 2FA not available
+	AppURL             string
 }
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.Limiter.Allow(r) {
+		if !deps.LoginLimiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
 			return
@@ -340,7 +343,7 @@ func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 // HandleSetup creates the first user as admin. Only works when no users exist.
 func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.Limiter.Allow(r) {
+		if !deps.SetupLimiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return
@@ -411,7 +414,7 @@ func HandleNeedsSetup(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerifyEmail accepts a verification token + password, verifies email, sets password, auto-logs in.
 func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.Limiter.Allow(r) {
+		if !deps.VerifyEmailLimiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return
@@ -485,7 +488,7 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerify2FA validates a TOTP code or recovery code after password authentication.
 func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.Limiter.Allow(r) {
+		if !deps.Verify2FALimiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return
