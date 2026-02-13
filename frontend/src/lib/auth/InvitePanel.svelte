@@ -1,13 +1,16 @@
 <script lang="ts">
-  import { inviteUser, listUsers, type User } from './authStore.svelte'
+  import { inviteUser, listUsers, deleteUser, resendVerification, type User, getAuthState } from './authStore.svelte'
+
+  const authState = getAuthState()
 
   let users = $state<User[]>([])
   let email = $state('')
-  let password = $state('')
   let role = $state<'admin' | 'user'>('user')
   let error = $state<string | null>(null)
   let success = $state<string | null>(null)
   let submitting = $state(false)
+  let resending = $state<number | null>(null)
+  let deleting = $state<number | null>(null)
 
   async function loadUsers() {
     users = await listUsers()
@@ -23,16 +26,37 @@
     success = null
     submitting = true
 
-    const result = await inviteUser(email, password, role)
+    const result = await inviteUser(email, role)
     submitting = false
 
     if (result.error) {
       error = result.error
     } else {
-      success = `User ${result.user!.email} created as ${result.user!.role}`
+      success = `Invitation sent to ${result.user!.email}`
       email = ''
-      password = ''
       role = 'user'
+      await loadUsers()
+    }
+  }
+
+  async function handleResend(userId: number) {
+    resending = userId
+    const result = await resendVerification(userId)
+    resending = null
+    if (result) {
+      error = result
+    } else {
+      success = 'Verification email resent'
+    }
+  }
+
+  async function handleDelete(userId: number) {
+    deleting = userId
+    const result = await deleteUser(userId)
+    deleting = null
+    if (result) {
+      error = result
+    } else {
       await loadUsers()
     }
   }
@@ -47,7 +71,9 @@
         <tr>
           <th>Email</th>
           <th>Role</th>
+          <th>Status</th>
           <th>Created</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -55,7 +81,37 @@
           <tr>
             <td>{u.email}</td>
             <td><span class="role-badge" class:admin={u.role === 'admin'}>{u.role}</span></td>
+            <td>
+              {#if u.email_verified}
+                <span class="status-badge verified">Verified</span>
+              {:else}
+                <span class="status-badge pending">Pending</span>
+              {/if}
+              {#if u.totp_enabled}
+                <span class="status-badge mfa">2FA</span>
+              {/if}
+            </td>
             <td>{new Date(u.created_at).toLocaleDateString()}</td>
+            <td class="actions">
+              {#if !u.email_verified}
+                <button
+                  class="btn-small"
+                  onclick={() => handleResend(u.id)}
+                  disabled={resending === u.id}
+                >
+                  {resending === u.id ? 'Sending...' : 'Resend'}
+                </button>
+              {/if}
+              {#if u.id !== authState.currentUser?.id}
+                <button
+                  class="btn-small btn-danger-small"
+                  onclick={() => handleDelete(u.id)}
+                  disabled={deleting === u.id}
+                >
+                  {deleting === u.id ? 'Deleting...' : 'Delete'}
+                </button>
+              {/if}
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -68,10 +124,6 @@
       <label>
         Email
         <input type="email" bind:value={email} required disabled={submitting} />
-      </label>
-      <label>
-        Password
-        <input type="text" bind:value={password} required disabled={submitting} placeholder="Temporary password" />
       </label>
       <label>
         Role
@@ -90,7 +142,7 @@
     {/if}
 
     <button type="submit" disabled={submitting}>
-      {submitting ? 'Creating...' : 'Create User'}
+      {submitting ? 'Inviting...' : 'Invite User'}
     </button>
   </form>
 </div>
@@ -146,6 +198,56 @@
     background: #d4edda;
     color: #155724;
   }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge.verified {
+    background: #d4edda;
+    color: #155724;
+  }
+
+  .status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  .status-badge.mfa {
+    background: #d1ecf1;
+    color: #0c5460;
+    margin-left: 0.25rem;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.35rem;
+    justify-content: flex-end;
+  }
+
+  .btn-small {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    background: #e0e0e0;
+    color: #333;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .btn-small:hover { background: #ccc; }
+
+  .btn-danger-small {
+    background: white;
+    color: #dc3545;
+    border: 1px solid #dc3545;
+  }
+
+  .btn-danger-small:hover { background: #fdecea; }
 
   .form-row {
     display: flex;

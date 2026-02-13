@@ -1,9 +1,12 @@
 <script lang="ts">
   import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
-  import { checkAuth, getAuthState, logout } from './lib/auth/authStore.svelte'
+  import { checkAuth, getAuthState, logout, getSettings } from './lib/auth/authStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import InvitePanel from './lib/auth/InvitePanel.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
+  import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
+  import SecuritySettings from './lib/auth/SecuritySettings.svelte'
+  import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
 
   const authState = getAuthState()
@@ -13,11 +16,19 @@
     logout()
   })
 
+  // URL-based routing
+  let isVerifyPage = $state(window.location.pathname === '/verify')
+
   let modules = $state<ModuleInfo[]>([])
   let error = $state<string | null>(null)
   let showConfig = $state(false)
   let showUsers = $state(false)
+  let showSecurity = $state(false)
   let toggling = $state<string | null>(null)
+
+  // 2FA enforcement
+  let require2FA = $state(false)
+  let show2FAEnforcement = $state(false)
 
   const availableModules = [
     { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
@@ -67,15 +78,25 @@
     checkAuth()
   })
 
-  // Load modules when user is authenticated
+  // Load modules and check 2FA enforcement when user is authenticated
   $effect(() => {
     if (authState.currentUser) {
       loadModules()
+      checkRequire2FA()
     }
   })
 
+  async function checkRequire2FA() {
+    const settings = await getSettings()
+    require2FA = settings.require_2fa
+    if (require2FA && authState.currentUser && !authState.currentUser.totp_enabled) {
+      show2FAEnforcement = true
+    }
+  }
+
   function handleLoginSuccess() {
     loadModules()
+    checkRequire2FA()
   }
 
   async function handleLogout() {
@@ -84,12 +105,16 @@
     error = null
     showUsers = false
     showConfig = false
+    showSecurity = false
+    show2FAEnforcement = false
   }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if authState.loading}
+{#if isVerifyPage}
+  <VerifyEmailPage />
+{:else if authState.loading}
   <main>
     <p class="loading">Loading...</p>
   </main>
@@ -99,6 +124,16 @@
   <ChangePasswordForm
     message="Please set a new password to continue."
   />
+{:else if show2FAEnforcement}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>Two-Factor Authentication Required</h1>
+        <p class="hint">Your administrator requires all users to enable two-factor authentication before continuing.</p>
+        <TwoFactorSetup onDone={() => { show2FAEnforcement = false; window.location.reload() }} />
+      </div>
+    </div>
+  </main>
 {:else}
 
   <main>
@@ -108,10 +143,13 @@
         <span class="role-tag">{authState.currentUser.role}</span>
         <span>{authState.currentUser.email}</span>
         {#if authState.currentUser.role === 'admin'}
-          <button class="btn-secondary" onclick={() => { showUsers = !showUsers; showConfig = false }}>
+          <button class="btn-secondary" onclick={() => { showUsers = !showUsers; showConfig = false; showSecurity = false }}>
             {showUsers ? 'Back' : 'Users'}
           </button>
         {/if}
+        <button class="btn-secondary" onclick={() => { showSecurity = !showSecurity; showUsers = false; showConfig = false }}>
+          {showSecurity ? 'Back' : 'Security'}
+        </button>
         <button class="btn-secondary" onclick={handleLogout}>Logout</button>
         <button class="config-btn" onclick={() => (showConfig = true)} aria-label="Configure modules">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -122,7 +160,9 @@
       </div>
     </div>
 
-    {#if showUsers}
+    {#if showSecurity}
+      <SecuritySettings onDone={() => { showSecurity = false }} />
+    {:else if showUsers}
       <InvitePanel />
     {:else if error}
       <p class="error">{error}</p>
@@ -258,6 +298,34 @@
   .module-id {
     color: #888;
     font-size: 0.85rem;
+  }
+
+  /* 2FA Enforcement */
+  .enforcement-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+  }
+
+  .enforcement-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px;
+  }
+
+  .enforcement-card h1 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .hint {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
   }
 
   /* Modal */
