@@ -88,6 +88,34 @@ When BFS publishes a new HABE edition, update the `Amount` fields in `BFSDefault
 
 The backend supports archiving budget categories (soft-delete). The DB column, store filtering, and update endpoint are in place — but the frontend has no UI for it yet. Useful for categories that no longer apply (ended lease, stopped side hustle) while keeping historical period data intact. To finish: add an "archive" action to category management and a "show archived" toggle to the category list.
 
+## Production Deployment
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | (required) | PostgreSQL connection string |
+| `PORT` | `8080` | API server port |
+| `COOKIE_SECURE` | `false` | Set to `true` when behind HTTPS (marks session cookies as Secure) |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins for CORS and CSRF origin validation |
+| `TRUSTED_PROXIES` | (none) | Comma-separated CIDRs for trusted reverse proxies (e.g. `172.16.0.0/12`). Only proxies in these ranges can set X-Forwarded-For / X-Real-IP headers |
+
+### Reverse Proxy Requirements
+
+When deploying behind a reverse proxy (nginx, Caddy, Traefik):
+
+1. **TLS termination** — the proxy should handle HTTPS. Set `COOKIE_SECURE=true` on the API.
+2. **HSTS header** — add `Strict-Transport-Security: max-age=63072000; includeSubDomains` at the proxy level.
+3. **Forwarded headers** — configure the proxy to set `X-Real-IP` and `X-Forwarded-For` headers. Add the proxy's IP range to `TRUSTED_PROXIES`.
+4. **CORS origin** — set `CORS_ORIGINS` to your actual domain (e.g. `https://finance.example.com`).
+
+### First-Time Setup
+
+1. Start the stack: `docker compose up -d`
+2. Open the frontend URL — you'll see the "Create First Account" screen
+3. Create the admin user with email and password (minimum 8 characters)
+4. Additional users can be invited from the admin panel (they'll be forced to change their temporary password on first login)
+
 ## Tech Stack
 
 - **Frontend:** Svelte 5 + Vite (SPA, talks to Go API)
