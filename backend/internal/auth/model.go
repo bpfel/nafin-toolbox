@@ -8,11 +8,12 @@ const (
 )
 
 type User struct {
-	ID           int       `json:"id"`
-	Email        string    `json:"email"`
-	Role         string    `json:"role"`
-	PasswordHash string    `json:"-"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                 int       `json:"id"`
+	Email              string    `json:"email"`
+	Role               string    `json:"role"`
+	PasswordHash       string    `json:"-"`
+	MustChangePassword bool      `json:"must_change_password"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 func (u *User) IsAdmin() bool {
@@ -36,4 +37,9 @@ type InviteRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Role     string `json:"role"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
 }
