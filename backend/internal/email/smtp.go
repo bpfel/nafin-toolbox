@@ -69,7 +69,7 @@ func (s *SMTPSender) Send(ctx context.Context, to, subject, htmlBody, textBody s
 
 	var opts []gomail.Option
 	opts = append(opts, gomail.WithPort(s.port))
-	opts = append(opts, gomail.WithSMTPAuth(gomail.SMTPAuthPlain))
+	opts = append(opts, gomail.WithSMTPAuth(gomail.SMTPAuthLogin))
 
 	// Port 1025 is typically mailpit/mailhog dev SMTP — skip TLS
 	if s.port == 1025 || s.port == 25 {
