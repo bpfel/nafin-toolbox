@@ -25,6 +25,7 @@
   let showUsers = $state(false)
   let showSecurity = $state(false)
   let toggling = $state<string | null>(null)
+  let menuOpen = $state(false)
 
   // 2FA enforcement
   let require2FA = $state(false)
@@ -68,10 +69,31 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (showConfig && e.key === 'Escape') showConfig = false
+    if (menuOpen && e.key === 'Escape') menuOpen = false
   }
 
   function handleBackdrop(e: MouseEvent) {
     if (e.target === e.currentTarget) showConfig = false
+  }
+
+  function handleMenuBackdrop(e: MouseEvent) {
+    if (e.target === e.currentTarget) menuOpen = false
+  }
+
+  function navigateTo(view: 'users' | 'security' | 'modules') {
+    menuOpen = false
+    if (view === 'users') {
+      showUsers = true; showSecurity = false; showConfig = false
+    } else if (view === 'security') {
+      showUsers = false; showSecurity = true; showConfig = false
+    } else if (view === 'modules') {
+      showUsers = false; showSecurity = false; showConfig = true
+    }
+  }
+
+  function navigateBack() {
+    showUsers = false
+    showSecurity = false
   }
 
   $effect(() => {
@@ -141,29 +163,48 @@
       <h1>Finance Tracker</h1>
       <div class="user-info">
         <span class="role-tag">{authState.currentUser.role}</span>
-        <span>{authState.currentUser.email}</span>
+        <span class="user-email">{authState.currentUser.email}</span>
         {#if authState.currentUser.role === 'admin'}
-          <button class="btn-secondary" onclick={() => { showUsers = !showUsers; showConfig = false; showSecurity = false }}>
-            {showUsers ? 'Back' : 'Users'}
-          </button>
+          <button class="btn-secondary" onclick={() => navigateTo('users')}>Users</button>
         {/if}
-        <button class="btn-secondary" onclick={() => { showSecurity = !showSecurity; showUsers = false; showConfig = false }}>
-          {showSecurity ? 'Back' : 'Security'}
-        </button>
-        <button class="btn-secondary" onclick={handleLogout}>Logout</button>
-        <button class="config-btn" onclick={() => (showConfig = true)} aria-label="Configure modules">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
+        <button class="btn-secondary" onclick={() => navigateTo('security')}>Security</button>
+        <button class="btn-secondary" onclick={() => navigateTo('modules')}>Modules</button>
+        <button class="btn-secondary" onclick={() => { handleLogout() }}>Logout</button>
       </div>
+      <button class="hamburger-btn" onclick={() => (menuOpen = !menuOpen)} aria-label="Toggle menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
     </div>
 
+    {#if menuOpen}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="backdrop menu-backdrop" onclick={handleMenuBackdrop}>
+        <div class="menu-modal" role="dialog" aria-label="Navigation menu">
+          <div class="menu-header">
+            <span class="role-tag">{authState.currentUser.role}</span>
+            <span class="user-email">{authState.currentUser.email}</span>
+          </div>
+          <div class="menu-items">
+            {#if authState.currentUser.role === 'admin'}
+              <button class="menu-item" onclick={() => navigateTo('users')}>Users</button>
+            {/if}
+            <button class="menu-item" onclick={() => navigateTo('security')}>Security</button>
+            <button class="menu-item" onclick={() => navigateTo('modules')}>Modules</button>
+            <button class="menu-item menu-item-danger" onclick={() => { handleLogout(); menuOpen = false }}>Logout</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     {#if showSecurity}
-      <SecuritySettings onDone={() => { showSecurity = false }} />
+      <SecuritySettings onDone={navigateBack} />
     {:else if showUsers}
-      <InvitePanel />
+      <InvitePanel onDone={navigateBack} />
     {:else if error}
       <p class="error">{error}</p>
     {:else if modules.length === 0}
@@ -239,12 +280,33 @@
     margin: 0;
   }
 
+  .hamburger-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    align-items: center;
+  }
+  .hamburger-btn:hover {
+    color: #333;
+    background: #f1f3f5;
+  }
+
   .user-info {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     font-size: 0.9rem;
     color: #666;
+  }
+
+  .user-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .btn-secondary {
@@ -269,19 +331,70 @@
     color: #155724;
   }
 
-  .config-btn {
-    background: none;
-    border: none;
-    color: #888;
-    cursor: pointer;
-    padding: 0.4rem;
-    border-radius: 6px;
+  /* Mobile menu overlay */
+  .menu-backdrop {
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding-top: 3.5rem;
+  }
+  .menu-modal {
+    background: white;
+    border-radius: 12px;
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 280px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    margin: 0 1rem;
+  }
+  .menu-header {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
   }
-  .config-btn:hover {
+  .menu-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0.65rem 0.75rem;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
     color: #333;
+    cursor: pointer;
+    text-align: left;
+    min-height: 44px;
+  }
+  .menu-item:hover {
     background: #f1f3f5;
+  }
+  .menu-item-danger {
+    color: #c0392b;
+  }
+  .menu-item-danger:hover {
+    background: #fdecea;
+  }
+
+  @media (max-width: 768px) {
+    .top-bar h1 {
+      font-size: 1.2rem;
+    }
+    .hamburger-btn {
+      display: flex;
+    }
+    .user-info {
+      display: none;
+    }
   }
   .module-section {
     margin-bottom: 2rem;
