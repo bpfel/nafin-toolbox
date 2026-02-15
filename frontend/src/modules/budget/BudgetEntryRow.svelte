@@ -6,12 +6,13 @@
 
   interface Props {
     entry: BudgetEntry
+    viewMode?: 'monthly' | 'yearly'
     onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
     ondelete: (categoryId: number, categoryName: string) => void
-    onedit: (categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean) => void
+    onedit: (categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) => void
   }
 
-  let { entry, onsave, ondelete, onedit }: Props = $props()
+  let { entry, viewMode = 'monthly', onsave, ondelete, onedit }: Props = $props()
 
   const MAX_MONTHLY = 9_999_999_999.99
 
@@ -29,6 +30,32 @@
   let actualMoError = $state(false)
 
   let focusedField = $state<Field | null>(null)
+
+  // Long-press to delete on touch devices
+  let longPressTimer: ReturnType<typeof setTimeout> | null = null
+  let longPressTriggered = false
+
+  function handleTouchStart() {
+    longPressTriggered = false
+    longPressTimer = setTimeout(() => {
+      longPressTriggered = true
+      ondelete(entry.category_id, entry.category_name)
+    }, 600)
+  }
+
+  function handleTouchEnd() {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  }
+
+  function handleTouchMove() {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  }
 
   // Sync from entry prop, skipping the currently focused field
   $effect(() => {
@@ -164,13 +191,17 @@
   class:income={entry.category_type === 'income'}
   class:fixed={entry.category_fixed}
   data-category-id={entry.category_id}
+  ontouchstart={handleTouchStart}
+  ontouchend={handleTouchEnd}
+  ontouchmove={handleTouchMove}
+  ontouchcancel={handleTouchEnd}
 >
   <td class="name-cell">
     <div class="name-cell-inner">
       <span class="drag-handle" aria-label="Drag to reorder">⠿</span>
       <button
         class="name-text"
-        onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, entry.category_fixed)}
+        onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, entry.category_fixed, entry.planned_amount, entry.actual_amount)}
       >
         {entry.category_name}
         {#if entry.category_fixed}
@@ -189,7 +220,7 @@
       </button>
     </div>
   </td>
-  <td class="amount-cell">
+  <td class="amount-cell planned-mo-cell">
     <input
       type="text"
       inputmode="decimal"
@@ -202,7 +233,7 @@
       onkeydown={(e) => handleKeydown('planned_mo', e)}
     />
   </td>
-  <td class="amount-cell yearly">
+  <td class="amount-cell yearly planned-yr-cell">
     <input
       type="text"
       inputmode="decimal"
@@ -307,8 +338,8 @@
   .trash-btn:hover {
     color: #c0392b;
   }
-  /* Always visible on touch devices */
-  @media (hover: none) {
+  /* Always visible on touch devices (desktop-width touch screens) */
+  @media (hover: none) and (min-width: 769px) {
     .trash-btn {
       opacity: 0.6;
     }
@@ -364,5 +395,33 @@
   :global(.drag-ghost) {
     opacity: 0.5;
     background: #e3f2fd !important;
+  }
+
+  @media (max-width: 768px) {
+    .entry-row td {
+      padding: 0.4rem 0.5rem;
+    }
+    .cell-input {
+      font-size: 16px;
+      padding: 0.2rem 0.35rem;
+    }
+    .amount-cell {
+      padding: 0.2rem 0.25rem;
+    }
+    .drag-handle {
+      display: none;
+    }
+    .trash-btn {
+      display: none;
+    }
+    .planned-yr-cell {
+      display: none;
+    }
+    :global(.view-yearly .planned-mo-cell) {
+      display: none;
+    }
+    :global(.view-yearly .planned-yr-cell) {
+      display: table-cell;
+    }
   }
 </style>
