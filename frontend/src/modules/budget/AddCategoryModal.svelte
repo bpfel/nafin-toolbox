@@ -4,12 +4,13 @@
   interface Props {
     type: 'income' | 'expense'
     groups: { name: string; id: number }[]
-    editCategory?: { id: number; name: string; fixed: boolean; groupName: string } | null
+    editCategory?: { id: number; name: string; fixed: boolean; groupName: string; plannedAmount?: string; actualAmount?: string } | null
     oncreated: () => void
     onclose: () => void
+    onsave?: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
   }
 
-  let { type, groups, editCategory = null, oncreated, onclose }: Props = $props()
+  let { type, groups, editCategory = null, oncreated, onclose, onsave }: Props = $props()
 
   let isEdit = $derived(editCategory != null)
   let name = $state(editCategory?.name ?? '')
@@ -19,6 +20,61 @@
   let useNewGroup = $state(false)
   let saving = $state(false)
   let error = $state<string | null>(null)
+
+  // Value fields for edit mode
+  let plannedMoValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')
+  let plannedYrValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')
+  let actualMoValue = $state(editCategory?.actualAmount ? fmt(Number(editCategory.actualAmount)) : '')
+  let valueFocusedField = $state<'planned_mo' | 'planned_yr' | 'actual_mo' | null>(null)
+
+  function fmt(val: number): string {
+    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  function parseInput(raw: string): number {
+    const cleaned = raw.replace(/'/g, '').replace(/,/g, '.')
+    return Number(cleaned)
+  }
+
+  function handleValueFocus(field: 'planned_mo' | 'planned_yr' | 'actual_mo', event: FocusEvent) {
+    valueFocusedField = field
+    const input = event.target as HTMLInputElement
+    requestAnimationFrame(() => input.select())
+  }
+
+  function handleValueBlur(field: 'planned_mo' | 'planned_yr' | 'actual_mo') {
+    valueFocusedField = null
+    if (!editCategory || !onsave) return
+    const raw = field === 'planned_mo' ? plannedMoValue : field === 'planned_yr' ? plannedYrValue : actualMoValue
+    const val = parseInput(raw)
+    if (isNaN(val) || !isFinite(val)) return
+
+    if (field === 'planned_mo') {
+      plannedMoValue = fmt(val)
+      plannedYrValue = fmt(val * 12)
+      onsave(editCategory.id, 'planned', val.toFixed(2))
+    } else if (field === 'planned_yr') {
+      const monthly = val / 12
+      plannedYrValue = fmt(val)
+      plannedMoValue = fmt(monthly)
+      onsave(editCategory.id, 'planned', monthly.toFixed(4))
+    } else {
+      actualMoValue = fmt(val)
+      onsave(editCategory.id, 'actual', val.toFixed(2))
+    }
+  }
+
+  function handleValueInput(field: 'planned_mo' | 'planned_yr') {
+    const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
+    const val = parseInput(raw)
+    if (isNaN(val) || !isFinite(val)) return
+
+    if (field === 'planned_mo') {
+      plannedYrValue = fmt(val * 12)
+    } else {
+      plannedMoValue = fmt(val / 12)
+    }
+  }
 
   let resolvedGroupName = $derived(useNewGroup ? newGroupName.trim() : selectedGroup)
 
@@ -113,6 +169,53 @@
       <span>Fixed amount</span>
       <span class="hint">Actual always equals planned</span>
     </label>
+
+    {#if isEdit && editCategory?.plannedAmount != null}
+      <div class="values-section">
+        <span class="label">Values</span>
+        <div class="values-grid">
+          <label class="value-field">
+            <span class="value-label">Planned/mo</span>
+            <input
+              type="text"
+              inputmode="decimal"
+              class="value-input"
+              bind:value={plannedMoValue}
+              onfocus={(e) => handleValueFocus('planned_mo', e)}
+              onblur={() => handleValueBlur('planned_mo')}
+              oninput={() => handleValueInput('planned_mo')}
+            />
+          </label>
+          <label class="value-field">
+            <span class="value-label">Planned/yr</span>
+            <input
+              type="text"
+              inputmode="decimal"
+              class="value-input yearly"
+              bind:value={plannedYrValue}
+              onfocus={(e) => handleValueFocus('planned_yr', e)}
+              onblur={() => handleValueBlur('planned_yr')}
+              oninput={() => handleValueInput('planned_yr')}
+            />
+          </label>
+          <label class="value-field">
+            <span class="value-label">Actual/mo</span>
+            {#if fixed}
+              <span class="value-fixed">{actualMoValue}</span>
+            {:else}
+              <input
+                type="text"
+                inputmode="decimal"
+                class="value-input"
+                bind:value={actualMoValue}
+                onfocus={(e) => handleValueFocus('actual_mo', e)}
+                onblur={() => handleValueBlur('actual_mo')}
+              />
+            {/if}
+          </label>
+        </div>
+      </div>
+    {/if}
 
     {#if error}
       <p class="error">{error}</p>
@@ -255,6 +358,52 @@
   }
   .save:hover:not(:disabled) {
     background: #245a42;
+  }
+
+  .values-section {
+    margin-bottom: 1rem;
+  }
+  .values-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+  .value-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .value-label {
+    font-size: 0.75rem;
+    color: #888;
+  }
+  .value-input {
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .value-input:focus {
+    border-color: #2d6a4f;
+    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
+  }
+  .value-input.yearly {
+    color: #888;
+  }
+  .value-fixed {
+    display: block;
+    padding: 0.5rem;
+    color: #888;
+    font-style: italic;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
   }
 
   @media (max-width: 480px) {
