@@ -327,4 +327,17 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  @media (max-width: 480px) {
+    .filters {
+      flex-direction: column;
+    }
+    .filters select {
+      width: 100%;
+    }
+    .btn-sm {
+      min-height: 44px;
+      padding: 0.4rem 1rem;
+    }
+  }
 </style>
