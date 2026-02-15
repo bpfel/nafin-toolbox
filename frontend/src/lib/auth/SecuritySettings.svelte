@@ -316,4 +316,14 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
+
+  @media (max-width: 480px) {
+    .btn-row {
+      flex-wrap: wrap;
+    }
+    .btn-row button {
+      flex: 1;
+      min-width: 0;
+    }
+  }
 </style>
