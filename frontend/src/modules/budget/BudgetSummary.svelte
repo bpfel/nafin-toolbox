@@ -117,4 +117,21 @@
   .expense { color: #c0392b; }
   .savings-positive { color: #2d6a4f; }
   .savings-negative { color: #c0392b; }
+
+  @media (max-width: 480px) {
+    .summary-bar {
+      padding: 0.75rem 1rem;
+    }
+    .summary-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    .summary-column + .summary-column {
+      padding-top: 1rem;
+      border-top: 1px solid #eee;
+    }
+    .value {
+      font-size: 0.9rem;
+    }
+  }
 </style>
