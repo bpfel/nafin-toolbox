@@ -254,4 +254,10 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
+
+  @media (max-width: 480px) {
+    .login-card {
+      padding: 1.5rem 1.25rem;
+    }
+  }
 </style>

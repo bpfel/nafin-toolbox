@@ -1,6 +1,8 @@
 <script lang="ts">
   import { inviteUser, listUsers, deleteUser, resendVerification, type User, getAuthState } from './authStore.svelte'
 
+  let { onDone }: { onDone?: () => void } = $props()
+
   const authState = getAuthState()
 
   let users = $state<User[]>([])
@@ -63,16 +65,19 @@
 </script>
 
 <div class="invite-panel">
-  <h2>User Management</h2>
+  <div class="panel-header">
+    <h2>User Management</h2>
+    <button class="btn-back" onclick={() => onDone?.()}>Back</button>
+  </div>
 
-  <div class="users-list">
+  <div class="users-list table-wrap">
     <table>
       <thead>
         <tr>
           <th>Email</th>
           <th>Role</th>
           <th>Status</th>
-          <th>Created</th>
+          <th class="created">Created</th>
           <th></th>
         </tr>
       </thead>
@@ -91,7 +96,7 @@
                 <span class="status-badge mfa">2FA</span>
               {/if}
             </td>
-            <td>{new Date(u.created_at).toLocaleDateString()}</td>
+            <td class="created">{new Date(u.created_at).toLocaleDateString()}</td>
             <td class="actions">
               {#if !u.email_verified}
                 <button
@@ -155,10 +160,25 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
-  h2 {
-    font-size: 1.2rem;
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
   }
+
+  h2 {
+    font-size: 1.2rem;
+    margin: 0;
+  }
+
+  .btn-back {
+    background: #e0e0e0;
+    color: #333;
+    padding: 0.35rem 1rem;
+    font-size: 0.85rem;
+  }
+  .btn-back:hover { background: #ccc; }
 
   h3 {
     font-size: 1rem;
@@ -304,5 +324,19 @@
   button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  @media (max-width: 768px) {
+    .created {
+      display: none;
+    }
+    .btn-small {
+      padding: 0.4rem 0.75rem;
+      min-height: 44px;
+    }
   }
 </style>
