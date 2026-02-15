@@ -65,4 +65,14 @@
     opacity: 0.3;
     cursor: not-allowed;
   }
+
+  @media (max-width: 768px) {
+    .month-nav {
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
 </style>
