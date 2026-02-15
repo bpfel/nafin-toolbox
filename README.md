@@ -194,59 +194,52 @@ After `docker compose up -d --build`:
 - Connect to the DB: `docker compose exec db psql -U finance -d finance`
 - Query: `SELECT id, user_id, event, ip_address, created_at FROM audit_log ORDER BY id DESC LIMIT 20;`
 
-### Production Mail Server Setup (VPS)
+### Production Mail Server Setup
 
-For production, replace mailpit with a real SMTP relay. Three common options:
+For production, replace mailpit with a real SMTP server. The app uses SMTP to send invite and email verification links.
 
-**Option A: External SMTP service (recommended)**
+#### Infomaniak (recommended for Infomaniak VPS)
 
-Use a transactional email service like [Resend](https://resend.com), [Mailgun](https://mailgun.com), or [Amazon SES](https://aws.amazon.com/ses/). These handle deliverability, SPF/DKIM, and bounce management.
+If your domain is registered with Infomaniak, you get a free email service included.
 
-```yaml
-# docker-compose.prod.yml (override)
-services:
-  api:
-    environment:
-      SMTP_HOST: "smtp.resend.com"
-      SMTP_PORT: "465"
-      SMTP_USERNAME: "resend"
-      SMTP_PASSWORD: "re_your_api_key_here"
-      SMTP_FROM: "noreply@yourdomain.com"
-      APP_URL: "https://finance.yourdomain.com"
-      ENCRYPTION_KEY: "your-64-char-hex-key"
-      COOKIE_SECURE: "true"
+**1. Create a mailbox**
+
+- Infomaniak Manager → Mail → select your domain → create a mailbox (e.g. `noreply@yourdomain.ch`)
+- Set a password for the mailbox
+
+**2. Create an application password**
+
+Infomaniak requires an application-specific password for SMTP — the regular mailbox password will not work.
+
+- Infomaniak Manager → Mail → select the mailbox → Devices / Application passwords
+- Create a new device/application password
+- Copy the generated password — this is your `SMTP_PASSWORD`
+
+**3. Configure `.env`**
+
+```
+SMTP_HOST=mail.infomaniak.com
+SMTP_PORT=587
+SMTP_USERNAME=noreply@yourdomain.ch
+SMTP_PASSWORD=<application-password-from-step-2>
+SMTP_FROM=noreply@yourdomain.ch
 ```
 
-DNS records needed for your domain:
-- **SPF**: `v=spf1 include:resend.com ~all` (or your provider's include)
-- **DKIM**: Add the TXT record your provider gives you
-- **DMARC**: `v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com`
+**4. Verify**
 
-**Option B: Postfix on the VPS**
+Restart the API (`docker compose ... up -d api`) and send a test invite. Check the API logs for errors:
 
-Run Postfix locally on the VPS, only for outbound mail:
-
-```sh
-# Install on Debian/Ubuntu
-apt install postfix libsasl2-modules
-# Choose "Internet Site", set your hostname
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs api --tail 20
 ```
 
-```yaml
-services:
-  api:
-    environment:
-      SMTP_HOST: "host.docker.internal"  # or the VPS IP
-      SMTP_PORT: "25"
-      SMTP_FROM: "noreply@yourdomain.com"
-      APP_URL: "https://finance.yourdomain.com"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-```
+If you see `535 5.7.0 Invalid login or password`, double-check that you're using the application password, not the webmail password.
 
-Configure Postfix as a relay through your provider (Resend, SES, etc.) for better deliverability. Direct sending from a VPS IP without a relay often lands in spam.
+#### Other SMTP providers
 
-**Option C: Disable email, use password fallback**
+Any SMTP relay works (Resend, Mailgun, Amazon SES, etc.). Set the `SMTP_*` env vars accordingly. For deliverability, configure SPF, DKIM, and DMARC DNS records for your sending domain.
+
+#### Disable email
 
 If you don't need email verification (single-user setup), simply omit `SMTP_HOST`. The invite flow falls back to admin-set passwords with mandatory password change on first login.
 
