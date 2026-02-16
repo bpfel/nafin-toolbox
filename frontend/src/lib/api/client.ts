@@ -54,11 +54,6 @@ export async function healthCheck(): Promise<{ status: string }> {
   return request<{ status: string }>('/health')
 }
 
-// Budget export (temporary — for migration to E2EE vault)
-export async function exportBudgetData(): Promise<any> {
-  return request('/budget/export')
-}
-
 // Vault
 
 export interface VaultKeysResponse {

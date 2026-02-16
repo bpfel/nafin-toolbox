@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { fetchModules, enableModule, disableModule, setOnUnauthorized, exportBudgetData, type ModuleInfo } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, completeVaultSetupWithMigration, recoverAccount } from './lib/auth/authStore.svelte'
+  import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
+  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount } from './lib/auth/authStore.svelte'
   import { getVaultState } from './lib/crypto/vaultStore.svelte'
-  import { migrateLegacyData } from './lib/crypto/migration'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import InvitePanel from './lib/auth/InvitePanel.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
@@ -33,8 +32,6 @@
 
   // Vault setup state
   let settingUpVault = $state(false)
-  let hasLegacyData = $state<boolean | null>(null) // null = not checked yet
-  let checkingLegacy = $state(false)
 
   // Recovery state
   let recoveryKey = $state('')
@@ -117,12 +114,6 @@
     }
   })
 
-  $effect(() => {
-    if (authState.vaultNeedsSetup && hasLegacyData === null && !checkingLegacy) {
-      checkLegacyData()
-    }
-  })
-
   async function checkRequire2FA() {
     const settings = await getSettings()
     require2FA = settings.require_2fa
@@ -146,35 +137,12 @@
     show2FAEnforcement = false
   }
 
-  async function checkLegacyData() {
-    checkingLegacy = true
-    try {
-      const data = await exportBudgetData()
-      hasLegacyData = (data.categories?.length > 0 || data.periods?.length > 0)
-    } catch {
-      hasLegacyData = false
-    } finally {
-      checkingLegacy = false
-    }
-  }
-
   async function handleVaultSetup() {
     settingUpVault = true
     try {
       await completeVaultSetup()
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to set up encryption'
-    } finally {
-      settingUpVault = false
-    }
-  }
-
-  async function handleVaultSetupWithMigration() {
-    settingUpVault = true
-    try {
-      await completeVaultSetupWithMigration(migrateLegacyData)
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to migrate data'
     } finally {
       settingUpVault = false
     }
@@ -245,23 +213,9 @@
         <h1>Set Up Encryption</h1>
         <p class="hint">Your data will be encrypted end-to-end. Only you can read it — the server never sees your data in plain text.</p>
 
-        {#if hasLegacyData === null}
-          <p class="hint">Checking for existing data...</p>
-        {:else if hasLegacyData}
-          <p class="hint">We found existing budget data. You can migrate it into your encrypted vault or start fresh.</p>
-          <div class="setup-actions">
-            <button class="btn-primary" onclick={handleVaultSetupWithMigration} disabled={settingUpVault}>
-              {settingUpVault ? 'Migrating...' : 'Migrate existing data'}
-            </button>
-            <button class="btn-secondary" onclick={handleVaultSetup} disabled={settingUpVault}>
-              Start fresh
-            </button>
-          </div>
-        {:else}
-          <button class="btn-primary" onclick={handleVaultSetup} disabled={settingUpVault}>
-            {settingUpVault ? 'Setting up encryption...' : 'Set up encryption'}
-          </button>
-        {/if}
+        <button class="btn-primary" onclick={handleVaultSetup} disabled={settingUpVault}>
+          {settingUpVault ? 'Setting up encryption...' : 'Set up encryption'}
+        </button>
 
         {#if error}
           <p class="error">{error}</p>
@@ -500,14 +454,6 @@
   .btn-primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-  }
-
-  .setup-actions {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-top: 1rem;
   }
 
   .recovery-form {
