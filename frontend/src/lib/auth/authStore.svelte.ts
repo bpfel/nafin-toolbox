@@ -1,4 +1,4 @@
-import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault } from '../crypto/vaultStore.svelte'
+import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault } from '../crypto/vaultStore.svelte'
 
 export interface User {
   id: number
@@ -62,8 +62,11 @@ export async function checkAuth() {
     const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
     if (res.ok) {
       currentUser = await res.json()
-      // User has a session but vault is not unlocked — need password to decrypt
-      vaultLocked = true
+      // Try to restore vault from sessionStorage (survives page refresh)
+      const restored = await tryRestoreVault()
+      if (!restored) {
+        vaultLocked = true
+      }
     } else {
       currentUser = null
     }
