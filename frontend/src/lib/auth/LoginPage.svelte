@@ -157,6 +157,10 @@
           {submitting ? 'Please wait...' : authState.needsSetup ? 'Create Account' : 'Sign In'}
         </button>
       </form>
+
+      {#if !authState.needsSetup}
+        <p class="forgot-hint">Forgot your password? Contact your administrator to reset it. You'll need your recovery key to restore your encrypted data.</p>
+      {/if}
     {/if}
   </div>
 </div>
@@ -245,6 +249,14 @@
     margin-top: 0.5rem;
   }
   .link-btn:hover { color: #245a42; }
+
+  .forgot-hint {
+    color: #999;
+    font-size: 0.8rem;
+    margin-top: 1.25rem;
+    text-align: center;
+    line-height: 1.4;
+  }
 
   button {
     margin-top: 0.5rem;
