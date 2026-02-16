@@ -28,6 +28,7 @@ let heldEmail = $state<string | null>(null)
 let vaultNeedsSetup = $state(false)
 let vaultDecryptFailed = $state(false)
 let recoveryKeyToShow = $state<string | null>(null)
+let vaultLocked = $state(false)
 
 export function getAuthState() {
   return {
@@ -36,6 +37,7 @@ export function getAuthState() {
     get needsSetup() { return needsSetup },
     get vaultNeedsSetup() { return vaultNeedsSetup },
     get vaultDecryptFailed() { return vaultDecryptFailed },
+    get vaultLocked() { return vaultLocked },
     get recoveryKeyToShow() { return recoveryKeyToShow },
   }
 }
@@ -60,6 +62,8 @@ export async function checkAuth() {
     const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
     if (res.ok) {
       currentUser = await res.json()
+      // User has a session but vault is not unlocked — need password to decrypt
+      vaultLocked = true
     } else {
       currentUser = null
     }
@@ -87,6 +91,7 @@ export async function login(email: string, password: string): Promise<string | {
       return { requires_2fa: true, mfa_token: data.mfa_token }
     }
     currentUser = data
+    vaultLocked = false
 
     // Initialize vault
     const vaultResult = await initializeVault(password, email)
@@ -119,6 +124,7 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
 
   if (res.ok) {
     currentUser = await res.json()
+    vaultLocked = false
 
     // Initialize vault using held credentials
     if (heldPassword && heldEmail) {
@@ -140,6 +146,34 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
 
   const data = await res.json().catch(() => ({ error: 'Verification failed' }))
   return data.error || 'Verification failed'
+}
+
+/**
+ * Unlock vault on page refresh (user has session but vault is locked).
+ * Returns error string or null on success.
+ */
+export async function unlockVault(password: string): Promise<string | null> {
+  if (!currentUser) return 'Not logged in'
+
+  const vaultResult = await initializeVault(password, currentUser.email)
+  if (vaultResult === 'ok') {
+    vaultLocked = false
+    return null
+  } else if (vaultResult === 'no-keys') {
+    // Keys don't exist yet — need setup
+    heldPassword = password
+    heldEmail = currentUser.email
+    vaultNeedsSetup = true
+    vaultLocked = false
+    return null
+  } else {
+    // decrypt-failed — need recovery
+    heldPassword = password
+    heldEmail = currentUser.email
+    vaultDecryptFailed = true
+    vaultLocked = false
+    return null
+  }
 }
 
 /**
@@ -174,6 +208,7 @@ export async function logout() {
     heldEmail = null
     vaultNeedsSetup = false
     vaultDecryptFailed = false
+    vaultLocked = false
     recoveryKeyToShow = null
     loggingOut = false
   }
@@ -267,8 +302,13 @@ export async function setup(email: string, password: string): Promise<string | n
     needsSetup = false
 
     // Set up vault keys for the new user
-    const recoveryKey = await setupKeys(password, email)
-    recoveryKeyToShow = recoveryKey
+    try {
+      const recoveryKey = await setupKeys(password, email)
+      recoveryKeyToShow = recoveryKey
+    } catch {
+      // If key setup fails, user can still unlock later via the vault lock screen
+      vaultLocked = true
+    }
     return null
   }
 
@@ -289,8 +329,12 @@ export async function verifyEmail(token: string, password: string): Promise<stri
 
     // Set up vault keys for the invited user
     if (currentUser) {
-      const recoveryKey = await setupKeys(password, currentUser.email)
-      recoveryKeyToShow = recoveryKey
+      try {
+        const recoveryKey = await setupKeys(password, currentUser.email)
+        recoveryKeyToShow = recoveryKey
+      } catch {
+        vaultLocked = true
+      }
     }
     return null
   }
