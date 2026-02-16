@@ -83,6 +83,26 @@ Three asset sub-types with different valuation strategies:
 - Events tracked: `login_success`, `login_failed`, `logout`, `password_changed`, `2fa_enabled`, `2fa_disabled`, `2fa_failed`, `recovery_code_used`, `user_invited`, `email_verified`, `user_deleted`.
 - On user deletion, audit log entries are preserved with `user_id` set to NULL (anonymized but retained for forensics).
 
+### End-to-End Encryption (E2EE)
+
+All financial data (budget categories, entries, periods) is encrypted client-side before leaving the browser. The server only stores opaque encrypted blobs — it cannot read user data.
+
+**Key hierarchy:**
+- **KEK** (Key Encryption Key) — derived from the user's password + email via PBKDF2 (600,000 iterations, SHA-256). Never stored.
+- **MEK** (Master Encryption Key) — random 256-bit AES-GCM key. Wrapped (encrypted) with the KEK and stored on the server. The server never sees the unwrapped MEK.
+- **Vault** — JSON blob containing all financial data, encrypted with the MEK using AES-256-GCM.
+
+**Recovery key** — a one-time-displayed base32 key that independently wraps the MEK. Stored bcrypt-hashed on the server. Required if the password is forgotten or reset by an admin.
+
+**Session persistence** — after unlocking, the MEK is cached in `sessionStorage` so page refreshes don't require re-entering the password. `sessionStorage` is tab-scoped and cleared when the tab or browser closes. On logout, the cached key is explicitly cleared.
+
+**Known limitation — no inactivity lock.** Currently, the vault stays unlocked for the entire tab lifetime. There is no automatic lock after idle time. A configurable inactivity timer (e.g., clear the cached MEK after 15 minutes of no interaction) would improve security for shared or unattended machines. This is not yet implemented.
+
+**Implications:**
+- The server (and its admin) cannot read user financial data.
+- Password resets by an admin break vault access — the user must use their recovery key.
+- Losing both the password and recovery key means permanent data loss. There is no backdoor.
+
 ### Data Protection (DSGVO/nDSG)
 - **Data minimization** — only email stored as PII.
 - **Right to deletion** — `DELETE /api/auth/account` cascades all user data. Audit logs anonymized.
