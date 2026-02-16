@@ -263,6 +263,29 @@ Any SMTP relay works (Resend, Mailgun, Amazon SES, etc.). Set the `SMTP_*` env v
 
 If you don't need email verification (single-user setup), simply omit `SMTP_HOST`. The invite flow falls back to admin-set passwords with mandatory password change on first login.
 
+### Admin Emergency Reset
+
+If the admin loses both their password and recovery key, they can reset their account from the server with DB access. This **destroys all encrypted data** — there is no way to recover it without the recovery key.
+
+```bash
+# Connect to the database
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance
+
+# Generate a new bcrypt hash (replace 'newpassword' with your chosen password)
+# You can use: htpasswd -nbBC 10 "" newpassword | cut -d: -f2
+# Or from the API container:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api sh -c \
+  "echo 'package main; import (\"fmt\"; \"golang.org/x/crypto/bcrypt\"); func main() { h, _ := bcrypt.GenerateFromPassword([]byte(\"newpassword\"), bcrypt.DefaultCost); fmt.Println(string(h)) }' > /tmp/h.go && go run /tmp/h.go"
+
+# Then in psql, reset the admin account:
+UPDATE users SET password_hash = '<bcrypt-hash-from-above>' WHERE email = 'admin@example.com';
+DELETE FROM user_vaults WHERE user_id = (SELECT id FROM users WHERE email = 'admin@example.com');
+UPDATE users SET encrypted_mek = NULL, recovery_key_hash = NULL, encrypted_mek_recovery = NULL
+  WHERE email = 'admin@example.com';
+```
+
+After this, the admin can log in with the new password. The vault setup screen will appear to generate new encryption keys and a new recovery key. All previous financial data is lost.
+
 **Security checklist for production:**
 - [ ] Generate a unique `ENCRYPTION_KEY` with `openssl rand -hex 32`
 - [ ] Set `COOKIE_SECURE=true`
