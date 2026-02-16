@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
-	"github.com/bpfel/nafin-toolbox/internal/budget"
 	"github.com/bpfel/nafin-toolbox/internal/email"
 	"github.com/bpfel/nafin-toolbox/internal/module"
 	"github.com/bpfel/nafin-toolbox/internal/vault"
@@ -113,9 +112,6 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))
 
 			r.Route("/modules", module.Routes(s.db))
-			// Budget routes kept temporarily for data migration export.
-			// Remove after all users have migrated to E2EE vault.
-			r.Route("/budget", budget.Routes(s.db))
 			r.Route("/vault", vault.Routes(s.db))
 		})
 	})
