@@ -11,6 +11,26 @@ let unlocked = $state(false)
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+const MEK_STORAGE_KEY = 'vault_mek'
+
+/** Export MEK to sessionStorage so it survives page refreshes. */
+async function cacheMEK(key: CryptoKey): Promise<void> {
+  const raw = await crypto.subtle.exportKey('raw', key)
+  sessionStorage.setItem(MEK_STORAGE_KEY, btoa(String.fromCharCode(...new Uint8Array(raw))))
+}
+
+/** Restore MEK from sessionStorage. Returns null if not cached. */
+async function restoreMEK(): Promise<CryptoKey | null> {
+  const stored = sessionStorage.getItem(MEK_STORAGE_KEY)
+  if (!stored) return null
+  const raw = Uint8Array.from(atob(stored), c => c.charCodeAt(0))
+  return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt'])
+}
+
+function clearCachedMEK(): void {
+  sessionStorage.removeItem(MEK_STORAGE_KEY)
+}
+
 export function getVaultState() {
   return {
     get vault() { return vault },
@@ -20,6 +40,30 @@ export function getVaultState() {
     get saving() { return saving },
     get lastSaved() { return lastSaved },
     get unlocked() { return unlocked },
+  }
+}
+
+/**
+ * Try to restore vault from sessionStorage (page refresh).
+ * Returns true if successful, false if no cached MEK.
+ */
+export async function tryRestoreVault(): Promise<boolean> {
+  const cachedMEK = await restoreMEK()
+  if (!cachedMEK) return false
+
+  try {
+    const vaultData = await fetchVault()
+    if (vaultData) {
+      vault = await decryptVault(vaultData.ciphertext, vaultData.nonce, cachedMEK)
+    } else {
+      vault = createEmptyVault()
+    }
+    mek = cachedMEK
+    unlocked = true
+    return true
+  } catch {
+    clearCachedMEK()
+    return false
   }
 }
 
@@ -44,6 +88,7 @@ export async function initializeVault(password: string, email: string): Promise<
       await saveVault()
     }
 
+    await cacheMEK(mek)
     unlocked = true
     return 'ok'
   } catch {
@@ -78,6 +123,7 @@ export async function setupKeys(password: string, email: string): Promise<string
   mek = newMEK
   vault = createEmptyVault()
   await saveVault()
+  await cacheMEK(mek)
   unlocked = true
 
   return recoveryKey
@@ -128,6 +174,7 @@ export function clearVault(): void {
   saving = false
   lastSaved = null
   unlocked = false
+  clearCachedMEK()
 }
 
 /**
@@ -175,6 +222,7 @@ export async function recoverVault(
     await saveVault()
   }
 
+  await cacheMEK(mek)
   unlocked = true
 }
 
