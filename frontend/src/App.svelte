@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount } from './lib/auth/authStore.svelte'
+  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
   import { getVaultState } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import InvitePanel from './lib/auth/InvitePanel.svelte'
@@ -32,6 +32,11 @@
 
   // Vault setup state
   let settingUpVault = $state(false)
+
+  // Unlock state (page refresh — need password to decrypt vault)
+  let unlockPassword = $state('')
+  let unlocking = $state(false)
+  let unlockError = $state<string | null>(null)
 
   // Recovery state
   let recoveryKey = $state('')
@@ -152,6 +157,23 @@
     clearRecoveryKey()
   }
 
+  async function handleUnlock() {
+    if (!unlockPassword) return
+    unlocking = true
+    unlockError = null
+    try {
+      const err = await unlockVault(unlockPassword)
+      if (err) {
+        unlockError = err
+      }
+    } catch (e) {
+      unlockError = e instanceof Error ? e.message : 'Failed to unlock vault'
+    } finally {
+      unlocking = false
+      unlockPassword = ''
+    }
+  }
+
   async function handleRecovery() {
     if (!recoveryKey.trim()) return
     recovering = true
@@ -256,9 +278,37 @@
       </div>
     </div>
   </main>
-{:else if !vaultState.unlocked}
+{:else if authState.vaultLocked || !vaultState.unlocked}
   <main>
-    <p class="loading">Decrypting...</p>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>Unlock Vault</h1>
+        <p class="hint">Enter your password to decrypt your data.</p>
+
+        <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleUnlock() }}>
+          <label>
+            Password
+            <input
+              type="password"
+              bind:value={unlockPassword}
+              disabled={unlocking}
+              autocomplete="current-password"
+              class="recovery-input"
+            />
+          </label>
+
+          {#if unlockError}
+            <p class="error">{unlockError}</p>
+          {/if}
+
+          <button class="btn-primary" type="submit" disabled={unlocking || !unlockPassword}>
+            {unlocking ? 'Unlocking...' : 'Unlock'}
+          </button>
+        </form>
+
+        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+      </div>
+    </div>
   </main>
 {:else}
 
