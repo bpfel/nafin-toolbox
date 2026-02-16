@@ -6,53 +6,6 @@ export interface ModuleInfo {
   enabled_at: string
 }
 
-export interface BudgetCategoryGroup {
-  id: number
-  name: string
-  type: string
-  sort_order: number
-  created_at: string
-}
-
-export interface BudgetCategory {
-  id: number
-  name: string
-  type: string
-  sort_order: number
-  archived: boolean
-  group_id: number | null
-  group_name: string
-  fixed: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface BudgetEntry {
-  id: number
-  period_id: number
-  category_id: number
-  category_name: string
-  category_type: string
-  category_group_name: string
-  category_fixed: boolean
-  planned_amount: string
-  actual_amount: string
-}
-
-export interface BudgetPeriodSummary {
-  period_id: number
-  year: number
-  month: number
-  notes: string
-  entries: BudgetEntry[]
-  total_planned_income: string
-  total_actual_income: string
-  total_planned_expenses: string
-  total_actual_expenses: string
-  planned_balance: string
-  actual_balance: string
-}
-
 let onUnauthorized: (() => void) | null = null
 
 export function setOnUnauthorized(callback: () => void) {
@@ -101,108 +54,76 @@ export async function healthCheck(): Promise<{ status: string }> {
   return request<{ status: string }>('/health')
 }
 
-// Budget
-
-export async function fetchBudgetCategories(): Promise<BudgetCategory[]> {
-  return request<BudgetCategory[]>('/budget/categories')
+// Budget export (temporary — for migration to E2EE vault)
+export async function exportBudgetData(): Promise<any> {
+  return request('/budget/export')
 }
 
-export async function fetchBudgetCategoryGroups(): Promise<BudgetCategoryGroup[]> {
-  return request<BudgetCategoryGroup[]>('/budget/categories/groups')
+// Vault
+
+export interface VaultKeysResponse {
+  encrypted_mek: string
+  iterations: number
 }
 
-export async function createBudgetCategoryGroup(group: {
-  name: string
-  type: string
-  sort_order?: number
-}): Promise<BudgetCategoryGroup> {
-  return request<BudgetCategoryGroup>('/budget/categories/groups', {
-    method: 'POST',
-    body: JSON.stringify(group),
-  })
+export interface VaultPayloadResponse {
+  ciphertext: string
+  nonce: string
+  version: number
 }
 
-export async function fetchBudgetPeriod(year: number, month: number): Promise<BudgetPeriodSummary> {
-  return request<BudgetPeriodSummary>(`/budget/periods/${year}/${month}`)
-}
-
-export async function createBudgetPeriod(year: number, month: number): Promise<void> {
-  await request('/budget/periods', {
-    method: 'POST',
-    body: JSON.stringify({ year, month }),
-  })
-}
-
-export async function upsertBudgetEntry(
-  year: number,
-  month: number,
-  entry: { category_id: number; planned_amount?: string; actual_amount?: string },
-): Promise<BudgetEntry> {
-  return request<BudgetEntry>(`/budget/periods/${year}/${month}/entries`, {
-    method: 'PUT',
-    body: JSON.stringify(entry),
-  })
-}
-
-export async function copyBudgetPeriod(
-  year: number,
-  month: number,
-  from: { from_year: number; from_month: number },
-): Promise<BudgetPeriodSummary> {
-  return request<BudgetPeriodSummary>(`/budget/periods/${year}/${month}/copy`, {
-    method: 'POST',
-    body: JSON.stringify(from),
-  })
-}
-
-export async function seedBudgetDefaults(): Promise<{
-  categories_created: number
-  period_created: boolean
-}> {
-  return request('/budget/seed-defaults', { method: 'POST' })
-}
-
-export async function createBudgetCategory(cat: {
-  name: string
-  type: string
-  group_id?: number
-  group_name?: string
-  fixed?: boolean
-}): Promise<BudgetCategory> {
-  return request<BudgetCategory>('/budget/categories', {
-    method: 'POST',
-    body: JSON.stringify(cat),
-  })
-}
-
-export async function updateBudgetCategory(
-  id: number,
-  update: Partial<Pick<BudgetCategory, 'name' | 'type' | 'sort_order' | 'archived' | 'group_id' | 'fixed'>> & { group_name?: string },
-): Promise<BudgetCategory> {
-  return request<BudgetCategory>(`/budget/categories/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(update),
-  })
-}
-
-export async function deleteBudgetCategory(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/budget/categories/${id}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    let msg = `API error: ${res.status}`
-    try {
-      const body = await res.json()
-      if (body.error) msg = body.error
-    } catch { /* ignore */ }
-    throw new Error(msg)
+export async function fetchVaultKeys(): Promise<VaultKeysResponse | null> {
+  try {
+    return await request<VaultKeysResponse>('/vault/keys')
+  } catch {
+    return null
   }
 }
 
-export async function reorderBudgetCategories(categoryIds: number[]): Promise<void> {
-  await request('/budget/categories/reorder', {
+export async function setupVaultKeys(body: {
+  encrypted_mek: string
+  recovery_key_hash: string
+  encrypted_mek_recovery: string
+}): Promise<void> {
+  await request('/vault/keys', {
     method: 'POST',
-    body: JSON.stringify({ category_ids: categoryIds }),
+    body: JSON.stringify(body),
   })
+}
+
+export async function updateVaultKeys(encryptedMEK: string): Promise<void> {
+  await request('/vault/keys', {
+    method: 'PUT',
+    body: JSON.stringify({ encrypted_mek: encryptedMEK }),
+  })
+}
+
+export async function fetchVault(): Promise<VaultPayloadResponse | null> {
+  try {
+    return await request<VaultPayloadResponse>('/vault')
+  } catch {
+    return null
+  }
+}
+
+export async function putVault(body: {
+  ciphertext: string
+  nonce: string
+  version: number
+}): Promise<void> {
+  await request('/vault', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function recoverVaultKeys(recoveryKey: string): Promise<{ encrypted_mek_recovery: string } | null> {
+  try {
+    return await request<{ encrypted_mek_recovery: string }>('/vault/recovery', {
+      method: 'POST',
+      body: JSON.stringify({ recovery_key: recoveryKey }),
+    })
+  } catch {
+    return null
+  }
 }
