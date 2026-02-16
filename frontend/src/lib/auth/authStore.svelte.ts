@@ -1,3 +1,5 @@
+import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault } from '../crypto/vaultStore.svelte'
+
 export interface User {
   id: number
   email: string
@@ -18,12 +20,28 @@ let currentUser = $state<User | null>(null)
 let loading = $state(true)
 let needsSetup = $state(false)
 
+// Held credentials for vault initialization (cleared after use)
+let heldPassword = $state<string | null>(null)
+let heldEmail = $state<string | null>(null)
+
+// Vault state exposed to UI
+let vaultNeedsSetup = $state(false)
+let vaultDecryptFailed = $state(false)
+let recoveryKeyToShow = $state<string | null>(null)
+
 export function getAuthState() {
   return {
     get currentUser() { return currentUser },
     get loading() { return loading },
     get needsSetup() { return needsSetup },
+    get vaultNeedsSetup() { return vaultNeedsSetup },
+    get vaultDecryptFailed() { return vaultDecryptFailed },
+    get recoveryKeyToShow() { return recoveryKeyToShow },
   }
+}
+
+export function clearRecoveryKey() {
+  recoveryKeyToShow = null
 }
 
 export async function checkAuth() {
@@ -63,9 +81,27 @@ export async function login(email: string, password: string): Promise<string | {
   if (res.ok) {
     const data = await res.json()
     if (data.requires_2fa) {
+      // Hold password for vault init after 2FA
+      heldPassword = password
+      heldEmail = email
       return { requires_2fa: true, mfa_token: data.mfa_token }
     }
     currentUser = data
+
+    // Initialize vault
+    const vaultResult = await initializeVault(password, email)
+    if (vaultResult === 'no-keys') {
+      // Keys don't exist yet — need setup/migration
+      heldPassword = password
+      heldEmail = email
+      vaultNeedsSetup = true
+    } else if (vaultResult === 'decrypt-failed') {
+      // Keys exist but can't decrypt — need recovery
+      heldPassword = password
+      heldEmail = email
+      vaultDecryptFailed = true
+    }
+
     return null
   }
 
@@ -83,11 +119,56 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
 
   if (res.ok) {
     currentUser = await res.json()
+
+    // Initialize vault using held credentials
+    if (heldPassword && heldEmail) {
+      const vaultResult = await initializeVault(heldPassword, heldEmail)
+      if (vaultResult === 'no-keys') {
+        vaultNeedsSetup = true
+      } else if (vaultResult === 'decrypt-failed') {
+        vaultDecryptFailed = true
+      }
+    }
+    // Clear held credentials if vault is ready
+    if (!vaultNeedsSetup && !vaultDecryptFailed) {
+      heldPassword = null
+      heldEmail = null
+    }
+
     return null
   }
 
   const data = await res.json().catch(() => ({ error: 'Verification failed' }))
   return data.error || 'Verification failed'
+}
+
+/**
+ * Complete vault key setup (after login when keys don't exist yet).
+ * Returns the recovery key to show to the user.
+ */
+export async function completeVaultSetup(): Promise<string | null> {
+  if (!heldPassword || !heldEmail) return null
+
+  const recoveryKey = await setupKeys(heldPassword, heldEmail)
+  heldPassword = null
+  heldEmail = null
+  vaultNeedsSetup = false
+  recoveryKeyToShow = recoveryKey
+  return recoveryKey
+}
+
+/**
+ * Complete vault setup with legacy data migration.
+ */
+export async function completeVaultSetupWithMigration(migrateVault: (password: string, email: string) => Promise<string>): Promise<string | null> {
+  if (!heldPassword || !heldEmail) return null
+
+  const recoveryKey = await migrateVault(heldPassword, heldEmail)
+  heldPassword = null
+  heldEmail = null
+  vaultNeedsSetup = false
+  recoveryKeyToShow = recoveryKey
+  return recoveryKey
 }
 
 let loggingOut = false
@@ -96,17 +177,32 @@ export async function logout() {
   if (loggingOut) return
   loggingOut = true
   try {
+    clearVault()
     await fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     })
   } finally {
     currentUser = null
+    heldPassword = null
+    heldEmail = null
+    vaultNeedsSetup = false
+    vaultDecryptFailed = false
+    recoveryKeyToShow = null
     loggingOut = false
   }
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<string | null> {
+  // Re-encrypt MEK before changing server password
+  if (currentUser) {
+    try {
+      await reEncryptMEK(currentPassword, newPassword, currentUser.email)
+    } catch (e) {
+      return e instanceof Error ? e.message : 'Failed to re-encrypt vault keys'
+    }
+  }
+
   const res = await fetch(`${API_BASE}/auth/change-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -116,11 +212,33 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
   if (res.ok) {
     currentUser = null
+    clearVault()
     return null
   }
 
   const data = await res.json().catch(() => ({ error: 'Password change failed' }))
   return data.error || 'Password change failed'
+}
+
+/**
+ * Recover account using recovery key.
+ * User must be logged in (auth session active) but vault is locked.
+ * Uses held password to re-wrap MEK after recovery.
+ */
+export async function recoverAccount(recoveryKey: string): Promise<string | null> {
+  if (!currentUser) return 'Not logged in'
+  if (!heldPassword || !heldEmail) return 'Password not available for re-encryption'
+
+  try {
+    await recoverVault(recoveryKey, heldPassword, heldEmail)
+    heldPassword = null
+    heldEmail = null
+    vaultDecryptFailed = false
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Recovery failed'
+  }
+
+  return null
 }
 
 export async function inviteUser(email: string, role: 'admin' | 'user' = 'user', password?: string): Promise<{ user?: User; error?: string }> {
@@ -161,6 +279,10 @@ export async function setup(email: string, password: string): Promise<string | n
   if (res.ok) {
     currentUser = await res.json()
     needsSetup = false
+
+    // Set up vault keys for the new user
+    const recoveryKey = await setupKeys(password, email)
+    recoveryKeyToShow = recoveryKey
     return null
   }
 
@@ -178,6 +300,12 @@ export async function verifyEmail(token: string, password: string): Promise<stri
 
   if (res.ok) {
     currentUser = await res.json()
+
+    // Set up vault keys for the invited user
+    if (currentUser) {
+      const recoveryKey = await setupKeys(password, currentUser.email)
+      recoveryKeyToShow = recoveryKey
+    }
     return null
   }
 
@@ -254,6 +382,7 @@ export async function deleteAccount(password: string): Promise<string | null> {
   })
 
   if (res.ok) {
+    clearVault()
     currentUser = null
     return null
   }
