@@ -91,7 +91,7 @@ export async function login(email: string, password: string): Promise<string | {
     // Initialize vault
     const vaultResult = await initializeVault(password, email)
     if (vaultResult === 'no-keys') {
-      // Keys don't exist yet — need setup/migration
+      // Keys don't exist yet — need setup
       heldPassword = password
       heldEmail = email
       vaultNeedsSetup = true
@@ -150,20 +150,6 @@ export async function completeVaultSetup(): Promise<string | null> {
   if (!heldPassword || !heldEmail) return null
 
   const recoveryKey = await setupKeys(heldPassword, heldEmail)
-  heldPassword = null
-  heldEmail = null
-  vaultNeedsSetup = false
-  recoveryKeyToShow = recoveryKey
-  return recoveryKey
-}
-
-/**
- * Complete vault setup with legacy data migration.
- */
-export async function completeVaultSetupWithMigration(migrateVault: (password: string, email: string) => Promise<string>): Promise<string | null> {
-  if (!heldPassword || !heldEmail) return null
-
-  const recoveryKey = await migrateVault(heldPassword, heldEmail)
   heldPassword = null
   heldEmail = null
   vaultNeedsSetup = false
