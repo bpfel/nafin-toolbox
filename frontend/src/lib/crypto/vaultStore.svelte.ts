@@ -55,7 +55,7 @@ export async function initializeVault(password: string, email: string): Promise<
 }
 
 /**
- * Set up encryption keys for the first time (new user or migration).
+ * Set up encryption keys for the first time.
  * Returns the recovery key that must be shown to the user.
  */
 export async function setupKeys(password: string, email: string): Promise<string> {
@@ -179,23 +179,10 @@ export async function recoverVault(
 }
 
 /**
- * Hash recovery key using bcrypt-compatible approach.
- * We use PBKDF2 to derive a hash that the server stores.
- * The server uses bcrypt on its end — so we send the raw key,
- * and the server hashes it. Actually, let's just send it for the server to hash.
- * Wait — the plan says server stores bcrypt hash, but we need to send the key.
- * Let's send the raw recovery key for the server to bcrypt-hash.
- *
- * Actually, looking at the handler: we send recovery_key_hash which the server stores directly.
- * And in recovery, the server compares with bcrypt.CompareHashAndPassword.
- * So we need to bcrypt-hash on the client? No — bcrypt is not available in browsers natively.
- *
- * Better approach: send the raw recovery key during setup, let the server hash it.
- * Let me adjust the API.
+ * Send raw recovery key to server — the server bcrypt-hashes it on receipt.
+ * bcrypt is not available in the browser Web Crypto API.
  */
 async function hashRecoveryKey(recoveryKey: string): Promise<string> {
-  // We'll send the raw key and let the server bcrypt-hash it.
-  // The handler needs adjustment to hash on receipt.
   return recoveryKey
 }
 
