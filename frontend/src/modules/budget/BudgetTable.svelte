@@ -1,7 +1,8 @@
 <script lang="ts">
   import Sortable from 'sortablejs'
-  import type { BudgetEntry } from '../../lib/api/client'
-  import { reorderBudgetCategories } from '../../lib/api/client'
+  import type { PeriodEntryView } from '../../lib/budget/budgetEngine'
+  import * as engine from '../../lib/budget/budgetEngine'
+  import type { VaultData } from '../../lib/crypto/vault'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
   import AddCategoryRow from './AddCategoryRow.svelte'
   import AddCategoryModal from './AddCategoryModal.svelte'
@@ -9,22 +10,26 @@
 
   interface EntryGroup {
     groupName: string
-    entries: BudgetEntry[]
+    groupId: string
+    entries: PeriodEntryView[]
     plannedTotal: number
     actualTotal: number
   }
 
   interface Props {
-    entries: BudgetEntry[]
-    onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
+    entries: PeriodEntryView[]
+    vault: VaultData
+    year: number
+    month: number
+    onsave: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
     oncategorycreated: () => void
     oncategorydeleted: () => void
   }
 
-  let { entries, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
+  let { entries, vault, year, month, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: number }[]; editCategory?: { id: number; name: string; fixed: boolean; groupName: string; plannedAmount: string; actualAmount: string } } | null>(null)
-  let deleteModalContext = $state<{ categoryId: number; categoryName: string } | null>(null)
+  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; editCategory?: { id: string; name: string; fixed: boolean; groupName: string; plannedAmount: string; actualAmount: string } } | null>(null)
+  let deleteModalContext = $state<{ categoryId: string; categoryName: string } | null>(null)
 
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
   let collapsedGroups = $state(new Set<string>())
@@ -41,16 +46,17 @@
     return collapsedGroups.has(`${type}:${groupName}`)
   }
 
-  let incomeEntries = $derived(entries.filter(e => e.category_type === 'income'))
-  let expenseEntries = $derived(entries.filter(e => e.category_type === 'expense'))
+  let incomeEntries = $derived(entries.filter(e => e.categoryType === 'income'))
+  let expenseEntries = $derived(entries.filter(e => e.categoryType === 'expense'))
 
-  function groupEntries(list: BudgetEntry[]): EntryGroup[] {
+  function groupEntries(list: PeriodEntryView[]): EntryGroup[] {
     const map = new Map<string, EntryGroup>()
     for (const e of list) {
-      const key = e.category_group_name || ''
+      const key = e.categoryGroupName || ''
       if (!map.has(key)) {
         map.set(key, {
           groupName: key,
+          groupId: e.categoryGroupId,
           entries: [],
           plannedTotal: 0,
           actualTotal: 0,
@@ -58,8 +64,8 @@
       }
       const g = map.get(key)!
       g.entries.push(e)
-      g.plannedTotal += Number(e.planned_amount)
-      g.actualTotal += Number(e.actual_amount)
+      g.plannedTotal += Number(e.plannedAmount)
+      g.actualTotal += Number(e.actualAmount)
     }
     return Array.from(map.values()).sort((a, b) => {
       const ai = list.indexOf(a.entries[0])
@@ -71,23 +77,30 @@
   let incomeGroups = $derived(groupEntries(incomeEntries))
   let expenseGroups = $derived(groupEntries(expenseEntries))
 
-  function groupsForType(type: 'income' | 'expense'): { name: string; id: number }[] {
+  function groupsForType(type: 'income' | 'expense'): { name: string; id: string }[] {
     const groups = type === 'income' ? incomeGroups : expenseGroups
-    // We don't have group IDs from entries alone, so we use 0 as placeholder.
-    // The AddCategoryModal will use group_name for create/update.
-    return groups.map(g => ({ name: g.groupName, id: 0 }))
+    return groups.map(g => ({ name: g.groupName, id: g.groupId }))
   }
 
   function openAddModal(type: 'income' | 'expense') {
     addModalContext = { type, groups: groupsForType(type) }
   }
 
-  function openEditModal(categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) {
+  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) {
     addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, fixed, groupName, plannedAmount, actualAmount } }
   }
 
-  function openDeleteModal(categoryId: number, categoryName: string) {
+  function openDeleteModal(categoryId: string, categoryName: string) {
     deleteModalContext = { categoryId, categoryName }
+  }
+
+  function handleCategoryCreated() {
+    oncategorycreated()
+  }
+
+  function handleCategoryDeleted(categoryId: string) {
+    engine.deleteCategory(vault, categoryId)
+    oncategorydeleted()
   }
 
   function sortable(node: HTMLElement) {
@@ -97,12 +110,12 @@
       draggable: '.entry-row',
       filter: '.group-header, .add-row',
       ghostClass: 'drag-ghost',
-      onEnd(evt) {
-        // Extract new order from DOM
+      onEnd() {
         const rows = node.querySelectorAll('.entry-row')
-        const ids = Array.from(rows).map(r => Number((r as HTMLElement).dataset.categoryId))
+        const ids = Array.from(rows).map(r => (r as HTMLElement).dataset.categoryId!).filter(Boolean)
         if (ids.length > 0) {
-          reorderBudgetCategories(ids).then(() => oncategorycreated())
+          engine.reorderCategories(vault, ids)
+          oncategorycreated()
         }
       },
     })
@@ -159,7 +172,7 @@
           </tr>
         {/if}
         {#if !isCollapsed('income', group.groupName)}
-          {#each group.entries as entry (entry.category_id)}
+          {#each group.entries as entry (entry.categoryId)}
             <BudgetEntryRow {entry} {onsave} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
           {/each}
         {/if}
@@ -201,7 +214,7 @@
           </tr>
         {/if}
         {#if !isCollapsed('expense', group.groupName)}
-          {#each group.entries as entry (entry.category_id)}
+          {#each group.entries as entry (entry.categoryId)}
             <BudgetEntryRow {entry} {onsave} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
           {/each}
         {/if}
@@ -218,7 +231,8 @@
     type={addModalContext.type}
     groups={addModalContext.groups}
     editCategory={addModalContext.editCategory}
-    oncreated={oncategorycreated}
+    {vault}
+    oncreated={handleCategoryCreated}
     onclose={() => addModalContext = null}
     {onsave}
   />
@@ -228,7 +242,7 @@
   <DeleteCategoryModal
     categoryId={deleteModalContext.categoryId}
     categoryName={deleteModalContext.categoryName}
-    ondeleted={oncategorydeleted}
+    ondeleted={() => handleCategoryDeleted(deleteModalContext!.categoryId)}
     onclose={() => deleteModalContext = null}
   />
 {/if}
@@ -346,14 +360,12 @@
     .col-amount {
       width: 25%;
     }
-    /* Default (monthly): hide yearly column */
     .col-planned-yr {
       display: none;
     }
     :global(.col-planned-yr) {
       display: none;
     }
-    /* Yearly mode: hide monthly, show yearly */
     :global(.view-yearly .col-planned-mo) {
       display: none;
     }

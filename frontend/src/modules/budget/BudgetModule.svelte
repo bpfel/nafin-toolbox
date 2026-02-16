@@ -1,130 +1,92 @@
 <script lang="ts">
-  import {
-    fetchBudgetCategories,
-    fetchBudgetPeriod,
-    upsertBudgetEntry,
-    copyBudgetPeriod,
-    createBudgetPeriod,
-    type BudgetPeriodSummary,
-    type BudgetCategory,
-  } from '../../lib/api/client'
+  import { getVaultState, markDirty } from '../../lib/crypto/vaultStore.svelte'
+  import * as engine from '../../lib/budget/budgetEngine'
   import MonthSelector from './MonthSelector.svelte'
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
 
+  const vaultState = getVaultState()
+
   let now = new Date()
   let currentYear = now.getFullYear()
   let currentMonth = now.getMonth() + 1
-  // Max navigable: one month after current
   let maxYear = currentMonth === 12 ? currentYear + 1 : currentYear
   let maxMonth = currentMonth === 12 ? 1 : currentMonth + 1
 
   let year = $state(currentYear)
   let month = $state(currentMonth)
 
-  let categories = $state<BudgetCategory[]>([])
-  let summary = $state<BudgetPeriodSummary | null>(null)
-  let needsSetup = $state(false)
-  let periodNotFound = $state(false)
+  // Trigger reactivity: increment on mutations so $derived recomputes
+  let version = $state(0)
+
   let isPastMonth = $derived(year < currentYear || (year === currentYear && month < currentMonth))
-  let error = $state<string | null>(null)
-  let loading = $state(true)
 
-  async function loadData() {
-    loading = true
-    error = null
-    periodNotFound = false
-    needsSetup = false
-    try {
-      categories = await fetchBudgetCategories()
-      try {
-        summary = await fetchBudgetPeriod(year, month)
-      } catch {
-        // No period for this month
-        if (categories.length === 0) {
-          needsSetup = true
-          loading = false
-          return
-        }
-        // Past months: don't fabricate history
-        if (isPastMonth) {
-          periodNotFound = true
-          summary = null
-          return
-        }
-        // Current/future months: auto-create by copying from previous
-        await autoCreatePeriod()
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load budget'
-    } finally {
-      loading = false
-    }
-  }
+  let needsSetup = $derived(
+    vaultState.vault ? vaultState.vault.budget.categories.length === 0 && version >= 0 : false
+  )
 
-  async function autoCreatePeriod() {
-    let prevYear = month === 1 ? year - 1 : year
-    let prevMonth = month === 1 ? 12 : month - 1
-    try {
-      summary = await copyBudgetPeriod(year, month, {
-        from_year: prevYear,
-        from_month: prevMonth,
-      })
-    } catch {
-      // No previous month to copy — create empty period
-      await createBudgetPeriod(year, month)
-      summary = await fetchBudgetPeriod(year, month)
-    }
-  }
+  let summary = $derived(
+    vaultState.vault && version >= 0 ? engine.getPeriodSummary(vaultState.vault, year, month) : null
+  )
+
+  let periodNotFound = $derived(!summary && !needsSetup && isPastMonth)
 
   function changeMonth(y: number, m: number) {
     year = y
     month = m
   }
 
+  // Auto-create period for current/future months
   $effect(() => {
-    year; month;
-    loadData()
+    if (!vaultState.vault) return
+    const s = engine.getPeriodSummary(vaultState.vault, year, month)
+    if (!s && !isPastMonth && vaultState.vault.budget.categories.length > 0) {
+      let prevYear = month === 1 ? year - 1 : year
+      let prevMonth = month === 1 ? 12 : month - 1
+      engine.copyPeriod(vaultState.vault, year, month, prevYear, prevMonth)
+      if (!engine.getPeriod(vaultState.vault, year, month)) {
+        engine.createPeriod(vaultState.vault, year, month)
+      }
+      markDirty()
+      version++
+    }
   })
 
-  async function refreshData() {
-    try {
-      categories = await fetchBudgetCategories()
-      summary = await fetchBudgetPeriod(year, month)
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to refresh'
-    }
+  function handleSave(categoryId: string, field: 'planned' | 'actual', amount: string) {
+    if (!vaultState.vault) return
+    engine.upsertEntry(vaultState.vault, year, month, categoryId, field, amount)
+    markDirty()
+    version++
   }
 
-  async function handleSave(categoryId: number, field: 'planned' | 'actual', amount: string) {
-    try {
-      const entry: { category_id: number; planned_amount?: string; actual_amount?: string } = {
-        category_id: categoryId,
-      }
-      if (field === 'planned') {
-        entry.planned_amount = amount
-      } else {
-        entry.actual_amount = amount
-      }
-      await upsertBudgetEntry(year, month, entry)
-      summary = await fetchBudgetPeriod(year, month)
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to save'
-    }
+  function handleCategoryChange() {
+    markDirty()
+    version++
   }
 
+  function handleSeeded() {
+    if (!vaultState.vault) return
+    engine.seedDefaults(vaultState.vault)
+    markDirty()
+    version++
+  }
+
+  function handleStartBlank() {
+    if (!vaultState.vault) return
+    engine.createPeriod(vaultState.vault, currentYear, currentMonth)
+    markDirty()
+    version++
+  }
 </script>
 
 <div class="budget-module">
   <MonthSelector {year} {month} {maxYear} {maxMonth} onchange={changeMonth} />
 
-  {#if loading}
+  {#if !vaultState.vault}
     <p class="loading">Loading...</p>
-  {:else if error}
-    <p class="error">{error}</p>
   {:else if needsSetup}
-    <BudgetSetup onseeded={loadData} />
+    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
   {:else if periodNotFound}
     <div class="no-period">
       <p>No budget was recorded for this month.</p>
@@ -133,7 +95,15 @@
     {#if summary.entries.length > 0}
       <BudgetSummary {summary} />
     {/if}
-    <BudgetTable entries={summary.entries} onsave={handleSave} oncategorycreated={refreshData} oncategorydeleted={refreshData} />
+    <BudgetTable
+      entries={summary.entries}
+      vault={vaultState.vault}
+      {year}
+      {month}
+      onsave={handleSave}
+      oncategorycreated={handleCategoryChange}
+      oncategorydeleted={handleCategoryChange}
+    />
   {/if}
 </div>
 
@@ -147,12 +117,6 @@
     color: #888;
     text-align: center;
     padding: 2rem;
-  }
-  .error {
-    color: #c0392b;
-    padding: 1rem;
-    background: #fdecea;
-    border-radius: 6px;
   }
   .no-period {
     text-align: center;

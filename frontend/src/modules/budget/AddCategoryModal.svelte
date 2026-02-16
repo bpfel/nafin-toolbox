@@ -1,16 +1,18 @@
 <script lang="ts">
-  import { createBudgetCategory, updateBudgetCategory } from '../../lib/api/client'
+  import * as engine from '../../lib/budget/budgetEngine'
+  import type { VaultData } from '../../lib/crypto/vault'
 
   interface Props {
     type: 'income' | 'expense'
-    groups: { name: string; id: number }[]
-    editCategory?: { id: number; name: string; fixed: boolean; groupName: string; plannedAmount?: string; actualAmount?: string } | null
+    groups: { name: string; id: string }[]
+    editCategory?: { id: string; name: string; fixed: boolean; groupName: string; plannedAmount?: string; actualAmount?: string } | null
+    vault: VaultData
     oncreated: () => void
     onclose: () => void
-    onsave?: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
+    onsave?: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
   }
 
-  let { type, groups, editCategory = null, oncreated, onclose, onsave }: Props = $props()
+  let { type, groups, editCategory = null, vault, oncreated, onclose, onsave }: Props = $props()
 
   let isEdit = $derived(editCategory != null)
   let name = $state(editCategory?.name ?? '')
@@ -18,10 +20,8 @@
   let selectedGroup = $state(editCategory?.groupName ?? groups[0]?.name ?? '')
   let newGroupName = $state('')
   let useNewGroup = $state(false)
-  let saving = $state(false)
   let error = $state<string | null>(null)
 
-  // Value fields for edit mode
   let plannedMoValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')
   let plannedYrValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')
   let actualMoValue = $state(editCategory?.actualAmount ? fmt(Number(editCategory.actualAmount)) : '')
@@ -78,24 +78,24 @@
 
   let resolvedGroupName = $derived(useNewGroup ? newGroupName.trim() : selectedGroup)
 
-  async function save() {
+  function save() {
     const trimmed = name.trim()
     if (!trimmed) return
     if (!isEdit && !resolvedGroupName) return
-    saving = true
     error = null
+
     try {
       if (isEdit && editCategory) {
-        await updateBudgetCategory(editCategory.id, {
+        engine.updateCategory(vault, editCategory.id, {
           name: trimmed,
           fixed,
-          group_name: resolvedGroupName,
+          groupName: resolvedGroupName,
         })
       } else {
-        await createBudgetCategory({
+        engine.createCategory(vault, {
           name: trimmed,
           type,
-          group_name: resolvedGroupName,
+          groupName: resolvedGroupName,
           fixed,
         })
       }
@@ -103,8 +103,6 @@
       onclose()
     } catch (e) {
       error = e instanceof Error ? e.message : isEdit ? 'Failed to update category' : 'Failed to create category'
-    } finally {
-      saving = false
     }
   }
 
@@ -133,20 +131,19 @@
             type="text"
             bind:value={newGroupName}
             placeholder="New group name"
-            disabled={saving}
           />
-          <button class="link-btn" onclick={() => { useNewGroup = false; newGroupName = '' }} disabled={saving}>
+          <button class="link-btn" onclick={() => { useNewGroup = false; newGroupName = '' }}>
             existing
           </button>
         </div>
       {:else}
         <div class="group-input-row">
-          <select bind:value={selectedGroup} disabled={saving}>
+          <select bind:value={selectedGroup}>
             {#each groups as g}
               <option value={g.name}>{g.name || 'Other'}</option>
             {/each}
           </select>
-          <button class="link-btn" onclick={() => (useNewGroup = true)} disabled={saving}>
+          <button class="link-btn" onclick={() => (useNewGroup = true)}>
             + new
           </button>
         </div>
@@ -159,13 +156,12 @@
         type="text"
         bind:value={name}
         placeholder="e.g. Gym membership"
-        disabled={saving}
         onkeydown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
       />
     </label>
 
     <label class="field checkbox-field">
-      <input type="checkbox" bind:checked={fixed} disabled={saving} />
+      <input type="checkbox" bind:checked={fixed} />
       <span>Fixed amount</span>
       <span class="hint">Actual always equals planned</span>
     </label>
@@ -222,9 +218,9 @@
     {/if}
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose} disabled={saving}>Cancel</button>
-      <button class="btn save" onclick={save} disabled={saving || !name.trim() || !resolvedGroupName}>
-        {saving ? 'Saving...' : isEdit ? 'Save' : 'Add'}
+      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedGroupName}>
+        {isEdit ? 'Save' : 'Add'}
       </button>
     </div>
   </div>
