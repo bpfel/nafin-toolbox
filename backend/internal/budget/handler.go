@@ -53,6 +53,8 @@ func Routes(db *sql.DB) func(r chi.Router) {
 		r.Delete("/entries/{id}", handleDeleteEntry(store))
 
 		r.Post("/seed-defaults", handleSeedDefaults(store))
+
+		r.Get("/export", handleExportAll(store))
 	}
 }
 
@@ -444,6 +446,67 @@ func handleSeedDefaults(store *Store) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"categories_created": categoriesCreated,
 			"period_created":     periodCreated,
+		})
+	}
+}
+
+func handleExportAll(store *Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		groups, err := store.ListGroups(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if groups == nil {
+			groups = []CategoryGroup{}
+		}
+
+		cats, err := store.ListCategories(r.Context(), true)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if cats == nil {
+			cats = []Category{}
+		}
+
+		periods, err := store.ListPeriods(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if periods == nil {
+			periods = []Period{}
+		}
+
+		type PeriodWithEntries struct {
+			Period
+			Entries []Entry `json:"entries"`
+		}
+
+		var periodsWithEntries []PeriodWithEntries
+		for _, p := range periods {
+			summary, err := store.GetPeriodSummary(r.Context(), p.Year, p.Month)
+			if err != nil {
+				continue
+			}
+			entries := summary.Entries
+			if entries == nil {
+				entries = []Entry{}
+			}
+			periodsWithEntries = append(periodsWithEntries, PeriodWithEntries{
+				Period:  p,
+				Entries: entries,
+			})
+		}
+		if periodsWithEntries == nil {
+			periodsWithEntries = []PeriodWithEntries{}
+		}
+
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"groups":     groups,
+			"categories": cats,
+			"periods":    periodsWithEntries,
 		})
 	}
 }

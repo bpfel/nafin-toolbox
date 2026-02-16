@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings } from './lib/auth/authStore.svelte'
+  import { fetchModules, enableModule, disableModule, setOnUnauthorized, exportBudgetData, type ModuleInfo } from './lib/api/client'
+  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, completeVaultSetupWithMigration, recoverAccount } from './lib/auth/authStore.svelte'
+  import { getVaultState } from './lib/crypto/vaultStore.svelte'
+  import { migrateLegacyData } from './lib/crypto/migration'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import InvitePanel from './lib/auth/InvitePanel.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
@@ -10,13 +12,12 @@
   import BudgetModule from './modules/budget/BudgetModule.svelte'
 
   const authState = getAuthState()
+  const vaultState = getVaultState()
 
-  // Clear auth state and redirect to login on 401
   setOnUnauthorized(() => {
     logout()
   })
 
-  // URL-based routing
   let isVerifyPage = $state(window.location.pathname === '/verify')
 
   let modules = $state<ModuleInfo[]>([])
@@ -27,9 +28,18 @@
   let toggling = $state<string | null>(null)
   let menuOpen = $state(false)
 
-  // 2FA enforcement
   let require2FA = $state(false)
   let show2FAEnforcement = $state(false)
+
+  // Vault setup state
+  let settingUpVault = $state(false)
+  let hasLegacyData = $state<boolean | null>(null) // null = not checked yet
+  let checkingLegacy = $state(false)
+
+  // Recovery state
+  let recoveryKey = $state('')
+  let recovering = $state(false)
+  let recoveryError = $state<string | null>(null)
 
   const availableModules = [
     { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
@@ -100,11 +110,16 @@
     checkAuth()
   })
 
-  // Load modules and check 2FA enforcement when user is authenticated
   $effect(() => {
     if (authState.currentUser) {
       loadModules()
       checkRequire2FA()
+    }
+  })
+
+  $effect(() => {
+    if (authState.vaultNeedsSetup && hasLegacyData === null && !checkingLegacy) {
+      checkLegacyData()
     }
   })
 
@@ -129,6 +144,60 @@
     showConfig = false
     showSecurity = false
     show2FAEnforcement = false
+  }
+
+  async function checkLegacyData() {
+    checkingLegacy = true
+    try {
+      const data = await exportBudgetData()
+      hasLegacyData = (data.categories?.length > 0 || data.periods?.length > 0)
+    } catch {
+      hasLegacyData = false
+    } finally {
+      checkingLegacy = false
+    }
+  }
+
+  async function handleVaultSetup() {
+    settingUpVault = true
+    try {
+      await completeVaultSetup()
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to set up encryption'
+    } finally {
+      settingUpVault = false
+    }
+  }
+
+  async function handleVaultSetupWithMigration() {
+    settingUpVault = true
+    try {
+      await completeVaultSetupWithMigration(migrateLegacyData)
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to migrate data'
+    } finally {
+      settingUpVault = false
+    }
+  }
+
+  function handleRecoveryKeyDismiss() {
+    clearRecoveryKey()
+  }
+
+  async function handleRecovery() {
+    if (!recoveryKey.trim()) return
+    recovering = true
+    recoveryError = null
+    try {
+      const err = await recoverAccount(recoveryKey.trim())
+      if (err) {
+        recoveryError = err
+      }
+    } catch (e) {
+      recoveryError = e instanceof Error ? e.message : 'Recovery failed'
+    } finally {
+      recovering = false
+    }
   }
 </script>
 
@@ -156,6 +225,87 @@
       </div>
     </div>
   </main>
+{:else if authState.recoveryKeyToShow}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>Save Your Recovery Key</h1>
+        <p class="hint">This key is the only way to recover your encrypted data if you forget your password. Save it in a secure location. It will not be shown again.</p>
+        <div class="recovery-key-box">
+          <code class="recovery-key">{authState.recoveryKeyToShow}</code>
+        </div>
+        <button class="btn-primary" onclick={handleRecoveryKeyDismiss}>I've saved my recovery key</button>
+      </div>
+    </div>
+  </main>
+{:else if authState.vaultNeedsSetup}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>Set Up Encryption</h1>
+        <p class="hint">Your data will be encrypted end-to-end. Only you can read it — the server never sees your data in plain text.</p>
+
+        {#if hasLegacyData === null}
+          <p class="hint">Checking for existing data...</p>
+        {:else if hasLegacyData}
+          <p class="hint">We found existing budget data. You can migrate it into your encrypted vault or start fresh.</p>
+          <div class="setup-actions">
+            <button class="btn-primary" onclick={handleVaultSetupWithMigration} disabled={settingUpVault}>
+              {settingUpVault ? 'Migrating...' : 'Migrate existing data'}
+            </button>
+            <button class="btn-secondary" onclick={handleVaultSetup} disabled={settingUpVault}>
+              Start fresh
+            </button>
+          </div>
+        {:else}
+          <button class="btn-primary" onclick={handleVaultSetup} disabled={settingUpVault}>
+            {settingUpVault ? 'Setting up encryption...' : 'Set up encryption'}
+          </button>
+        {/if}
+
+        {#if error}
+          <p class="error">{error}</p>
+        {/if}
+      </div>
+    </div>
+  </main>
+{:else if authState.vaultDecryptFailed}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>Vault Decryption Failed</h1>
+        <p class="hint">Your encrypted vault could not be decrypted with your current password. This can happen if your password was reset by an admin. Use your recovery key to restore access.</p>
+
+        <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleRecovery() }}>
+          <label>
+            Recovery Key
+            <input
+              type="text"
+              bind:value={recoveryKey}
+              placeholder="XXXX-XXXX-XXXX-..."
+              disabled={recovering}
+              autocomplete="off"
+              class="recovery-input"
+            />
+          </label>
+
+          {#if recoveryError}
+            <p class="error">{recoveryError}</p>
+          {/if}
+
+          <button class="btn-primary" type="submit" disabled={recovering || !recoveryKey.trim()}>
+            {recovering ? 'Recovering...' : 'Recover vault'}
+          </button>
+        </form>
+
+        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+      </div>
+    </div>
+  </main>
+{:else if !vaultState.unlocked}
+  <main>
+    <p class="loading">Decrypting...</p>
+  </main>
 {:else}
 
   <main>
@@ -164,6 +314,11 @@
       <div class="user-info">
         <span class="role-tag">{authState.currentUser.role}</span>
         <span class="user-email">{authState.currentUser.email}</span>
+        {#if vaultState.saving}
+          <span class="save-indicator">Saving...</span>
+        {:else if vaultState.dirty}
+          <span class="save-indicator unsaved">Unsaved</span>
+        {/if}
         {#if authState.currentUser.role === 'admin'}
           <button class="btn-secondary" onclick={() => navigateTo('users')}>Users</button>
         {/if}
@@ -309,6 +464,15 @@
     white-space: nowrap;
   }
 
+  .save-indicator {
+    font-size: 0.75rem;
+    color: #2d6a4f;
+    font-weight: 500;
+  }
+  .save-indicator.unsaved {
+    color: #e67e22;
+  }
+
   .btn-secondary {
     background: #e0e0e0;
     color: #333;
@@ -320,6 +484,71 @@
     background: #ccc;
   }
 
+  .btn-primary {
+    background: #2d6a4f;
+    color: white;
+    padding: 0.6rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-top: 1rem;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #245a42;
+  }
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .setup-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+
+  .recovery-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+    text-align: left;
+  }
+  .recovery-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #333;
+  }
+  .recovery-input {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: monospace;
+  }
+  .recovery-input:focus {
+    outline: none;
+    border-color: #2d6a4f;
+    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.15);
+  }
+  .link-btn {
+    background: none;
+    border: none;
+    color: #2d6a4f;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0.25rem;
+    text-decoration: underline;
+    margin-top: 0.75rem;
+  }
+  .link-btn:hover { color: #245a42; }
+
   .role-tag {
     display: inline-block;
     padding: 0.1rem 0.4rem;
@@ -329,6 +558,32 @@
     text-transform: uppercase;
     background: #d4edda;
     color: #155724;
+  }
+
+  .recovery-key-box {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin: 1rem 0;
+    text-align: center;
+  }
+  .recovery-key {
+    font-size: 0.85rem;
+    font-family: monospace;
+    word-break: break-all;
+    line-height: 1.8;
+    color: #333;
+    user-select: all;
+  }
+
+  .error {
+    color: #c0392b;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+    background: #fdecea;
+    border-radius: 6px;
+    margin-top: 1rem;
   }
 
   /* Mobile menu overlay */
@@ -428,6 +683,7 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     width: 100%;
     max-width: 500px;
+    text-align: center;
   }
 
   .enforcement-card h1 {
