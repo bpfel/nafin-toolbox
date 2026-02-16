@@ -1,22 +1,21 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { BudgetEntry } from '../../lib/api/client'
+  import type { PeriodEntryView } from '../../lib/budget/budgetEngine'
 
   type Field = 'planned_mo' | 'planned_yr' | 'actual_mo'
 
   interface Props {
-    entry: BudgetEntry
+    entry: PeriodEntryView
     viewMode?: 'monthly' | 'yearly'
-    onsave: (categoryId: number, field: 'planned' | 'actual', amount: string) => void
-    ondelete: (categoryId: number, categoryName: string) => void
-    onedit: (categoryId: number, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) => void
+    onsave: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
+    ondelete: (categoryId: string, categoryName: string) => void
+    onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) => void
   }
 
   let { entry, viewMode = 'monthly', onsave, ondelete, onedit }: Props = $props()
 
   const MAX_MONTHLY = 9_999_999_999.99
 
-  // Per-field state
   let plannedMoValue = $state('')
   let plannedYrValue = $state('')
   let actualMoValue = $state('')
@@ -31,7 +30,6 @@
 
   let focusedField = $state<Field | null>(null)
 
-  // Long-press to delete on touch devices
   let longPressTimer: ReturnType<typeof setTimeout> | null = null
   let longPressTriggered = false
 
@@ -39,7 +37,7 @@
     longPressTriggered = false
     longPressTimer = setTimeout(() => {
       longPressTriggered = true
-      ondelete(entry.category_id, entry.category_name)
+      ondelete(entry.categoryId, entry.categoryName)
     }, 600)
   }
 
@@ -57,10 +55,9 @@
     }
   }
 
-  // Sync from entry prop, skipping the currently focused field
   $effect(() => {
-    const planned = Number(entry.planned_amount)
-    const actual = Number(entry.actual_amount)
+    const planned = Number(entry.plannedAmount)
+    const actual = Number(entry.actualAmount)
     const focused = untrack(() => focusedField)
 
     if (focused !== 'planned_mo') {
@@ -81,11 +78,9 @@
   function handleFocus(field: Field, event: FocusEvent) {
     focusedField = field
     const input = event.target as HTMLInputElement
-    // Snapshot original for revert on Escape
     if (field === 'planned_mo') plannedMoOriginal = plannedMoValue
     else if (field === 'planned_yr') plannedYrOriginal = plannedYrValue
     else if (field === 'actual_mo') actualMoOriginal = actualMoValue
-    // Select all text after the focus event completes
     requestAnimationFrame(() => input.select())
   }
 
@@ -96,7 +91,6 @@
     if (current !== original) {
       saveField(field)
     }
-    // Clear error on blur regardless
     setError(field, false)
   }
 
@@ -152,7 +146,6 @@
   }
 
   function parseInput(raw: string): number {
-    // Handle Swiss locale: 1'234.56 or 1'234,56
     const cleaned = raw.replace(/'/g, '').replace(/,/g, '.')
     return Number(cleaned)
   }
@@ -175,11 +168,11 @@
     setError(field, false)
 
     if (field === 'planned_mo') {
-      onsave(entry.category_id, 'planned', val.toFixed(2))
+      onsave(entry.categoryId, 'planned', val.toFixed(2))
     } else if (field === 'planned_yr') {
-      onsave(entry.category_id, 'planned', (val / 12).toFixed(4))
+      onsave(entry.categoryId, 'planned', (val / 12).toFixed(4))
     } else if (field === 'actual_mo') {
-      onsave(entry.category_id, 'actual', val.toFixed(2))
+      onsave(entry.categoryId, 'actual', val.toFixed(2))
     }
 
     return true
@@ -188,9 +181,9 @@
 
 <tr
   class="entry-row"
-  class:income={entry.category_type === 'income'}
-  class:fixed={entry.category_fixed}
-  data-category-id={entry.category_id}
+  class:income={entry.categoryType === 'income'}
+  class:fixed={entry.categoryFixed}
+  data-category-id={entry.categoryId}
   ontouchstart={handleTouchStart}
   ontouchend={handleTouchEnd}
   ontouchmove={handleTouchMove}
@@ -198,20 +191,20 @@
 >
   <td class="name-cell">
     <div class="name-cell-inner">
-      <span class="drag-handle" aria-label="Drag to reorder">⠿</span>
+      <span class="drag-handle" aria-label="Drag to reorder">&#x2807;</span>
       <button
         class="name-text"
-        onclick={() => onedit(entry.category_id, entry.category_name, entry.category_type as 'income' | 'expense', entry.category_group_name, entry.category_fixed, entry.planned_amount, entry.actual_amount)}
+        onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.categoryFixed, entry.plannedAmount, entry.actualAmount)}
       >
-        {entry.category_name}
-        {#if entry.category_fixed}
+        {entry.categoryName}
+        {#if entry.categoryFixed}
           <span class="fixed-badge">fixed</span>
         {/if}
       </button>
       <button
         class="trash-btn"
-        onclick={() => ondelete(entry.category_id, entry.category_name)}
-        aria-label="Delete {entry.category_name}"
+        onclick={() => ondelete(entry.categoryId, entry.categoryName)}
+        aria-label="Delete {entry.categoryName}"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"></polyline>
@@ -247,8 +240,8 @@
     />
   </td>
   <td class="amount-cell">
-    {#if entry.category_fixed}
-      <span class="amount-fixed">{fmt(Number(entry.actual_amount))}</span>
+    {#if entry.categoryFixed}
+      <span class="amount-fixed">{fmt(Number(entry.actualAmount))}</span>
     {:else}
       <input
         type="text"
@@ -338,7 +331,6 @@
   .trash-btn:hover {
     color: #c0392b;
   }
-  /* Always visible on touch devices (desktop-width touch screens) */
   @media (hover: none) and (min-width: 769px) {
     .trash-btn {
       opacity: 0.6;
@@ -391,7 +383,6 @@
     background: #fdecea;
   }
 
-  /* Drag ghost styling */
   :global(.drag-ghost) {
     opacity: 0.5;
     background: #e3f2fd !important;

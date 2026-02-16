@@ -1,54 +1,20 @@
 <script lang="ts">
-  import { seedBudgetDefaults, createBudgetPeriod } from '../../lib/api/client'
-
   interface Props {
     onseeded: () => void
+    onstartblank: () => void
   }
 
-  let { onseeded }: Props = $props()
-
-  let loading = $state(false)
-  let error = $state<string | null>(null)
-
-  async function seed() {
-    loading = true
-    error = null
-    try {
-      await seedBudgetDefaults()
-      onseeded()
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to seed defaults'
-    } finally {
-      loading = false
-    }
-  }
-
-  async function startBlank() {
-    loading = true
-    error = null
-    try {
-      const now = new Date()
-      await createBudgetPeriod(now.getFullYear(), now.getMonth() + 1)
-      onseeded()
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to create budget'
-    } finally {
-      loading = false
-    }
-  }
+  let { onseeded, onstartblank }: Props = $props()
 </script>
 
 <div class="setup">
   <h3>Set up your budget</h3>
   <p>Start with default Swiss budget categories based on BFS household survey data (HABE 2023, single person). You can customize everything later.</p>
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
   <div class="actions">
-    <button class="primary" onclick={seed} disabled={loading}>
-      {loading ? 'Setting up...' : 'Load Swiss defaults'}
+    <button class="primary" onclick={onseeded}>
+      Load Swiss defaults
     </button>
-    <button class="secondary" onclick={startBlank} disabled={loading}>
+    <button class="secondary" onclick={onstartblank}>
       Start blank
     </button>
   </div>
@@ -72,9 +38,6 @@
     margin-left: auto;
     margin-right: auto;
   }
-  .error {
-    color: #c0392b;
-  }
   .actions {
     display: flex;
     gap: 0.75rem;
@@ -95,9 +58,5 @@
   }
   .secondary:hover:not(:disabled) {
     background: #e9ecef;
-  }
-  button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
   }
 </style>

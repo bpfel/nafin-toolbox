@@ -1,8 +1,6 @@
 <script lang="ts">
-  import { deleteBudgetCategory } from '../../lib/api/client'
-
   interface Props {
-    categoryId: number
+    categoryId: string
     categoryName: string
     ondeleted: () => void
     onclose: () => void
@@ -10,21 +8,9 @@
 
   let { categoryId, categoryName, ondeleted, onclose }: Props = $props()
 
-  let deleting = $state(false)
-  let error = $state<string | null>(null)
-
-  async function confirm() {
-    deleting = true
-    error = null
-    try {
-      await deleteBudgetCategory(categoryId)
-      ondeleted()
-      onclose()
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to delete'
-    } finally {
-      deleting = false
-    }
+  function confirm() {
+    ondeleted()
+    onclose()
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -45,14 +31,10 @@
     <h3>Delete category</h3>
     <p>Remove <strong>{categoryName}</strong> from your budget? This deletes it from all periods.</p>
 
-    {#if error}
-      <p class="error">{error}</p>
-    {/if}
-
     <div class="actions">
-      <button class="btn cancel" onclick={onclose} disabled={deleting}>Cancel</button>
-      <button class="btn delete" onclick={confirm} disabled={deleting}>
-        {deleting ? 'Deleting...' : 'Delete'}
+      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn delete" onclick={confirm}>
+        Delete
       </button>
     </div>
   </div>
@@ -86,13 +68,6 @@
     color: #555;
     line-height: 1.4;
   }
-  .error {
-    color: #c0392b;
-    font-size: 0.85rem;
-    padding: 0.5rem;
-    background: #fdecea;
-    border-radius: 4px;
-  }
   .actions {
     display: flex;
     gap: 0.75rem;
@@ -103,10 +78,6 @@
     border-radius: 6px;
     font-size: 0.9rem;
     cursor: pointer;
-  }
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
   .cancel {
     background: #f1f3f5;
