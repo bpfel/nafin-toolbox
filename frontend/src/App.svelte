@@ -43,6 +43,8 @@
   let recovering = $state(false)
   let recoveryError = $state<string | null>(null)
 
+  const isAdmin = $derived(authState.currentUser?.role === 'admin')
+
   const availableModules = [
     { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
     { id: 'accounts', name: 'Accounts', description: 'Manage bank and savings accounts' },
@@ -215,7 +217,7 @@
       </div>
     </div>
   </main>
-{:else if authState.recoveryKeyToShow}
+{:else if authState.recoveryKeyToShow && !isAdmin}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -228,7 +230,7 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultNeedsSetup}
+{:else if authState.vaultNeedsSetup && !isAdmin}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -245,7 +247,7 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultDecryptFailed}
+{:else if authState.vaultDecryptFailed && !isAdmin}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -278,7 +280,7 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultLocked || !vaultState.unlocked}
+{:else if (authState.vaultLocked || !vaultState.unlocked) && !isAdmin}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -318,10 +320,12 @@
       <div class="user-info">
         <span class="role-tag">{authState.currentUser.role}</span>
         <span class="user-email">{authState.currentUser.email}</span>
-        {#if vaultState.saving}
-          <span class="save-indicator">Saving...</span>
-        {:else if vaultState.dirty}
-          <span class="save-indicator unsaved">Unsaved</span>
+        {#if !isAdmin}
+          {#if vaultState.saving}
+            <span class="save-indicator">Saving...</span>
+          {:else if vaultState.dirty}
+            <span class="save-indicator unsaved">Unsaved</span>
+          {/if}
         {/if}
         {#if authState.currentUser.role === 'admin'}
           <button class="btn-secondary" onclick={() => navigateTo('users')}>Users</button>
@@ -375,7 +379,11 @@
       {#each modules as mod}
         <section class="module-section">
           <h2>{mod.name}</h2>
-          {#if mod.id === 'budget'}
+          {#if isAdmin}
+            <div class="module-card admin-notice">
+              <p>Sign in with a regular account to use encrypted modules.</p>
+            </div>
+          {:else if mod.id === 'budget'}
             <BudgetModule />
           {:else}
             <div class="module-card">
@@ -662,6 +670,11 @@
   .module-id {
     color: #888;
     font-size: 0.85rem;
+  }
+  .admin-notice {
+    color: #666;
+    font-style: italic;
+    text-align: center;
   }
 
   /* 2FA Enforcement */
