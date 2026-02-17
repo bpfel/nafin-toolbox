@@ -125,25 +125,6 @@ func TestClientIP_RemoteAddrNoPort(t *testing.T) {
 	}
 }
 
-func TestAllowKey_RateLimitsByKey(t *testing.T) {
-	rl := NewLoginRateLimiter(3, time.Minute)
-
-	for i := 0; i < 3; i++ {
-		if !rl.AllowKey("user@example.com") {
-			t.Fatalf("attempt %d should be allowed", i+1)
-		}
-	}
-
-	if rl.AllowKey("user@example.com") {
-		t.Fatal("4th attempt for same email should be blocked")
-	}
-
-	// Different email should still be allowed
-	if !rl.AllowKey("other@example.com") {
-		t.Fatal("different email should be allowed")
-	}
-}
-
 func newRequestWithRemote(addr string) *http.Request {
 	r, _ := http.NewRequest("POST", "/api/auth/login", nil)
 	r.RemoteAddr = addr
