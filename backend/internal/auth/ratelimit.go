@@ -41,8 +41,11 @@ func (rl *LoginRateLimiter) SetTrustedProxies(cidrs []string) {
 
 // Allow records an attempt for the request's client IP and returns true if under the limit.
 func (rl *LoginRateLimiter) Allow(r *http.Request) bool {
-	key := rl.ClientIP(r)
+	return rl.AllowKey(rl.ClientIP(r))
+}
 
+// AllowKey records an attempt for the given key and returns true if under the limit.
+func (rl *LoginRateLimiter) AllowKey(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
