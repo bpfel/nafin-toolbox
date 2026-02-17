@@ -263,28 +263,65 @@ Any SMTP relay works (Resend, Mailgun, Amazon SES, etc.). Set the `SMTP_*` env v
 
 If you don't need email verification (single-user setup), simply omit `SMTP_HOST`. The invite flow falls back to admin-set passwords with mandatory password change on first login.
 
-### Admin Emergency Reset
+### Admin Accounts and E2EE
 
-If the admin loses both their password and recovery key, they can reset their account from the server with DB access. This **destroys all encrypted data** — there is no way to recover it without the recovery key.
+Admin accounts are service accounts — they manage users, settings, audit logs, and module configuration but **do not use encrypted financial modules**. As a result:
+
+- Admin accounts **skip vault setup entirely** — no encryption keys, no recovery key
+- Admin users see "Sign in with a regular account to use encrypted modules" if they navigate to a financial module
+- Each regular user has their own independent vault — one user's password reset does not affect another user's data
+
+### Password Reset
+
+#### Admin password reset (simple)
+
+Admin accounts have no vault, so resetting an admin password has **no data implications**. Just update the password hash:
 
 ```bash
-# Connect to the database
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance
-
-# Generate a new bcrypt hash (replace 'newpassword' with your chosen password)
-# You can use: htpasswd -nbBC 10 "" newpassword | cut -d: -f2
-# Or from the API container:
+# Generate a bcrypt hash (replace 'newpassword' with your chosen password)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api sh -c \
   "echo 'package main; import (\"fmt\"; \"golang.org/x/crypto/bcrypt\"); func main() { h, _ := bcrypt.GenerateFromPassword([]byte(\"newpassword\"), bcrypt.DefaultCost); fmt.Println(string(h)) }' > /tmp/h.go && go run /tmp/h.go"
 
-# Then in psql, reset the admin account:
-UPDATE users SET password_hash = '<bcrypt-hash-from-above>' WHERE email = 'admin@example.com';
-DELETE FROM user_vaults WHERE user_id = (SELECT id FROM users WHERE email = 'admin@example.com');
-UPDATE users SET encrypted_mek = NULL, recovery_key_hash = NULL, encrypted_mek_recovery = NULL
-  WHERE email = 'admin@example.com';
+# Update the password in the database
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c \
+  "UPDATE users SET password_hash = '<bcrypt-hash>' WHERE email = 'admin@example.com';"
 ```
 
-After this, the admin can log in with the new password. The vault setup screen will appear to generate new encryption keys and a new recovery key. All previous financial data is lost.
+The admin can now log in with the new password immediately — no vault screens, no recovery key needed.
+
+#### Regular user password reset (two tiers)
+
+Regular users have encrypted vaults. There are two levels of reset:
+
+**Tier 1: Password-only reset (data preserved)**
+
+If the user still has their recovery key, reset just the password. The user will use the recovery key to re-wrap their vault on next login:
+
+```bash
+# Generate bcrypt hash (same as above)
+# Then update only the password:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c \
+  "UPDATE users SET password_hash = '<bcrypt-hash>' WHERE email = 'user@example.com';"
+```
+
+On next login, the vault will fail to decrypt (password changed). The user enters their recovery key to restore access. All data is preserved.
+
+**Tier 2: Nuclear reset (data destroyed)**
+
+If the user has lost both their password and recovery key, their encrypted data is unrecoverable. Reset the password and wipe the vault:
+
+```bash
+# Generate bcrypt hash (same as above)
+# Then reset password + wipe vault:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c "
+  UPDATE users SET password_hash = '<bcrypt-hash>' WHERE email = 'user@example.com';
+  DELETE FROM user_vaults WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.com');
+  UPDATE users SET encrypted_mek = NULL, recovery_key_hash = NULL, encrypted_mek_recovery = NULL
+    WHERE email = 'user@example.com';
+"
+```
+
+After this, the user logs in with the new password. The vault setup screen appears to create new encryption keys and a new recovery key. All previous financial data is permanently lost.
 
 **Security checklist for production:**
 - [ ] Generate a unique `ENCRYPTION_KEY` with `openssl rand -hex 32`
