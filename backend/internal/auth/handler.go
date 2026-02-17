@@ -32,6 +32,12 @@ type HandlerDeps struct {
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !deps.LoginLimiter.Allow(r) {
+			w.Header().Set("Retry-After", "900")
+			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
+			return
+		}
+
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -40,12 +46,6 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 
 		if req.Email == "" || req.Password == "" {
 			http.Error(w, `{"error":"email and password required"}`, http.StatusBadRequest)
-			return
-		}
-
-		if !deps.LoginLimiter.AllowKey(strings.ToLower(req.Email)) {
-			w.Header().Set("Retry-After", "900")
-			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
 			return
 		}
 
