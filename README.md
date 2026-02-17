@@ -278,14 +278,16 @@ Admin accounts are service accounts — they manage users, settings, audit logs,
 Admin accounts have no vault, so resetting an admin password has **no data implications**. Just update the password hash:
 
 ```bash
-# Generate a bcrypt hash (replace 'newpassword' with your chosen password)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api sh -c \
-  "echo 'package main; import (\"fmt\"; \"golang.org/x/crypto/bcrypt\"); func main() { h, _ := bcrypt.GenerateFromPassword([]byte(\"newpassword\"), bcrypt.DefaultCost); fmt.Println(string(h)) }' > /tmp/h.go && go run /tmp/h.go"
+# Step 1: Generate a bcrypt hash (replace 'newpassword' with your chosen password)
+docker run --rm python:3-alpine sh -c \
+  "pip install -q bcrypt && python3 -c \"import bcrypt; print(bcrypt.hashpw(b'newpassword', bcrypt.gensalt()).decode())\""
 
-# Update the password in the database
+# Step 2: Update the password in the database (paste the hash from step 1)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c \
-  "UPDATE users SET password_hash = '<bcrypt-hash>' WHERE email = 'admin@example.com';"
+  "UPDATE users SET password_hash = '\$2b\$12\$YOUR_HASH_HERE' WHERE email = 'admin@example.com';"
 ```
+
+Note: escape `$` signs in the hash with `\$` when passing it in a shell command.
 
 The admin can now log in with the new password immediately — no vault screens, no recovery key needed.
 
@@ -298,10 +300,9 @@ Regular users have encrypted vaults. There are two levels of reset:
 If the user still has their recovery key, reset just the password. The user will use the recovery key to re-wrap their vault on next login:
 
 ```bash
-# Generate bcrypt hash (same as above)
-# Then update only the password:
+# Generate bcrypt hash (same method as admin reset above), then update:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c \
-  "UPDATE users SET password_hash = '<bcrypt-hash>' WHERE email = 'user@example.com';"
+  "UPDATE users SET password_hash = '\$2b\$12\$YOUR_HASH_HERE' WHERE email = 'user@example.com';"
 ```
 
 On next login, the vault will fail to decrypt (password changed). The user enters their recovery key to restore access. All data is preserved.
@@ -311,10 +312,9 @@ On next login, the vault will fail to decrypt (password changed). The user enter
 If the user has lost both their password and recovery key, their encrypted data is unrecoverable. Reset the password and wipe the vault:
 
 ```bash
-# Generate bcrypt hash (same as above)
-# Then reset password + wipe vault:
+# Generate bcrypt hash (same method as admin reset above), then reset password + wipe vault:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c "
-  UPDATE users SET password_hash = '<bcrypt-hash>' WHERE email = 'user@example.com';
+  UPDATE users SET password_hash = '\$2b\$12\$YOUR_HASH_HERE' WHERE email = 'user@example.com';
   DELETE FROM user_vaults WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.com');
   UPDATE users SET encrypted_mek = NULL, recovery_key_hash = NULL, encrypted_mek_recovery = NULL
     WHERE email = 'user@example.com';
