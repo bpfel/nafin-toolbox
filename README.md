@@ -76,11 +76,11 @@ Three asset sub-types with different valuation strategies:
 - **CSRF protection** — Origin header validation on all state-changing requests.
 - **Rate limiting** — login, setup, verify-email, and verify-2fa endpoints are rate-limited per IP.
 - **Trusted proxy support** — `TRUSTED_PROXIES` CIDR list controls which reverse proxies can set `X-Forwarded-For` / `X-Real-IP`.
-- **Security headers** — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy`, `Permissions-Policy` (all set by nginx).
+- **Security headers** — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy`, `Permissions-Policy` (set by nginx and backend middleware). CSP is nginx-only; the other headers are set by both layers redundantly.
 
 ### Audit Log
 - All security-relevant actions are logged to the `audit_log` table with user ID, event type, IP address, user agent, and optional metadata (JSONB).
-- Events tracked: `login_success`, `login_failed`, `logout`, `password_changed`, `2fa_enabled`, `2fa_disabled`, `2fa_failed`, `recovery_code_used`, `user_invited`, `email_verified`, `user_deleted`.
+- Events tracked: `login_success`, `login_failed`, `logout`, `password_changed`, `2fa_enabled`, `2fa_disabled`, `2fa_verified`, `2fa_failed`, `recovery_code_used`, `user_invited`, `email_verified`, `user_deleted`, `password_reset`.
 - On user deletion, audit log entries are preserved with `user_id` set to NULL (anonymized but retained for forensics).
 
 ### End-to-End Encryption (E2EE)
@@ -124,7 +124,7 @@ Rebuild after code changes with the same command. Go recompile takes ~10s, front
 
 ## Budget Defaults — Maintenance Notes
 
-The budget module ships with default categories and amounts based on **BFS HABE 2023** (Swiss Federal Statistical Office, Household Budget Survey). These live in `backend/internal/budget/defaults.go` and are only used when a user seeds their budget for the first time (`POST /api/budget/seed-defaults`). Changing the defaults does **not** affect existing user data.
+The budget module ships with default categories and amounts based on **BFS HABE 2023** (Swiss Federal Statistical Office, Household Budget Survey). These live in `frontend/src/lib/budget/budgetEngine.ts` (the `bfsDefaults()` function) and are seeded client-side via `seedDefaults()` when a user first creates their budget. Because budget data is stored in the user's encrypted vault, there is no backend endpoint — seeding happens entirely in the browser. Changing the defaults does **not** affect existing user data.
 
 The following values should be reviewed periodically:
 
@@ -137,11 +137,11 @@ The following values should be reviewed periodically:
 | Food & Groceries, Transportation, etc. | BFS HABE averages for a single-person household | When BFS publishes new HABE (every ~2 years) |
 | Salary (`6000.00`) | Placeholder net income for a single person | As needed |
 
-When BFS publishes a new HABE edition, update the `Amount` fields in `BFSDefaults()` and note the data source year in the function comment.
+When BFS publishes a new HABE edition, update the `amount` fields in `bfsDefaults()` and note the data source year in the function comment.
 
 ## Category Archiving (not yet wired up)
 
-The backend supports archiving budget categories (soft-delete). The DB column, store filtering, and update endpoint are in place — but the frontend has no UI for it yet. Useful for categories that no longer apply (ended lease, stopped side hustle) while keeping historical period data intact. To finish: add an "archive" action to category management and a "show archived" toggle to the category list.
+The frontend data model (`VaultCategory.archived`) and budget engine (`budgetEngine.ts` — `listCategories(includeArchived)`, `updateCategory({ archived })`) support archiving budget categories (soft-delete) — but there is no UI for it yet. Useful for categories that no longer apply (ended lease, stopped side hustle) while keeping historical period data intact. To finish: add an "archive" action to category management and a "show archived" toggle to the category list.
 
 ## Production Deployment
 
@@ -161,6 +161,7 @@ The backend supports archiving budget categories (soft-delete). The DB column, s
 | `SMTP_FROM` | `noreply@localhost` | Sender email address |
 | `APP_URL` | `http://localhost:3000` | Base URL for verification links in emails |
 | `ENCRYPTION_KEY` | (empty) | 32-byte hex key (64 chars) for AES-256-GCM encryption of TOTP secrets. Generate with `openssl rand -hex 32`. Required for 2FA |
+| `MIGRATIONS_DIR` | `migrations` | Directory containing SQL migration files. Override to use a custom path |
 
 ### Reverse Proxy Requirements
 
