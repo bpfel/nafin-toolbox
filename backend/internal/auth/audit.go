@@ -21,6 +21,7 @@ const (
 	AuditUserInvited      AuditEvent = "user_invited"
 	AuditEmailVerified    AuditEvent = "email_verified"
 	AuditUserDeleted      AuditEvent = "user_deleted"
+	AuditPasswordReset    AuditEvent = "password_reset"
 )
 
 // LogAudit records a security event in the audit_log table.
