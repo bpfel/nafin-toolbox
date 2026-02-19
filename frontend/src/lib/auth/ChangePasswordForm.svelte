@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { changePassword } from './authStore.svelte'
+  import { changePassword, logout } from './authStore.svelte'
 
-  let { message = '', onDone }: { message?: string; onDone?: () => void } = $props()
+  let { message = '', onDone, showLogout = false }: { message?: string; onDone?: () => void; showLogout?: boolean } = $props()
 
   let currentPassword = $state('')
   let newPassword = $state('')
@@ -81,6 +81,10 @@
         {submitting ? 'Changing...' : 'Change Password'}
       </button>
     </form>
+
+    {#if showLogout}
+      <button class="btn-logout" onclick={logout}>Log out</button>
+    {/if}
   </div>
 </div>
 
@@ -158,5 +162,20 @@
   button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .btn-logout {
+    margin-top: 1rem;
+    background: transparent;
+    color: #888;
+    border: 1px solid #ddd;
+    font-size: 0.85rem;
+    width: 100%;
+  }
+
+  .btn-logout:hover {
+    color: #c0392b;
+    border-color: #c0392b;
+    background: #fdecea;
   }
 </style>
