@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -12,6 +13,16 @@ import (
 )
 
 const maxVaultSize = 512 * 1024 // 512KB
+
+// VaultStorer defines the storage operations needed by vault handlers.
+type VaultStorer interface {
+	GetVault(ctx context.Context, userID int) (*Vault, error)
+	PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int) error
+	GetEncryptedMEK(ctx context.Context, userID int) (string, int, error)
+	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string) error
+	UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error
+	GetRecoveryData(ctx context.Context, userID int) (string, string, error)
+}
 
 func Routes(db *sql.DB) func(r chi.Router) {
 	store := NewStore(db)
@@ -25,7 +36,7 @@ func Routes(db *sql.DB) func(r chi.Router) {
 	}
 }
 
-func handleGetVault(store *Store) http.HandlerFunc {
+func handleGetVault(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
@@ -47,7 +58,7 @@ func handleGetVault(store *Store) http.HandlerFunc {
 	}
 }
 
-func handlePutVault(store *Store) http.HandlerFunc {
+func handlePutVault(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
@@ -86,7 +97,7 @@ func handlePutVault(store *Store) http.HandlerFunc {
 	}
 }
 
-func handleGetKeys(store *Store) http.HandlerFunc {
+func handleGetKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
@@ -107,7 +118,7 @@ func handleGetKeys(store *Store) http.HandlerFunc {
 	}
 }
 
-func handleSetupKeys(store *Store) http.HandlerFunc {
+func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
@@ -149,7 +160,7 @@ func handleSetupKeys(store *Store) http.HandlerFunc {
 	}
 }
 
-func handleUpdateKeys(store *Store) http.HandlerFunc {
+func handleUpdateKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
@@ -177,7 +188,7 @@ func handleUpdateKeys(store *Store) http.HandlerFunc {
 	}
 }
 
-func handleRecovery(store *Store) http.HandlerFunc {
+func handleRecovery(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
