@@ -107,6 +107,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Post("/auth/invite", auth.HandleInvite(deps))
 			r.Get("/auth/users", auth.HandleListUsers(deps))
 			r.Delete("/auth/users/{id}", auth.HandleAdminDeleteUser(deps))
+			r.Post("/auth/users/{id}/reset-password", auth.HandleAdminResetPassword(deps))
 			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))

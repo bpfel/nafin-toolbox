@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { inviteUser, listUsers, deleteUser, resendVerification, type User, getAuthState } from './authStore.svelte'
+  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, type User, getAuthState } from './authStore.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
 
@@ -13,6 +13,9 @@
   let submitting = $state(false)
   let resending = $state<number | null>(null)
   let deleting = $state<number | null>(null)
+  let confirmingReset = $state<number | null>(null)
+  let resettingPassword = $state<number | null>(null)
+  let tempPassword = $state<{ userId: number; password: string } | null>(null)
 
   async function loadUsers() {
     users = await listUsers()
@@ -49,6 +52,19 @@
       error = result
     } else {
       success = 'Verification email resent'
+    }
+  }
+
+  async function handleResetPassword(userId: number) {
+    resettingPassword = userId
+    const result = await adminResetPassword(userId)
+    resettingPassword = null
+    confirmingReset = null
+    if ('error' in result) {
+      error = result.error
+    } else {
+      tempPassword = { userId, password: result.temp_password }
+      await loadUsers()
     }
   }
 
@@ -97,31 +113,70 @@
               {/if}
             </td>
             <td class="created">{new Date(u.created_at).toLocaleDateString()}</td>
-            <td class="actions">
-              {#if !u.email_verified}
-                <button
-                  class="btn-small"
-                  onclick={() => handleResend(u.id)}
-                  disabled={resending === u.id}
-                >
-                  {resending === u.id ? 'Sending...' : 'Resend'}
-                </button>
-              {/if}
-              {#if u.id !== authState.currentUser?.id}
-                <button
-                  class="btn-small btn-danger-small"
-                  onclick={() => handleDelete(u.id)}
-                  disabled={deleting === u.id}
-                >
-                  {deleting === u.id ? 'Deleting...' : 'Delete'}
-                </button>
-              {/if}
+            <td>
+              <div class="actions">
+                {#if !u.email_verified}
+                  <button
+                    class="btn-small"
+                    onclick={() => handleResend(u.id)}
+                    disabled={resending === u.id}
+                  >
+                    {resending === u.id ? 'Sending...' : 'Resend'}
+                  </button>
+                {/if}
+                {#if u.id !== authState.currentUser?.id && u.email_verified}
+                  {#if confirmingReset === u.id}
+                    <span class="confirm-reset">
+                      <span class="confirm-label">Reset?</span>
+                      <button
+                        class="btn-small btn-danger-small"
+                        onclick={() => handleResetPassword(u.id)}
+                        disabled={resettingPassword === u.id}
+                      >
+                        {resettingPassword === u.id ? 'Resetting...' : 'Confirm'}
+                      </button>
+                      <button
+                        class="btn-small"
+                        onclick={() => confirmingReset = null}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  {:else}
+                    <button
+                      class="btn-small"
+                      onclick={() => confirmingReset = u.id}
+                    >
+                      Reset PW
+                    </button>
+                  {/if}
+                {/if}
+                {#if u.id !== authState.currentUser?.id}
+                  <button
+                    class="btn-small btn-danger-small"
+                    onclick={() => handleDelete(u.id)}
+                    disabled={deleting === u.id}
+                  >
+                    {deleting === u.id ? 'Deleting...' : 'Delete'}
+                  </button>
+                {/if}
+              </div>
             </td>
           </tr>
         {/each}
       </tbody>
     </table>
   </div>
+
+  {#if tempPassword}
+    {@const user = users.find(u => u.id === tempPassword.userId)}
+    <div class="temp-password-box">
+      <p><strong>Temporary password for {user?.email ?? 'user'}:</strong></p>
+      <code class="temp-password">{tempPassword.password}</code>
+      <p class="temp-password-hint">Share this with the user securely. They will be asked to set a new password on next login.</p>
+      <button class="btn-small" onclick={() => tempPassword = null}>Dismiss</button>
+    </div>
+  {/if}
 
   <h3>Invite New User</h3>
   <form onsubmit={handleInvite}>
@@ -268,6 +323,48 @@
   }
 
   .btn-danger-small:hover { background: #fdecea; }
+
+  .confirm-reset {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .confirm-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #dc3545;
+  }
+
+  .temp-password-box {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+  }
+
+  .temp-password-box p {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .temp-password {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: monospace;
+    user-select: all;
+    margin-bottom: 0.5rem;
+  }
+
+  .temp-password-hint {
+    color: #856404;
+    font-size: 0.8rem;
+  }
 
   .form-row {
     display: flex;

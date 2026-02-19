@@ -32,7 +32,7 @@ type HandlerDeps struct {
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.LoginLimiter.Allow(r) {
+		if !deps.LoginLimiter.Check(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
 			return
@@ -55,6 +55,7 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
+			deps.LoginLimiter.RecordFailure(r)
 			uid := userIDPtr(user)
 			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
 			http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
@@ -416,7 +417,7 @@ func HandleNeedsSetup(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerifyEmail accepts a verification token + password, verifies email, sets password, auto-logs in.
 func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.VerifyEmailLimiter.Allow(r) {
+		if !deps.VerifyEmailLimiter.Check(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return
@@ -444,6 +445,7 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 		if userID == 0 {
+			deps.VerifyEmailLimiter.RecordFailure(r)
 			http.Error(w, `{"error":"invalid or expired token"}`, http.StatusBadRequest)
 			return
 		}
@@ -490,7 +492,7 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerify2FA validates a TOTP code or recovery code after password authentication.
 func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.Verify2FALimiter.Allow(r) {
+		if !deps.Verify2FALimiter.Check(r) {
 			w.Header().Set("Retry-After", "900")
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return
@@ -534,6 +536,7 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if !valid {
+			deps.Verify2FALimiter.RecordFailure(r)
 			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, nil)
 			http.Error(w, `{"error":"invalid code"}`, http.StatusUnauthorized)
 			return
@@ -832,6 +835,70 @@ func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// HandleAdminResetPassword lets an admin reset another user's password.
+// Generates a random temporary password, sets must_change_password = true.
+func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		caller := UserFromContext(r.Context())
+		if !caller.IsAdmin() {
+			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			return
+		}
+
+		idStr := chi.URLParam(r, "id")
+		targetID, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, `{"error":"invalid user ID"}`, http.StatusBadRequest)
+			return
+		}
+
+		if targetID == caller.ID {
+			http.Error(w, `{"error":"cannot reset your own password via admin endpoint"}`, http.StatusBadRequest)
+			return
+		}
+
+		target, err := deps.Store.GetUserByID(r.Context(), targetID)
+		if err != nil || target == nil {
+			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+			return
+		}
+
+		// Generate random 16-char temporary password
+		tempBytes := make([]byte, 12)
+		if _, err := rand.Read(tempBytes); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		tempPassword := hex.EncodeToString(tempBytes)[:16]
+
+		hash, err := HashPassword(tempPassword)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.Store.UpdatePassword(r.Context(), targetID, hash); err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := deps.Store.SetMustChangePassword(r.Context(), targetID); err != nil {
+			log.Printf("setting must_change_password: %v", err)
+		}
+
+		deps.Store.LogAudit(r.Context(), &caller.ID, AuditPasswordReset, r, map[string]any{
+			"target_user_id": targetID,
+			"target_email":   target.Email,
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":         "ok",
+			"temp_password":  tempPassword,
+		})
 	}
 }
 

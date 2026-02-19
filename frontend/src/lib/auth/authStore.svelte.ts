@@ -227,12 +227,17 @@ export async function logout() {
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<string | null> {
-  // Re-encrypt MEK before changing server password (admin has no vault)
+  // Re-encrypt MEK before changing server password.
+  // Skip for admin (no vault) and when must_change_password is set with locked vault
+  // (e.g. after admin password reset — vault recovery happens separately).
   if (currentUser && currentUser.role !== 'admin') {
-    try {
-      await reEncryptMEK(currentPassword, newPassword, currentUser.email)
-    } catch (e) {
-      return e instanceof Error ? e.message : 'Failed to re-encrypt vault keys'
+    const mustChangeWithLockedVault = currentUser.must_change_password && vaultDecryptFailed
+    if (!mustChangeWithLockedVault) {
+      try {
+        await reEncryptMEK(currentPassword, newPassword, currentUser.email)
+      } catch (e) {
+        return e instanceof Error ? e.message : 'Failed to re-encrypt vault keys'
+      }
     }
   }
 
@@ -446,6 +451,17 @@ export async function deleteUser(id: number): Promise<string | null> {
 
   const data = await res.json().catch(() => ({ error: 'Failed to delete user' }))
   return data.error || 'Failed to delete user'
+}
+
+export async function adminResetPassword(id: number): Promise<{ temp_password: string } | { error: string }> {
+  const res = await fetch(`${API_BASE}/auth/users/${id}/reset-password`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+
+  const data = await res.json().catch(() => ({ error: 'Failed to reset password' }))
+  if (res.ok) return { temp_password: data.temp_password }
+  return { error: data.error || 'Failed to reset password' }
 }
 
 export async function resendVerification(id: number): Promise<string | null> {

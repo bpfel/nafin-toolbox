@@ -112,6 +112,14 @@ func (s *Store) ClearMustChangePassword(ctx context.Context, userID int) error {
 	return err
 }
 
+func (s *Store) SetMustChangePassword(ctx context.Context, userID int) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET must_change_password = TRUE WHERE id = $1`,
+		userID,
+	)
+	return err
+}
+
 func (s *Store) SetEmailVerified(ctx context.Context, userID int) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE users SET email_verified = TRUE WHERE id = $1`,
