@@ -196,7 +196,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if isVerifyPage}
-  <VerifyEmailPage />
+  <VerifyEmailPage onVerified={() => { isVerifyPage = false }} />
 {:else if authState.loading}
   <main>
     <p class="loading">Loading...</p>
