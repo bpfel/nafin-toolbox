@@ -297,31 +297,27 @@ Regular users have encrypted vaults. There are two levels of reset:
 
 **Tier 1: Password-only reset (data preserved)**
 
-If the user still has their recovery key, reset just the password. The user will use the recovery key to re-wrap their vault on next login:
+If the user still has their recovery key, the admin can reset the password directly from the UI:
 
-```bash
-# Generate bcrypt hash (same method as admin reset above), then update:
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c \
-  "UPDATE users SET password_hash = '\$2b\$12\$YOUR_HASH_HERE' WHERE email = 'user@example.com';"
-```
-
-On next login, the vault will fail to decrypt (password changed). The user enters their recovery key to restore access. All data is preserved.
+1. Log in as admin → click "Users" in the top bar
+2. Find the user → click "Reset Password" → confirm
+3. A temporary password is displayed — share it securely with the user
+4. On next login, the user is prompted to set a new password
+5. The vault will fail to decrypt (password changed) — the user enters their recovery key to restore access. All data is preserved.
 
 **Tier 2: Nuclear reset (data destroyed)**
 
-If the user has lost both their password and recovery key, their encrypted data is unrecoverable. Reset the password and wipe the vault:
+If the user has lost both their password and recovery key, their encrypted data is unrecoverable. Use Tier 1 (the button above) to reset the password, then manually wipe the vault:
 
 ```bash
-# Generate bcrypt hash (same method as admin reset above), then reset password + wipe vault:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c "
-  UPDATE users SET password_hash = '\$2b\$12\$YOUR_HASH_HERE' WHERE email = 'user@example.com';
   DELETE FROM user_vaults WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.com');
   UPDATE users SET encrypted_mek = NULL, recovery_key_hash = NULL, encrypted_mek_recovery = NULL
     WHERE email = 'user@example.com';
 "
 ```
 
-After this, the user logs in with the new password. The vault setup screen appears to create new encryption keys and a new recovery key. All previous financial data is permanently lost.
+After this, the user logs in with the temporary password from Tier 1. The vault setup screen appears to create new encryption keys and a new recovery key. All previous financial data is permanently lost.
 
 **Security checklist for production:**
 - [ ] Generate a unique `ENCRYPTION_KEY` with `openssl rand -hex 32`
