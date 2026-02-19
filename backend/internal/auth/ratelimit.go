@@ -67,6 +67,43 @@ func (rl *LoginRateLimiter) Allow(r *http.Request) bool {
 	return true
 }
 
+// Check returns true if under the limit without recording an attempt.
+func (rl *LoginRateLimiter) Check(r *http.Request) bool {
+	key := rl.ClientIP(r)
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	cutoff := time.Now().Add(-rl.window)
+	count := 0
+	for _, t := range rl.attempts[key] {
+		if t.After(cutoff) {
+			count++
+		}
+	}
+	return count < rl.max
+}
+
+// RecordFailure records a failed attempt for the request's client IP.
+func (rl *LoginRateLimiter) RecordFailure(r *http.Request) {
+	key := rl.ClientIP(r)
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-rl.window)
+
+	existing := rl.attempts[key]
+	pruned := existing[:0]
+	for _, t := range existing {
+		if t.After(cutoff) {
+			pruned = append(pruned, t)
+		}
+	}
+	rl.attempts[key] = append(pruned, now)
+}
+
 // ClientIP extracts the client IP from the request.
 // Proxy headers (X-Real-IP, X-Forwarded-For) are only trusted when
 // RemoteAddr is in the configured trusted proxy CIDR ranges.
