@@ -206,6 +206,7 @@
 {:else if authState.currentUser.must_change_password}
   <ChangePasswordForm
     message="Please set a new password to continue."
+    showLogout={true}
   />
 {:else if show2FAEnforcement}
   <main>
