@@ -1,6 +1,12 @@
 <script lang="ts">
   import { verifyEmail } from './authStore.svelte'
 
+  interface Props {
+    onVerified?: () => void
+  }
+
+  let { onVerified }: Props = $props()
+
   let token = $state('')
   let password = $state('')
   let confirmPassword = $state('')
@@ -32,9 +38,10 @@
       error = result
     } else {
       success = true
-      // Redirect to app after short delay
+      // Return to main app flow (shows recovery key screen if vault was set up)
       setTimeout(() => {
-        window.location.href = '/'
+        window.history.replaceState({}, '', '/')
+        onVerified?.()
       }, 1500)
     }
   }
