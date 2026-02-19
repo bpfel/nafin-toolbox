@@ -10,17 +10,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    alias: {
-      // Force Svelte client-side bundle in tests (jsdom is not SSR)
-      'svelte': 'svelte',
-    },
-    server: {
-      deps: {
-        inline: ['svelte'],
-      },
-    },
   },
-  resolve: {
-    conditions: process.env.VITEST ? ['browser'] : [],
-  },
+  resolve: process.env.VITEST
+    ? { conditions: ['browser'] }
+    : undefined,
 })
