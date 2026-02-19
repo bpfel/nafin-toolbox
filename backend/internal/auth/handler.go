@@ -391,6 +391,8 @@ func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
+		deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginSuccess, r, map[string]any{"method": "setup"})
+
 		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -951,6 +953,7 @@ func HandleListAuditLogs(deps *HandlerDeps) http.HandlerFunc {
 
 		entries, total, err := deps.Store.ListAuditLogs(r.Context(), limit, offset, eventFilter, userIDFilter)
 		if err != nil {
+			log.Printf("audit log query error: %v", err)
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 			return
 		}

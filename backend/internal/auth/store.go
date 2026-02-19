@@ -531,7 +531,7 @@ func (s *Store) ListAuditLogs(ctx context.Context, limit, offset int, eventFilte
 
 	// Fetch entries
 	query := fmt.Sprintf(
-		`SELECT a.id, a.user_id, u.email, a.event, COALESCE(a.ip_address,''), COALESCE(a.user_agent,''), a.metadata, a.created_at
+		`SELECT a.id, a.user_id, u.email, a.event, COALESCE(a.ip_address,''), COALESCE(a.user_agent,''), COALESCE(a.metadata, 'null'::jsonb), a.created_at
 		 FROM audit_log a
 		 LEFT JOIN users u ON u.id = a.user_id
 		 WHERE TRUE%s
