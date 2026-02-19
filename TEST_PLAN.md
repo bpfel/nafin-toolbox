@@ -2,22 +2,22 @@
 
 ## 1. Automated Unit Tests
 
-### Backend (Go) — all passing
+### Backend (Go) — 204 passing
 
 | Package | Test File | What It Tests | Count |
 |---------|-----------|---------------|-------|
 | auth | `password_test.go` | Bcrypt hashing, password validation | 4 |
 | auth | `crypto_test.go` | AES-GCM encrypt/decrypt of TOTP secrets | 5 |
-| auth | `ratelimit_test.go` | Sliding-window rate limiter: Allow, Check, RecordFailure, concurrency, trusted proxies | 22 |
-| auth | `middleware_test.go` | RequireAuth (no cookie, nil DB), UserFromContext, ContextWithUser | 5 |
-| auth | `handler_test.go` | Handler input validation (login, invite, 2FA, password change, admin ops), UserFromContext | ~40 |
-| vault | `handler_test.go` | All 6 vault HTTP handlers via VaultStorer mock: GET/PUT vault, GET/POST/PUT keys, POST recovery, auth enforcement, size limits, bcrypt verification | 73 |
-| module | `module_test.go` | KnownModules map, constants, NetWorthContributor interface | 11 |
-| module | `handler_test.go` | enableRequest JSON decoding, Routes function, panic on missing auth context | 5 (8 skipped — need DB) |
-| email | `templates_test.go` | Invite email HTML+text rendering, XSS prevention, URL construction, edge cases | 18 |
-| email | `smtp_test.go` | LogSender (always succeeds), NewSMTPSender config parsing, port defaults | 20 |
-| database | `migrate_test.go` | listMigrationFiles: sorting, filtering, empty dir, non-SQL files, special chars | 10 |
-| server | `server_test.go` | getAllowedOrigins, originCheck CSRF, securityHeaders, maxBodySize boundaries | 20 |
+| auth | `ratelimit_test.go` | Sliding-window rate limiter: Allow, Check, RecordFailure, concurrency, trusted proxies | 21 |
+| auth | `middleware_test.go` | RequireAuth (no cookie), UserFromContext, ContextWithUser | 5 |
+| auth | `handler_test.go` | Handler input validation (login, invite, 2FA, password change, admin ops), UserFromContext | 48 |
+| vault | `handler_test.go` | All 6 vault HTTP handlers via VaultStorer mock: GET/PUT vault, GET/POST/PUT keys, POST recovery, auth enforcement, size limits, bcrypt verification | 41 |
+| module | `module_test.go` | KnownModules map, constants, NetWorthContributor interface | 8 |
+| module | `handler_test.go` | enableRequest JSON decoding, enable/disable handlers, auth enforcement | 21 |
+| email | `templates_test.go` | Invite email HTML+text rendering, XSS prevention, URL construction, edge cases | 14 |
+| email | `smtp_test.go` | LogSender (always succeeds), NewSMTPSender config parsing, port defaults | 17 |
+| database | `migrate_test.go` | listMigrationFiles: sorting, filtering, empty dir, non-SQL files, special chars | 9 |
+| server | `server_test.go` | getAllowedOrigins, originCheck CSRF, securityHeaders, maxBodySize boundaries | 27 |
 
 ### Frontend (TypeScript/Vitest) — all passing
 
@@ -29,7 +29,7 @@
 | budget | `budgetEngine.test.ts` | All 17 budget functions: groups CRUD, categories CRUD + reorder, periods CRUD + copy, entries upsert/delete, getPeriodSummary, seedDefaults, cascade delete, sortOrder auto-increment | 106 |
 | auth | `VerifyEmailPage.test.ts` | Email verification page rendering | 1 |
 
-**Total automated: ~460 tests**
+**Total automated: ~431 tests** (204 backend + 227 frontend)
 
 ---
 
@@ -37,7 +37,7 @@
 
 | Package | Test File | What It Tests | Prerequisites |
 |---------|-----------|---------------|---------------|
-| auth | `store_integration_test.go` | Full user CRUD, sessions, verification tokens, TOTP secrets, recovery codes, MFA challenges, app settings, audit log, cascade deletes | `DATABASE_URL` env var pointing to Postgres |
+| auth | `store_integration_test.go` | Full user CRUD, sessions, verification tokens, TOTP secrets, recovery codes, MFA challenges, app settings, audit log, cascade deletes (37 tests) | `DATABASE_URL` env var pointing to Postgres |
 
 **How to run:** `docker compose run --rm api sh -c "DATABASE_URL=... go test ./internal/auth/ -run Integration -v"`
 
