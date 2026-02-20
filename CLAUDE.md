@@ -30,16 +30,21 @@ A self-hosted personal finance web app for a Swiss user. Covers budgeting, accou
 ```
 nafin-toolbox/
 ├── docker-compose.yml              # 3 services: db, api, frontend
+├── docker-compose.prod.yml         # Production overrides
+├── .github/workflows/test.yml      # CI: unit, frontend, integration tests
 ├── backend/
 │   ├── Dockerfile
 │   ├── go.mod
 │   ├── main.go                     # Entry point
 │   ├── internal/
 │   │   ├── server/server.go        # HTTP server, chi router, CORS, route registration
-│   │   ├── database/db.go          # PostgreSQL connection via pgx
-│   │   └── module/module.go        # Module type + NetWorthContributor interface
+│   │   ├── database/               # PostgreSQL connection (pgx) + migration runner
+│   │   ├── auth/                   # Authentication: handlers, store, middleware, TOTP, rate limiting, audit
+│   │   ├── email/                  # SMTP client + HTML email templates
+│   │   ├── module/                 # Module type + NetWorthContributor interface
+│   │   └── vault/                  # E2EE vault storage: encrypted MEK + vault blobs
 │   └── migrations/
-│       └── 001_init.sql            # Modules table
+│       └── 001_init.sql            # Full schema (users, sessions, audit_log, modules, vaults)
 ├── frontend/
 │   ├── Dockerfile
 │   ├── nginx.conf                  # Serves SPA + proxies /api/ to Go
@@ -48,9 +53,15 @@ nafin-toolbox/
 │   ├── index.html
 │   └── src/
 │       ├── main.ts                 # Svelte mount
-│       ├── App.svelte              # Root component (empty-state → module cards)
+│       ├── App.svelte              # Root component
 │       ├── app.css                 # Global styles
-│       └── lib/api/client.ts       # Typed API client (fetchModules, healthCheck)
+│       ├── lib/
+│       │   ├── api/client.ts       # Typed API client
+│       │   ├── auth/               # Auth UI components + authStore
+│       │   ├── crypto/             # E2EE: key derivation, vault encrypt/decrypt, vaultStore
+│       │   └── budget/             # Budget engine: categories, periods, entries, BFS defaults
+│       └── modules/
+│           └── budget/             # Budget module UI (table, summary, modals, setup)
 ```
 
 ### How to add a new module (backend)
@@ -61,17 +72,33 @@ nafin-toolbox/
 
 ### How to add a new module (frontend)
 1. Create `src/modules/<module>/` with Svelte components
-2. Add API functions to `lib/api/client.ts`
-3. Wire into App.svelte (or future router)
+2. Add engine/logic to `src/lib/<module>/` if needed
+3. Add API functions to `lib/api/client.ts` for any backend endpoints
+4. Wire into App.svelte (or future router)
+5. For E2EE modules: store data in the vault (`VaultData` in `lib/crypto/vault.ts`), not via backend API
 
 ## Investment Valuation Strategy
 - **Traded securities:** Fetch prices via financial data API (Yahoo Finance, Alpha Vantage, or similar). Need an API key. Cache prices to avoid rate limits.
 - **Physical gold:** Store weight in grams/ounces. Multiply by gold spot price from API.
 - **Unlisted stocks:** User enters valuations manually with a date. Latest entry = current value.
 
-## Data Model (Draft Concepts)
+## Data Model
+
+### PostgreSQL (backend)
+- `users` — email, password_hash, role (admin/user), verification, TOTP secrets
+- `sessions` — hashed session tokens, expiry, user association
+- `audit_log` — security event log (user_id nullable for anonymization)
+- `modules` — enabled module registry per user
+- `user_vaults` — encrypted vault blobs (opaque to server)
+
+### Encrypted Vault (frontend, inside `VaultData`)
+- `VaultCategoryGroup` — name, type (income/expense), sort order
+- `VaultCategory` — name, type, group, fixed flag, archived flag
+- `VaultPeriod` — year, month, notes, entries
+- `VaultEntry` — category reference, planned/actual amounts
+
+### Future modules (not yet implemented)
 - `Account` — name, type (bank/savings/cash), currency, balance
-- `Budget` — month, category, planned amount, actual amount
 - `Allocation` — month, source (income), target account, planned amount, actual amount
 - `Provision3a` — provider, fund, contributions (yearly), current value
 - `Investment` — name, type (stock/etf/gold/unlisted), ticker (nullable), quantity, purchase_price, purchase_date
@@ -88,9 +115,11 @@ Active worktrees:
 |---|---|---|
 | `/home/bpfel/nafin-toolbox/` | `develop` (main repo) | Base code, shared infrastructure |
 
+Additional worktrees are created as needed for parallel feature development — update this table when adding or removing them.
+
 **Rules:**
 - **Before writing or editing any file**, verify the file path starts with the correct worktree root for the feature you are working on.
-- Feature work (e.g. budget module) MUST go in the feature worktree, NOT the main repo.
+- Feature work MUST go in the feature worktree, NOT the main repo.
 - If the user asks you to implement a feature that has an associated worktree, make all changes in that worktree.
 - When in doubt, run `git branch --show-current` in the target directory to confirm.
 
@@ -105,7 +134,6 @@ When creating git worktrees for parallel feature development:
 4. Update the worktree table above when adding or removing worktrees
 
 ## Open Questions
-- Single-user auth or multi-user?
 - Which financial data API for stock/ETF prices?
 - How to handle currency conversion (live rates or manual)?
 - Mobile-friendly responsive design or desktop-only?
