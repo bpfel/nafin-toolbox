@@ -4,7 +4,8 @@
   import MonthSelector from './MonthSelector.svelte'
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
-  import BudgetSetup from './BudgetSetup.svelte'
+  import BudgetWizard from './wizard/BudgetWizard.svelte'
+  import { generateCategories, calculateBudget, type WizardData } from './wizard/wizardCalculations'
 
   const vaultState = getVaultState()
 
@@ -65,16 +66,20 @@
     version++
   }
 
-  function handleSeeded() {
+  function handleWizardComplete(data: WizardData) {
     if (!vaultState.vault) return
-    engine.seedDefaults(vaultState.vault)
+    // Calculate full budget allocation from wizard data
+    const budgetAllocation = calculateBudget(data)
+    // Generate categories from the calculated budget
+    const categories = generateCategories(budgetAllocation, data)
+    engine.seedFromWizard(vaultState.vault, categories)
     markDirty()
     version++
   }
 
-  function handleStartBlank() {
+  function handleQuickSetup() {
     if (!vaultState.vault) return
-    engine.createPeriod(vaultState.vault, currentYear, currentMonth)
+    engine.seedDefaults(vaultState.vault)
     markDirty()
     version++
   }
@@ -86,7 +91,7 @@
   {#if !vaultState.vault}
     <p class="loading">Loading...</p>
   {:else if needsSetup}
-    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
+    <BudgetWizard oncomplete={handleWizardComplete} onquicksetup={handleQuickSetup} />
   {:else if periodNotFound}
     <div class="no-period">
       <p>No budget was recorded for this month.</p>

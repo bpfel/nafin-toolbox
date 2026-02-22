@@ -363,3 +363,70 @@ export function seedDefaults(vault: VaultData): void {
     period.entries.push(entry)
   }
 }
+
+// --- Seed from Wizard ---
+
+export interface WizardCategory {
+  name: string
+  type: 'income' | 'expense'
+  groupName: string
+  fixed: boolean
+  amount: number
+}
+
+export function seedFromWizard(vault: VaultData, wizardCategories: WizardCategory[]): void {
+  if (vault.budget.categories.length > 0) return
+
+  // Create groups (derive from wizard categories)
+  const groupNames = new Set<string>()
+  for (const wc of wizardCategories) {
+    groupNames.add(wc.groupName)
+  }
+
+  const groupOrder: Record<string, number> = {
+    'Employment': 1,
+    'Housing': 10,
+    'Insurance & Taxes': 20,
+    'Living': 30,
+    'Lifestyle': 40,
+    'Savings & Investments': 50,
+  }
+
+  for (const name of groupNames) {
+    const type = name === 'Employment' ? 'income' : 'expense'
+    createGroup(vault, name, type, groupOrder[name] ?? 100)
+  }
+
+  // Create categories
+  const categories: VaultCategory[] = []
+  let sortOrder = 10
+  for (const wc of wizardCategories) {
+    const cat = createCategory(vault, {
+      name: wc.name,
+      type: wc.type,
+      groupName: wc.groupName,
+      fixed: wc.fixed,
+      sortOrder: sortOrder,
+    })
+    categories.push(cat)
+    sortOrder += 10
+  }
+
+  // Create current month period with entries
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const period = createPeriod(vault, year, month)
+
+  for (let i = 0; i < categories.length; i++) {
+    const cat = categories[i]
+    const wc = wizardCategories[i]
+    const amount = wc.amount.toFixed(2)
+    const entry: VaultEntry = {
+      categoryId: cat.id,
+      plannedAmount: amount,
+      actualAmount: cat.fixed ? amount : '0.00',
+    }
+    period.entries.push(entry)
+  }
+}

@@ -79,14 +79,11 @@ frontend/src/modules/budget/wizard/
     └── PreviewStep.svelte
 ```
 
-### Also in This Branch
+### Integration
 
-This branch includes the full nafin-toolbox foundation:
-- Go backend with auth, modules, vault, email
-- PostgreSQL migrations
-- Docker Compose setup
-- Frontend with Svelte 5
-- Test infrastructure
+This branch adds the wizard on top of `main`. Key integration points:
+- `BudgetModule.svelte` — Shows wizard when budget has no categories
+- `budgetEngine.ts` — New `seedFromWizard()` function creates categories from wizard data
 
 ## Running Locally
 
