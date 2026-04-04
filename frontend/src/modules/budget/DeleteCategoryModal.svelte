@@ -24,9 +24,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="backdrop" onclick={handleBackdrop}>
+<div class="backdrop" role="presentation" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label="Delete category">
     <h3>Delete category</h3>
     <p>Remove <strong>{categoryName}</strong> from your budget? This deletes it from all periods.</p>
