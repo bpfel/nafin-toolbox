@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
+  import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
     type: 'income' | 'expense'
@@ -118,7 +119,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit category' : 'Add category'}>
+  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit category' : 'Add category'} use:focusTrap>
     <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} category</h3>
 
     <label class="field">
