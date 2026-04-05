@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { focusTrap } from '../../lib/util/focusTrap'
+
   interface Props {
     categoryId: string
     categoryName: string
@@ -25,7 +27,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Delete category">
+  <div class="modal" role="dialog" aria-label="Delete category" use:focusTrap>
     <h3>Delete category</h3>
     <p>Remove <strong>{categoryName}</strong> from your budget? This deletes it from all periods.</p>
 

@@ -9,6 +9,7 @@
   import SecuritySettings from './lib/auth/SecuritySettings.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
+  import { focusTrap } from './lib/util/focusTrap'
 
   const authState = getAuthState()
   const vaultState = getVaultState()
@@ -346,7 +347,7 @@
 
     {#if menuOpen}
       <div class="backdrop menu-backdrop" role="presentation" onclick={handleMenuBackdrop}>
-        <div class="menu-modal" role="dialog" aria-label="Navigation menu">
+        <div class="menu-modal" role="dialog" aria-label="Navigation menu" use:focusTrap>
           <div class="menu-header">
             <span class="role-tag">{authState.currentUser.role}</span>
             <span class="user-email">{authState.currentUser.email}</span>
@@ -396,7 +397,7 @@
 
     {#if showConfig}
       <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-        <div class="modal" role="dialog" aria-label="Configure modules">
+        <div class="modal" role="dialog" aria-label="Configure modules" use:focusTrap>
           <h3>Modules</h3>
           <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
           <div class="module-list">
