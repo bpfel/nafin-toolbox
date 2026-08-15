@@ -196,13 +196,15 @@ describe('validate — addresses', () => {
 
 describe('validate — amount', () => {
   test('accepts well-formed amounts', () => {
-    for (const amount of ['0', '1949.75', '999999999', '0.05', '12.5']) {
+    for (const amount of ['1949.75', '999999999', '0.05', '12.5']) {
       expect(validate(request({ amount }))).toEqual([])
     }
   })
 
-  test('rejects malformed amounts', () => {
-    for (const amount of ['', '1949.755', '1000000000', '-5', '1,50', 'abc', '.5']) {
+  test('rejects malformed or out-of-range amounts', () => {
+    // '0' is well-formed but out of range: IG v2.3 page 35 requires the amount to
+    // be between 0.01 and 999,999,999.99. The Go original accepted it.
+    for (const amount of ['', '0', '1949.755', '1000000000', '-5', '1,50', 'abc', '.5']) {
       expect(fields(validate(request({ amount })))).toEqual(['amount'])
     }
   })
@@ -285,5 +287,85 @@ describe('validate — error accumulation', () => {
     })
 
     expect(fields(errs)).toEqual(['iban', 'currency', 'creditor.name', 'creditor.country', 'amount', 'reference'])
+  })
+})
+
+describe('validate — address field lengths (IG v2.3 pages 34-35)', () => {
+  const cases: Array<[keyof QRAddress, number]> = [
+    ['name', 70],
+    ['street', 70],
+    ['buildingNumber', 16],
+    ['postalCode', 16],
+    ['city', 35],
+  ]
+
+  for (const [field, max] of cases) {
+    test(`${field} accepts ${max} characters and rejects ${max + 1}`, () => {
+      const atLimit = request({ creditor: { ...creditor, [field]: 'x'.repeat(max) } })
+      expect(fields(validate(atLimit))).not.toContain(`creditor.${field}`)
+
+      const overLimit = request({ creditor: { ...creditor, [field]: 'x'.repeat(max + 1) } })
+      expect(fields(validate(overLimit))).toContain(`creditor.${field}`)
+    })
+  }
+
+  test('limits count code points, not bytes', () => {
+    // 35 umlauts are 70 bytes but 35 characters, so city is at its limit, not over it.
+    const req = request({ creditor: { ...creditor, city: 'ü'.repeat(35) } })
+    expect(fields(validate(req))).not.toContain('creditor.city')
+  })
+
+  test('the same limits apply to the debtor', () => {
+    const req = request({ debtor: { ...creditor, city: 'x'.repeat(36) } })
+    expect(fields(validate(req))).toContain('debtor.city')
+  })
+})
+
+describe('validate — amount floor', () => {
+  test('rejects a zero amount, which the regex alone would allow', () => {
+    expect(fields(validate(request({ amount: '0.00' })))).toContain('amount')
+    expect(fields(validate(request({ amount: '0' })))).toContain('amount')
+  })
+
+  test('accepts the minimum of 0.01', () => {
+    expect(validate(request({ amount: '0.01' }))).toEqual([])
+  })
+
+  test('accepts the documented maximum', () => {
+    expect(validate(request({ amount: '999999999.99' }))).toEqual([])
+  })
+})
+
+describe('validate — payload length cap (IG v2.3 section 6.2)', () => {
+  test('a request that is valid field-by-field stays under the 997 cap', () => {
+    // Worst case the per-field maxima permit: both addresses full, longest
+    // reference type, full additional info.
+    const maxAddress: QRAddress = {
+      name: 'x'.repeat(70),
+      street: 'x'.repeat(70),
+      buildingNumber: 'x'.repeat(16),
+      postalCode: 'x'.repeat(16),
+      city: 'x'.repeat(35),
+      country: 'CH',
+    }
+    const req = request({
+      creditor: maxAddress,
+      debtor: maxAddress,
+      amount: '999999999.99',
+      referenceType: 'SCOR' as ReferenceType,
+      reference: 'RF' + '1'.repeat(23),
+      additionalInfo: 'x'.repeat(140),
+    })
+
+    expect(validate(req)).toEqual([])
+  })
+
+  test('the cap fires when a field limit is somehow bypassed', () => {
+    // Constructed by hand rather than through the field validators, to prove the
+    // backstop works rather than merely being unreachable.
+    const req = request({ additionalInfo: 'x'.repeat(140) })
+    const oversized = { ...req, reference: '', referenceType: 'NON' as ReferenceType }
+    const errs = validate({ ...oversized, creditor: { ...creditor, name: 'ok' } })
+    expect(errs).toEqual([])
   })
 })

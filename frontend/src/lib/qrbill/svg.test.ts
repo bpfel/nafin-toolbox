@@ -118,54 +118,25 @@ describe('renderQRSvg — quiet zone', () => {
   })
 })
 
-describe('renderQRSvg — Swiss cross', () => {
-  test('includes a Swiss cross group', () => {
-    const cross = parse(renderQRSvg(cornerMatrix)).querySelector('g.swiss-cross')
-
-    expect(cross).not.toBeNull()
-  })
-
-  test('every cross shape is centred on the symbol', () => {
+describe('renderQRSvg — Swiss cross is deliberately absent', () => {
+  // The cross is a recognition symbol (IG v2.3 section 6.4.2), not encoded data.
+  // Scanners read the payload and never look at it, while overlaying it removes
+  // modules. We ship no cross rather than a hand-drawn approximation of an image
+  // the standard distributes as a file and protects as IP.
+  test('no cross group is emitted', () => {
     for (const matrix of [cornerMatrix, largeMatrix]) {
-      const svg = renderQRSvg(matrix, { moduleSize: 10 })
-      const size = (matrix.length + 2 * QUIET_ZONE) * 10
-      const centre = size / 2
-      const shapes = Array.from(parse(svg).querySelectorAll('g.swiss-cross rect'))
-
-      expect(shapes.length).toBeGreaterThan(0)
-      for (const s of shapes) {
-        // Coordinates are emitted rounded to 3 decimals, so centring holds to
-        // within that rounding, not to the last bit of a float.
-        expect(attrNum(s, 'x') + attrNum(s, 'width') / 2).toBeCloseTo(centre, 2)
-        expect(attrNum(s, 'y') + attrNum(s, 'height') / 2).toBeCloseTo(centre, 2)
-      }
+      expect(parse(renderQRSvg(matrix)).querySelector('g.swiss-cross')).toBeNull()
     }
   })
 
-  test('is a white square, a black square inset in it, then a white cross', () => {
-    const shapes = Array.from(
-      parse(renderQRSvg(cornerMatrix)).querySelectorAll('g.swiss-cross rect'),
-    )
+  test('nothing overlays the centre of the symbol', () => {
+    // Every emitted rect is either the background or a module — no third shape
+    // sitting on top of the data area.
+    const svg = parse(renderQRSvg(largeMatrix))
+    const all = Array.from(svg.querySelectorAll('rect'))
+    const modules = Array.from(svg.querySelectorAll('g.qr-modules rect'))
 
-    expect(shapes.map(s => s.getAttribute('fill'))).toEqual(['white', 'black', 'white', 'white'])
-
-    const [outer, inner, horizontal, vertical] = shapes
-    expect(attrNum(inner, 'width')).toBeLessThan(attrNum(outer, 'width'))
-    expect(attrNum(horizontal, 'width')).toBeLessThan(attrNum(inner, 'width'))
-    expect(attrNum(horizontal, 'width')).toBeGreaterThan(attrNum(horizontal, 'height'))
-    expect(attrNum(vertical, 'height')).toBeGreaterThan(attrNum(vertical, 'width'))
-    expect(attrNum(horizontal, 'width')).toBeCloseTo(attrNum(vertical, 'height'), 6)
-  })
-
-  test('cross scales with the code width: 7/46 of it at any version', () => {
-    for (const matrix of [cornerMatrix, largeMatrix]) {
-      const moduleSize = 10
-      const codeWidth = matrix.length * moduleSize
-      const outer = parse(renderQRSvg(matrix, { moduleSize })).querySelector('g.swiss-cross rect')!
-
-      expect(attrNum(outer, 'width')).toBeCloseTo((codeWidth * 7) / 46, 3)
-      expect(attrNum(outer, 'height')).toBeCloseTo((codeWidth * 7) / 46, 3)
-    }
+    expect(all.length).toBe(modules.length + 1) // + the background
   })
 })
 

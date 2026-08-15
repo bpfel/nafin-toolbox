@@ -1,11 +1,32 @@
 // Pure SVG renderer for a Swiss QR code.
 //
 // Ported from the Go implementation preserved in plans/qrbill-feature-snapshot.md
-// (backend/internal/qrbill/svg.go), with the Swiss cross overlay added — the Go
-// original omits it, and the standard requires it.
+// (backend/internal/qrbill/svg.go).
 //
 // This module deliberately knows nothing about QR encoding. It takes an already
 // computed module matrix so it stays trivially testable and dependency-free.
+//
+// --- Why there is no Swiss cross ------------------------------------------
+//
+// IG v2.3 section 6.4.2 says the printed code is overlaid with a black-and-white
+// cross logo measuring 7 x 7 mm. We deliberately do not draw one.
+//
+// It is a *recognition* symbol, not encoded data: scanners read the payload,
+// which begins "SPC", and never look at the image. Overlaying the cross actively
+// destroys modules, which is part of why error correction level M is mandated —
+// so a code without it scans strictly better than one with it.
+//
+// A hand-drawn approximation would be the worst of the three options. The
+// standard publishes only the 7 mm outer dimension and distributes the glyph
+// itself as a file from the SIX Download Centre, so the inner proportions cannot
+// be derived from the document; and page 5 records the image as legally
+// protected by SIC Ltd. An eyeballed reconstruction is therefore both inaccurate
+// and someone else's IP, while damaging the symbol into the bargain.
+//
+// To add it properly: fetch the official logo from the SIX Download Centre, embed
+// it as inline SVG, and centre it at 7/46 of the code width (not of the canvas —
+// the canvas includes the quiet zone). That is a compliance requirement for
+// issuing QR-bills to other people, not a functional one for scanning.
 
 // Quiet zone required around the symbol, in modules.
 const QUIET_ZONE = 4
@@ -16,28 +37,6 @@ const DEFAULT_MODULE_SIZE = 10
 // The Swiss QR code is printed at 46 x 46 mm.
 const CODE_WIDTH_MM = 46
 
-// --- Swiss cross geometry -------------------------------------------------
-//
-// Verified against SIX "Swiss Implementation Guidelines for the QR-bill" v2.3,
-// section 6.4.2 "Recognition symbol": the code is overlaid with a black-and-
-// white cross logo measuring 7 x 7 mm. That is the ONLY dimension the standard
-// publishes — it distributes the logo as a file from the SIX Download Centre
-// rather than specifying its internal proportions.
-//
-// !!! PLACEHOLDER GLYPH — the 7 mm outer size is authoritative; the inner
-// subdivisions below are approximations and cannot be corrected from the
-// document, because the document does not contain them. Before shipping,
-// replace renderSwissCross's inner shapes with the official SIX asset embedded
-// as inline SVG. Note also that IG v2.3 page 5 records the cross image as
-// legally protected by SIC Ltd, so an eyeballed reconstruction is the wrong
-// artefact on both accuracy and licensing grounds.
-//
-// Ratios are millimetres over the 46 mm code width.
-const CROSS_SIZE_RATIO = 7 / CODE_WIDTH_MM // 7 mm — IG v2.3 section 6.4.2
-const CROSS_BLACK_INSET_RATIO = 0.7 / CODE_WIDTH_MM // approximation
-const CROSS_ARM_LENGTH_RATIO = 3.9 / CODE_WIDTH_MM // approximation
-const CROSS_ARM_WIDTH_RATIO = 1.17 / CODE_WIDTH_MM // approximation
-
 export interface RenderQRSvgOptions {
   moduleSize?: number
 }
@@ -45,31 +44,6 @@ export interface RenderQRSvgOptions {
 // Formats a number for SVG output: rounded to 3 decimals, no trailing zeros.
 function num(value: number): string {
   return String(Math.round(value * 1000) / 1000)
-}
-
-function rect(x: number, y: number, width: number, height: number, fill: string): string {
-  return `<rect x="${num(x)}" y="${num(y)}" width="${num(width)}" height="${num(height)}" fill="${fill}"/>`
-}
-
-// Renders the Swiss cross overlay, centred on the code area.
-//
-// Three stacked shapes, per the standard's appearance: a white backing square,
-// a black square inset within it, and a white cross centred in the black
-// square (drawn as two overlapping arms).
-function renderSwissCross(centre: number, codeWidth: number): string {
-  const crossSize = codeWidth * CROSS_SIZE_RATIO
-  const blackSize = crossSize - 2 * (codeWidth * CROSS_BLACK_INSET_RATIO)
-  const armLength = codeWidth * CROSS_ARM_LENGTH_RATIO
-  const armWidth = codeWidth * CROSS_ARM_WIDTH_RATIO
-
-  const parts = [
-    rect(centre - crossSize / 2, centre - crossSize / 2, crossSize, crossSize, 'white'),
-    rect(centre - blackSize / 2, centre - blackSize / 2, blackSize, blackSize, 'black'),
-    rect(centre - armLength / 2, centre - armWidth / 2, armLength, armWidth, 'white'),
-    rect(centre - armWidth / 2, centre - armLength / 2, armWidth, armLength, 'white'),
-  ]
-
-  return `<g class="swiss-cross">${parts.join('')}</g>`
 }
 
 /**
@@ -96,7 +70,6 @@ export function renderQRSvg(matrix: boolean[][], opts: RenderQRSvgOptions = {}):
   const modules = matrix.length
   const totalModules = modules + 2 * QUIET_ZONE
   const size = totalModules * moduleSize
-  const codeWidth = modules * moduleSize
 
   // IG v2.3 section 6.4: the 46 x 46 mm applies to the code "without surrounding
   // quiet space". The viewBox spans code *plus* quiet zone, so the physical width
@@ -124,8 +97,6 @@ export function renderQRSvg(matrix: boolean[][], opts: RenderQRSvgOptions = {}):
     }
   }
   parts.push('</g>')
-
-  parts.push(renderSwissCross(size / 2, codeWidth))
   parts.push('</svg>')
 
   return parts.join('')
