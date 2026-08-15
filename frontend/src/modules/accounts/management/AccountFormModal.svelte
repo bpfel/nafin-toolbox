@@ -176,32 +176,32 @@
 
           <label class="field">
             <span class="label">Holder name</span>
-            <input type="text" bind:value={holderName} />
+            <input type="text" autocomplete="name" enterkeyhint="next" bind:value={holderName} />
           </label>
 
           <div class="row">
             <label class="field grow">
               <span class="label">Street</span>
-              <input type="text" bind:value={street} />
+              <input type="text" autocomplete="address-line1" enterkeyhint="next" bind:value={street} />
             </label>
             <label class="field narrow">
               <span class="label">No.</span>
-              <input type="text" bind:value={buildingNumber} />
+              <input type="text" inputmode="numeric" enterkeyhint="next" bind:value={buildingNumber} />
             </label>
           </div>
 
           <div class="row">
             <label class="field narrow">
               <span class="label">Postal code</span>
-              <input type="text" bind:value={postalCode} />
+              <input type="text" inputmode="numeric" autocomplete="postal-code" enterkeyhint="next" bind:value={postalCode} />
             </label>
             <label class="field grow">
               <span class="label">City</span>
-              <input type="text" bind:value={city} />
+              <input type="text" autocomplete="address-level2" enterkeyhint="next" bind:value={city} />
             </label>
             <label class="field narrow">
               <span class="label">Country</span>
-              <input type="text" bind:value={country} maxlength="2" />
+              <input type="text" autocomplete="country" autocapitalize="characters" maxlength="2" enterkeyhint="done" bind:value={country} />
             </label>
           </div>
         </div>

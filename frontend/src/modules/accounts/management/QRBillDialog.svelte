@@ -4,7 +4,7 @@
   import type { QRBillRequest, ReferenceType, ValidationError } from '../../../lib/qrbill/types'
   import { buildPayload } from '../../../lib/qrbill/payload'
   import { validate } from '../../../lib/qrbill/validate'
-  import { normalizeAmount } from '../../../lib/qrbill/format'
+  import { normalizeAmount, moneyInput } from '../../../lib/util/money'
   import { renderQRSvg } from '../../../lib/qrbill/svg'
   import { focusTrap } from '../../../lib/util/focusTrap'
 
@@ -81,12 +81,9 @@
     country: '',
   }
 
-  // Normalise on blur so the user sees the exact string that goes into the bill —
-  // '12' becomes '12.00' in front of them rather than silently at submit time.
-  // The two decimals are mandatory; a bank rejected a bill generated without them.
-  function normalizeAmountField() {
-    amount = normalizeAmount(amount)
-  }
+  // Normalisation and select-on-focus both come from the shared `moneyInput`
+  // action; the amount still passes through normalizeAmount at submit in case the
+  // field was never blurred (submitting straight from the keyboard).
 
   function debtorAddress(): QRAddress | undefined {
     if (!showDebtor) return undefined
@@ -189,8 +186,9 @@
       <input
         type="text"
         inputmode="decimal"
+        enterkeyhint="next"
+        use:moneyInput
         bind:value={amount}
-        onblur={normalizeAmountField}
         placeholder="Leave empty for an open amount"
       />
     </label>
@@ -215,8 +213,12 @@
     {#if referenceType !== 'NON'}
       <label class="field">
         <span class="label">Reference</span>
+        <!-- A QRR reference is 27 digits, so the phone gets the digit pad;
+             SCOR is alphanumeric (RF...) and needs the full keyboard. -->
         <input
           type="text"
+          inputmode={referenceType === 'QRR' ? 'numeric' : 'text'}
+          enterkeyhint="next"
           bind:value={reference}
           placeholder={referenceType === 'QRR' ? '27 digits' : 'RF...'}
         />
@@ -245,30 +247,30 @@
         <div class="advanced-body">
           <label class="field">
             <span class="label">Name</span>
-            <input type="text" bind:value={debtorName} />
+            <input type="text" autocomplete="name" enterkeyhint="next" bind:value={debtorName} />
           </label>
           <div class="row">
             <label class="field grow">
               <span class="label">Street</span>
-              <input type="text" bind:value={debtorStreet} />
+              <input type="text" autocomplete="address-line1" enterkeyhint="next" bind:value={debtorStreet} />
             </label>
             <label class="field narrow">
               <span class="label">No.</span>
-              <input type="text" bind:value={debtorBuildingNumber} />
+              <input type="text" inputmode="numeric" enterkeyhint="next" bind:value={debtorBuildingNumber} />
             </label>
           </div>
           <div class="row">
             <label class="field narrow">
               <span class="label">Postal code</span>
-              <input type="text" bind:value={debtorPostalCode} />
+              <input type="text" inputmode="numeric" autocomplete="postal-code" enterkeyhint="next" bind:value={debtorPostalCode} />
             </label>
             <label class="field grow">
               <span class="label">City</span>
-              <input type="text" bind:value={debtorCity} />
+              <input type="text" autocomplete="address-level2" enterkeyhint="next" bind:value={debtorCity} />
             </label>
             <label class="field narrow">
               <span class="label">Country</span>
-              <input type="text" bind:value={debtorCountry} maxlength="2" />
+              <input type="text" autocomplete="country" autocapitalize="characters" maxlength="2" enterkeyhint="done" bind:value={debtorCountry} />
             </label>
           </div>
           {#each errors.filter(e => e.field.startsWith('debtor.')) as e}

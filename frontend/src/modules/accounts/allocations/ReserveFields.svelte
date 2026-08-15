@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
+  import { moneyInput, integerInput } from '../../../lib/util/money'
 
   // The reserve definition, only ever rendered by a set-aside row. The gate is
   // structural: `reserve implies expense AND sink !== null` holds because the
@@ -140,6 +141,8 @@
         <input
           type="text"
           inputmode="decimal"
+          enterkeyhint="next"
+          use:moneyInput
           value={reserve.targetAmount}
           onchange={(e) => changeTarget(e.currentTarget.value)}
         />
@@ -147,10 +150,15 @@
 
       <label class="control">
         <span class="control-label">Period in months</span>
+        <!-- text + inputmode rather than type="number": the number spinner is
+             awkward on desktop (a stray scroll changes the value) and inputmode
+             already brings up the digit pad on a phone. -->
         <input
-          type="number"
-          min="1"
-          step="1"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          enterkeyhint="next"
+          use:integerInput
           value={reserve.periodMonths}
           onchange={(e) => changePeriod(e.currentTarget.value)}
         />
@@ -228,8 +236,7 @@
     border-color: #2d6a4f;
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }
-  input[type='text'],
-  input[type='number'] {
+  input[type='text'] {
     text-align: right;
     font-variant-numeric: tabular-nums;
   }

@@ -5,30 +5,10 @@
 // one. Nothing here rejects anything — malformed input is passed through so
 // validate() reports it, rather than a formatter silently swallowing it.
 
-/**
- * Normalises a typed amount into the exact form the standard demands:
- * no leading zeros, mandatory two decimal places, '.' as the separator.
- *
- * Swiss keyboards and habits produce `1'234,50` and `1 234.5`; both become
- * `1234.50`. A bare `12` becomes `12.00`, which matters because a live bank
- * rejected `12` outright — the two decimals are not optional.
- *
- * Input that is not a number at all is returned cleaned but otherwise untouched,
- * so `validate()` can report it against the field.
- */
-export function normalizeAmount(raw: string): string {
-  // Apostrophe, right single quote (what iOS produces), and any whitespace.
-  const cleaned = raw.replace(/['’\s]/g, '').replace(',', '.')
-  if (cleaned === '') return ''
-  if (!/^\d*\.?\d*$/.test(cleaned) || cleaned === '.') return cleaned
-
-  const value = Number(cleaned)
-  if (!Number.isFinite(value)) return cleaned
-  // toFixed both pads to two places and drops leading zeros, and it rounds rather
-  // than truncates — the normalised value is shown back to the user, so a rounded
-  // third decimal is visible rather than silent.
-  return value.toFixed(2)
-}
+// Amount normalisation is general money handling, not QR-specific — it lives in
+// lib/util/money.ts alongside the input actions that use it. Re-exported here so
+// QR bill code can reach it without knowing that.
+export { normalizeAmount } from '../util/money'
 
 /**
  * Groups an IBAN into blocks of four for display: the conventional way it is

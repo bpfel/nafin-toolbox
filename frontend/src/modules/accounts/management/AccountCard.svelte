@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
+  import { moneyInput } from '../../../lib/util/money'
 
   interface Props {
     account: VaultAccount
@@ -136,6 +137,8 @@
           <input
             type="text"
             inputmode="decimal"
+            enterkeyhint="done"
+            use:moneyInput
             bind:value={amountInput}
             onkeydown={e => { if (e.key === 'Enter') submitCorrection() }}
           />
