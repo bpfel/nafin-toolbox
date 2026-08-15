@@ -110,19 +110,22 @@ nafin-toolbox/
 ### Git Worktrees — CRITICAL
 **Always check which worktree you are working in before making any changes.**
 
-Active worktrees:
-| Worktree path | Branch | Purpose |
-|---|---|---|
-| `/home/bpfel/nafin-toolbox/` | `develop` (main repo) | Base code, shared infrastructure |
-| `/home/bpfel/nafin-toolbox-onboarding/` | `feature/onboarding` | Onboarding feature work |
+**Never rely on a recorded list of worktrees — not in this file, not in agent memory.**
+Worktrees and their branches change constantly; any written-down list is stale the moment
+someone switches a branch or adds a worktree. Always determine the current state live:
 
-Additional worktrees are created as needed for parallel feature development — update this table when adding or removing them.
+```bash
+git worktree list          # every worktree and the branch each has checked out
+git branch --show-current  # branch of the worktree you are standing in
+git status --porcelain     # uncommitted work that would follow a branch switch
+```
 
 **Rules:**
+- **Run `git worktree list` before starting work**, and confirm which worktree the task belongs in.
 - **Before writing or editing any file**, verify the file path starts with the correct worktree root for the feature you are working on.
 - Feature work MUST go in the feature worktree, NOT the main repo.
 - If the user asks you to implement a feature that has an associated worktree, make all changes in that worktree.
-- When in doubt, run `git branch --show-current` in the target directory to confirm.
+- Uncommitted changes belong to no branch — they follow you across a checkout. Check `git status` before switching.
 
 ### Creating new worktrees
 When creating git worktrees for parallel feature development:
@@ -135,7 +138,7 @@ When creating git worktrees for parallel feature development:
    `<new-worktree-path>` set to the main repo itself** — that makes `.claude` a symlink to
    itself and every settings read fails with `ELOOP`.
 3. This ensures consistent agent memory, settings, and permissions across all feature branches
-4. Update the worktree table above when adding or removing worktrees
+4. Do not record the new worktree anywhere — `git worktree list` is the only source of truth
 
 **`.claude/` is gitignored and must stay that way.** It is local, machine-specific config
 shared between worktrees by symlink. It was previously committed as a symlink holding an
