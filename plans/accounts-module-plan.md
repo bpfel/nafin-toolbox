@@ -36,9 +36,12 @@ interface VaultAccount {
   currentAmount: string      // user-correctable
   lastCorrectedAt: string    // ISO date — surfaced in the UI
 
+  bankName?: string          // institution holding the account; absent for cash
+
   // Swiss QR bill payment details. Optional: an account is QR-capable
   // only once iban and a complete holder address are present.
   iban?: string
+  ibanKind?: 'iban' | 'qr-iban'
   holder?: QRAddress
 }
 
@@ -216,6 +219,37 @@ Two distinct uses, same data:
 The second is the more valuable one here: it makes an allocation actionable without any bank
 API. Either way the creditor is one of your own accounts, so the data model is unchanged.
 
+### IBAN kind and reference type must match
+
+A hard rule in the standard, and banks reject mismatches:
+
+| Account IBAN | Permitted reference types |
+|---|---|
+| Regular IBAN | `NON` (none) or `SCOR` |
+| QR-IBAN | `QRR` only |
+
+For the self-funding transfer case the right combination is **regular IBAN + `NON`** — no
+structured reference is needed when paying yourself.
+
+Also: a **QR-IBAN can only receive**. Payments cannot be made *from* a QR-IBAN. That does not
+block us — the account is always the creditor on a generated bill — but `ibanKind` is stored
+so validation can enforce the pairing rather than emitting a bill the bank will refuse.
+
+### Delivery: scan from another screen, do not rely on sharing
+
+Research finding: most Swiss banking apps, **UBS and Raiffeisen included, scan with the
+camera only** and do not read a QR code from a screenshot or the photo gallery. Only a
+handful handle PDF QR bills on the phone at all.
+
+So the reliable flow is the ordinary one — display the code on screen, scan it with the
+phone. That works today with no integration.
+
+A "share" action (`navigator.share()` with the SVG/PNG) can still be offered, but it should
+be understood as sharing an *image* to Files, Photos or a chat — **not** as piping payment
+data into a banking app. No deep-link or share-target convention for Swiss banking apps
+turned up. Same-device phone-browser-to-banking-app is precisely the case the ecosystem does
+not support; desktop-screen-to-phone-camera is the case that works.
+
 ### Generate client-side
 
 Given E2EE, generation happens in the browser. Sending IBAN and holder address to the server
@@ -256,10 +290,9 @@ Own the Swiss layer, where the logic is verifiable string assembly; delegate the
 
 - **Swiss cross missing.** The spec requires a 7×7 mm cross centred on the code; `svg.go`
   does not draw one. Small, static overlay.
-- **Bare QR only.** There is no A6 payment slip (receipt part, payment part, cut lines,
-  field labels, millimetre positioning). Sufficient for scan-to-pay on screen; a printable
-  slip for sending to someone else is a much larger job, and is most of what `swissqrbill`'s
-  weight consists of. Scope decision still open.
+- **Bare QR only** — and that is the decided scope. No A6 payment slip (receipt part,
+  payment part, cut lines, field labels, millimetre positioning). Scan-to-pay on screen is
+  the use case; a printable slip is out of scope.
 
 ## Screens
 
@@ -285,10 +318,11 @@ project's progressive-disclosure principle, without a second data model.
    agreed mitigation; confirm-per-month remains the alternative if it proves insufficient.
 2. **Does `kind` drive behaviour?** The field exists; nothing branches on it yet. Candidates:
    restricting which kinds can be reserve sinks, or hiding QR fields for `cash`.
-3. **Bare QR or full A6 slip?** Scan-to-pay on screen needs only the code. A printable
-   payment slip is a much larger job. Decides the size of the QR work.
-4. **Which generic QR encoder.** Needs to be well-tested and small; it is the only new
+3. **Which generic QR encoder.** Needs to be well-tested and small; it is the only new
    runtime dependency the port introduces.
+4. **Is `bankName` worth typing?** For Swiss IBANs the institution is derivable from the
+   clearing number embedded in the IBAN, so the field could be inferred rather than entered.
+   Kept explicit for now because cash and foreign accounts have no IBAN to derive from.
 
 ## Deliberately out of scope
 
