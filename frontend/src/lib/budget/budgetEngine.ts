@@ -6,6 +6,7 @@ import type {
   VaultPeriod,
   VaultEntry,
 } from '../crypto/vault'
+import { defaultRouting, primaryAccountId } from '../accounts/routing'
 
 // --- Category Groups ---
 
@@ -63,6 +64,9 @@ export function createCategory(
   const group = getOrCreateGroup(vault, opts.groupName, opts.type)
   const cats = vault.budget.categories
   const order = opts.sortOrder ?? (cats.length > 0 ? Math.max(...cats.map(c => c.sortOrder)) + 10 : 10)
+  // Categories are born routed: the default is legal for both types, so no
+  // category ever exists unrouted or contradictory.
+  const routing = defaultRouting(opts.type, primaryAccountId(vault))
   const cat: VaultCategory = {
     id: crypto.randomUUID(),
     name: opts.name,
@@ -71,6 +75,8 @@ export function createCategory(
     archived: false,
     groupId: group.id,
     fixed: opts.fixed ?? false,
+    sourceAccountId: routing.sourceAccountId,
+    sinkAccountId: routing.sinkAccountId,
   }
   cats.push(cat)
   return cat
@@ -85,7 +91,20 @@ export function updateCategory(
   if (!cat) return null
 
   if (update.name !== undefined) cat.name = update.name
-  if (update.type !== undefined) cat.type = update.type
+
+  // Changing the type invalidates the existing routing: an income category
+  // routed (null, A) would become an expense on the same endpoints, which is
+  // an illegal combination. Re-derive the defaults rather than leave a
+  // contradiction behind. A reserve cannot survive a move to income either,
+  // since a reserve implies an expense with a non-null sink.
+  if (update.type !== undefined && update.type !== cat.type) {
+    cat.type = update.type
+    const routing = defaultRouting(cat.type, primaryAccountId(vault))
+    cat.sourceAccountId = routing.sourceAccountId
+    cat.sinkAccountId = routing.sinkAccountId
+    if (cat.type === 'income') delete cat.reserve
+  }
+
   if (update.sortOrder !== undefined) cat.sortOrder = update.sortOrder
   if (update.archived !== undefined) cat.archived = update.archived
   if (update.fixed !== undefined) cat.fixed = update.fixed
