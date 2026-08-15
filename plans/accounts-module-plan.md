@@ -408,49 +408,54 @@ Two, built in parallel:
 
 ## UX workflow
 
-The four contradictory combinations should be **unrepresentable**, not validated after the
-fact. `AddCategoryModal` is already opened with `type` fixed by which section the user
-clicked, so type is known before any routing question is asked — and the routing controls
-can differ by type.
+**Routing is never asked for in the budget.** `AddCategoryModal` stays exactly as it is
+today: income or expense, nothing about accounts. All routing is set on the allocation
+screen.
 
-### Income: one question
+### Categories are born routed, by default
 
-> **Which account does this land in?**  → sets `sink`
+Creation applies defaults rather than asking. With the always-one-account invariant there is
+always something to default to:
 
-`source` is implicitly external. The three income contradictions cannot be expressed.
+| Created as | Default routing | Resulting kind |
+|---|---|---|
+| income | `source = null`, `sink = primary account` | Income |
+| expense | `source = primary account`, `sink = null` | Spending |
 
-### Expense: a source, then a kind choice
+Both defaults are legal combinations, so no category is ever born unrouted or contradictory.
+A user who never opens the allocation screen has a fully consistent model they never had to
+think about.
 
-> **Paid from which account?**  → sets `source`
+### Changing routing on the allocation screen
+
+Set-aside is an opt-in change made later, not a decision forced at creation. The controls are
+constrained by the category's existing type, so the four contradictions remain
+unrepresentable — the constraint logic is unchanged, only its location moved:
+
+> **Income category** → one control: which account does this land in? (`sink`)
 >
-> **Does the money stay yours?**
-> - ○ No, it leaves my accounts → **Spending**, `sink = null`
-> - ○ Yes, set it aside into… [account] → **Set-aside**, `sink = account`
+> **Expense category** → a source, then a two-way choice:
+> - ○ Leaves my accounts → **Spending**, `sink = null`
+> - ○ Set aside into… [account] → **Set-aside**, `sink = account`
 
-Not a free dropdown — a two-way choice between named kinds. The expense contradiction cannot
-be expressed, and picking the source account again is naturally the `(A, A)` case.
-
-Choosing **Set-aside** is also the gate that reveals the reserve fields (obligation or
-amortization, target amount, period, anchor month). That enforces
-`reserve ⟹ expense ∧ sink !== null` structurally rather than by rule.
+Choosing **Set-aside** is the gate that reveals the reserve fields (obligation or
+amortization, target amount, period, anchor month), enforcing
+`reserve ⟹ expense ∧ sink !== null` structurally rather than by rule. Picking the source
+account again is naturally the `(A, A)` case.
 
 The single question that drives everything — *does the money stay yours?* — is answerable
 without understanding the model underneath.
 
-### Progressive disclosure with one account
+### Nothing to see with one account
 
-The *account pickers* collapse when only one account exists — there is nothing to choose, so
-Income asks nothing at all. The **leaves / set aside** question does not collapse: it is
-meaningful even with a single account, because that is exactly the `(A, A)` notional
-set-aside.
-
-So a single-account user sees one extra question on expenses and nothing else. Enabling the
-Accounts module later is purely additive — the pickers appear, already defaulted.
+A user with one account and no Accounts module enabled never encounters any of this. Defaults
+route everything; the allocation screen does not exist for them; the budget is unchanged from
+today. Enabling the module is purely additive.
 
 ### No unassigned state
 
-The always-one-account invariant means categories are routed from creation. There is no
-unassigned badge, no "not yet assigned" prompt, and no bulk-assignment flow to build.
+Defaults plus the always-one-account invariant mean categories are routed from creation.
+There is no unassigned badge, no "not yet assigned" prompt, and no bulk-assignment flow.
 
 ### Keeping it consistent over time
 
@@ -469,9 +474,8 @@ Three surfaces do the explaining, so the concept never has to be described in pr
 - **Account card**: balance / reserved / available as three numbers, which makes "set aside"
   tangible.
 - **Allocation screen**: the monthly flow view — income into accounts, outflows away from
-  them — so source and sink are seen rather than learned.
-- **Budget summary**: both totals side by side, "fully allocated" and "net worth change",
-  which is where the expense-vs-transfer distinction pays off visibly.
+  them — so source and sink are seen rather than learned. This is also where "fully
+  allocated" and "net worth change" appear side by side.
 
 ## Settled
 
@@ -487,26 +491,30 @@ Three surfaces do the explaining, so the concept never has to be described in pr
 
 ## What the budget view shows
 
-**The budget shows semantics; allocations show routing.**
+**Income and expense. Nothing else.**
 
-No per-row account information in the budget table — no source column, no sink column. Which
-account a category draws from is routing detail and belongs on the allocation screen.
+The budget module is untouched by Accounts. Set-asides appear among the expenses and are
+totalled as expenses, indistinguishable from rent — exactly as the seeded `Savings` category
+behaves today. No kind badge, no source or sink column, no account information of any form.
 
-What the budget *does* show is the **kind** (Income / Spending / Set-aside), because that is
-a budget fact, not an account fact: it changes what the totals mean. `plannedBalance` treats
-a set-aside as spent; `netChange` does not. Hiding the kind would make two different totals
-inexplicable.
+`plannedBalance = income − expenses` remains the single total, and the zero-based reading of
+`balance ≈ 0` is preserved unchanged.
 
-### The oversight this risks, and the fix
+### What moves to the accounts side
 
-A budget edit can break an account's feasibility invisibly — budget CHF 2 000 of spending
-from an account that only receives CHF 500, and the budget looks fine while the account is
-short. The consequence is real even though the relation is hidden.
+Everything the distinction buys lives on the allocation screen, not here:
 
-Fix: one **aggregate indicator**, not a column. A single line in the budget summary —
-"2 accounts under-funded →" — linking through to allocations. Zero cost when everything
-balances, and one click to the detail when it does not. Oversight is preserved without
-putting account structure in front of users who have one account and never think about it.
+- **`netChange`** (income − true outflow) is a net-worth question, and net worth is an
+  accounts concept. It belongs next to `plannedBalance` on the allocation screen, where the
+  routing that explains the difference is visible.
+- **Under-funding warnings.** A budget edit can still break an account's feasibility —
+  budgeting CHF 2 000 of spending from an account receiving CHF 500. Surface that on the
+  allocation screen and, if needed, as a badge on the Accounts module card. Not in the
+  budget.
+
+The trade is deliberate: a user editing the budget will not see an account problem they have
+caused until they look at accounts. That is accepted in exchange for a budget view that never
+grows account concepts, and it costs nothing for the majority who run a single account.
 
 ## Open questions
 
@@ -557,10 +565,6 @@ the 31 lines come back byte-identical — plus scanning a generated code with a 
 app before shipping.
 
 ## Tasks before implementation
-- **Verify the Übertrag behaviour with a real bank.** Whether a QR bill paid to your own IBAN
-  routes as an internal transfer or an ordinary payment could not be confirmed from
-  documentation. A five-minute real-world test validates the scan-to-fund-Reserves premise
-  that much of the QR work rests on.
 - **Note the modularity deviation in CLAUDE.md** once the module ships: one account record is
   foundational, which softens "any module works without the others". The module stays opt-in;
   the record does not.
