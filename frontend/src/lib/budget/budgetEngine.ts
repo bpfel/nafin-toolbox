@@ -347,6 +347,10 @@ function bfsDefaults(): DefaultCategory[] {
     { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, groupName: 'Lifestyle', amount: '250.00' },
     { name: 'Dining Out', type: 'expense', sortOrder: 30, groupName: 'Lifestyle', amount: '250.00' },
     { name: 'Savings', type: 'expense', sortOrder: 10, groupName: 'Savings', amount: '500.00' },
+    // Pillar 3a is budgeted like any other set-aside: the money leaves the
+    // spending plan but stays yours. 588.00 is the 2026 employee cap (7'056)
+    // spread over twelve months — a starting point, not a rule.
+    { name: 'Pillar 3a', type: 'expense', sortOrder: 20, groupName: 'Savings', amount: '588.00' },
   ]
 }
 

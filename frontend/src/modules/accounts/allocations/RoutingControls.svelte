@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { VaultAccount } from '../../../lib/crypto/vault'
   import { isLegalRouting } from '../../../lib/accounts/routing'
+  import { accountLabel } from '../../../lib/accounts/labels'
 
   // Routing controls shaped so the four contradictory combinations cannot be
   // expressed. The category's own `type` selects the shape of the control:
@@ -80,7 +81,7 @@
         onchange={(e) => chooseIncomeSink(e.currentTarget.value)}
       >
         {#each accounts as account (account.id)}
-          <option value={account.id}>{account.name}</option>
+          <option value={account.id}>{accountLabel(account)}</option>
         {/each}
       </select>
     </label>
@@ -93,7 +94,7 @@
         onchange={(e) => chooseSource(e.currentTarget.value)}
       >
         {#each accounts as account (account.id)}
-          <option value={account.id}>{account.name}</option>
+          <option value={account.id}>{accountLabel(account)}</option>
         {/each}
       </select>
     </label>
@@ -126,7 +127,7 @@
             onchange={(e) => chooseSetAsideAccount(e.currentTarget.value)}
           >
             {#each accounts as account (account.id)}
-              <option value={account.id}>{account.name}</option>
+              <option value={account.id}>{accountLabel(account)}</option>
             {/each}
           </select>
         {/if}
