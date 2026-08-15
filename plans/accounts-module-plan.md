@@ -218,22 +218,48 @@ API. Either way the creditor is one of your own accounts, so the data model is u
 
 ### Generate client-side
 
-The snapshot records both a Go backend route (`POST /api/qrbill/generate`) and a frontend
-dependency (`swissqrbill`). Given E2EE, the frontend library is the right choice — sending
-IBAN and holder address to the server to render a QR code would leak exactly the data the
-vault exists to protect. The server should not be in this path.
+Given E2EE, generation happens in the browser. Sending IBAN and holder address to the server
+to render a QR code would leak exactly the data the vault exists to protect, so the Go route
+recorded in the snapshot (`POST /api/qrbill/generate`) is not used.
 
 Feasibility: generation is computationally trivial. The payload is ~31 lines of text and the
 encode produces a grid of a few thousand modules; this is a button-press operation, not a
 workload. Client CPU is a non-issue at any realistic volume.
 
-The real cost is **bundle size**. The frontend currently has exactly one runtime dependency
-(`sortablejs`), so `swissqrbill` would likely become the largest thing in it. Mitigation:
-load it with a dynamic `import()` when the QR dialogue opens, so users who never generate a
-bill never download it.
+### Port the preserved code; do not take `swissqrbill`
 
-To verify before committing: that `swissqrbill` v4 supports browser SVG output rather than
-being Node/PDF-oriented, and its actual bundle weight.
+The snapshot already contains a working implementation, and it establishes the right split:
+`svg.go` calls a **generic** QR library (`skip2/go-qrcode`) and hand-writes the SVG in ~30
+lines. Nothing Swiss-specific lives in the encoding step — it is all in `payload.go` and
+`validate.go`.
+
+So the plan is to port that code to TypeScript rather than depend on, or partially fork,
+`swissqrbill`:
+
+| Source file | Lines | Port? |
+|---|---|---|
+| `model.go` | 38 | Yes — becomes TS types |
+| `validate.go` | 160 | Yes — Swiss Payment Standards field rules |
+| `payload.go` | 92 | Yes — the 31-line SPC payload |
+| `svg.go` | 47 | Yes — swap the Go QR lib for a JS one |
+| `handler.go` | 49 | No — server not in the path |
+
+Plus one small generic QR encoder as the only new runtime dependency. This avoids the
+licensing and divergence questions a vendored fork carries, ships no unused code, and keeps
+the frontend near its current single-dependency weight.
+
+**Do not hand-roll the QR encoder.** Reed-Solomon, masking and version selection are fiddly,
+and a subtly wrong encoder yields a code that scans but carries the wrong IBAN or amount.
+Own the Swiss layer, where the logic is verifiable string assembly; delegate the maths.
+
+### Gaps in the preserved code
+
+- **Swiss cross missing.** The spec requires a 7×7 mm cross centred on the code; `svg.go`
+  does not draw one. Small, static overlay.
+- **Bare QR only.** There is no A6 payment slip (receipt part, payment part, cut lines,
+  field labels, millimetre positioning). Sufficient for scan-to-pay on screen; a printable
+  slip for sending to someone else is a much larger job, and is most of what `swissqrbill`'s
+  weight consists of. Scope decision still open.
 
 ## Screens
 
@@ -259,8 +285,10 @@ project's progressive-disclosure principle, without a second data model.
    agreed mitigation; confirm-per-month remains the alternative if it proves insufficient.
 2. **Does `kind` drive behaviour?** The field exists; nothing branches on it yet. Candidates:
    restricting which kinds can be reserve sinks, or hiding QR fields for `cash`.
-3. **Browser support in `swissqrbill`.** Client-side SVG output needs verifying before the
-   dependency is committed to.
+3. **Bare QR or full A6 slip?** Scan-to-pay on screen needs only the code. A printable
+   payment slip is a much larger job. Decides the size of the QR work.
+4. **Which generic QR encoder.** Needs to be well-tested and small; it is the only new
+   runtime dependency the port introduces.
 
 ## Deliberately out of scope
 
