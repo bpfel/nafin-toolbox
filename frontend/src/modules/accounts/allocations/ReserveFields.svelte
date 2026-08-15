@@ -84,12 +84,41 @@
     update({ anchorMonth: raw })
   }
 
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ]
+
+  // For an obligation the anchor picks a residue class: the series is every
+  // `periodMonths` from it, extending in both directions. So shifting the anchor
+  // by a whole year changes nothing whenever the period divides 12 — which every
+  // real billing cycle does (monthly, quarterly, half-yearly, yearly). In that
+  // case the year is noise and we ask only for the month.
+  //
+  // It is NOT noise otherwise. An amortization's anchor is a real point in time
+  // (the month the item was bought), and an obligation on an odd period such as
+  // 5 months has a series that genuinely depends on the year. Both keep the full
+  // month-and-year input.
+  let monthOnly = $derived(
+    selectedKind === 'obligation' && reserve != null && 12 % reserve.periodMonths === 0,
+  )
+
+  let anchorMonthNumber = $derived(reserve ? reserve.anchorMonth.slice(5, 7) : '01')
+
+  function changeAnchorMonthOnly(mm: string) {
+    // Any year works, given the period divides 12; the displayed month is what
+    // carries the meaning.
+    update({ anchorMonth: `${currentMonth.slice(0, 4)}-${mm}` })
+  }
+
   let anchorLabel = $derived(
-    selectedKind === 'obligation' ? 'A month it is due' : 'Cycle started',
+    selectedKind === 'obligation' ? 'Next month it is due' : 'Cycle started',
   )
   let anchorHint = $derived(
     selectedKind === 'obligation'
-      ? 'Any month the bill falls due. The rest of the series follows from the period.'
+      ? monthOnly
+        ? 'The month the bill falls due. The rest of the series follows from the period.'
+        : 'Any month the bill falls due. With this period the year matters, so give both.'
       : 'The month the current item was bought. Nothing is required yet in that month.',
   )
 </script>
@@ -129,11 +158,22 @@
 
       <label class="control">
         <span class="control-label">{anchorLabel}</span>
-        <input
-          type="month"
-          value={reserve.anchorMonth}
-          onchange={(e) => changeAnchor(e.currentTarget.value)}
-        />
+        {#if monthOnly}
+          <select
+            value={anchorMonthNumber}
+            onchange={(e) => changeAnchorMonthOnly(e.currentTarget.value)}
+          >
+            {#each MONTH_NAMES as name, i}
+              <option value={String(i + 1).padStart(2, '0')}>{name}</option>
+            {/each}
+          </select>
+        {:else}
+          <input
+            type="month"
+            value={reserve.anchorMonth}
+            onchange={(e) => changeAnchor(e.currentTarget.value)}
+          />
+        {/if}
       </label>
     </div>
 
