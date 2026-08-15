@@ -422,9 +422,18 @@ always something to default to:
 | income | `source = null`, `sink = primary account` | Income |
 | expense | `source = primary account`, `sink = null` | Spending |
 
+These are **defaults, not the available shapes**. An expense may equally be
+`primary → other account` or `primary → primary`; both are legal and both are reached by
+editing the routing on the allocation screen. Spending is merely the most common case and so
+the safest thing to assume when nothing has been said.
+
 Both defaults are legal combinations, so no category is ever born unrouted or contradictory.
 A user who never opens the allocation screen has a fully consistent model they never had to
 think about.
+
+The default also assumes the *primary* account is the source, which is wrong for a
+multi-account user who pays rent from a secondary account. That is not worth guessing at
+creation time — it is exactly what the allocation screen is for.
 
 ### Changing routing on the allocation screen
 
