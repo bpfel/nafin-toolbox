@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ReserveDefinition, VaultAccount, VaultCategory } from '../../../lib/crypto/vault'
   import { flowKindOf } from '../../../lib/accounts/routing'
+  import { accountShortLabel } from '../../../lib/accounts/labels'
   import {
     addMonths,
     fromCents,
@@ -70,9 +71,13 @@
     }
   }
 
+  // Named with the bank where one is recorded: two accounts can easily share a
+  // name ("Savings" at two banks), and the flow line is where that ambiguity
+  // would actually mislead.
   function accountName(id: string | null): string {
     if (id === null) return 'outside your accounts'
-    return accounts.find(a => a.id === id)?.name ?? 'a deleted account'
+    const account = accounts.find(a => a.id === id)
+    return account ? accountShortLabel(account) : 'a deleted account'
   }
 
   // A category with no endpoints at all is a broken record rather than a flow.
