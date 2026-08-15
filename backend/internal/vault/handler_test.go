@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"golang.org/x/crypto/bcrypt"
@@ -26,6 +27,9 @@ type mockStore struct {
 	setMEKErr          error
 	updateMEKErr       error
 	getRecoveryDataErr error
+
+	// Captured so tests can assert the precondition reached the store.
+	lastExpectedUpdatedAt *time.Time
 }
 
 func (m *mockStore) GetVault(ctx context.Context, userID int) (*Vault, error) {
@@ -35,17 +39,26 @@ func (m *mockStore) GetVault(ctx context.Context, userID int) (*Vault, error) {
 	return m.vault, nil
 }
 
-func (m *mockStore) PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int) error {
+func (m *mockStore) PutVault(
+	ctx context.Context,
+	userID int,
+	ciphertext, nonce []byte,
+	version int,
+	expectedUpdatedAt *time.Time,
+) (time.Time, error) {
+	m.lastExpectedUpdatedAt = expectedUpdatedAt
 	if m.putVaultErr != nil {
-		return m.putVaultErr
+		return time.Time{}, m.putVaultErr
 	}
+	updatedAt := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 	m.vault = &Vault{
 		UserID:     userID,
 		Ciphertext: ciphertext,
 		Nonce:      nonce,
 		Version:    version,
+		UpdatedAt:  updatedAt,
 	}
-	return nil
+	return updatedAt, nil
 }
 
 func (m *mockStore) GetEncryptedMEK(ctx context.Context, userID int) (string, int, error) {
@@ -870,7 +883,7 @@ func TestHandleRecovery_NoRecoveryKeyConfigured(t *testing.T) {
 func TestHandleRecovery_EmptyRecoveryHash(t *testing.T) {
 	// Test when query succeeds but hash is empty
 	store := &mockStore{
-		recoveryKeyHash: "",
+		recoveryKeyHash:   "",
 		encryptedMEKRecov: "some-data",
 	}
 	handler := handleRecovery(store)
@@ -1104,5 +1117,90 @@ func TestHandlePutVault_LargeVersion(t *testing.T) {
 
 	if store.vault.Version != largeVersion {
 		t.Errorf("version = %d, want %d", store.vault.Version, largeVersion)
+	}
+}
+
+// --- Optimistic locking ---
+//
+// The vault is one opaque blob, so a stale client's write does not merge badly —
+// it replaces the newer vault entirely. These cover the handler half of refusing
+// that; the conditional SQL itself is exercised by the integration tests.
+
+func TestHandlePutVault_PassesPreconditionToStore(t *testing.T) {
+	store := &mockStore{}
+	handler := handlePutVault(store)
+
+	body := `{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3,"expected_updated_at":"2026-08-16T10:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/vault", strings.NewReader(body)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if store.lastExpectedUpdatedAt == nil {
+		t.Fatal("precondition was not passed to the store")
+	}
+	want := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
+	if !store.lastExpectedUpdatedAt.Equal(want) {
+		t.Errorf("precondition = %v, want %v", *store.lastExpectedUpdatedAt, want)
+	}
+}
+
+func TestHandlePutVault_OmittedPreconditionIsNil(t *testing.T) {
+	// First save after key setup, and recovery, have nothing to conflict with.
+	store := &mockStore{}
+	handler := handlePutVault(store)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/vault",
+		strings.NewReader(`{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3}`)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if store.lastExpectedUpdatedAt != nil {
+		t.Errorf("precondition = %v, want nil", *store.lastExpectedUpdatedAt)
+	}
+}
+
+func TestHandlePutVault_ConflictReturns409(t *testing.T) {
+	store := &mockStore{putVaultErr: ErrVaultConflict}
+	handler := handlePutVault(store)
+
+	body := `{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3,"expected_updated_at":"2026-08-16T10:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/vault", strings.NewReader(body)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	// 409, not 500: the client can recover by reloading, and the distinction is
+	// what lets the UI say something useful instead of "failed to save".
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusConflict)
+	}
+}
+
+func TestHandlePutVault_ReturnsNewUpdatedAt(t *testing.T) {
+	// The response carries the token for the client's next write; without it the
+	// client could only save once before going stale against itself.
+	store := &mockStore{}
+	handler := handlePutVault(store)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/vault",
+		strings.NewReader(`{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3}`)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	var got PutVaultResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.UpdatedAt.IsZero() {
+		t.Error("response did not carry updated_at")
 	}
 }

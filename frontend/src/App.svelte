@@ -13,6 +13,8 @@
   import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
   import { isExpanded, toggleExpanded } from './lib/util/collapse.svelte'
   import { focusTrap } from './lib/util/focusTrap'
+  import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
+  import UpdateBanner from './lib/util/UpdateBanner.svelte'
 
   const authState = getAuthState()
   const vaultState = getVaultState()
@@ -123,6 +125,9 @@
   $effect(() => {
     checkAuth()
   })
+
+  // Watch for deploys that leave this tab running chunks the server no longer has.
+  $effect(() => startBuildVersionWatch())
 
   $effect(() => {
     if (authState.currentUser) {
@@ -492,6 +497,9 @@
     {/if}
   </main>
 {/if}
+
+<!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
+<UpdateBanner />
 
 <style>
   .loading {

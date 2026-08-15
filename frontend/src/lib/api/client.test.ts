@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
+  VaultConflictError,
   fetchModules,
   enableModule,
   disableModule,
@@ -527,6 +528,7 @@ describe('fetchVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -570,6 +572,7 @@ describe('fetchVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 0,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -588,6 +591,7 @@ describe('fetchVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 999,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -606,6 +610,7 @@ describe('fetchVault', () => {
       ciphertext: '',
       nonce: '',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -630,6 +635,7 @@ describe('putVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -653,6 +659,7 @@ describe('putVault', () => {
       ciphertext: '',
       nonce: '',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -676,6 +683,7 @@ describe('putVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -899,5 +907,79 @@ describe('error handling edge cases', () => {
     mockFetch.mockRejectedValueOnce(new Error('Request timeout'))
 
     await expect(fetchModules()).rejects.toThrow('Request timeout')
+  })
+})
+
+describe('putVault — optimistic locking', () => {
+  beforeEach(() => {
+    mockFetch.mockClear()
+  })
+
+  test('sends the precondition and returns the new token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', updated_at: '2026-08-16T11:00:00Z' }),
+    })
+
+    const result = await putVault({
+      ciphertext: 'c',
+      nonce: 'n',
+      version: 3,
+      expected_updated_at: '2026-08-16T10:00:00Z',
+    })
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(body.expected_updated_at).toBe('2026-08-16T10:00:00Z')
+    // The response token becomes the precondition for the next write; without it
+    // a client could only ever save once before going stale against itself.
+    expect(result.updated_at).toBe('2026-08-16T11:00:00Z')
+  })
+
+  test('omits the precondition when there is no server copy yet', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', updated_at: '2026-08-16T11:00:00Z' }),
+    })
+
+    await putVault({ ciphertext: 'c', nonce: 'n', version: 3 })
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect('expected_updated_at' in body).toBe(false)
+  })
+
+  test('a 409 throws VaultConflictError, not a generic Error', async () => {
+    // The distinction is the point: the caller can only tell the user to reload
+    // if it can tell a conflict apart from a network or server failure.
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: 'vault was modified elsewhere — reload before saving again' }),
+    })
+
+    await expect(
+      putVault({ ciphertext: 'c', nonce: 'n', version: 3, expected_updated_at: 'x' }),
+    ).rejects.toBeInstanceOf(VaultConflictError)
+  })
+
+  test('a 409 with an unreadable body still yields a usable message', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => { throw new Error('not json') },
+    })
+
+    await expect(
+      putVault({ ciphertext: 'c', nonce: 'n', version: 3, expected_updated_at: 'x' }),
+    ).rejects.toThrow(/changed elsewhere/i)
+  })
+
+  test('other failures stay generic errors', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' })
+
+    await expect(
+      putVault({ ciphertext: 'c', nonce: 'n', version: 3 }),
+    ).rejects.not.toBeInstanceOf(VaultConflictError)
   })
 })

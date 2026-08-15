@@ -65,6 +65,25 @@ export interface VaultPayloadResponse {
   ciphertext: string
   nonce: string
   version: number
+  /** Concurrency token: echoed back on the next save so a stale write is refused. */
+  updated_at: string
+}
+
+export interface PutVaultResponse {
+  status: string
+  updated_at: string
+}
+
+/**
+ * Thrown when the server refuses a save because the stored vault has moved on.
+ * Distinct from a generic failure: the user can recover by reloading, and only a
+ * distinct type lets the UI say so.
+ */
+export class VaultConflictError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VaultConflictError'
+  }
 }
 
 export async function fetchVaultKeys(): Promise<VaultKeysResponse | null> {
@@ -105,11 +124,35 @@ export async function putVault(body: {
   ciphertext: string
   nonce: string
   version: number
-}): Promise<void> {
-  await request('/vault', {
+  /**
+   * The updated_at last seen. Omit only when there is nothing to conflict with —
+   * the first save after key setup, and recovery. Sending it makes the write
+   * conditional, so a tab left open across a deploy cannot overwrite a newer
+   * vault with its stale copy.
+   */
+  expected_updated_at?: string
+}): Promise<PutVaultResponse> {
+  const res = await fetch(`${API_BASE}/vault`, {
     method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(body),
   })
+
+  if (res.status === 409) {
+    let message = 'This vault was changed elsewhere. Reload before saving again.'
+    try {
+      const parsed = await res.json()
+      if (parsed.error) message = parsed.error
+    } catch { /* keep the default */ }
+    throw new VaultConflictError(message)
+  }
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status} ${res.statusText}`)
+  }
+
+  return res.json()
 }
 
 export async function recoverVaultKeys(recoveryKey: string): Promise<{ encrypted_mek_recovery: string } | null> {

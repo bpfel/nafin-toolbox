@@ -1,6 +1,6 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
 import { encryptVault, decryptVault, createEmptyVault, type VaultData } from './vault'
-import { fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys } from '../api/client'
+import { fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError } from '../api/client'
 
 let vault = $state<VaultData | null>(null)
 let mek = $state<CryptoKey | null>(null)
@@ -8,6 +8,16 @@ let dirty = $state(false)
 let saving = $state(false)
 let lastSaved = $state<Date | null>(null)
 let unlocked = $state(false)
+
+// The updated_at last seen from the server. Sent back on save so a stale write
+// is refused rather than silently replacing a newer vault. Null means "nothing
+// on the server yet", which is the only case that may write unconditionally.
+let lastUpdatedAt = $state<string | null>(null)
+
+// Set when the server refuses a save because the vault moved on. Sticky: the
+// in-memory vault is now known to be stale, and every further save would fail
+// the same way, so the UI must tell the user to reload rather than retry.
+let conflicted = $state(false)
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -37,6 +47,8 @@ export function getVaultState() {
     set vault(v: VaultData | null) { vault = v },
     get mek() { return mek },
     get dirty() { return dirty },
+    /** True once the server refused a save because the vault changed elsewhere. */
+    get conflicted() { return conflicted },
     get saving() { return saving },
     get lastSaved() { return lastSaved },
     get unlocked() { return unlocked },
@@ -55,8 +67,10 @@ export async function tryRestoreVault(): Promise<boolean> {
     const vaultData = await fetchVault()
     if (vaultData) {
       vault = await decryptVault(vaultData.ciphertext, vaultData.nonce, cachedMEK)
+      lastUpdatedAt = vaultData.updated_at
     } else {
       vault = createEmptyVault()
+      lastUpdatedAt = null
     }
     mek = cachedMEK
     unlocked = true
@@ -83,6 +97,7 @@ export async function initializeVault(password: string, email: string): Promise<
     const vaultData = await fetchVault()
     if (vaultData) {
       vault = await decryptVault(vaultData.ciphertext, vaultData.nonce, mek)
+      lastUpdatedAt = vaultData.updated_at
     } else {
       vault = createEmptyVault()
       await saveVault()
@@ -134,12 +149,32 @@ export async function setupKeys(password: string, email: string): Promise<string
  */
 export async function saveVault(): Promise<void> {
   if (!vault || !mek) return
+  // Once the server has told us we are stale, retrying can only fail again — and
+  // the auto-save runs every couple of seconds, so retrying would hammer it.
+  if (conflicted) return
+
   saving = true
   try {
     const { ciphertext, nonce } = await encryptVault(vault, mek)
-    await putVault({ ciphertext, nonce, version: vault.version })
+    const result = await putVault({
+      ciphertext,
+      nonce,
+      version: vault.version,
+      // Omitted when there is no server copy yet: the first save has nothing to
+      // conflict with, and sending a token we never received would be a lie.
+      ...(lastUpdatedAt === null ? {} : { expected_updated_at: lastUpdatedAt }),
+    })
+    lastUpdatedAt = result.updated_at
     dirty = false
     lastSaved = new Date()
+  } catch (e) {
+    if (e instanceof VaultConflictError) {
+      // Leave `dirty` set: the edits are still unsaved, and the user needs to
+      // know they will be lost on reload rather than believing they persisted.
+      conflicted = true
+      return
+    }
+    throw e
   } finally {
     saving = false
   }
@@ -174,6 +209,8 @@ export function clearVault(): void {
   saving = false
   lastSaved = null
   unlocked = false
+  lastUpdatedAt = null
+  conflicted = false
   clearCachedMEK()
 }
 
