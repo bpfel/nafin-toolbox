@@ -11,7 +11,8 @@ frontend/dist/
 .idea/
 
 # Claude Code — local config, shared across worktrees via symlink (see CLAUDE.md)
-.claude/
+# No trailing slash: matches the real directory in the main repo AND the symlink in worktrees.
+.claude
 
 # OS
 .DS_Store
