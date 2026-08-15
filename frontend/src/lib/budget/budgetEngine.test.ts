@@ -20,6 +20,7 @@ import {
   type PeriodEntryView,
 } from './budgetEngine'
 import { createEmptyVault, type VaultData, type VaultCategoryGroup, type VaultCategory } from '../crypto/vault'
+import { isLegalCategoryRouting, isLegalRouting, flowKindOf, primaryAccountId } from '../accounts/routing'
 
 describe('listGroups', () => {
   test('returns empty array for empty vault', () => {
@@ -253,8 +254,8 @@ describe('listCategories', () => {
   test('excludes archived categories by default', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false },
-      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', fixed: false },
+      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
     ]
 
     const categories = listCategories(vault)
@@ -266,8 +267,8 @@ describe('listCategories', () => {
   test('includes archived categories when requested', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false },
-      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', fixed: false },
+      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
     ]
 
     const categories = listCategories(vault, true)
@@ -278,9 +279,9 @@ describe('listCategories', () => {
   test('returns categories sorted by sortOrder', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '3', name: 'Third', type: 'expense', sortOrder: 30, archived: false, groupId: 'g1', fixed: false },
-      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false },
-      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', fixed: false },
+      { id: '3', name: 'Third', type: 'expense', sortOrder: 30, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
+      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
     ]
 
     const categories = listCategories(vault)
@@ -293,8 +294,8 @@ describe('listCategories', () => {
   test('does not mutate original array', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', fixed: false },
-      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false },
+      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
+      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
     ]
 
     const originalOrder = [...vault.budget.categories]
@@ -404,6 +405,63 @@ describe('createCategory', () => {
 
     expect(category.name).toBe('給料 💰')
     expect(vault.budget.categoryGroups[0].name).toBe('雇用')
+  })
+})
+
+describe('updateCategory — routing stays legal across a type change', () => {
+  test('flipping income to expense re-derives routing instead of leaving a contradiction', () => {
+    const vault = createEmptyVault()
+    const primary = vault.accounts[0].id
+    const category = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Work' })
+    expect(category.sourceAccountId).toBe(null)
+    expect(category.sinkAccountId).toBe(primary)
+
+    const updated = updateCategory(vault, category.id, { type: 'expense' })
+
+    // Keeping (null, primary) would be an illegal expense row.
+    expect(updated?.sourceAccountId).toBe(primary)
+    expect(updated?.sinkAccountId).toBe(null)
+    expect(isLegalRouting('expense', updated!.sourceAccountId, updated!.sinkAccountId)).toBe(true)
+  })
+
+  test('flipping expense to income re-derives routing', () => {
+    const vault = createEmptyVault()
+    const primary = vault.accounts[0].id
+    const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+
+    const updated = updateCategory(vault, category.id, { type: 'income' })
+
+    expect(updated?.sourceAccountId).toBe(null)
+    expect(updated?.sinkAccountId).toBe(primary)
+    expect(isLegalRouting('income', updated!.sourceAccountId, updated!.sinkAccountId)).toBe(true)
+  })
+
+  test('a reserve cannot survive a move to income', () => {
+    const vault = createEmptyVault()
+    const primary = vault.accounts[0].id
+    const category = createCategory(vault, { name: 'Taxes', type: 'expense', groupName: 'Tax' })
+    category.sinkAccountId = primary
+    category.reserve = {
+      kind: 'obligation',
+      targetAmount: '10000.00',
+      periodMonths: 12,
+      anchorMonth: '2026-09',
+    }
+
+    const updated = updateCategory(vault, category.id, { type: 'income' })
+
+    expect(updated?.reserve).toBeUndefined()
+  })
+
+  test('routing is untouched when the type is set to its current value', () => {
+    const vault = createEmptyVault()
+    const category = createCategory(vault, { name: 'Groceries', type: 'expense', groupName: 'Living' })
+    category.sinkAccountId = vault.accounts[0].id // hand-routed as a set-aside
+
+    updateCategory(vault, category.id, { type: 'expense', name: 'Food' })
+
+    expect(category.sinkAccountId).toBe(vault.accounts[0].id)
+    expect(category.name).toBe('Food')
   })
 })
 
@@ -966,7 +1024,7 @@ describe('getPeriodSummary', () => {
   test('handles category with missing group', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: 'cat1', name: 'Test', type: 'income', sortOrder: 10, archived: false, groupId: 'missing-group', fixed: false },
+      { id: 'cat1', name: 'Test', type: 'income', sortOrder: 10, archived: false, groupId: 'missing-group', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
     ]
 
     createPeriod(vault, 2024, 3)
@@ -1261,5 +1319,93 @@ describe('seedDefaults', () => {
 
     expect(vault.budget.categories).toHaveLength(categoriesCount)
     expect(vault.budget.categoryGroups).toHaveLength(groupsCount)
+  })
+
+  test('routes every seeded category to the primary account', () => {
+    const vault = createEmptyVault()
+    const primary = primaryAccountId(vault)
+
+    seedDefaults(vault)
+
+    expect(vault.budget.categories.length).toBeGreaterThan(0)
+    for (const cat of vault.budget.categories) {
+      if (cat.type === 'income') {
+        expect(cat.sourceAccountId).toBeNull()
+        expect(cat.sinkAccountId).toBe(primary)
+      } else {
+        expect(cat.sourceAccountId).toBe(primary)
+        expect(cat.sinkAccountId).toBeNull()
+      }
+    }
+  })
+
+  test('every seeded category is legally routed', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+
+    for (const cat of vault.budget.categories) {
+      expect(isLegalCategoryRouting(cat)).toBe(true)
+    }
+  })
+})
+
+describe('createCategory routing defaults', () => {
+  test('a new income category gets source null, sink primary account', () => {
+    const vault = createEmptyVault()
+    const primary = primaryAccountId(vault)
+
+    const category = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+
+    expect(category.sourceAccountId).toBeNull()
+    expect(category.sinkAccountId).toBe(primary)
+  })
+
+  test('a new expense category gets source primary account, sink null', () => {
+    const vault = createEmptyVault()
+    const primary = primaryAccountId(vault)
+
+    const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+
+    expect(category.sourceAccountId).toBe(primary)
+    expect(category.sinkAccountId).toBeNull()
+  })
+
+  test('created categories are legally routed and never carry a reserve', () => {
+    const vault = createEmptyVault()
+
+    const income = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const expense = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+
+    expect(isLegalCategoryRouting(income)).toBe(true)
+    expect(isLegalCategoryRouting(expense)).toBe(true)
+    expect(income.reserve).toBeUndefined()
+    expect(expense.reserve).toBeUndefined()
+  })
+
+  test('defaults classify as income and spending', () => {
+    const vault = createEmptyVault()
+
+    const income = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const expense = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+
+    expect(flowKindOf(income)).toBe('income')
+    expect(flowKindOf(expense)).toBe('spending')
+  })
+
+  test('routes to the first account when the vault has several', () => {
+    const vault = createEmptyVault()
+    vault.accounts.push({
+      id: 'second-account',
+      name: 'Reserves',
+      kind: 'reserves',
+      currency: 'CHF',
+      currentAmount: '0.00',
+      lastCorrectedAt: '2026-01-01',
+    })
+
+    const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+
+    expect(category.sourceAccountId).toBe(vault.accounts[0].id)
   })
 })
