@@ -114,6 +114,7 @@ Active worktrees:
 | Worktree path | Branch | Purpose |
 |---|---|---|
 | `/home/bpfel/nafin-toolbox/` | `develop` (main repo) | Base code, shared infrastructure |
+| `/home/bpfel/nafin-toolbox-onboarding/` | `feature/onboarding` | Onboarding feature work |
 
 Additional worktrees are created as needed for parallel feature development — update this table when adding or removing them.
 
@@ -130,8 +131,16 @@ When creating git worktrees for parallel feature development:
    ```bash
    ln -s /home/bpfel/nafin-toolbox/.claude <new-worktree-path>/.claude
    ```
+   The link target is the main repo's real `.claude/` directory. **Never run this with
+   `<new-worktree-path>` set to the main repo itself** — that makes `.claude` a symlink to
+   itself and every settings read fails with `ELOOP`.
 3. This ensures consistent agent memory, settings, and permissions across all feature branches
 4. Update the worktree table above when adding or removing worktrees
+
+**`.claude/` is gitignored and must stay that way.** It is local, machine-specific config
+shared between worktrees by symlink. It was previously committed as a symlink holding an
+absolute path, which broke settings on every branch and every clone. If `git status` ever
+shows `.claude` as a tracked or staged file, that is a regression — untrack it.
 
 ## Open Questions
 - Which financial data API for stock/ETF prices?
