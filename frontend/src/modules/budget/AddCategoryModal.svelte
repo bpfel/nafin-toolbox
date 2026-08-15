@@ -7,13 +7,13 @@
   interface Props {
     type: 'income' | 'expense'
     groups: { name: string; id: string }[]
-    editCategory?: { id: string; name: string; groupName: string; plannedAmount?: string; actualAmount?: string } | null
+    editCategory?: { id: string; name: string; groupName: string; plannedAmount?: string } | null
     /** Preselects the group when adding — set by the "+" on a group header. */
     presetGroupName?: string
     vault: VaultData
     oncreated: () => void
     onclose: () => void
-    onsave?: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
+    onsave?: (categoryId: string, amount: string) => void
   }
 
   let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave }: Props = $props()
@@ -31,8 +31,7 @@
 
   let plannedMoValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')
   let plannedYrValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')
-  let actualMoValue = $state(editCategory?.actualAmount ? fmt(Number(editCategory.actualAmount)) : '')
-  let valueFocusedField = $state<'planned_mo' | 'planned_yr' | 'actual_mo' | null>(null)
+  let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
 
   function fmt(val: number): string {
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -43,31 +42,28 @@
     return Number(cleaned)
   }
 
-  function handleValueFocus(field: 'planned_mo' | 'planned_yr' | 'actual_mo', event: FocusEvent) {
+  function handleValueFocus(field: 'planned_mo' | 'planned_yr', event: FocusEvent) {
     valueFocusedField = field
     const input = event.target as HTMLInputElement
     requestAnimationFrame(() => input.select())
   }
 
-  function handleValueBlur(field: 'planned_mo' | 'planned_yr' | 'actual_mo') {
+  function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
     valueFocusedField = null
     if (!editCategory || !onsave) return
-    const raw = field === 'planned_mo' ? plannedMoValue : field === 'planned_yr' ? plannedYrValue : actualMoValue
+    const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
     const val = parseInput(raw)
     if (isNaN(val) || !isFinite(val)) return
 
     if (field === 'planned_mo') {
       plannedMoValue = fmt(val)
       plannedYrValue = fmt(val * 12)
-      onsave(editCategory.id, 'planned', val.toFixed(2))
-    } else if (field === 'planned_yr') {
+      onsave(editCategory.id, val.toFixed(2))
+    } else {
       const monthly = val / 12
       plannedYrValue = fmt(val)
       plannedMoValue = fmt(monthly)
-      onsave(editCategory.id, 'planned', monthly.toFixed(4))
-    } else {
-      actualMoValue = fmt(val)
-      onsave(editCategory.id, 'actual', val.toFixed(2))
+      onsave(editCategory.id, monthly.toFixed(4))
     }
   }
 
@@ -191,17 +187,6 @@
               oninput={() => handleValueInput('planned_yr')}
             />
           </label>
-          <label class="value-field">
-            <span class="value-label">Actual/mo</span>
-            <input
-              type="text"
-              inputmode="decimal"
-              class="value-input"
-              bind:value={actualMoValue}
-              onfocus={(e) => handleValueFocus('actual_mo', e)}
-              onblur={() => handleValueBlur('actual_mo')}
-            />
-          </label>
         </div>
       </div>
     {/if}
@@ -295,20 +280,6 @@
     border-color: #2d6a4f;
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }
-  .checkbox-field {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .checkbox-field input[type="checkbox"] {
-    width: 1.1rem;
-    height: 1.1rem;
-    accent-color: #2d6a4f;
-  }
-  .hint {
-    font-size: 0.8rem;
-    color: #888;
-  }
   .error {
     color: #c0392b;
     font-size: 0.85rem;
@@ -354,7 +325,7 @@
   }
   .values-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
     margin-top: 0.25rem;
   }

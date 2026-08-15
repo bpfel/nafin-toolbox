@@ -30,8 +30,8 @@ function account(id: string, name: string): VaultAccount {
 
 function vault(...accounts: VaultAccount[]): VaultData {
   return {
-    version: 3,
-    budget: { categoryGroups: [], categories: [], periods: [] },
+    version: 4,
+    budget: { categoryGroups: [], categories: [], plan: [], archives: [] },
     accounts,
   }
 }

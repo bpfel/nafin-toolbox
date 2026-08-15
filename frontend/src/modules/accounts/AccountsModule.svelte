@@ -10,18 +10,11 @@
 
   let view = $state<View>('accounts')
 
-  // The month is owned here so both views agree. Account figures and allocation
-  // flows for different months side by side would be actively misleading.
+  // Both views need to know what month it is — balances are projected to it and
+  // reserves cycle in it — but neither lets the user pick one. The budget is a
+  // single standing plan, so the only month there is to show is this one.
   const now = new Date()
-  let year = $state(now.getFullYear())
-  let month = $state(now.getMonth() + 1)
-
-  let currentMonth = $derived(`${year}-${String(month).padStart(2, '0')}`)
-
-  function changeMonth(y: number, m: number) {
-    year = y
-    month = m
-  }
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 </script>
 
 <div class="accounts-module">
@@ -47,7 +40,7 @@
   {#if view === 'accounts'}
     <AccountManagement {currentMonth} />
   {:else}
-    <AllocationScreen {year} {month} onmonthchange={changeMonth} />
+    <AllocationScreen {currentMonth} />
   {/if}
 </div>
 

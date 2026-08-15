@@ -15,10 +15,6 @@ function findAccount(vault: VaultData, accountId: string): VaultAccount {
   return account
 }
 
-function periodMonth(year: number, month: number): string {
-  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`
-}
-
 // --- Required ---------------------------------------------------------------
 
 // A shortfall is a property of the account, not of any one item, so individual
@@ -46,7 +42,7 @@ export function requiredForAccount(
 
 // --- Projection -------------------------------------------------------------
 
-// What one month's planned entries do to one account's balance. A category that
+// What one month of the plan does to one account's balance. A category that
 // both sources from and sinks into this account moves nothing, which falls out
 // of adding the sink side and subtracting the source side.
 function netAllocationCents(
@@ -83,10 +79,19 @@ function netAllocationCents(
   return cents
 }
 
-// The anchor plus every net allocation since it. Months are compared at month
-// granularity: `lastCorrectedAt` is a date, and the correction is taken to
-// account for the whole month it falls in, so that month is excluded and only
-// months strictly after it — up to and including `currentMonth` — are added.
+// The anchor plus one month of the plan for every month elapsed since it.
+//
+// Months are compared at month granularity: `lastCorrectedAt` is a date, and the
+// correction is taken to account for the whole month it falls in, so that month
+// contributes nothing and only months strictly after it — up to and including
+// `currentMonth` — are added. A `currentMonth` before the anchor adds nothing
+// rather than subtracting: the projection runs forward from a correction, it
+// does not reconstruct the past.
+//
+// This also fixes a quiet bug in the previous, period-based definition. It summed
+// the periods that fell in the window, so a month with no period row contributed
+// zero and any gap in the periods silently understated the projection. The plan
+// is a standing monthly flow, so every elapsed month now counts the same amount.
 //
 // Pure and idempotent by construction: it reads the vault and returns a string.
 export function projectedBalance(
@@ -98,15 +103,11 @@ export function projectedBalance(
   const anchorMonth = account.lastCorrectedAt.slice(0, 7)
 
   const categoriesById = new Map(vault.budget.categories.map(c => [c.id, c]))
+  // The plan does not vary by month, so the flow is computed once and scaled.
+  const netMonthlyFlow = netAllocationCents(categoriesById, vault.budget.plan, accountId)
+  const monthsElapsed = Math.max(0, monthsBetween(anchorMonth, currentMonth))
 
-  let cents = toCents(account.currentAmount)
-  for (const period of vault.budget.periods) {
-    const month = periodMonth(period.year, period.month)
-    if (monthsBetween(anchorMonth, month) < 1) continue
-    if (monthsBetween(month, currentMonth) < 0) continue
-    cents += netAllocationCents(categoriesById, period.entries, accountId)
-  }
-  return fromCents(cents)
+  return fromCents(toCents(account.currentAmount) + monthsElapsed * netMonthlyFlow)
 }
 
 // --- Available --------------------------------------------------------------

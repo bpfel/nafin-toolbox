@@ -8,18 +8,17 @@ import {
   updateCategory,
   deleteCategory,
   reorderCategories,
-  listPeriods,
-  getPeriod,
-  createPeriod,
-  copyPeriod,
-  getPeriodSummary,
-  upsertEntry,
-  deleteEntry,
+  plannedFor,
+  setPlanned,
+  getPlanSummary,
+  listArchives,
+  archivePlan,
+  renameArchive,
+  updateArchiveLine,
+  deleteArchive,
   seedDefaults,
-  type PeriodSummary,
-  type PeriodEntryView,
 } from './budgetEngine'
-import { createEmptyVault, type VaultData, type VaultCategoryGroup, type VaultCategory } from '../crypto/vault'
+import { createEmptyVault, type VaultData } from '../crypto/vault'
 import { isLegalCategoryRouting, isLegalRouting, flowKindOf, primaryAccountId } from '../accounts/routing'
 
 describe('listGroups', () => {
@@ -566,34 +565,27 @@ describe('deleteCategory', () => {
     expect(vault.budget.categories).toHaveLength(0)
   })
 
-  test('removes entries for deleted category from all periods', () => {
+  test('removes the deleted category’s line from the plan', () => {
     const vault = createEmptyVault()
     const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Group' })
-
-    const period1 = createPeriod(vault, 2024, 1)
-    const period2 = createPeriod(vault, 2024, 2)
-    period1.entries.push({ categoryId: category.id, plannedAmount: '100.00', actualAmount: '100.00' })
-    period2.entries.push({ categoryId: category.id, plannedAmount: '200.00', actualAmount: '200.00' })
+    setPlanned(vault, category.id, '100.00')
 
     deleteCategory(vault, category.id)
 
-    expect(period1.entries).toHaveLength(0)
-    expect(period2.entries).toHaveLength(0)
+    expect(vault.budget.plan).toHaveLength(0)
   })
 
-  test('does not affect entries for other categories', () => {
+  test('does not affect plan lines for other categories', () => {
     const vault = createEmptyVault()
     const cat1 = createCategory(vault, { name: 'Cat1', type: 'income', groupName: 'Group' })
     const cat2 = createCategory(vault, { name: 'Cat2', type: 'income', groupName: 'Group' })
-
-    const period = createPeriod(vault, 2024, 1)
-    period.entries.push({ categoryId: cat1.id, plannedAmount: '100.00', actualAmount: '100.00' })
-    period.entries.push({ categoryId: cat2.id, plannedAmount: '200.00', actualAmount: '200.00' })
+    setPlanned(vault, cat1.id, '100.00')
+    setPlanned(vault, cat2.id, '200.00')
 
     deleteCategory(vault, cat1.id)
 
-    expect(period.entries).toHaveLength(1)
-    expect(period.entries[0].categoryId).toBe(cat2.id)
+    expect(vault.budget.plan).toHaveLength(1)
+    expect(vault.budget.plan[0].categoryId).toBe(cat2.id)
   })
 
   test('handles deleting non-existent category', () => {
@@ -651,235 +643,84 @@ describe('reorderCategories', () => {
   })
 })
 
-describe('listPeriods', () => {
-  test('returns empty array for empty vault', () => {
+describe('plannedFor and setPlanned', () => {
+  test('a category with no plan line reads 0.00', () => {
     const vault = createEmptyVault()
-    const periods = listPeriods(vault)
+    const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
 
-    expect(periods).toEqual([])
+    expect(plannedFor(vault, category.id)).toBe('0.00')
+    expect(vault.budget.plan).toHaveLength(0)
   })
 
-  test('returns periods sorted by year and month', () => {
+  test('an unknown category reads 0.00 rather than throwing', () => {
     const vault = createEmptyVault()
-    vault.budget.periods = [
-      { year: 2024, month: 3, notes: '', entries: [] },
-      { year: 2023, month: 12, notes: '', entries: [] },
-      { year: 2024, month: 1, notes: '', entries: [] },
-    ]
 
-    const periods = listPeriods(vault)
-
-    expect(periods[0]).toEqual({ year: 2023, month: 12, notes: '', entries: [] })
-    expect(periods[1]).toEqual({ year: 2024, month: 1, notes: '', entries: [] })
-    expect(periods[2]).toEqual({ year: 2024, month: 3, notes: '', entries: [] })
+    expect(plannedFor(vault, 'no-such-category')).toBe('0.00')
   })
 
-  test('does not mutate original array', () => {
+  test('setPlanned creates the line', () => {
     const vault = createEmptyVault()
-    vault.budget.periods = [
-      { year: 2024, month: 2, notes: '', entries: [] },
-      { year: 2024, month: 1, notes: '', entries: [] },
-    ]
+    const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
 
-    const originalOrder = [...vault.budget.periods]
-    listPeriods(vault)
+    setPlanned(vault, category.id, '1350.00')
 
-    expect(vault.budget.periods).toEqual(originalOrder)
-  })
-})
-
-describe('getPeriod', () => {
-  test('returns existing period', () => {
-    const vault = createEmptyVault()
-    const period = createPeriod(vault, 2024, 3)
-
-    const result = getPeriod(vault, 2024, 3)
-
-    expect(result).toBe(period)
+    expect(vault.budget.plan).toEqual([{ categoryId: category.id, plannedAmount: '1350.00' }])
+    expect(plannedFor(vault, category.id)).toBe('1350.00')
   })
 
-  test('returns null for non-existent period', () => {
+  test('setPlanned updates in place instead of adding a second line', () => {
     const vault = createEmptyVault()
+    const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
 
-    const result = getPeriod(vault, 2024, 3)
+    setPlanned(vault, category.id, '1350.00')
+    setPlanned(vault, category.id, '1400.00')
 
-    expect(result).toBeNull()
+    expect(vault.budget.plan).toHaveLength(1)
+    expect(plannedFor(vault, category.id)).toBe('1400.00')
   })
 
-  test('distinguishes between different months in same year', () => {
+  test('the amount stays the exact decimal string it was given', () => {
     const vault = createEmptyVault()
-    createPeriod(vault, 2024, 1)
-    createPeriod(vault, 2024, 2)
+    const category = createCategory(vault, { name: 'Odd', type: 'expense', groupName: 'Living' })
 
-    const result = getPeriod(vault, 2024, 1)
+    // Money never becomes a number on the way through: 1234.50 must not come
+    // back as 1234.5, and a large amount must not pick up floating-point noise.
+    setPlanned(vault, category.id, '1234.50')
+    expect(plannedFor(vault, category.id)).toBe('1234.50')
 
-    expect(result?.month).toBe(1)
+    setPlanned(vault, category.id, '999999999.99')
+    expect(plannedFor(vault, category.id)).toBe('999999999.99')
+
+    setPlanned(vault, category.id, '-100.00')
+    expect(plannedFor(vault, category.id)).toBe('-100.00')
+
+    setPlanned(vault, category.id, '')
+    expect(plannedFor(vault, category.id)).toBe('')
   })
 
-  test('distinguishes between same month in different years', () => {
+  test('each category has its own line', () => {
     const vault = createEmptyVault()
-    createPeriod(vault, 2023, 12)
-    createPeriod(vault, 2024, 12)
+    const rent = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    const food = createCategory(vault, { name: 'Food', type: 'expense', groupName: 'Living' })
 
-    const result = getPeriod(vault, 2024, 12)
+    setPlanned(vault, rent.id, '1350.00')
+    setPlanned(vault, food.id, '500.00')
 
-    expect(result?.year).toBe(2024)
+    expect(plannedFor(vault, rent.id)).toBe('1350.00')
+    expect(plannedFor(vault, food.id)).toBe('500.00')
   })
 })
 
-describe('createPeriod', () => {
-  test('creates period successfully', () => {
-    const vault = createEmptyVault()
-    const period = createPeriod(vault, 2024, 3)
-
-    expect(period.year).toBe(2024)
-    expect(period.month).toBe(3)
-    expect(period.notes).toBe('')
-    expect(period.entries).toEqual([])
-    expect(vault.budget.periods).toContain(period)
-  })
-
-  test('returns existing period if already exists', () => {
-    const vault = createEmptyVault()
-    const period1 = createPeriod(vault, 2024, 3)
-    const period2 = createPeriod(vault, 2024, 3)
-
-    expect(period1).toBe(period2)
-    expect(vault.budget.periods).toHaveLength(1)
-  })
-
-  test('handles month boundaries', () => {
-    const vault = createEmptyVault()
-    const jan = createPeriod(vault, 2024, 1)
-    const dec = createPeriod(vault, 2024, 12)
-
-    expect(jan.month).toBe(1)
-    expect(dec.month).toBe(12)
-  })
-
-  test('handles year boundaries', () => {
-    const vault = createEmptyVault()
-    const period = createPeriod(vault, 2100, 1)
-
-    expect(period.year).toBe(2100)
-  })
-
-  test('handles very old years', () => {
-    const vault = createEmptyVault()
-    const period = createPeriod(vault, 1900, 1)
-
-    expect(period.year).toBe(1900)
-  })
-})
-
-describe('copyPeriod', () => {
-  test('copies entries from source to target', () => {
-    const vault = createEmptyVault()
-    const cat1 = createCategory(vault, { name: 'Cat1', type: 'income', groupName: 'Group' })
-    const cat2 = createCategory(vault, { name: 'Cat2', type: 'expense', groupName: 'Group' })
-
-    const source = createPeriod(vault, 2024, 1)
-    source.entries = [
-      { categoryId: cat1.id, plannedAmount: '100.00', actualAmount: '90.00' },
-      { categoryId: cat2.id, plannedAmount: '200.00', actualAmount: '210.00' },
-    ]
-
-    const target = copyPeriod(vault, 2024, 2, 2024, 1)
-
-    expect(target.entries).toHaveLength(2)
-    expect(target.entries[0].categoryId).toBe(cat1.id)
-    expect(target.entries[0].plannedAmount).toBe('100.00')
-    expect(target.entries[0].actualAmount).toBe('90.00')
-    expect(target.entries[1].categoryId).toBe(cat2.id)
-  })
-
-  test('does not copy if target already has entries', () => {
-    const vault = createEmptyVault()
-    const cat = createCategory(vault, { name: 'Cat', type: 'income', groupName: 'Group' })
-
-    const source = createPeriod(vault, 2024, 1)
-    source.entries = [{ categoryId: cat.id, plannedAmount: '100.00', actualAmount: '100.00' }]
-
-    const target = createPeriod(vault, 2024, 2)
-    target.entries = [{ categoryId: cat.id, plannedAmount: '999.00', actualAmount: '999.00' }]
-
-    copyPeriod(vault, 2024, 2, 2024, 1)
-
-    expect(target.entries).toHaveLength(1)
-    expect(target.entries[0].plannedAmount).toBe('999.00')
-  })
-
-  test('creates target period if it does not exist', () => {
-    const vault = createEmptyVault()
-    createPeriod(vault, 2024, 1)
-
-    const target = copyPeriod(vault, 2024, 2, 2024, 1)
-
-    expect(vault.budget.periods).toHaveLength(2)
-    expect(target.year).toBe(2024)
-    expect(target.month).toBe(2)
-  })
-
-  test('handles copying from non-existent source', () => {
+describe('getPlanSummary', () => {
+  test('returns an empty summary for an empty vault', () => {
     const vault = createEmptyVault()
 
-    const target = copyPeriod(vault, 2024, 2, 2024, 1)
+    const summary = getPlanSummary(vault)
 
-    expect(target.entries).toHaveLength(0)
-  })
-
-  test('handles copying to same period', () => {
-    const vault = createEmptyVault()
-    const cat = createCategory(vault, { name: 'Cat', type: 'income', groupName: 'Group' })
-
-    const source = createPeriod(vault, 2024, 1)
-    source.entries = [{ categoryId: cat.id, plannedAmount: '100.00', actualAmount: '100.00' }]
-
-    const target = copyPeriod(vault, 2024, 1, 2024, 1)
-
-    expect(target).toBe(source)
-    expect(vault.budget.periods).toHaveLength(1)
-  })
-
-  test('creates new entry objects (not references)', () => {
-    const vault = createEmptyVault()
-    const cat = createCategory(vault, { name: 'Cat', type: 'income', groupName: 'Group' })
-
-    const source = createPeriod(vault, 2024, 1)
-    source.entries = [{ categoryId: cat.id, plannedAmount: '100.00', actualAmount: '100.00' }]
-
-    const target = copyPeriod(vault, 2024, 2, 2024, 1)
-
-    expect(target.entries[0]).not.toBe(source.entries[0])
-  })
-})
-
-describe('getPeriodSummary', () => {
-  test('returns null for non-existent period', () => {
-    const vault = createEmptyVault()
-
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary).toBeNull()
-  })
-
-  test('returns summary for empty period', () => {
-    const vault = createEmptyVault()
-    createPeriod(vault, 2024, 3)
-
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary).not.toBeNull()
-    expect(summary!.year).toBe(2024)
-    expect(summary!.month).toBe(3)
-    expect(summary!.notes).toBe('')
-    expect(summary!.entries).toEqual([])
-    expect(summary!.totalPlannedIncome).toBe('0.00')
-    expect(summary!.totalActualIncome).toBe('0.00')
-    expect(summary!.totalPlannedExpenses).toBe('0.00')
-    expect(summary!.totalActualExpenses).toBe('0.00')
-    expect(summary!.plannedBalance).toBe('0.00')
-    expect(summary!.actualBalance).toBe('0.00')
+    expect(summary.entries).toEqual([])
+    expect(summary.totalPlannedIncome).toBe('0.00')
+    expect(summary.totalPlannedExpenses).toBe('0.00')
+    expect(summary.plannedBalance).toBe('0.00')
   })
 
   test('calculates totals correctly', () => {
@@ -888,91 +729,84 @@ describe('getPeriodSummary', () => {
     const expense1 = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
     const expense2 = createCategory(vault, { name: 'Food', type: 'expense', groupName: 'Living' })
 
-    const period = createPeriod(vault, 2024, 3)
-    period.entries = [
-      { categoryId: income.id, plannedAmount: '5000.00', actualAmount: '5100.00' },
-      { categoryId: expense1.id, plannedAmount: '1500.00', actualAmount: '1500.00' },
-      { categoryId: expense2.id, plannedAmount: '500.00', actualAmount: '550.00' },
-    ]
+    setPlanned(vault, income.id, '5000.00')
+    setPlanned(vault, expense1.id, '1500.00')
+    setPlanned(vault, expense2.id, '500.00')
 
-    const summary = getPeriodSummary(vault, 2024, 3)
+    const summary = getPlanSummary(vault)
 
-    expect(summary!.totalPlannedIncome).toBe('5000.00')
-    expect(summary!.totalActualIncome).toBe('5100.00')
-    expect(summary!.totalPlannedExpenses).toBe('2000.00')
-    expect(summary!.totalActualExpenses).toBe('2050.00')
-    expect(summary!.plannedBalance).toBe('3000.00')
-    expect(summary!.actualBalance).toBe('3050.00')
+    expect(summary.totalPlannedIncome).toBe('5000.00')
+    expect(summary.totalPlannedExpenses).toBe('2000.00')
+    expect(summary.plannedBalance).toBe('3000.00')
   })
 
-  test('shows all categories even without entries', () => {
+  test('a fully assigned plan balances to 0.00', () => {
+    const vault = createEmptyVault()
+    const income = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const expense = createCategory(vault, { name: 'Everything', type: 'expense', groupName: 'Living' })
+
+    setPlanned(vault, income.id, '6000.00')
+    setPlanned(vault, expense.id, '6000.00')
+
+    // The zero-based reading the budget is built around: nothing left unassigned.
+    expect(getPlanSummary(vault).plannedBalance).toBe('0.00')
+  })
+
+  test('shows every category, including those with no plan line', () => {
     const vault = createEmptyVault()
     createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
     createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
 
-    createPeriod(vault, 2024, 3)
+    const summary = getPlanSummary(vault)
 
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary!.entries).toHaveLength(2)
-    expect(summary!.entries[0].plannedAmount).toBe('0.00')
-    expect(summary!.entries[0].actualAmount).toBe('0.00')
+    expect(summary.entries).toHaveLength(2)
+    expect(summary.entries[0].plannedAmount).toBe('0.00')
+    expect(summary.entries[1].plannedAmount).toBe('0.00')
   })
 
   test('excludes archived categories', () => {
     const vault = createEmptyVault()
     const active = createCategory(vault, { name: 'Active', type: 'income', groupName: 'Group' })
     const archived = createCategory(vault, { name: 'Archived', type: 'income', groupName: 'Group' })
+    setPlanned(vault, archived.id, '999.00')
     updateCategory(vault, archived.id, { archived: true })
 
-    createPeriod(vault, 2024, 3)
+    const summary = getPlanSummary(vault)
 
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary!.entries).toHaveLength(1)
-    expect(summary!.entries[0].categoryId).toBe(active.id)
+    expect(summary.entries).toHaveLength(1)
+    expect(summary.entries[0].categoryId).toBe(active.id)
+    // An archived category's amount must not leak into the totals either.
+    expect(summary.totalPlannedIncome).toBe('0.00')
   })
 
-  test('includes period notes', () => {
+  test('keeps the category sort order', () => {
     const vault = createEmptyVault()
-    const period = createPeriod(vault, 2024, 3)
-    period.notes = 'Test notes'
+    const third = createCategory(vault, { name: 'Third', type: 'expense', groupName: 'G', sortOrder: 30 })
+    const first = createCategory(vault, { name: 'First', type: 'expense', groupName: 'G', sortOrder: 10 })
+    const second = createCategory(vault, { name: 'Second', type: 'expense', groupName: 'G', sortOrder: 20 })
 
-    const summary = getPeriodSummary(vault, 2024, 3)
+    const summary = getPlanSummary(vault)
 
-    expect(summary!.notes).toBe('Test notes')
+    expect(summary.entries.map(e => e.categoryId)).toEqual([first.id, second.id, third.id])
   })
 
-  test('handles negative balance', () => {
+  test('handles a negative balance', () => {
     const vault = createEmptyVault()
     const income = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
     const expense = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
 
-    const period = createPeriod(vault, 2024, 3)
-    period.entries = [
-      { categoryId: income.id, plannedAmount: '1000.00', actualAmount: '1000.00' },
-      { categoryId: expense.id, plannedAmount: '2000.00', actualAmount: '2000.00' },
-    ]
+    setPlanned(vault, income.id, '1000.00')
+    setPlanned(vault, expense.id, '2000.00')
 
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary!.plannedBalance).toBe('-1000.00')
-    expect(summary!.actualBalance).toBe('-1000.00')
+    expect(getPlanSummary(vault).plannedBalance).toBe('-1000.00')
   })
 
   test('handles decimal precision', () => {
     const vault = createEmptyVault()
     const income = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    setPlanned(vault, income.id, '1234.56')
 
-    const period = createPeriod(vault, 2024, 3)
-    period.entries = [
-      { categoryId: income.id, plannedAmount: '1234.56', actualAmount: '1234.78' },
-    ]
-
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary!.totalPlannedIncome).toBe('1234.56')
-    expect(summary!.totalActualIncome).toBe('1234.78')
+    expect(getPlanSummary(vault).totalPlannedIncome).toBe('1234.56')
   })
 
   test('includes category metadata in entries', () => {
@@ -984,176 +818,282 @@ describe('getPeriodSummary', () => {
       groupName: 'Employment',
     })
 
-    createPeriod(vault, 2024, 3)
+    const summary = getPlanSummary(vault)
 
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary!.entries[0].categoryId).toBe(category.id)
-    expect(summary!.entries[0].categoryName).toBe('Salary')
-    expect(summary!.entries[0].categoryType).toBe('income')
-    expect(summary!.entries[0].categoryGroupId).toBe(group.id)
-    expect(summary!.entries[0].categoryGroupName).toBe('Employment')
+    expect(summary.entries[0].categoryId).toBe(category.id)
+    expect(summary.entries[0].categoryName).toBe('Salary')
+    expect(summary.entries[0].categoryType).toBe('income')
+    expect(summary.entries[0].categoryGroupId).toBe(group.id)
+    expect(summary.entries[0].categoryGroupName).toBe('Employment')
   })
 
-  test('handles category with missing group', () => {
+  test('handles a category with a missing group', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
       { id: 'cat1', name: 'Test', type: 'income', sortOrder: 10, archived: false, groupId: 'missing-group', sourceAccountId: null, sinkAccountId: 'acc1' },
     ]
 
-    createPeriod(vault, 2024, 3)
-
-    const summary = getPeriodSummary(vault, 2024, 3)
-
-    expect(summary!.entries[0].categoryGroupName).toBe('')
+    expect(getPlanSummary(vault).entries[0].categoryGroupName).toBe('')
   })
 })
 
-describe('upsertEntry', () => {
-  test('creates entry for category if it does not exist', () => {
+describe('archivePlan', () => {
+  function planned(vault: VaultData) {
+    const salary = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const rent = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    setPlanned(vault, salary.id, '6000.00')
+    setPlanned(vault, rent.id, '1350.00')
+    return { salary, rent }
+  }
+
+  test('snapshots the plan as names and amounts', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
-    createPeriod(vault, 2024, 3)
+    planned(vault)
 
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '5000.00')
+    const archive = archivePlan(vault, '2026 baseline')
 
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries).toHaveLength(1)
-    expect(period!.entries[0].categoryId).toBe(category.id)
-    expect(period!.entries[0].plannedAmount).toBe('5000.00')
-    expect(period!.entries[0].actualAmount).toBe('0.00')
+    expect(archive.name).toBe('2026 baseline')
+    expect(archive.id).toBeTruthy()
+    expect(archive.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(archive.lines).toEqual([
+      { categoryName: 'Salary', groupName: 'Employment', type: 'income', plannedAmount: '6000.00' },
+      { categoryName: 'Rent', groupName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
+    ])
+    expect(vault.budget.archives).toContain(archive)
   })
 
-  test('updates existing entry', () => {
+  test('includes categories left at 0.00, so the archive reads like the plan did', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
-    const period = createPeriod(vault, 2024, 3)
-    period.entries = [{ categoryId: category.id, plannedAmount: '5000.00', actualAmount: '0.00' }]
+    createCategory(vault, { name: 'Holidays', type: 'expense', groupName: 'Lifestyle' })
 
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '6000.00')
+    const archive = archivePlan(vault, 'Empty start')
 
-    expect(period.entries).toHaveLength(1)
-    expect(period.entries[0].plannedAmount).toBe('6000.00')
+    expect(archive.lines).toHaveLength(1)
+    expect(archive.lines[0].plannedAmount).toBe('0.00')
   })
 
-  test('updates actual amount', () => {
+  test('does not snapshot archived categories', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
-    createPeriod(vault, 2024, 3)
+    const { rent } = planned(vault)
+    updateCategory(vault, rent.id, { archived: true })
 
-    upsertEntry(vault, 2024, 3, category.id, 'actual', '5100.00')
+    const archive = archivePlan(vault, 'After archiving Rent')
 
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries[0].actualAmount).toBe('5100.00')
-    expect(period!.entries[0].plannedAmount).toBe('0.00')
+    expect(archive.lines.map(l => l.categoryName)).toEqual(['Salary'])
   })
 
-  test('creates period if it does not exist', () => {
+  test('rejects an empty or whitespace-only name', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    planned(vault)
 
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '5000.00')
-
-    expect(vault.budget.periods).toHaveLength(1)
-    expect(vault.budget.periods[0].year).toBe(2024)
-    expect(vault.budget.periods[0].month).toBe(3)
+    expect(() => archivePlan(vault, '')).toThrow(/name/)
+    expect(() => archivePlan(vault, '   ')).toThrow(/name/)
+    expect(() => archivePlan(vault, '\t\n')).toThrow(/name/)
+    // A rejected archive must not be half-stored.
+    expect(vault.budget.archives).toHaveLength(0)
   })
 
-  test('setting planned never touches actual', () => {
+  test('trims the name', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, {
-      name: 'Food',
-      type: 'expense',
-      groupName: 'Living',
-    })
 
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '500.00')
-
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries[0].plannedAmount).toBe('500.00')
-    expect(period!.entries[0].actualAmount).toBe('0.00')
+    expect(archivePlan(vault, '  March review  ').name).toBe('March review')
   })
 
-  test('handles zero amounts', () => {
+  test('renaming a category afterwards does not rewrite the archive', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Group' })
+    const { rent } = planned(vault)
+    const archive = archivePlan(vault, 'Before the rename')
 
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '0.00')
+    updateCategory(vault, rent.id, { name: 'Rent (new flat)', groupName: 'Accommodation' })
 
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries[0].plannedAmount).toBe('0.00')
+    // The archive records what the plan said at the time. A later rename is a
+    // fact about today's budget, not about the snapshot.
+    expect(archive.lines[1].categoryName).toBe('Rent')
+    expect(archive.lines[1].groupName).toBe('Housing')
+    expect(listArchives(vault)[0].lines[1].categoryName).toBe('Rent')
   })
 
-  test('handles negative amounts', () => {
+  test('deleting a category afterwards does not remove its archived line', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Group' })
+    const { rent } = planned(vault)
+    const archive = archivePlan(vault, 'Before the delete')
 
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '-100.00')
+    deleteCategory(vault, rent.id)
 
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries[0].plannedAmount).toBe('-100.00')
+    expect(vault.budget.categories).toHaveLength(1)
+    expect(vault.budget.plan.some(e => e.categoryId === rent.id)).toBe(false)
+    // The snapshot keeps both lines: it holds names, not references.
+    expect(archive.lines).toHaveLength(2)
+    expect(archive.lines[1].categoryName).toBe('Rent')
+    expect(archive.lines[1].plannedAmount).toBe('1350.00')
   })
 
-  test('handles very large amounts', () => {
+  test('editing the plan afterwards does not change the archive', () => {
     const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Group' })
+    const { rent } = planned(vault)
+    const archive = archivePlan(vault, 'Snapshot')
 
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '999999999.99')
+    setPlanned(vault, rent.id, '1500.00')
 
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries[0].plannedAmount).toBe('999999999.99')
-  })
-
-  test('handles empty string amount', () => {
-    const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Group' })
-
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '')
-
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries[0].plannedAmount).toBe('')
+    expect(archive.lines[1].plannedAmount).toBe('1350.00')
+    expect(plannedFor(vault, rent.id)).toBe('1500.00')
   })
 })
 
-describe('deleteEntry', () => {
-  test('removes entry from period', () => {
-    const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Group' })
-    const period = createPeriod(vault, 2024, 3)
-    period.entries = [{ categoryId: category.id, plannedAmount: '100.00', actualAmount: '100.00' }]
-
-    deleteEntry(vault, 2024, 3, category.id)
-
-    expect(period.entries).toHaveLength(0)
+describe('listArchives', () => {
+  test('returns an empty array for an empty vault', () => {
+    expect(listArchives(createEmptyVault())).toEqual([])
   })
 
-  test('does not affect other entries', () => {
+  test('returns archives newest first', () => {
     const vault = createEmptyVault()
-    const cat1 = createCategory(vault, { name: 'Cat1', type: 'income', groupName: 'Group' })
-    const cat2 = createCategory(vault, { name: 'Cat2', type: 'income', groupName: 'Group' })
-    const period = createPeriod(vault, 2024, 3)
-    period.entries = [
-      { categoryId: cat1.id, plannedAmount: '100.00', actualAmount: '100.00' },
-      { categoryId: cat2.id, plannedAmount: '200.00', actualAmount: '200.00' },
-    ]
+    const first = archivePlan(vault, 'First')
+    const second = archivePlan(vault, 'Second')
+    const third = archivePlan(vault, 'Third')
 
-    deleteEntry(vault, 2024, 3, cat1.id)
-
-    expect(period.entries).toHaveLength(1)
-    expect(period.entries[0].categoryId).toBe(cat2.id)
+    expect(listArchives(vault).map(a => a.id)).toEqual([third.id, second.id, first.id])
   })
 
-  test('handles deleting from non-existent period', () => {
+  test('orders by createdAt, not by insertion', () => {
     const vault = createEmptyVault()
+    const older = archivePlan(vault, 'Older')
+    const newer = archivePlan(vault, 'Newer')
+    older.createdAt = '2020-01-01T00:00:00.000Z'
+    newer.createdAt = '2030-01-01T00:00:00.000Z'
 
-    expect(() => deleteEntry(vault, 2024, 3, 'any-id')).not.toThrow()
+    expect(listArchives(vault).map(a => a.name)).toEqual(['Newer', 'Older'])
   })
 
-  test('handles deleting non-existent entry', () => {
+  test('does not mutate the stored array', () => {
     const vault = createEmptyVault()
-    createPeriod(vault, 2024, 3)
+    archivePlan(vault, 'First')
+    archivePlan(vault, 'Second')
+    const original = [...vault.budget.archives]
 
-    expect(() => deleteEntry(vault, 2024, 3, 'non-existent')).not.toThrow()
+    listArchives(vault)
+
+    expect(vault.budget.archives).toEqual(original)
+  })
+})
+
+describe('renameArchive', () => {
+  test('renames the archive', () => {
+    const vault = createEmptyVault()
+    const archive = archivePlan(vault, 'Old name')
+
+    renameArchive(vault, archive.id, 'New name')
+
+    expect(archive.name).toBe('New name')
+  })
+
+  test('trims the new name', () => {
+    const vault = createEmptyVault()
+    const archive = archivePlan(vault, 'Old name')
+
+    renameArchive(vault, archive.id, '  Tidy  ')
+
+    expect(archive.name).toBe('Tidy')
+  })
+
+  test('rejects an empty name, as creation does', () => {
+    const vault = createEmptyVault()
+    const archive = archivePlan(vault, 'Keep me')
+
+    expect(() => renameArchive(vault, archive.id, '   ')).toThrow(/name/)
+    expect(archive.name).toBe('Keep me')
+  })
+
+  test('an unknown id is a no-op', () => {
+    const vault = createEmptyVault()
+    const archive = archivePlan(vault, 'Only one')
+
+    expect(() => renameArchive(vault, 'no-such-archive', 'Whatever')).not.toThrow()
+    expect(archive.name).toBe('Only one')
+  })
+})
+
+describe('updateArchiveLine', () => {
+  function vaultWithArchive() {
+    const vault = createEmptyVault()
+    const salary = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const rent = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    setPlanned(vault, salary.id, '6000.00')
+    setPlanned(vault, rent.id, '1350.00')
+    const archive = archivePlan(vault, 'Snapshot')
+    return { vault, archive, salary, rent }
+  }
+
+  test('edits the line in place', () => {
+    const { vault, archive } = vaultWithArchive()
+
+    updateArchiveLine(vault, archive.id, 1, '1400.00')
+
+    expect(archive.lines[1].plannedAmount).toBe('1400.00')
+    expect(archive.lines[1].categoryName).toBe('Rent')
+    expect(archive.lines[0].plannedAmount).toBe('6000.00')
+  })
+
+  test('never touches the live plan', () => {
+    const { vault, archive, salary, rent } = vaultWithArchive()
+    const planBefore = structuredClone(vault.budget.plan)
+
+    updateArchiveLine(vault, archive.id, 0, '1.00')
+    updateArchiveLine(vault, archive.id, 1, '2.00')
+
+    expect(vault.budget.plan).toEqual(planBefore)
+    expect(plannedFor(vault, salary.id)).toBe('6000.00')
+    expect(plannedFor(vault, rent.id)).toBe('1350.00')
+  })
+
+  test('leaves other archives alone', () => {
+    const { vault, archive } = vaultWithArchive()
+    const other = archivePlan(vault, 'Other')
+
+    updateArchiveLine(vault, archive.id, 0, '1.00')
+
+    expect(other.lines[0].plannedAmount).toBe('6000.00')
+  })
+
+  test('an unknown archive or an out-of-range line is a no-op', () => {
+    const { vault, archive } = vaultWithArchive()
+
+    expect(() => updateArchiveLine(vault, 'no-such-archive', 0, '1.00')).not.toThrow()
+    expect(() => updateArchiveLine(vault, archive.id, 99, '1.00')).not.toThrow()
+    expect(() => updateArchiveLine(vault, archive.id, -1, '1.00')).not.toThrow()
+    expect(archive.lines.map(l => l.plannedAmount)).toEqual(['6000.00', '1350.00'])
+  })
+})
+
+describe('deleteArchive', () => {
+  test('removes the archive', () => {
+    const vault = createEmptyVault()
+    const archive = archivePlan(vault, 'Doomed')
+
+    deleteArchive(vault, archive.id)
+
+    expect(vault.budget.archives).toHaveLength(0)
+    expect(listArchives(vault)).toEqual([])
+  })
+
+  test('leaves the other archives and the plan alone', () => {
+    const vault = createEmptyVault()
+    const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    setPlanned(vault, category.id, '1350.00')
+    const keep = archivePlan(vault, 'Keep')
+    const drop = archivePlan(vault, 'Drop')
+
+    deleteArchive(vault, drop.id)
+
+    expect(listArchives(vault).map(a => a.id)).toEqual([keep.id])
+    expect(plannedFor(vault, category.id)).toBe('1350.00')
+  })
+
+  test('deleting an unknown id is a no-op', () => {
+    const vault = createEmptyVault()
+    archivePlan(vault, 'Keep')
+
+    expect(() => deleteArchive(vault, 'no-such-archive')).not.toThrow()
+    expect(vault.budget.archives).toHaveLength(1)
   })
 })
 
@@ -1167,17 +1107,23 @@ describe('seedDefaults', () => {
     expect(vault.budget.categories.length).toBeGreaterThan(0)
   })
 
-  test('creates current month period with entries', () => {
+  test('writes the suggested amounts into the plan', () => {
     const vault = createEmptyVault()
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
 
     seedDefaults(vault)
 
-    const period = getPeriod(vault, year, month)
-    expect(period).not.toBeNull()
-    expect(period!.entries.length).toBeGreaterThan(0)
+    expect(vault.budget.plan.length).toBe(vault.budget.categories.length)
+    for (const cat of vault.budget.categories) {
+      expect(plannedFor(vault, cat.id)).not.toBe('0.00')
+    }
+  })
+
+  test('seeds no archives — a fresh budget has no history', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+
+    expect(vault.budget.archives).toEqual([])
   })
 
   test('does not seed if categories already exist', () => {
@@ -1202,37 +1148,28 @@ describe('seedDefaults', () => {
     expect(expenseCount).toBeGreaterThan(0)
   })
 
-  test('seeds every default category with actual 0.00', () => {
+  test('every plan line carries a non-zero amount and nothing else', () => {
     const vault = createEmptyVault()
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
 
     seedDefaults(vault)
 
-    const period = getPeriod(vault, year, month)
-    const nonFixedCategories = vault.budget.categories
-
-    for (const cat of nonFixedCategories) {
-      const entry = period!.entries.find(e => e.categoryId === cat.id)
-      expect(entry).toBeTruthy()
-      expect(entry!.actualAmount).toBe('0.00')
+    for (const entry of vault.budget.plan) {
+      expect(Number(entry.plannedAmount)).toBeGreaterThan(0)
+      // v4 dropped the actual amount along with the months it belonged to.
+      expect(Object.keys(entry).sort()).toEqual(['categoryId', 'plannedAmount'])
     }
   })
 
-  test('creates entries with non-zero planned amounts', () => {
+  test('the seeded plan summarises to the seeded totals', () => {
     const vault = createEmptyVault()
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
 
     seedDefaults(vault)
+    const summary = getPlanSummary(vault)
 
-    const period = getPeriod(vault, year, month)
-
-    for (const entry of period!.entries) {
-      expect(Number(entry.plannedAmount)).toBeGreaterThan(0)
-    }
+    expect(summary.entries).toHaveLength(vault.budget.categories.length)
+    expect(summary.totalPlannedIncome).toBe('6000.00')
+    expect(summary.totalPlannedExpenses).toBe('5559.67')
+    expect(summary.plannedBalance).toBe('440.33')
   })
 
   test('is idempotent', () => {
@@ -1241,11 +1178,13 @@ describe('seedDefaults', () => {
     seedDefaults(vault)
     const categoriesCount = vault.budget.categories.length
     const groupsCount = vault.budget.categoryGroups.length
+    const planCount = vault.budget.plan.length
 
     seedDefaults(vault)
 
     expect(vault.budget.categories).toHaveLength(categoriesCount)
     expect(vault.budget.categoryGroups).toHaveLength(groupsCount)
+    expect(vault.budget.plan).toHaveLength(planCount)
   })
 
   test('routes every seeded category to the primary account', () => {
