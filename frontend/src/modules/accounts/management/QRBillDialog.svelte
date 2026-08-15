@@ -4,6 +4,7 @@
   import type { QRBillRequest, ReferenceType, ValidationError } from '../../../lib/qrbill/types'
   import { buildPayload } from '../../../lib/qrbill/payload'
   import { validate } from '../../../lib/qrbill/validate'
+  import { normalizeAmount } from '../../../lib/qrbill/format'
   import { renderQRSvg } from '../../../lib/qrbill/svg'
   import { focusTrap } from '../../../lib/util/focusTrap'
 
@@ -80,9 +81,11 @@
     country: '',
   }
 
-  /** Accepts 1'234.50 and 1234,50; leaves anything else for validate() to reject. */
-  function normalizeAmount(raw: string): string {
-    return raw.replace(/['\s]/g, '').replace(',', '.')
+  // Normalise on blur so the user sees the exact string that goes into the bill —
+  // '12' becomes '12.00' in front of them rather than silently at submit time.
+  // The two decimals are mandatory; a bank rejected a bill generated without them.
+  function normalizeAmountField() {
+    amount = normalizeAmount(amount)
   }
 
   function debtorAddress(): QRAddress | undefined {
@@ -187,6 +190,7 @@
         type="text"
         inputmode="decimal"
         bind:value={amount}
+        onblur={normalizeAmountField}
         placeholder="Leave empty for an open amount"
       />
     </label>

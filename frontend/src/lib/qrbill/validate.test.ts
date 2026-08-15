@@ -196,17 +196,37 @@ describe('validate — addresses', () => {
 
 describe('validate — amount', () => {
   test('accepts well-formed amounts', () => {
-    for (const amount of ['1949.75', '999999999', '0.05', '12.5']) {
+    for (const amount of ['1949.75', '0.05', '0.01', '999999999.99', '12.50']) {
       expect(validate(request({ amount }))).toEqual([])
     }
   })
 
   test('rejects malformed or out-of-range amounts', () => {
-    // '0' is well-formed but out of range: IG v2.3 page 35 requires the amount to
-    // be between 0.01 and 999,999,999.99. The Go original accepted it.
-    for (const amount of ['', '0', '1949.755', '1000000000', '-5', '1,50', 'abc', '.5']) {
+    for (const amount of ['', '0', '1949.755', '1000000000.00', '-5', '1,50', 'abc', '.5']) {
       expect(fields(validate(request({ amount })))).toEqual(['amount'])
     }
+  })
+
+  // Regression: a real bank rejected a generated bill with "Das Element 'Amt' ...
+  // ist ungültig", because the two decimal places are mandatory and the Go
+  // original's regex made them optional. These four all shipped as valid before.
+  test('requires exactly two decimal places', () => {
+    for (const amount of ['12', '12.5', '999999999', '1949.7']) {
+      expect(fields(validate(request({ amount })))).toEqual(['amount'])
+    }
+  })
+
+  test('rejects leading zeros', () => {
+    for (const amount of ['0012.50', '00.50', '01.00']) {
+      expect(fields(validate(request({ amount })))).toEqual(['amount'])
+    }
+    // A single leading zero is the legitimate way to write a sub-franc amount.
+    expect(validate(request({ amount: '0.75' }))).toEqual([])
+  })
+
+  test('stays within the 12-character maximum', () => {
+    expect(validate(request({ amount: '999999999.99' }))).toEqual([]) // exactly 12
+    expect(fields(validate(request({ amount: '1000000000.00' })))).toEqual(['amount']) // 13
   })
 
   test('an absent amount is allowed', () => {

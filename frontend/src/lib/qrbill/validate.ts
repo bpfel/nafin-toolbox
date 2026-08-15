@@ -7,7 +7,19 @@ import { buildPayload } from './payload'
 //   2. the mod-97 IBAN checksum uses an iterative remainder, not big.Int
 //   3. the IBAN-kind / reference-type pairing rule is enforced (absent in Go)
 
-const amountRegex = /^\d{1,9}(\.\d{1,2})?$/
+// IG v2.3 page 35, confirmed by a live bank rejection: "The amount element is to
+// be entered without leading zeroes, including decimal separators and two decimal
+// places. Decimal, maximum 12-digits permitted, including decimal separators. Only
+// decimal points (".") are permitted."
+//
+// So the two decimals are MANDATORY, not optional — '12' and '12.5' are both
+// rejected by the bank — and leading zeros are forbidden, which is why the integer
+// part is either a bare '0' or a digit string that cannot start with one. Nine
+// integer digits plus '.' plus two decimals is exactly the 12-character maximum.
+//
+// The Go original had /^\d{1,9}(\.\d{1,2})?$/, which accepted all of '12', '12.5',
+// '999999999' and '0012.50'. Every one of those produces a bill the bank refuses.
+const amountRegex = /^(0|[1-9]\d{0,8})\.\d{2}$/
 const ibanRegex = /^(CH|LI)\d{19}$/
 const qrrRegex = /^\d{27}$/
 
@@ -35,8 +47,27 @@ function charLength(s: string): number {
   return [...s].length
 }
 
-function normalizeIBAN(iban: string): string {
-  return iban.replace(/ /g, '').toUpperCase()
+export function normalizeIBAN(iban: string): string {
+  return iban.replace(/[\s'’]/g, '').toUpperCase()
+}
+
+export type IBANStatus = 'empty' | 'incomplete' | 'invalid' | 'valid'
+
+/**
+ * Live status for an IBAN field, for feedback while typing.
+ *
+ * Distinguishes "not finished yet" from "wrong" so the UI does not shout at a
+ * user three characters into a 21-character identifier. Swiss and Liechtenstein
+ * IBANs are always exactly 21 characters.
+ */
+export function ibanStatus(raw: string): IBANStatus {
+  const cleaned = normalizeIBAN(raw)
+  if (cleaned === '') return 'empty'
+  // Anything that could not become a CH/LI IBAN is wrong straight away.
+  if (!/^[A-Z]{0,2}[0-9]*$/.test(cleaned)) return 'invalid'
+  if (cleaned.length < 21) return 'incomplete'
+  if (!ibanRegex.test(cleaned)) return 'invalid'
+  return validIBANChecksum(cleaned) ? 'valid' : 'invalid'
 }
 
 /**
@@ -91,7 +122,8 @@ export function validate(req: QRBillRequest): ValidationError[] {
     if (!amountRegex.test(req.amount)) {
       errs.push({
         field: 'amount',
-        message: 'must be a decimal number with up to 9 integer digits and up to 2 decimal places',
+        message:
+          'must have exactly 2 decimal places and no leading zeros, e.g. 12.50 — up to 9 digits before the point',
       })
     } else if (Math.round(parseFloat(req.amount) * 100) < MIN_AMOUNT_CENTS) {
       // A zero amount passes the regex but the standard requires at least 0.01.
