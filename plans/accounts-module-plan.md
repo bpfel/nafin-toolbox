@@ -394,9 +394,31 @@ Own the Swiss layer, where the logic is verifiable string assembly; delegate the
   payment part, cut lines, field labels, millimetre positioning). Scan-to-pay on screen is
   the use case; a printable slip is out of scope.
 
+## Packaging: one module, two views
+
+The registry (`backend/internal/module/module.go`) declares `accounts` and `allocations` as
+separate IDs, and `App.svelte` lists both. **Both views ship under `accounts`; `allocations`
+is removed from `availableModules`.**
+
+The dependency runs one way — Allocations needs Accounts, not the reverse — so a two-module
+split would be legitimate rather than a fudge. It is rejected for two reasons:
+
+- **Accounts alone is degenerate.** Without reserve definitions it is a list of numbers the
+  user typed in. Everything of value — required, available, spendable — comes from the
+  Allocations side.
+- **The module system has no dependency mechanism.** A flat enable/disable list would need
+  auto-enable or grey-out machinery built specially for this split.
+
+The decision is reversible and cheap: the code seam already exists between
+`accountsEngine.ts` (account CRUD) and `routing.ts` (flows and reserves), so splitting later
+is a registry and UI change, not a rewrite.
+
+This is the second place the design pushes against CLAUDE.md's "any subset without the
+others", after the always-one-account invariant. Both belong in the same CLAUDE.md note.
+
 ## Screens
 
-Two, built in parallel:
+Two views within the one module, built in parallel:
 
 1. **Account management** — list accounts; add, rename, remove. Per account: kind, bank,
    projected balance, required amount, and the difference — with `lastCorrectedAt` shown next

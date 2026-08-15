@@ -10,9 +10,9 @@ and sliced to maximise parallel execution.
 in `availableModules`. The design's "no server-side anything" holds in full — the only wiring
 is one branch in the App.svelte render switch.
 
-**`accounts` and `allocations` are two registry IDs, but the design merged them into one
-module.** This needs a decision (see Open questions). The packages below assume the module
-ships under `accounts` and `allocations` is removed from the picker.
+**`accounts` and `allocations` are two registry IDs; the module ships as one.** Decided: both
+views live under the `accounts` ID and `allocations` is removed from `availableModules`. See
+*Packaging* in the design doc for the reasoning.
 
 ## Verification
 
@@ -339,8 +339,5 @@ then UI. That hides the entire QR port behind the accounts critical path.
 
 ## Open questions
 
-1. **`accounts` vs `allocations` module IDs.** The registry and picker have both; the design
-   merged them. Recommend shipping under `accounts` and removing `allocations` from
-   `availableModules` — otherwise it sits in the picker as a feature that will never arrive.
-2. **What happens when the Accounts module is disabled?** Carried over from the design doc,
+1. **What happens when the Accounts module is disabled?** Carried over from the design doc,
    still unanswered.
