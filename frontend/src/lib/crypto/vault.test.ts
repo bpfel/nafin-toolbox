@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest'
-import { encryptVault, decryptVault, createEmptyVault, type VaultData } from './vault'
+import { encryptVault, decryptVault, createEmptyVault, migrateVault, type VaultData } from './vault'
 import { generateMEK } from './keys'
 
 beforeAll(() => {
@@ -31,10 +31,10 @@ function legacyV1Vault(): unknown {
 }
 
 describe('createEmptyVault', () => {
-  test('creates a valid empty v2 vault structure', () => {
+  test('creates a valid empty v3 vault structure', () => {
     const vault = createEmptyVault()
 
-    expect(vault.version).toBe(2)
+    expect(vault.version).toBe(3)
     expect(vault.budget).toEqual({
       categoryGroups: [],
       categories: [],
@@ -81,13 +81,13 @@ describe('createEmptyVault', () => {
 })
 
 describe('version scrub', () => {
-  test('decrypting a v1 blob yields a fresh v2 vault with one Main account', async () => {
+  test('decrypting a v1 blob yields a fresh v3 vault with one Main account', async () => {
     const mek = await generateMEK()
 
     const encrypted = await encryptVault(legacyV1Vault() as VaultData, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.version).toBe(2)
+    expect(decrypted.version).toBe(3)
     expect(decrypted.accounts.length).toBe(1)
     expect(decrypted.accounts[0].name).toBe('Main')
     expect(decrypted.accounts[0].currentAmount).toBe('0.00')
@@ -113,13 +113,13 @@ describe('version scrub', () => {
     const fromVersionless = await decryptVault(versionless.ciphertext, versionless.nonce, mek)
     const fromFuture = await decryptVault(future.ciphertext, future.nonce, mek)
 
-    expect(fromVersionless.version).toBe(2)
+    expect(fromVersionless.version).toBe(3)
     expect(fromVersionless.accounts.length).toBe(1)
-    expect(fromFuture.version).toBe(2)
+    expect(fromFuture.version).toBe(3)
     expect(fromFuture.accounts.length).toBe(1)
   })
 
-  test('a v2 blob is returned untouched', async () => {
+  test('a current-version blob is returned untouched', async () => {
     const mek = await generateMEK()
     const vault = createEmptyVault()
     vault.accounts.push({
@@ -205,7 +205,7 @@ describe('encryptVault and decryptVault', () => {
   test('round-trip encryption and decryption preserves data', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -347,7 +347,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves complex vault with multiple periods', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -394,7 +394,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves archived flag in categories', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -418,7 +418,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '1234.05', lastCorrectedAt: '2026-08-15' },
       ],
@@ -451,7 +451,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves special characters in text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: 'a1', name: 'Zürich «Haupt»', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -483,7 +483,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves sortOrder values', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -516,7 +516,7 @@ describe('encryptVault and decryptVault', () => {
 
     // Create a large vault with many entries
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: Array.from({ length: 5 }, (_, i) => ({
         id: `a${i}`,
         name: `Account ${i}`,
@@ -568,7 +568,7 @@ describe('encryptVault and decryptVault', () => {
   test('handles empty strings in all text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: '', name: '', kind: 'cash', currency: 'CHF', currentAmount: '', lastCorrectedAt: '' },
       ],
@@ -604,7 +604,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves exact JSON structure including whitespace in strings', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -635,7 +635,7 @@ describe('encryptVault and decryptVault', () => {
     const encryptedSmall = await encryptVault(smallVault, mek)
 
     const largeVault: VaultData = {
-      version: 2,
+      version: 3,
       accounts: [],
       budget: {
         categoryGroups: Array.from({ length: 50 }, (_, i) => ({
@@ -655,5 +655,99 @@ describe('encryptVault and decryptVault', () => {
     const largeSize = atob(encryptedLarge.ciphertext).length
 
     expect(largeSize).toBeGreaterThan(smallSize * 2)
+  })
+})
+
+describe('migrateVault — v2 to v3', () => {
+  // v3 removed the `fixed` flag from categories. A v2 vault must keep all of its
+  // data and lose only that field, which is what separates a migration from the
+  // scrub we used before v1.0.
+  function v2Vault() {
+    return {
+      version: 2,
+      budget: {
+        categoryGroups: [{ id: 'g1', name: 'Housing', type: 'expense', sortOrder: 10 }],
+        categories: [
+          {
+            id: 'c1',
+            name: 'Rent',
+            type: 'expense',
+            sortOrder: 10,
+            archived: false,
+            groupId: 'g1',
+            fixed: true,
+            sourceAccountId: 'a1',
+            sinkAccountId: null,
+          },
+          {
+            id: 'c2',
+            name: 'Taxes',
+            type: 'expense',
+            sortOrder: 20,
+            archived: false,
+            groupId: 'g1',
+            fixed: false,
+            sourceAccountId: 'a1',
+            sinkAccountId: 'a1',
+            reserve: {
+              kind: 'obligation',
+              targetAmount: '9000.00',
+              periodMonths: 12,
+              anchorMonth: '2026-09',
+            },
+          },
+        ],
+        periods: [
+          { year: 2026, month: 8, notes: 'note', entries: [{ categoryId: 'c1', plannedAmount: '1350.00', actualAmount: '1350.00' }] },
+        ],
+      },
+      accounts: [
+        { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '500.00', lastCorrectedAt: '2026-08-01' },
+      ],
+    }
+  }
+
+  test('strips the removed fixed flag from every category', () => {
+    const migrated = migrateVault(v2Vault())
+
+    for (const category of migrated.budget.categories) {
+      expect('fixed' in category).toBe(false)
+    }
+  })
+
+  test('keeps everything else — this is a migration, not a scrub', () => {
+    const migrated = migrateVault(v2Vault())
+
+    expect(migrated.version).toBe(3)
+    expect(migrated.budget.categories).toHaveLength(2)
+    expect(migrated.budget.categories[0].name).toBe('Rent')
+    expect(migrated.budget.categoryGroups).toHaveLength(1)
+    expect(migrated.budget.periods[0].entries[0].plannedAmount).toBe('1350.00')
+    expect(migrated.accounts).toHaveLength(1)
+    expect(migrated.accounts[0].currentAmount).toBe('500.00')
+  })
+
+  test('preserves routing and reserve definitions', () => {
+    const migrated = migrateVault(v2Vault())
+    const taxes = migrated.budget.categories[1]
+
+    expect(taxes.sourceAccountId).toBe('a1')
+    expect(taxes.sinkAccountId).toBe('a1')
+    expect(taxes.reserve?.targetAmount).toBe('9000.00')
+    expect(taxes.reserve?.anchorMonth).toBe('2026-09')
+  })
+
+  test('a v3 vault passes through untouched', () => {
+    const v3 = { ...v2Vault(), version: 3 }
+    const migrated = migrateVault(v3)
+
+    expect(migrated.budget.categories).toHaveLength(2)
+    expect(migrated.version).toBe(3)
+  })
+
+  test('an unknown version still scrubs', () => {
+    expect(migrateVault({ version: 99, budget: { categories: [{}] } }).budget.categories).toHaveLength(0)
+    expect(migrateVault(null).budget.categories).toHaveLength(0)
+    expect(migrateVault('nonsense').budget.categories).toHaveLength(0)
   })
 })
