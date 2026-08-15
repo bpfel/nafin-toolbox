@@ -24,7 +24,7 @@ CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
 
 CREATE TABLE modules (
-    user_id    INTEGER NOT NULL REFERENCES users(id),
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     id         TEXT NOT NULL,
     name       TEXT NOT NULL,
     enabled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
