@@ -57,7 +57,6 @@ export function createCategory(
     name: string
     type: 'income' | 'expense'
     groupName: string
-    fixed?: boolean
     sortOrder?: number
   },
 ): VaultCategory {
@@ -74,7 +73,6 @@ export function createCategory(
     sortOrder: order,
     archived: false,
     groupId: group.id,
-    fixed: opts.fixed ?? false,
     sourceAccountId: routing.sourceAccountId,
     sinkAccountId: routing.sinkAccountId,
   }
@@ -85,7 +83,7 @@ export function createCategory(
 export function updateCategory(
   vault: VaultData,
   categoryId: string,
-  update: Partial<Pick<VaultCategory, 'name' | 'type' | 'sortOrder' | 'archived' | 'fixed'>> & { groupName?: string },
+  update: Partial<Pick<VaultCategory, 'name' | 'type' | 'sortOrder' | 'archived'>> & { groupName?: string },
 ): VaultCategory | null {
   const cat = vault.budget.categories.find(c => c.id === categoryId)
   if (!cat) return null
@@ -107,7 +105,6 @@ export function updateCategory(
 
   if (update.sortOrder !== undefined) cat.sortOrder = update.sortOrder
   if (update.archived !== undefined) cat.archived = update.archived
-  if (update.fixed !== undefined) cat.fixed = update.fixed
   if (update.groupName !== undefined) {
     const group = getOrCreateGroup(vault, update.groupName, cat.type)
     cat.groupId = group.id
@@ -128,6 +125,23 @@ export function reorderCategories(vault: VaultData, categoryIds: string[]): void
   for (let i = 0; i < categoryIds.length; i++) {
     const cat = vault.budget.categories.find(c => c.id === categoryIds[i])
     if (cat) cat.sortOrder = (i + 1) * 10
+  }
+}
+
+/**
+ * Reorders category groups. `groupIds` is the full new order for one side of the
+ * budget (income or expense); groups of the other type keep their sortOrder.
+ *
+ * Group order used to be inferred from wherever each group's first category
+ * happened to land in the category sort, which meant reordering categories could
+ * silently reshuffle groups. `sortOrder` on the group has always existed and is
+ * what `listGroups` uses, so this makes the table read the same field rather
+ * than deriving the order a second, conflicting way.
+ */
+export function reorderGroups(vault: VaultData, groupIds: string[]): void {
+  for (let i = 0; i < groupIds.length; i++) {
+    const group = vault.budget.categoryGroups.find(g => g.id === groupIds[i])
+    if (group) group.sortOrder = (i + 1) * 10
   }
 }
 
@@ -200,7 +214,6 @@ export interface PeriodEntryView {
   categoryType: 'income' | 'expense'
   categoryGroupId: string
   categoryGroupName: string
-  categoryFixed: boolean
   plannedAmount: string
   actualAmount: string
 }
@@ -232,7 +245,6 @@ export function getPeriodSummary(vault: VaultData, year: number, month: number):
       categoryType: cat.type,
       categoryGroupId: cat.groupId,
       categoryGroupName: group?.name ?? '',
-      categoryFixed: cat.fixed,
       plannedAmount: (entry?.plannedAmount ?? '0.00'),
       actualAmount: (entry?.actualAmount ?? '0.00'),
     })
@@ -281,10 +293,6 @@ export function upsertEntry(
 
   if (field === 'planned') {
     entry.plannedAmount = amount
-    // Fixed categories: actual always equals planned
-    if (cat?.fixed) {
-      entry.actualAmount = amount
-    }
   } else {
     entry.actualAmount = amount
   }
@@ -310,7 +318,6 @@ interface DefaultCategory {
   type: 'income' | 'expense'
   sortOrder: number
   groupName: string
-  fixed: boolean
   amount: string
 }
 
@@ -327,19 +334,19 @@ function bfsDefaultGroups(): DefaultGroup[] {
 
 function bfsDefaults(): DefaultCategory[] {
   return [
-    { name: 'Salary (net)', type: 'income', sortOrder: 10, groupName: 'Employment', fixed: true, amount: '6000.00' },
-    { name: 'Rent', type: 'expense', sortOrder: 10, groupName: 'Housing', fixed: true, amount: '1350.00' },
-    { name: 'Utilities', type: 'expense', sortOrder: 20, groupName: 'Housing', fixed: false, amount: '150.00' },
-    { name: 'Health Insurance', type: 'expense', sortOrder: 10, groupName: 'Insurance & Taxes', fixed: true, amount: '391.67' },
-    { name: 'Other Insurance', type: 'expense', sortOrder: 20, groupName: 'Insurance & Taxes', fixed: true, amount: '166.67' },
-    { name: 'Taxes', type: 'expense', sortOrder: 30, groupName: 'Insurance & Taxes', fixed: true, amount: '833.33' },
-    { name: 'Food & Groceries', type: 'expense', sortOrder: 10, groupName: 'Living', fixed: false, amount: '500.00' },
-    { name: 'Transportation', type: 'expense', sortOrder: 20, groupName: 'Living', fixed: false, amount: '400.00' },
-    { name: 'Telecommunications', type: 'expense', sortOrder: 30, groupName: 'Living', fixed: true, amount: '80.00' },
-    { name: 'Clothing & Footwear', type: 'expense', sortOrder: 10, groupName: 'Lifestyle', fixed: false, amount: '100.00' },
-    { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, groupName: 'Lifestyle', fixed: false, amount: '250.00' },
-    { name: 'Dining Out', type: 'expense', sortOrder: 30, groupName: 'Lifestyle', fixed: false, amount: '250.00' },
-    { name: 'Savings', type: 'expense', sortOrder: 10, groupName: 'Savings', fixed: false, amount: '500.00' },
+    { name: 'Salary (net)', type: 'income', sortOrder: 10, groupName: 'Employment', amount: '6000.00' },
+    { name: 'Rent', type: 'expense', sortOrder: 10, groupName: 'Housing', amount: '1350.00' },
+    { name: 'Utilities', type: 'expense', sortOrder: 20, groupName: 'Housing', amount: '150.00' },
+    { name: 'Health Insurance', type: 'expense', sortOrder: 10, groupName: 'Insurance & Taxes', amount: '391.67' },
+    { name: 'Other Insurance', type: 'expense', sortOrder: 20, groupName: 'Insurance & Taxes', amount: '166.67' },
+    { name: 'Taxes', type: 'expense', sortOrder: 30, groupName: 'Insurance & Taxes', amount: '833.33' },
+    { name: 'Food & Groceries', type: 'expense', sortOrder: 10, groupName: 'Living', amount: '500.00' },
+    { name: 'Transportation', type: 'expense', sortOrder: 20, groupName: 'Living', amount: '400.00' },
+    { name: 'Telecommunications', type: 'expense', sortOrder: 30, groupName: 'Living', amount: '80.00' },
+    { name: 'Clothing & Footwear', type: 'expense', sortOrder: 10, groupName: 'Lifestyle', amount: '100.00' },
+    { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, groupName: 'Lifestyle', amount: '250.00' },
+    { name: 'Dining Out', type: 'expense', sortOrder: 30, groupName: 'Lifestyle', amount: '250.00' },
+    { name: 'Savings', type: 'expense', sortOrder: 10, groupName: 'Savings', amount: '500.00' },
   ]
 }
 
@@ -358,7 +365,6 @@ export function seedDefaults(vault: VaultData): void {
       name: d.name,
       type: d.type,
       groupName: d.groupName,
-      fixed: d.fixed,
       sortOrder: d.sortOrder,
     })
     categories.push(cat)
@@ -377,7 +383,7 @@ export function seedDefaults(vault: VaultData): void {
     const entry: VaultEntry = {
       categoryId: cat.id,
       plannedAmount: d.amount,
-      actualAmount: cat.fixed ? d.amount : '0.00',
+      actualAmount: '0.00',
     }
     period.entries.push(entry)
   }

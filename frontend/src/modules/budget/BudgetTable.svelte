@@ -28,7 +28,7 @@
 
   let { entries, vault, year, month, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; editCategory?: { id: string; name: string; fixed: boolean; groupName: string; plannedAmount: string; actualAmount: string } } | null>(null)
+  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; presetGroupName?: string; editCategory?: { id: string; name: string; groupName: string; plannedAmount: string; actualAmount: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: string; categoryName: string } | null>(null)
 
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
@@ -67,11 +67,14 @@
       g.plannedTotal += Number(e.plannedAmount)
       g.actualTotal += Number(e.actualAmount)
     }
-    return Array.from(map.values()).sort((a, b) => {
-      const ai = list.indexOf(a.entries[0])
-      const bi = list.indexOf(b.entries[0])
-      return ai - bi
-    })
+    // Order by the group's own sortOrder. This used to be inferred from wherever
+    // each group's first category landed in the category sort, which meant
+    // dragging a category could silently reshuffle whole groups.
+    return Array.from(map.values()).sort((a, b) => groupOrder(a.groupId) - groupOrder(b.groupId))
+  }
+
+  function groupOrder(groupId: string): number {
+    return vault.budget.categoryGroups.find(g => g.id === groupId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
   }
 
   let incomeGroups = $derived(groupEntries(incomeEntries))
@@ -82,12 +85,19 @@
     return groups.map(g => ({ name: g.groupName, id: g.groupId }))
   }
 
-  function openAddModal(type: 'income' | 'expense') {
-    addModalContext = { type, groups: groupsForType(type) }
+  function openAddModal(type: 'income' | 'expense', presetGroupName?: string) {
+    addModalContext = { type, groups: groupsForType(type), presetGroupName }
   }
 
-  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) {
-    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, fixed, groupName, plannedAmount, actualAmount } }
+  // The group header toggles collapse on click, so the "+" has to stop the event
+  // reaching it — otherwise adding to a group also folds it away underneath you.
+  function addToGroup(event: MouseEvent, type: 'income' | 'expense', groupName: string) {
+    event.stopPropagation()
+    openAddModal(type, groupName)
+  }
+
+  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string, actualAmount: string) {
+    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, groupName, plannedAmount, actualAmount } }
   }
 
   function openDeleteModal(categoryId: string, categoryName: string) {
@@ -126,6 +136,32 @@
     }
   }
 
+  // Groups are <tbody> elements, so the sortable lives on the <table> and drags
+  // whole tbodies. Separate from the per-group `sortable` above, which drags rows
+  // within one group.
+  function groupSortable(node: HTMLElement) {
+    const instance = Sortable.create(node, {
+      animation: 150,
+      handle: '.group-drag-handle',
+      draggable: 'tbody',
+      ghostClass: 'drag-ghost',
+      onEnd() {
+        const ids = Array.from(node.querySelectorAll('tbody'))
+          .map(b => (b as HTMLElement).dataset.groupId)
+          .filter((id): id is string => Boolean(id))
+        if (ids.length > 0) {
+          engine.reorderGroups(vault, ids)
+          oncategorycreated()
+        }
+      },
+    })
+    return {
+      destroy() {
+        instance.destroy()
+      },
+    }
+  }
+
   function fmt(val: number): string {
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
@@ -141,7 +177,7 @@
     </button>
   </div>
 
-  <table>
+  <table use:groupSortable>
     <thead>
       <tr>
         <th class="col-name">Income</th>
@@ -151,10 +187,16 @@
       </tr>
     </thead>
     {#each incomeGroups as group (group.groupName)}
-      <tbody use:sortable>
+      <tbody use:sortable data-group-id={group.groupId}>
         {#if incomeGroups.length > 1 || group.groupName}
           <tr class="group-header" class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
             <td>
+              <span
+                class="group-drag-handle"
+                title="Drag to reorder"
+                role="presentation"
+                onclick={(e) => e.stopPropagation()}
+              >⠿</span>
               <span class="group-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
                   {#if isCollapsed('income', group.groupName)}
@@ -165,6 +207,12 @@
                 </svg>
               </span>
               {group.groupName || 'Other'}
+              <button
+                class="group-add"
+                title="Add a category to {group.groupName || 'Other'}"
+                aria-label="Add a category to {group.groupName || 'Other'}"
+                onclick={(e) => addToGroup(e, 'income', group.groupName)}
+              >+</button>
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
@@ -183,7 +231,7 @@
     </tfoot>
   </table>
 
-  <table>
+  <table use:groupSortable>
     <thead>
       <tr>
         <th class="col-name">Expenses</th>
@@ -193,10 +241,16 @@
       </tr>
     </thead>
     {#each expenseGroups as group (group.groupName)}
-      <tbody use:sortable>
+      <tbody use:sortable data-group-id={group.groupId}>
         {#if expenseGroups.length > 1 || group.groupName}
           <tr class="group-header" class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
             <td>
+              <span
+                class="group-drag-handle"
+                title="Drag to reorder"
+                role="presentation"
+                onclick={(e) => e.stopPropagation()}
+              >⠿</span>
               <span class="group-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
                   {#if isCollapsed('expense', group.groupName)}
@@ -207,6 +261,12 @@
                 </svg>
               </span>
               {group.groupName || 'Other'}
+              <button
+                class="group-add"
+                title="Add a category to {group.groupName || 'Other'}"
+                aria-label="Add a category to {group.groupName || 'Other'}"
+                onclick={(e) => addToGroup(e, 'expense', group.groupName)}
+              >+</button>
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
@@ -231,6 +291,7 @@
     type={addModalContext.type}
     groups={addModalContext.groups}
     editCategory={addModalContext.editCategory}
+    presetGroupName={addModalContext.presetGroupName}
     {vault}
     oncreated={handleCategoryCreated}
     onclose={() => addModalContext = null}
@@ -302,6 +363,41 @@
   }
   :global(.group-header) .yearly {
     color: #888;
+  }
+  /* Both group affordances stay invisible until the row is hovered, so the
+     header reads as a label rather than a toolbar. */
+  .group-drag-handle {
+    display: inline-block;
+    cursor: grab;
+    color: #ced4da;
+    margin-right: 0.3rem;
+    opacity: 0;
+    transition: opacity 0.12s;
+    user-select: none;
+  }
+  .group-drag-handle:active {
+    cursor: grabbing;
+  }
+  .group-add {
+    background: none;
+    border: none;
+    color: #adb5bd;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.35rem;
+    margin-left: 0.2rem;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .group-add:hover {
+    color: #2d6a4f;
+  }
+  :global(.group-header:hover) .group-drag-handle,
+  :global(.group-header:hover) .group-add,
+  .group-drag-handle:focus-visible,
+  .group-add:focus-visible {
+    opacity: 1;
   }
   .group-chevron {
     display: inline-flex;

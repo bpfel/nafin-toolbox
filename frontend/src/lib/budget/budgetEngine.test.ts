@@ -254,8 +254,8 @@ describe('listCategories', () => {
   test('excludes archived categories by default', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
-      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
+      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', sourceAccountId: 'acc1', sinkAccountId: null },
     ]
 
     const categories = listCategories(vault)
@@ -267,8 +267,8 @@ describe('listCategories', () => {
   test('includes archived categories when requested', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
-      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
+      { id: '1', name: 'Active', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: '2', name: 'Archived', type: 'expense', sortOrder: 20, archived: true, groupId: 'g2', sourceAccountId: 'acc1', sinkAccountId: null },
     ]
 
     const categories = listCategories(vault, true)
@@ -279,9 +279,9 @@ describe('listCategories', () => {
   test('returns categories sorted by sortOrder', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '3', name: 'Third', type: 'expense', sortOrder: 30, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
-      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
-      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
+      { id: '3', name: 'Third', type: 'expense', sortOrder: 30, archived: false, groupId: 'g1', sourceAccountId: 'acc1', sinkAccountId: null },
+      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', sourceAccountId: 'acc1', sinkAccountId: null },
     ]
 
     const categories = listCategories(vault)
@@ -294,8 +294,8 @@ describe('listCategories', () => {
   test('does not mutate original array', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'acc1', sinkAccountId: null },
-      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: '2', name: 'Second', type: 'expense', sortOrder: 20, archived: false, groupId: 'g1', sourceAccountId: 'acc1', sinkAccountId: null },
+      { id: '1', name: 'First', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'acc1' },
     ]
 
     const originalOrder = [...vault.budget.categories]
@@ -318,22 +318,9 @@ describe('createCategory', () => {
     expect(category.type).toBe('income')
     expect(category.sortOrder).toBe(10)
     expect(category.archived).toBe(false)
-    expect(category.fixed).toBe(false)
     expect(category.id).toBeTruthy()
     expect(category.groupId).toBeTruthy()
     expect(vault.budget.categories).toContain(category)
-  })
-
-  test('creates fixed category', () => {
-    const vault = createEmptyVault()
-    const category = createCategory(vault, {
-      name: 'Rent',
-      type: 'expense',
-      groupName: 'Housing',
-      fixed: true,
-    })
-
-    expect(category.fixed).toBe(true)
   })
 
   test('creates category with custom sortOrder', () => {
@@ -513,15 +500,6 @@ describe('updateCategory', () => {
     expect(updated?.archived).toBe(false)
   })
 
-  test('updates fixed flag', () => {
-    const vault = createEmptyVault()
-    const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Group' })
-
-    const updated = updateCategory(vault, category.id, { fixed: true })
-
-    expect(updated?.fixed).toBe(true)
-  })
-
   test('updates groupName by creating new group', () => {
     const vault = createEmptyVault()
     const category = createCategory(vault, { name: 'Test', type: 'income', groupName: 'Old Group' })
@@ -558,13 +536,11 @@ describe('updateCategory', () => {
 
     const updated = updateCategory(vault, category.id, {
       name: 'Updated',
-      fixed: true,
       archived: true,
       sortOrder: 99,
     })
 
     expect(updated?.name).toBe('Updated')
-    expect(updated?.fixed).toBe(true)
     expect(updated?.archived).toBe(true)
     expect(updated?.sortOrder).toBe(99)
   })
@@ -1006,7 +982,6 @@ describe('getPeriodSummary', () => {
       name: 'Salary',
       type: 'income',
       groupName: 'Employment',
-      fixed: true,
     })
 
     createPeriod(vault, 2024, 3)
@@ -1018,13 +993,12 @@ describe('getPeriodSummary', () => {
     expect(summary!.entries[0].categoryType).toBe('income')
     expect(summary!.entries[0].categoryGroupId).toBe(group.id)
     expect(summary!.entries[0].categoryGroupName).toBe('Employment')
-    expect(summary!.entries[0].categoryFixed).toBe(true)
   })
 
   test('handles category with missing group', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: 'cat1', name: 'Test', type: 'income', sortOrder: 10, archived: false, groupId: 'missing-group', fixed: false, sourceAccountId: null, sinkAccountId: 'acc1' },
+      { id: 'cat1', name: 'Test', type: 'income', sortOrder: 10, archived: false, groupId: 'missing-group', sourceAccountId: null, sinkAccountId: 'acc1' },
     ]
 
     createPeriod(vault, 2024, 3)
@@ -1085,29 +1059,12 @@ describe('upsertEntry', () => {
     expect(vault.budget.periods[0].month).toBe(3)
   })
 
-  test('auto-updates actual for fixed categories', () => {
-    const vault = createEmptyVault()
-    const category = createCategory(vault, {
-      name: 'Rent',
-      type: 'expense',
-      groupName: 'Housing',
-      fixed: true,
-    })
-
-    upsertEntry(vault, 2024, 3, category.id, 'planned', '1500.00')
-
-    const period = getPeriod(vault, 2024, 3)
-    expect(period!.entries[0].plannedAmount).toBe('1500.00')
-    expect(period!.entries[0].actualAmount).toBe('1500.00')
-  })
-
-  test('does not auto-update actual for non-fixed categories', () => {
+  test('setting planned never touches actual', () => {
     const vault = createEmptyVault()
     const category = createCategory(vault, {
       name: 'Food',
       type: 'expense',
       groupName: 'Living',
-      fixed: false,
     })
 
     upsertEntry(vault, 2024, 3, category.id, 'planned', '500.00')
@@ -1233,18 +1190,6 @@ describe('seedDefaults', () => {
     expect(vault.budget.categories[0].name).toBe('Existing')
   })
 
-  test('creates fixed and non-fixed categories', () => {
-    const vault = createEmptyVault()
-
-    seedDefaults(vault)
-
-    const fixedCount = vault.budget.categories.filter(c => c.fixed).length
-    const nonFixedCount = vault.budget.categories.filter(c => !c.fixed).length
-
-    expect(fixedCount).toBeGreaterThan(0)
-    expect(nonFixedCount).toBeGreaterThan(0)
-  })
-
   test('creates both income and expense categories', () => {
     const vault = createEmptyVault()
 
@@ -1257,7 +1202,7 @@ describe('seedDefaults', () => {
     expect(expenseCount).toBeGreaterThan(0)
   })
 
-  test('sets actual amount for fixed categories in default period', () => {
+  test('seeds every default category with actual 0.00', () => {
     const vault = createEmptyVault()
     const now = new Date()
     const year = now.getFullYear()
@@ -1266,25 +1211,7 @@ describe('seedDefaults', () => {
     seedDefaults(vault)
 
     const period = getPeriod(vault, year, month)
-    const fixedCategories = vault.budget.categories.filter(c => c.fixed)
-
-    for (const cat of fixedCategories) {
-      const entry = period!.entries.find(e => e.categoryId === cat.id)
-      expect(entry).toBeTruthy()
-      expect(entry!.plannedAmount).toBe(entry!.actualAmount)
-    }
-  })
-
-  test('sets actual to 0.00 for non-fixed categories in default period', () => {
-    const vault = createEmptyVault()
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
-
-    seedDefaults(vault)
-
-    const period = getPeriod(vault, year, month)
-    const nonFixedCategories = vault.budget.categories.filter(c => !c.fixed)
+    const nonFixedCategories = vault.budget.categories
 
     for (const cat of nonFixedCategories) {
       const entry = period!.entries.find(e => e.categoryId === cat.id)

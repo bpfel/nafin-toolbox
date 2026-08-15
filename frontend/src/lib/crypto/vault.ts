@@ -67,7 +67,6 @@ export interface VaultCategory {
   sortOrder: number
   archived: boolean
   groupId: string
-  fixed: boolean
   sourceAccountId: string | null
   sinkAccountId: string | null
   reserve?: ReserveDefinition
