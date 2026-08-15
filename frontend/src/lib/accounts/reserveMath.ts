@@ -104,16 +104,40 @@ export function nextDue(anchorMonth: string, periodMonths: number, currentMonth:
 //                  Past the full period the requirement stays at the target
 //                  instead of rolling over: only the purchase dialogue resets
 //                  an amortization, because only the user knows they bought it.
+/**
+ * How far ahead of the due month an obligation must be fully funded.
+ *
+ * A bill that falls due in March is often paid in February, and having the money
+ * appear only in the month it leaves is too late to be useful. With a lead of 1
+ * the full target is required a month early, which means the same amount is
+ * saved over one fewer month — the monthly rate rises from target/period to
+ * target/(period - 1) rather than the schedule simply shifting and leaving a
+ * permanent shortfall.
+ */
+const OBLIGATION_LEAD_MONTHS = 1
+
 export function requiredForItem(reserve: ReserveDefinition, currentMonth: string): string {
   const { kind, targetAmount, periodMonths, anchorMonth } = reserve
   assertPeriod(periodMonths)
 
-  const elapsed = kind === 'obligation'
-    ? periodMonths - monthsBetween(currentMonth, nextDue(anchorMonth, periodMonths, currentMonth))
-    : clamp(monthsBetween(anchorMonth, currentMonth), 0, periodMonths)
-
   const target = toCents(targetAmount)
-  return fromCents(roundHalfAwayFromZero((target * elapsed) / periodMonths))
+
+  if (kind === 'amortization') {
+    // No lead: nothing arrives on a date. The purchase happens when the money is
+    // there, so being ready "early" is not a distinct state.
+    const elapsed = clamp(monthsBetween(anchorMonth, currentMonth), 0, periodMonths)
+    return fromCents(roundHalfAwayFromZero((target * elapsed) / periodMonths))
+  }
+
+  // Obligation. The saving window is the cycle minus the lead, so the full target
+  // lands `OBLIGATION_LEAD_MONTHS` before the bill. A period short enough that the
+  // lead would consume it entirely (a monthly bill) keeps a one-month window
+  // rather than dividing by zero.
+  const savingMonths = Math.max(1, periodMonths - OBLIGATION_LEAD_MONTHS)
+  const monthsUntilDue = monthsBetween(currentMonth, nextDue(anchorMonth, periodMonths, currentMonth))
+  const elapsed = clamp(periodMonths - monthsUntilDue, 0, savingMonths)
+
+  return fromCents(roundHalfAwayFromZero((target * elapsed) / savingMonths))
 }
 
 function clamp(value: number, low: number, high: number): number {

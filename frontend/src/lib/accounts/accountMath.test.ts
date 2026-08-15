@@ -66,7 +66,7 @@ function vaultWith(
   periods: VaultPeriod[] = [],
 ): VaultData {
   return {
-    version: 2,
+    version: 3,
     budget: { categoryGroups: [], categories, periods },
     accounts,
   }
@@ -100,8 +100,10 @@ describe('requiredForAccount', () => {
       ],
     )
 
-    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('400.00')
-    expect(requiredForAccount(vault, MAIN, '2027-01')).toBe('500.00')
+    // 1200/11 + 900/2 — the saving window is period - 1, because an obligation
+    // must be funded a month before it falls due.
+    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('559.09')
+    expect(requiredForAccount(vault, MAIN, '2027-01')).toBe('545.45') // 6000/11
   })
 
   test('an archived category with a reserve contributes nothing', () => {
@@ -119,7 +121,7 @@ describe('requiredForAccount', () => {
     const vault = vaultWith([account(MAIN), account(RESERVES)], [live, archived])
 
     // Only the live 1200/12 reserve counts; archiving lowers the requirement.
-    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('100.00')
+    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('109.09')
   })
 
   test('is 0.00 for an account with no reserves', () => {
@@ -257,8 +259,8 @@ describe('availableForAccount', () => {
     const projected = projectedBalance(vault, RESERVES, '2027-01')
     const required = requiredForAccount(vault, RESERVES, '2027-01')
     expect(projected).toBe('1100.00')
-    expect(required).toBe('100.00')
-    expect(availableForAccount(vault, RESERVES, '2027-01')).toBe('1000.00')
+    expect(required).toBe('109.09')
+    expect(availableForAccount(vault, RESERVES, '2027-01')).toBe('990.91')
     expect(Number(availableForAccount(vault, RESERVES, '2027-01')))
       .toBeCloseTo(Number(projected) - Number(required), 2)
   })
