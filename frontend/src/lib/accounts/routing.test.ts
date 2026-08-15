@@ -19,7 +19,6 @@ function category(overrides: Partial<VaultCategory> = {}): VaultCategory {
     sortOrder: 10,
     archived: false,
     groupId: 'group-1',
-    fixed: false,
     sourceAccountId: A,
     sinkAccountId: null,
     ...overrides,

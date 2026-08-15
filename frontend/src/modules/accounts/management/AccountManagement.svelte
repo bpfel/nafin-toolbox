@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Sortable from 'sortablejs'
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/accounts/accountsEngine'
   import {
@@ -58,6 +59,47 @@
   // throws on the last one — so the card hides the action instead of offering
   // a button that can only fail.
   let canDelete = $derived(rows.length > 1)
+
+  // A drag handle on a one-card list is a control that can only do nothing, so
+  // it is hidden rather than shown inert.
+  let canReorder = $derived(rows.length > 1)
+
+  // `vault.accounts` carries no sortOrder — the array order is the display
+  // order. So the new order is read straight back off the DOM after a drop and
+  // handed to the engine, which is defensive about anything missing or stale.
+  function sortable(node: HTMLElement) {
+    const instance = Sortable.create(node, {
+      animation: 150,
+      handle: '.drag-handle',
+      draggable: '.account-card',
+      ghostClass: 'drag-ghost',
+      onEnd() {
+        const cards = node.querySelectorAll('.account-card')
+        const ids = Array.from(cards)
+          .map(c => (c as HTMLElement).dataset.accountId)
+          .filter((id): id is string => Boolean(id))
+        if (ids.length > 0) reorder(ids)
+      },
+    })
+    return {
+      destroy() {
+        instance.destroy()
+      },
+    }
+  }
+
+  function reorder(ids: string[]) {
+    const vault = vaultState.vault
+    if (!vault) return
+    error = null
+    try {
+      engine.reorderAccounts(vault, ids)
+      markDirty()
+      version++
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to reorder the accounts'
+    }
+  }
 
   function openCreate() {
     formAccount = null
@@ -160,7 +202,7 @@
   {#if !vaultState.vault}
     <p class="loading">Loading...</p>
   {:else}
-    <div class="cards">
+    <div class="cards" use:sortable>
       {#each rows as row (row.account.id)}
         <AccountCard
           account={row.account}
@@ -169,6 +211,7 @@
           available={row.available}
           {currentMonth}
           {canDelete}
+          {canReorder}
           onedit={() => openEdit(row.account)}
           ondelete={() => (deleteTarget = row.account)}
           onqrbill={() => (qrTarget = row.account)}

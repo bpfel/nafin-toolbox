@@ -12,13 +12,15 @@
     currentMonth: string
     /** False for the last remaining account, which cannot be deleted at all. */
     canDelete: boolean
+    /** False when this is the only account — there is nothing to drag it past. */
+    canReorder: boolean
     onedit: () => void
     ondelete: () => void
     onqrbill: () => void
     oncorrect: (amount: string, atDate: string) => void
   }
 
-  let { account, projected, required, available, currentMonth, canDelete, onedit, ondelete, onqrbill, oncorrect }: Props = $props()
+  let { account, projected, required, available, currentMonth, canDelete, canReorder, onedit, ondelete, onqrbill, oncorrect }: Props = $props()
 
   const KIND_LABELS: Record<AccountKind, string> = {
     transactional: 'Transactional',
@@ -94,8 +96,14 @@
   }
 </script>
 
-<article class="card">
+<article class="card account-card" data-account-id={account.id}>
   <header class="card-head">
+    {#if canReorder}
+      <!-- The sole drag affordance: `handle: '.drag-handle'` confines dragging
+           to this element, so the buttons and the correction inputs below stay
+           clickable and selectable. -->
+      <span class="drag-handle" role="img" aria-label="Drag to reorder {account.name}">&#x2807;</span>
+    {/if}
     <div class="identity">
       <h3>{account.name}</h3>
       <p class="meta">
@@ -197,6 +205,24 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.5rem;
+  }
+  .drag-handle {
+    cursor: grab;
+    color: #ccc;
+    font-size: 1rem;
+    line-height: 1.3;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .drag-handle:hover {
+    color: #888;
+  }
+  .drag-handle:active {
+    cursor: grabbing;
+  }
+  /* Scoped to this card so it cannot collide with another module's ghost. */
+  :global(.account-card.drag-ghost) {
+    opacity: 0.4;
   }
   h3 {
     margin: 0;

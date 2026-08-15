@@ -71,6 +71,52 @@ describe('AccountManagement delete affordance', () => {
   })
 })
 
+describe('AccountManagement reorder affordance', () => {
+  // `vault.accounts` has no sortOrder — the array order is the display order,
+  // and `onEnd` reads it back out of these attributes.
+  test('every card carries its account id for the drop handler to read', () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    const ids = Array.from(container.querySelectorAll('.account-card')).map(
+      c => (c as HTMLElement).dataset.accountId,
+    )
+    expect(ids).toEqual(['a', 'b'])
+  })
+
+  test('cards render in vault.accounts order', () => {
+    store.vault = vault(account('b', 'Reserves'), account('a', 'Main'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    const ids = Array.from(container.querySelectorAll('.account-card')).map(
+      c => (c as HTMLElement).dataset.accountId,
+    )
+    expect(ids).toEqual(['b', 'a'])
+  })
+
+  test('each card exposes a labelled drag handle', () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(screen.getByLabelText('Drag to reorder Main').classList.contains('drag-handle')).toBe(
+      true,
+    )
+    expect(screen.getByLabelText('Drag to reorder Reserves')).toBeTruthy()
+  })
+
+  // Dragging the only account can only put it back where it was.
+  test('no drag handle is offered when a single account exists', () => {
+    store.vault = vault(account('a', 'Main'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
+  })
+})
+
 describe('AccountManagement QR capability', () => {
   // Capability follows from holding an IBAN, not from the account's kind.
   test('the QR bill action appears only for an account with an IBAN', () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
@@ -6,19 +7,24 @@
   interface Props {
     type: 'income' | 'expense'
     groups: { name: string; id: string }[]
-    editCategory?: { id: string; name: string; fixed: boolean; groupName: string; plannedAmount?: string; actualAmount?: string } | null
+    editCategory?: { id: string; name: string; groupName: string; plannedAmount?: string; actualAmount?: string } | null
+    /** Preselects the group when adding — set by the "+" on a group header. */
+    presetGroupName?: string
     vault: VaultData
     oncreated: () => void
     onclose: () => void
     onsave?: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
   }
 
-  let { type, groups, editCategory = null, vault, oncreated, onclose, onsave }: Props = $props()
+  let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave }: Props = $props()
 
   let isEdit = $derived(editCategory != null)
   let name = $state(editCategory?.name ?? '')
-  let fixed = $state(editCategory?.fixed ?? false)
-  let selectedGroup = $state(editCategory?.groupName ?? groups[0]?.name ?? '')
+  // Seeded once: the modal is created fresh each time it opens, so these are
+  // deliberately initial values rather than reactive reads.
+  let selectedGroup = $state(
+    untrack(() => editCategory?.groupName ?? presetGroupName ?? groups[0]?.name ?? ''),
+  )
   let newGroupName = $state('')
   let useNewGroup = $state(false)
   let error = $state<string | null>(null)
@@ -89,7 +95,6 @@
       if (isEdit && editCategory) {
         engine.updateCategory(vault, editCategory.id, {
           name: trimmed,
-          fixed,
           groupName: resolvedGroupName,
         })
       } else {
@@ -97,7 +102,6 @@
           name: trimmed,
           type,
           groupName: resolvedGroupName,
-          fixed,
         })
       }
       oncreated()
@@ -159,12 +163,6 @@
       />
     </label>
 
-    <label class="field checkbox-field">
-      <input type="checkbox" bind:checked={fixed} />
-      <span>Fixed amount</span>
-      <span class="hint">Actual always equals planned</span>
-    </label>
-
     {#if isEdit && editCategory?.plannedAmount != null}
       <div class="values-section">
         <span class="label">Values</span>
@@ -195,18 +193,14 @@
           </label>
           <label class="value-field">
             <span class="value-label">Actual/mo</span>
-            {#if fixed}
-              <span class="value-fixed">{actualMoValue}</span>
-            {:else}
-              <input
-                type="text"
-                inputmode="decimal"
-                class="value-input"
-                bind:value={actualMoValue}
-                onfocus={(e) => handleValueFocus('actual_mo', e)}
-                onblur={() => handleValueBlur('actual_mo')}
-              />
-            {/if}
+            <input
+              type="text"
+              inputmode="decimal"
+              class="value-input"
+              bind:value={actualMoValue}
+              onfocus={(e) => handleValueFocus('actual_mo', e)}
+              onblur={() => handleValueBlur('actual_mo')}
+            />
           </label>
         </div>
       </div>
@@ -390,15 +384,6 @@
   }
   .value-input.yearly {
     color: #888;
-  }
-  .value-fixed {
-    display: block;
-    padding: 0.5rem;
-    color: #888;
-    font-style: italic;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.95rem;
   }
 
   @media (max-width: 480px) {

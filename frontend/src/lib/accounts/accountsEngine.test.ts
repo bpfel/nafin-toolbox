@@ -1,5 +1,11 @@
 import { describe, test, expect } from 'vitest'
-import { createAccount, renameAccount, deleteAccount, correctBalance } from './accountsEngine'
+import {
+  createAccount,
+  renameAccount,
+  deleteAccount,
+  correctBalance,
+  reorderAccounts,
+} from './accountsEngine'
 import { isLegalCategoryRouting } from './routing'
 import { createEmptyVault, type VaultCategory, type VaultData, type ReserveDefinition } from '../crypto/vault'
 
@@ -11,7 +17,6 @@ function addCategory(vault: VaultData, overrides: Partial<VaultCategory> = {}): 
     sortOrder: 10,
     archived: false,
     groupId: 'group-1',
-    fixed: false,
     sourceAccountId: null,
     sinkAccountId: null,
     ...overrides,
@@ -157,6 +162,126 @@ describe('correctBalance', () => {
 
     expect(() => correctBalance(vault, 'no-such-account', '10.00', '2026-03-31')).toThrow(/not found/)
     expect(snapshot(vault)).toBe(before)
+  })
+})
+
+describe('reorderAccounts', () => {
+  // Four accounts named for their starting position, so an expectation reads
+  // as the order it describes.
+  function fourAccounts(vault: VaultData) {
+    const first = vault.accounts[0]
+    return [
+      first,
+      createAccount(vault, { name: 'Second' }),
+      createAccount(vault, { name: 'Third' }),
+      createAccount(vault, { name: 'Fourth' }),
+    ]
+  }
+
+  test('a full id list produces exactly that order', () => {
+    const vault = createEmptyVault()
+    const [a, b, c, d] = fourAccounts(vault)
+
+    reorderAccounts(vault, [d.id, b.id, a.id, c.id])
+
+    expect(vault.accounts.map(x => x.id)).toEqual([d.id, b.id, a.id, c.id])
+  })
+
+  test('reversing then restoring returns the original order', () => {
+    const vault = createEmptyVault()
+    const [a, b, c, d] = fourAccounts(vault)
+
+    reorderAccounts(vault, [d.id, c.id, b.id, a.id])
+    reorderAccounts(vault, [a.id, b.id, c.id, d.id])
+
+    expect(vault.accounts.map(x => x.id)).toEqual([a.id, b.id, c.id, d.id])
+  })
+
+  test('omitted accounts are kept, appended in their original relative order', () => {
+    const vault = createEmptyVault()
+    const [a, b, c, d] = fourAccounts(vault)
+
+    // Only two ids arrive — a stale or filtered read. b and d must survive,
+    // and b (originally before d) must still come before it.
+    reorderAccounts(vault, [c.id, a.id])
+
+    expect(vault.accounts.map(x => x.id)).toEqual([c.id, a.id, b.id, d.id])
+  })
+
+  test('an empty id list is a no-op rather than an erasure', () => {
+    const vault = createEmptyVault()
+    const [a, b, c, d] = fourAccounts(vault)
+
+    reorderAccounts(vault, [])
+
+    expect(vault.accounts.map(x => x.id)).toEqual([a.id, b.id, c.id, d.id])
+  })
+
+  test('unknown ids are ignored and nothing is lost', () => {
+    const vault = createEmptyVault()
+    const [a, b, c, d] = fourAccounts(vault)
+
+    reorderAccounts(vault, ['ghost-1', c.id, 'ghost-2', a.id, 'ghost-3', d.id, b.id])
+
+    expect(vault.accounts.map(x => x.id)).toEqual([c.id, a.id, d.id, b.id])
+  })
+
+  test('a repeated id places the account once, keeping every other account', () => {
+    const vault = createEmptyVault()
+    const [a, b, c, d] = fourAccounts(vault)
+
+    reorderAccounts(vault, [b.id, b.id, a.id])
+
+    expect(vault.accounts.map(x => x.id)).toEqual([b.id, a.id, c.id, d.id])
+  })
+
+  test('the account count never changes, whatever the id list', () => {
+    const lists: (string[] | 'full' | 'partial')[] = ['full', 'partial', [], ['nope'], ['nope', 'nope']]
+
+    for (const spec of lists) {
+      const vault = createEmptyVault()
+      const [a, b, c, d] = fourAccounts(vault)
+      const ids =
+        spec === 'full' ? [d.id, c.id, b.id, a.id] : spec === 'partial' ? [c.id] : spec
+
+      reorderAccounts(vault, ids)
+
+      expect(vault.accounts).toHaveLength(4)
+      expect(new Set(vault.accounts.map(x => x.id))).toEqual(new Set([a.id, b.id, c.id, d.id]))
+    }
+  })
+
+  test('reordering disturbs no account field and keeps object identity', () => {
+    const vault = createEmptyVault()
+    const [a, b, c, d] = fourAccounts(vault)
+    correctBalance(vault, b.id, '1234.50', '2026-03-31')
+    b.iban = 'CH9300762011623852957'
+    b.bankName = 'Example Bank'
+    const before = JSON.stringify(vault.accounts.map(x => ({ ...x })).sort((x, y) => x.id < y.id ? -1 : 1))
+
+    reorderAccounts(vault, [d.id, a.id])
+
+    const after = JSON.stringify(vault.accounts.map(x => ({ ...x })).sort((x, y) => x.id < y.id ? -1 : 1))
+    expect(after).toBe(before)
+    // The same objects, not copies — the UI holds references to them.
+    expect(vault.accounts).toContain(b)
+    expect(vault.accounts).toContain(c)
+    expect(b.currentAmount).toBe('1234.50')
+    expect(b.lastCorrectedAt).toBe('2026-03-31')
+    expect(b.iban).toBe('CH9300762011623852957')
+  })
+
+  test('leaves categories and their routing alone', () => {
+    const vault = createEmptyVault()
+    const [a, b] = fourAccounts(vault)
+    const spending = addCategory(vault, { sourceAccountId: a.id, sinkAccountId: null })
+    const income = addCategory(vault, { type: 'income', sourceAccountId: null, sinkAccountId: b.id })
+
+    reorderAccounts(vault, [b.id, a.id])
+
+    expect(spending.sourceAccountId).toBe(a.id)
+    expect(income.sinkAccountId).toBe(b.id)
+    expect(vault.budget.categories).toHaveLength(2)
   })
 })
 

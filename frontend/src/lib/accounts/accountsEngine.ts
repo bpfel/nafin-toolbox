@@ -60,6 +60,32 @@ export function deleteAccount(vault: VaultData, id: string, reassignToId: string
   vault.accounts = vault.accounts.filter(a => a.id !== id)
 }
 
+// `vault.accounts` has no sortOrder field: the array order *is* the display
+// order, so reordering means rearranging the array itself.
+//
+// `accountIds` is treated as a preference, not as the truth about what exists.
+// It comes from reading the DOM back out after a drag, so it can be stale,
+// partial, or carry an id for an account that is already gone. Anything it
+// leaves out is kept and appended in its previous relative order, and ids that
+// match no account are skipped — losing an account here would destroy user data,
+// which no reordering gesture should ever be able to do.
+export function reorderAccounts(vault: VaultData, accountIds: string[]): void {
+  const unplaced = new Map(vault.accounts.map(a => [a.id, a]))
+  const ordered: VaultAccount[] = []
+
+  for (const id of accountIds) {
+    const account = unplaced.get(id)
+    // Skips both unknown ids and a repeated id already placed.
+    if (!account) continue
+    unplaced.delete(id)
+    ordered.push(account)
+  }
+
+  // A Map iterates in insertion order, so the leftovers come out in the order
+  // they had in the vault.
+  vault.accounts = [...ordered, ...unplaced.values()]
+}
+
 // The anchor pair. `currentAmount` is only meaningful as at `lastCorrectedAt`,
 // so the two always move together — this is the sole way `currentAmount`
 // changes. Allocations never touch it; the working balance is projected from

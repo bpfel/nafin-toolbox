@@ -16,7 +16,7 @@ function legacyV1Vault(): unknown {
     budget: {
       categoryGroups: [{ id: 'g1', name: 'Income', type: 'income', sortOrder: 0 }],
       categories: [
-        { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', fixed: true },
+        { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1' },
       ],
       periods: [
         {
@@ -172,7 +172,7 @@ describe('account and routing fields', () => {
 
     vault.budget.categoryGroups.push({ id: 'g1', name: 'Expenses', type: 'expense', sortOrder: 0 })
     vault.budget.categories.push(
-      { id: 'c1', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', fixed: false, sourceAccountId: accountId, sinkAccountId: null },
+      { id: 'c1', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: accountId, sinkAccountId: null },
       {
         id: 'c2',
         name: 'Car service',
@@ -180,7 +180,6 @@ describe('account and routing fields', () => {
         sortOrder: 1,
         archived: false,
         groupId: 'g1',
-        fixed: true,
         sourceAccountId: accountId,
         sinkAccountId: accountId,
         reserve: { kind: 'obligation', targetAmount: '900.00', periodMonths: 12, anchorMonth: '2026-11' },
@@ -216,8 +215,8 @@ describe('encryptVault and decryptVault', () => {
           { id: 'g2', name: 'Expenses', type: 'expense', sortOrder: 1 },
         ],
         categories: [
-          { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', fixed: true, sourceAccountId: null, sinkAccountId: 'a1' },
-          { id: 'c2', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g2', fixed: false, sourceAccountId: 'a1', sinkAccountId: null },
+          { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
+          { id: 'c2', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g2', sourceAccountId: 'a1', sinkAccountId: null },
         ],
         periods: [
           {
@@ -357,7 +356,7 @@ describe('encryptVault and decryptVault', () => {
           { id: 'g1', name: 'Income', type: 'income', sortOrder: 0 },
         ],
         categories: [
-          { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', fixed: true, sourceAccountId: null, sinkAccountId: 'a1' },
+          { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
         periods: [
           {
@@ -402,8 +401,8 @@ describe('encryptVault and decryptVault', () => {
       budget: {
         categoryGroups: [{ id: 'g1', name: 'Expenses', type: 'expense', sortOrder: 0 }],
         categories: [
-          { id: 'c1', name: 'Active', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'a1', sinkAccountId: null },
-          { id: 'c2', name: 'Archived', type: 'expense', sortOrder: 1, archived: true, groupId: 'g1', fixed: false, sourceAccountId: 'a1', sinkAccountId: null },
+          { id: 'c1', name: 'Active', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
+          { id: 'c2', name: 'Archived', type: 'expense', sortOrder: 1, archived: true, groupId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
         ],
         periods: [],
       },
@@ -416,30 +415,6 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.budget.categories[1].archived).toBe(true)
   })
 
-  test('preserves fixed flag in categories', async () => {
-    const mek = await generateMEK()
-    const vault: VaultData = {
-      version: 2,
-      accounts: [
-        { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
-      ],
-      budget: {
-        categoryGroups: [{ id: 'g1', name: 'Income', type: 'income', sortOrder: 0 }],
-        categories: [
-          { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', fixed: true, sourceAccountId: null, sinkAccountId: 'a1' },
-          { id: 'c2', name: 'Bonus', type: 'income', sortOrder: 1, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'a1' },
-        ],
-        periods: [],
-      },
-    }
-
-    const encrypted = await encryptVault(vault, mek)
-    const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
-
-    expect(decrypted.budget.categories[0].fixed).toBe(true)
-    expect(decrypted.budget.categories[1].fixed).toBe(false)
-  })
-
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
@@ -450,7 +425,7 @@ describe('encryptVault and decryptVault', () => {
       budget: {
         categoryGroups: [{ id: 'g1', name: 'Expenses', type: 'expense', sortOrder: 0 }],
         categories: [
-          { id: 'c1', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', fixed: false, sourceAccountId: 'a1', sinkAccountId: null },
+          { id: 'c1', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
         ],
         periods: [
           {
@@ -483,7 +458,7 @@ describe('encryptVault and decryptVault', () => {
       budget: {
         categoryGroups: [{ id: 'g1', name: 'Émoji 🎉 & Special "chars"', type: 'income', sortOrder: 0 }],
         categories: [
-          { id: 'c1', name: 'Salary (CHF)', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', fixed: true, sourceAccountId: null, sinkAccountId: 'a1' },
+          { id: 'c1', name: 'Salary (CHF)', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
         periods: [
           {
@@ -519,8 +494,8 @@ describe('encryptVault and decryptVault', () => {
           { id: 'g3', name: 'Third', type: 'expense', sortOrder: 2 },
         ],
         categories: [
-          { id: 'c1', name: 'Cat1', type: 'income', sortOrder: 5, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'a1' },
-          { id: 'c2', name: 'Cat2', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', fixed: false, sourceAccountId: null, sinkAccountId: 'a1' },
+          { id: 'c1', name: 'Cat1', type: 'income', sortOrder: 5, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
+          { id: 'c2', name: 'Cat2', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
         periods: [],
       },
@@ -564,7 +539,6 @@ describe('encryptVault and decryptVault', () => {
           sortOrder: i,
           archived: i % 10 === 0,
           groupId: `g${i % 10}`,
-          fixed: i % 3 === 0,
           sourceAccountId: i % 2 === 0 ? null : `a${i % 5}`,
           sinkAccountId: i % 2 === 0 ? `a${i % 5}` : null,
         })),
@@ -601,7 +575,7 @@ describe('encryptVault and decryptVault', () => {
       budget: {
         categoryGroups: [{ id: '', name: '', type: 'income', sortOrder: 0 }],
         categories: [
-          { id: '', name: '', type: 'income', sortOrder: 0, archived: false, groupId: '', fixed: false, sourceAccountId: null, sinkAccountId: '' },
+          { id: '', name: '', type: 'income', sortOrder: 0, archived: false, groupId: '', sourceAccountId: null, sinkAccountId: '' },
         ],
         periods: [
           {

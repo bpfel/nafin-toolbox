@@ -9,7 +9,7 @@
     viewMode?: 'monthly' | 'yearly'
     onsave: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
     ondelete: (categoryId: string, categoryName: string) => void
-    onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) => void
+    onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string, actualAmount: string) => void
   }
 
   let { entry, viewMode = 'monthly', onsave, ondelete, onedit }: Props = $props()
@@ -182,7 +182,6 @@
 <tr
   class="entry-row"
   class:income={entry.categoryType === 'income'}
-  class:fixed={entry.categoryFixed}
   data-category-id={entry.categoryId}
   ontouchstart={handleTouchStart}
   ontouchend={handleTouchEnd}
@@ -194,12 +193,9 @@
       <span class="drag-handle" aria-label="Drag to reorder">&#x2807;</span>
       <button
         class="name-text"
-        onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.categoryFixed, entry.plannedAmount, entry.actualAmount)}
+        onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount, entry.actualAmount)}
       >
         {entry.categoryName}
-        {#if entry.categoryFixed}
-          <span class="fixed-badge">fixed</span>
-        {/if}
       </button>
       <button
         class="trash-btn"
@@ -240,21 +236,17 @@
     />
   </td>
   <td class="amount-cell">
-    {#if entry.categoryFixed}
-      <span class="amount-fixed">{fmt(Number(entry.actualAmount))}</span>
-    {:else}
-      <input
-        type="text"
-        inputmode="decimal"
-        class="cell-input"
-        class:cell-error={actualMoError}
-        data-field="actual_mo"
-        bind:value={actualMoValue}
-        onfocus={(e) => handleFocus('actual_mo', e)}
-        onblur={() => handleBlur('actual_mo')}
-        onkeydown={(e) => handleKeydown('actual_mo', e)}
-      />
-    {/if}
+    <input
+      type="text"
+      inputmode="decimal"
+      class="cell-input"
+      class:cell-error={actualMoError}
+      data-field="actual_mo"
+      bind:value={actualMoValue}
+      onfocus={(e) => handleFocus('actual_mo', e)}
+      onblur={() => handleBlur('actual_mo')}
+      onkeydown={(e) => handleKeydown('actual_mo', e)}
+    />
   </td>
 </tr>
 
@@ -306,13 +298,6 @@
     text-decoration-color: #aaa;
     text-underline-offset: 2px;
   }
-  .fixed-badge {
-    font-size: 0.7rem;
-    color: #888;
-    font-style: italic;
-    font-weight: 400;
-    margin-left: 0.35rem;
-  }
   .trash-btn {
     background: none;
     border: none;
@@ -345,14 +330,6 @@
   }
   .amount-cell.yearly .cell-input {
     color: #888;
-  }
-  .amount-fixed {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    color: #888;
-    font-style: italic;
-    text-align: right;
-    width: 100%;
   }
   .cell-input {
     width: 100%;
