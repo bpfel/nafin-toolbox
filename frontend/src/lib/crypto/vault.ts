@@ -1,11 +1,11 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 2
+export const VAULT_VERSION = 3
 
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 2
+  version: 3
   budget: BudgetVaultData
   accounts: VaultAccount[]
 }
@@ -122,13 +122,47 @@ export async function decryptVault(
 
   const parsed = JSON.parse(new TextDecoder().decode(decrypted))
 
-  // Pre-v1.0 decision: vaults of any other version are scrubbed, not migrated.
-  // Their contents are discarded entirely and replaced by a fresh v2 vault.
-  if (!parsed || parsed.version !== VAULT_VERSION) {
-    return createEmptyVault()
-  }
+  return migrateVault(parsed)
+}
 
-  return parsed as VaultData
+/**
+ * Brings a decrypted vault up to the current version.
+ *
+ * Versions with a known upgrade path are migrated in place, preserving the
+ * user's data. Anything else — a version predating migrations, a missing
+ * version, a non-object — is scrubbed and replaced by a fresh vault. That
+ * scrub remains the pre-v1.0 fallback; it is no longer the only behaviour.
+ */
+export function migrateVault(parsed: unknown): VaultData {
+  if (!parsed || typeof parsed !== 'object') return createEmptyVault()
+
+  const vault = parsed as { version?: unknown; budget?: { categories?: unknown } }
+
+  if (vault.version === VAULT_VERSION) return vault as unknown as VaultData
+  if (vault.version === 2) return migrateV2ToV3(vault)
+
+  return createEmptyVault()
+}
+
+/**
+ * v2 -> v3: the `fixed` flag was removed from categories.
+ *
+ * Dropping a field is backward-compatible at runtime, so nothing breaks without
+ * this — but the key would linger in stored data, describing a feature that no
+ * longer exists. Strip it explicitly; everything else carries over untouched, so
+ * budgets, accounts, routing and reserves all survive.
+ */
+function migrateV2ToV3(vault: { version?: unknown; budget?: { categories?: unknown } }): VaultData {
+  const categories = vault.budget?.categories
+  if (Array.isArray(categories)) {
+    for (const category of categories) {
+      if (category && typeof category === 'object') {
+        delete (category as Record<string, unknown>).fixed
+      }
+    }
+  }
+  vault.version = VAULT_VERSION
+  return vault as unknown as VaultData
 }
 
 export function createEmptyVault(): VaultData {

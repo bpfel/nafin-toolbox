@@ -37,7 +37,7 @@ function category(overrides: Partial<VaultCategory> & { id: string; name: string
 
 function makeVault(): VaultData {
   return {
-    version: 2,
+    version: 3,
     accounts: [
       {
         id: 'main',
