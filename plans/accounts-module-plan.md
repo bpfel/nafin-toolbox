@@ -106,35 +106,61 @@ The last row is what generalizes the setup. A user running everything from one a
 source and sink to the same account everywhere; a user who splits salary from savings gets
 multi-account behaviour from the same model with no special cases.
 
+### At least one account always exists
+
+**Invariant: there is never zero accounts.** One is created implicitly — named "Main",
+carrying nothing but an id, a name and a zero balance — so every category can be routed from
+the moment it is created. The last account cannot be deleted.
+
+This is what removes the unassigned state entirely. It also keeps **Set-aside** available to
+users who never enable the Accounts module: the sink always exists, even if it is the same
+account the money came from.
+
+The Accounts *module* — management screens, multiple accounts, QR bills — remains opt-in.
+The single account *record* is substrate the budget needs anyway, because money always sits
+somewhere. A user who never enables the module never sees an account.
+
 ### Which combinations are valid
 
-Ten combinations of `type` × routing; six legal, four contradictory.
+With the invariant, `null` on both sides cannot occur. Six combinations remain; four legal.
 
 | `type` | Routing | Verdict |
 |---|---|---|
-| income | (null, null) | Legal — unrouted |
 | income | (null, A) | Canonical income |
 | income | (A, null) | Contradiction — typed income, money leaves |
 | income | (A, B) | Contradiction — internal move counted as new income |
 | income | (A, A) | Contradiction — nothing moves, nothing earned |
-| expense | (null, null) | Legal — unrouted |
 | expense | (null, A) | Contradiction — typed expense, money arrives |
 | expense | (A, null) | Canonical expense — real outflow |
-| expense | (A, B) | Legal — reserve allocation |
-| expense | (A, A) | Legal — single-account reserve, notional set-aside |
+| expense | (A, B) | Legal — set-aside into another account |
+| expense | (A, A) | Legal — set-aside within the same account |
 
 The rule in one sentence: **`type` must agree with the direction of boundary crossing, when
 there is one.** A null source means income; a null sink means expense; two internal endpoints
-can only be an expense; two external endpoints are unrouted.
+can only be an expense.
 
 Derived constraints:
 
-- `reserve` implies `type === 'expense'` **and** `sink !== null`. A reserve accumulates
-  somewhere for future spending, so it is always one of the last two rows.
-- `(A, A)` implies `reserve`. An ordinary expense from an account into itself would mean
-  "spent but still there". In a single-account setup real expenses are still `(A, null)`.
-- **`(null, null)` must stay legal.** Every category in every existing budget is unrouted
-  today. Rejecting it would break every budget on the day the module is enabled.
+- `reserve` implies `type === 'expense'` **and** `sink !== null` — a reserve accumulates
+  somewhere, so it is always one of the last two rows.
+- `(A, A)` implies set-aside. An ordinary expense from an account into itself would mean
+  "spent but still there"; real expenses are always `(A, null)`.
+
+### Named kinds
+
+The four legal rows collapse to three kinds the user actually picks:
+
+| Kind | Routing | Question it answers |
+|---|---|---|
+| **Income** | (null, A) | Money arrives from outside |
+| **Spending** | (A, null) | Money leaves your accounts for good |
+| **Set-aside** | (A, B) or (A, A) | Money moves but stays yours |
+
+Set-aside then optionally refines into a reserve:
+
+- **no target** — generic savings, what the seeded `Savings` category is today
+- **Obligation** — a bill that will arrive; target, period, due month
+- **Amortization** — a replacement you will buy; target, period, anchor
 
 ### Budget semantics vs accounting semantics
 
@@ -373,40 +399,46 @@ can differ by type.
 
 `source` is implicitly external. The three income contradictions cannot be expressed.
 
-### Expense: a source, then a mode choice
+### Expense: a source, then a kind choice
 
 > **Paid from which account?**  → sets `source`
 >
-> **Where does it go?**
-> - ○ Leaves my accounts → `sink = null`
-> - ○ Set aside into… [account] → `sink = account`
+> **Does the money stay yours?**
+> - ○ No, it leaves my accounts → **Spending**, `sink = null`
+> - ○ Yes, set it aside into… [account] → **Set-aside**, `sink = account`
 
-Not a free dropdown — a mode choice. The expense contradiction cannot be expressed, and
-picking the same account as the source is naturally the `(A, A)` case.
+Not a free dropdown — a two-way choice between named kinds. The expense contradiction cannot
+be expressed, and picking the source account again is naturally the `(A, A)` case.
 
-Choosing **Set aside** is also the gate that reveals the reserve fields (kind, target
-amount, period, anchor month). That enforces `reserve ⟹ expense ∧ sink !== null`
-structurally rather than by rule.
+Choosing **Set-aside** is also the gate that reveals the reserve fields (obligation or
+amortization, target amount, period, anchor month). That enforces
+`reserve ⟹ expense ∧ sink !== null` structurally rather than by rule.
+
+The single question that drives everything — *does the money stay yours?* — is answerable
+without understanding the model underneath.
 
 ### Progressive disclosure with one account
 
-The *account pickers* collapse when only one account exists — there is nothing to choose.
-The **leaves / set aside** question does not: it is meaningful even in a single-account
-setup, because that is exactly the `(A, A)` notional reserve. So with one account, income
-asks nothing at all, and an expense still asks whether the money leaves or is set aside.
+The *account pickers* collapse when only one account exists — there is nothing to choose, so
+Income asks nothing at all. The **leaves / set aside** question does not collapse: it is
+meaningful even with a single account, because that is exactly the `(A, A)` notional
+set-aside.
 
-### Unrouted categories
+So a single-account user sees one extra question on expenses and nothing else. Enabling the
+Accounts module later is purely additive — the pickers appear, already defaulted.
 
-`(null, null)` is the state every existing budget starts in, so it is never blocked. Surface
-it instead: a quiet badge on unrouted rows and a dismissible prompt — "12 categories are not
-assigned to accounts yet" — leading to a bulk-assignment flow. Nudge, never gate.
+### No unassigned state
+
+The always-one-account invariant means categories are routed from creation. There is no
+unassigned badge, no "not yet assigned" prompt, and no bulk-assignment flow to build.
 
 ### Keeping it consistent over time
 
-- **Changing a category's type** invalidates its routing. Warn and reset routing rather than
+- **Changing a category's kind** invalidates its routing. Warn and re-derive rather than
   silently leaving a contradiction behind.
-- **Deleting an account** that is referenced: offer reassignment of the affected categories
-  in the delete dialog, or mark them unrouted. Do not orphan the references.
+- **Deleting an account** requires reassigning its categories. Since one account always
+  remains, the delete dialog can always offer "move these 7 categories to [account]" — there
+  is no orphan case to handle. The last account cannot be deleted at all.
 - **Archiving a category with a reserve** stops its accumulation and lowers the account's
   required amount. Make that consequence explicit in the confirmation.
 
