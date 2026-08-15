@@ -16,6 +16,20 @@ type VaultPayload struct {
 	Ciphertext string `json:"ciphertext"`
 	Nonce      string `json:"nonce"`
 	Version    int    `json:"version"`
+
+	// ExpectedUpdatedAt is the updated_at the client last saw. When set, the
+	// write is refused with 409 if the stored vault has moved on since — which
+	// is how a stale tab is stopped from overwriting a newer vault wholesale.
+	// Omitted for the first save after key setup and for recovery, where there
+	// is nothing to conflict with.
+	ExpectedUpdatedAt *time.Time `json:"expected_updated_at,omitempty"`
+}
+
+// PutVaultResponse hands back the new updated_at, which becomes the client's
+// precondition for its next write.
+type PutVaultResponse struct {
+	Status    string    `json:"status"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // KeysResponse is returned by GET /vault/keys.

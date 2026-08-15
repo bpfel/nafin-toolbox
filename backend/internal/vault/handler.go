@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/go-chi/chi/v5"
@@ -17,7 +19,7 @@ const maxVaultSize = 512 * 1024 // 512KB
 // VaultStorer defines the storage operations needed by vault handlers.
 type VaultStorer interface {
 	GetVault(ctx context.Context, userID int) (*Vault, error)
-	PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int) error
+	PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int, expectedUpdatedAt *time.Time) (time.Time, error)
 	GetEncryptedMEK(ctx context.Context, userID int) (string, int, error)
 	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string) error
 	UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error
@@ -88,12 +90,22 @@ func handlePutVault(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		if err := store.PutVault(r.Context(), user.ID, ciphertext, nonce, payload.Version); err != nil {
+		updatedAt, err := store.PutVault(r.Context(), user.ID, ciphertext, nonce, payload.Version, payload.ExpectedUpdatedAt)
+		if errors.Is(err, ErrVaultConflict) {
+			// The client is working from a vault that has since been replaced.
+			// Refusing is the only safe answer: the vault is one opaque blob, so
+			// the server cannot merge, and overwriting would discard the newer copy.
+			writeJSON(w, http.StatusConflict, map[string]string{
+				"error": "vault was modified elsewhere — reload before saving again",
+			})
+			return
+		}
+		if err != nil {
 			http.Error(w, `{"error":"failed to save vault"}`, http.StatusInternalServerError)
 			return
 		}
 
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, PutVaultResponse{Status: "ok", UpdatedAt: updatedAt})
 	}
 }
 
