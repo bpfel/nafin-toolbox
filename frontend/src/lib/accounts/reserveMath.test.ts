@@ -104,17 +104,23 @@ describe('requiredForItem — obligation, yearly', () => {
     expect(requiredForItem(reserve, '2026-06')).toBe('1200.00')
   })
 
-  test('requires one twelfth the month after the due month', () => {
-    expect(requiredForItem(reserve, '2026-07')).toBe('100.00')
+  // The saving window is 11 months, not 12: the full target is required a month
+  // early so the bill can be paid before it lands.
+  test('requires one eleventh the month after the due month', () => {
+    expect(requiredForItem(reserve, '2026-07')).toBe('109.09')
   })
 
-  test('requires eleven twelfths the month before the due month', () => {
-    expect(requiredForItem(reserve, '2026-05')).toBe('1100.00')
+  test('requires the FULL target the month before the due month', () => {
+    expect(requiredForItem(reserve, '2026-05')).toBe('1200.00')
+  })
+
+  test('stays at the full target through the due month itself', () => {
+    expect(requiredForItem(reserve, '2026-06')).toBe('1200.00')
   })
 
   test('is the full target again at the next occurrence a year later', () => {
     expect(requiredForItem(reserve, '2027-06')).toBe('1200.00')
-    expect(requiredForItem(reserve, '2027-07')).toBe('100.00')
+    expect(requiredForItem(reserve, '2027-07')).toBe('109.09')
   })
 })
 
@@ -125,19 +131,20 @@ describe('requiredForItem — obligation, quarterly Swiss tax across a year boun
     expect(requiredForItem(reserve, '2026-12')).toBe('900.00')
   })
 
-  test('rolls to a third in the January after a December due month', () => {
-    expect(requiredForItem(reserve, '2027-01')).toBe('300.00')
+  // A quarterly instalment saved over 2 months rather than 3, for the same reason.
+  test('rolls to a half in the January after a December due month', () => {
+    expect(requiredForItem(reserve, '2027-01')).toBe('450.00')
   })
 
-  test('accumulates through the quarter and lands on the next due month', () => {
-    expect(requiredForItem(reserve, '2027-02')).toBe('600.00')
+  test('is fully funded the month before the instalment falls due', () => {
+    expect(requiredForItem(reserve, '2027-02')).toBe('900.00')
     expect(requiredForItem(reserve, '2027-03')).toBe('900.00')
-    expect(requiredForItem(reserve, '2027-04')).toBe('300.00')
+    expect(requiredForItem(reserve, '2027-04')).toBe('450.00')
   })
 
   test('works for months before the anchor, on the same recurrence', () => {
     expect(requiredForItem(reserve, '2026-09')).toBe('900.00')
-    expect(requiredForItem(reserve, '2026-10')).toBe('300.00')
+    expect(requiredForItem(reserve, '2026-10')).toBe('450.00')
   })
 })
 
@@ -189,10 +196,12 @@ describe('requiredForItem — no floating-point drift', () => {
   })
 
   test('every month is within a cent of the exact fraction', () => {
+    // 11 saving months, so the exact fraction is k/11 and month 11 (November,
+    // the month before the December due date) is the full target.
     const reserve = obligation({ targetAmount: '1000.00', periodMonths: 12, anchorMonth: '2026-12' })
-    for (let k = 1; k <= 12; k++) {
+    for (let k = 1; k <= 11; k++) {
       const month = addMonths('2026-01', k - 1)
-      const exact = (100000 * k) / 12
+      const exact = (100000 * k) / 11
       expect(Math.abs(cents(requiredForItem(reserve, month)) - exact)).toBeLessThanOrEqual(0.5)
     }
   })
@@ -205,5 +214,38 @@ describe('requiredForItem — no floating-point drift', () => {
   test('rejects a malformed target amount', () => {
     const reserve = obligation({ targetAmount: 'CHF 12' })
     expect(() => requiredForItem(reserve, '2026-01')).toThrow(/invalid amount/)
+  })
+})
+
+describe('requiredForItem — the one-month payment lead', () => {
+  // A bill due in March is paid in February, so the money has to be there a month
+  // early. The saving window is period - 1, which raises the monthly rate rather
+  // than shifting the schedule and leaving a permanent shortfall.
+  test('a yearly obligation is fully funded one month before it falls due', () => {
+    const reserve = obligation({ targetAmount: '1100.00', periodMonths: 12, anchorMonth: '2026-03' })
+
+    expect(requiredForItem(reserve, '2026-02')).toBe('1100.00')
+    expect(requiredForItem(reserve, '2026-03')).toBe('1100.00')
+  })
+
+  test('the monthly rate is target/(period-1), not target/period', () => {
+    const reserve = obligation({ targetAmount: '1100.00', periodMonths: 12, anchorMonth: '2026-03' })
+
+    // One month into the cycle: 1100/11 = 100.00 exactly, where the old schedule
+    // would have required 1100/12 = 91.67.
+    expect(requiredForItem(reserve, '2026-04')).toBe('100.00')
+  })
+
+  test('a monthly obligation degrades to no lead rather than dividing by zero', () => {
+    const reserve = obligation({ targetAmount: '50.00', periodMonths: 1, anchorMonth: '2026-01' })
+
+    expect(requiredForItem(reserve, '2026-01')).toBe('50.00')
+  })
+
+  test('an amortization gets no lead — nothing arrives on a date', () => {
+    const reserve = amortization({ targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-01' })
+
+    // Still the plain k/12 ramp: half the target at six months.
+    expect(requiredForItem(reserve, '2026-07')).toBe('600.00')
   })
 })
