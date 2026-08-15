@@ -2,6 +2,7 @@
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
   import { toCents } from '../../../lib/accounts/reserveMath'
   import { focusTrap } from '../../../lib/util/focusTrap'
+  import { moneyInput } from '../../../lib/util/money'
 
   // Recording the purchase of an amortized item. Deliberately narrow: it takes
   // the real price paid, makes that the target for the next cycle so the
@@ -100,6 +101,8 @@
       <input
         type="text"
         inputmode="decimal"
+        enterkeyhint="done"
+        use:moneyInput
         value={price}
         oninput={(e) => (priceOverride = e.currentTarget.value)}
       />
