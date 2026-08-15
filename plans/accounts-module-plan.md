@@ -485,17 +485,78 @@ Three surfaces do the explaining, so the concept never has to be described in pr
   shipping and maintaining a Swiss bank registry — real weight for a cosmetic label on an
   optional field entered once.
 
+## What the budget view shows
+
+**The budget shows semantics; allocations show routing.**
+
+No per-row account information in the budget table — no source column, no sink column. Which
+account a category draws from is routing detail and belongs on the allocation screen.
+
+What the budget *does* show is the **kind** (Income / Spending / Set-aside), because that is
+a budget fact, not an account fact: it changes what the totals mean. `plannedBalance` treats
+a set-aside as spent; `netChange` does not. Hiding the kind would make two different totals
+inexplicable.
+
+### The oversight this risks, and the fix
+
+A budget edit can break an account's feasibility invisibly — budget CHF 2 000 of spending
+from an account that only receives CHF 500, and the budget looks fine while the account is
+short. The consequence is real even though the relation is hidden.
+
+Fix: one **aggregate indicator**, not a column. A single line in the budget summary —
+"2 accounts under-funded →" — linking through to allocations. Zero cost when everything
+balances, and one click to the detail when it does not. Oversight is preserved without
+putting account structure in front of users who have one account and never think about it.
+
 ## Open questions
 
 1. **What happens when the Accounts module is disabled?** Categories keep routing to accounts
    that are no longer surfaced. Presumably inert and harmless, but the Set-aside kind depends
    on accounts existing, so this needs an explicit answer.
 
-## Tasks before implementation
+## QR encoder
 
-- **Choose a QR encoder.** Criteria: small, well-tested, browser-native, ideally
-  zero-dependency, error correction level M, and it must expose a boolean module matrix so we
-  emit the SVG ourselves rather than accept its rendering.
+**Chosen: `paulmillr/qr`** (npm `qr`), dual Apache-2.0 / MIT.
+
+| Criterion | Fit |
+|---|---|
+| Boolean module matrix | `encodeQR(text, 'raw')` returns a 2D boolean array |
+| Error correction M | Configurable; medium is the default |
+| Byte mode / UTF-8 | Encoding mode explicitly selectable |
+| Dependencies | Zero |
+| Size | ~9 KB gzipped, encoding only |
+| Maintenance | Actively maintained, modern ESM — works with Vite |
+
+Runner-up was Nayuki's `qrcodegen` — the reference implementation, MIT, ~970 lines, exposing
+`getModule(x, y)` and `QRC.Ecc.MEDIUM`. Equally correct, and the more battle-tested of the
+two. It loses on two practical points: it selects the encoding mode automatically rather than
+letting us pin it, and its distribution is file-download rather than a maintained package.
+Both are safe fallbacks if `qr` disappoints.
+
+### The library is the small part of Swiss conformance
+
+An encoder only turns bytes into modules. "Agrees with the Swiss standard" is mostly *our*
+responsibility, spread across five things — only two of which the library touches:
+
+| Requirement | Owned by |
+|---|---|
+| 31-line SPC payload structure | Our port of `payload.go` |
+| Field-level validation (SPS rules) | Our port of `validate.go` |
+| Error correction level **M** | Library, configured explicitly |
+| **UTF-8** encoding, Latin character set only | Library, byte mode + our input sanitation |
+| Swiss cross, 7 × 7 mm, centred | Our SVG rendering — missing from the preserved code |
+| Printed size 46 × 46 mm regardless of version | Our SVG rendering |
+
+Pin the ECC level and the encoding mode explicitly rather than relying on defaults or
+auto-selection. The payload always contains newlines and mixed case, so byte mode is what any
+encoder would pick anyway — but a payment instruction is the wrong place to depend on a
+library's heuristics.
+
+Verification should be a round-trip test: encode a known-good payload, decode it, and assert
+the 31 lines come back byte-identical — plus scanning a generated code with a real banking
+app before shipping.
+
+## Tasks before implementation
 - **Verify the Übertrag behaviour with a real bank.** Whether a QR bill paid to your own IBAN
   routes as an internal transfer or an ordinary payment could not be confirmed from
   documentation. A five-minute real-world test validates the scan-to-fund-Reserves premise
