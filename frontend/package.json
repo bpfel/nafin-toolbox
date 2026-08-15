@@ -27,6 +27,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "qr": "^0.6.0",
     "sortablejs": "^1.15.6"
   }
 }
