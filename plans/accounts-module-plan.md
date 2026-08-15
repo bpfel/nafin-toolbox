@@ -106,6 +106,61 @@ The last row is what generalizes the setup. A user running everything from one a
 source and sink to the same account everywhere; a user who splits salary from savings gets
 multi-account behaviour from the same model with no special cases.
 
+### Which combinations are valid
+
+Ten combinations of `type` × routing; six legal, four contradictory.
+
+| `type` | Routing | Verdict |
+|---|---|---|
+| income | (null, null) | Legal — unrouted |
+| income | (null, A) | Canonical income |
+| income | (A, null) | Contradiction — typed income, money leaves |
+| income | (A, B) | Contradiction — internal move counted as new income |
+| income | (A, A) | Contradiction — nothing moves, nothing earned |
+| expense | (null, null) | Legal — unrouted |
+| expense | (null, A) | Contradiction — typed expense, money arrives |
+| expense | (A, null) | Canonical expense — real outflow |
+| expense | (A, B) | Legal — reserve allocation |
+| expense | (A, A) | Legal — single-account reserve, notional set-aside |
+
+The rule in one sentence: **`type` must agree with the direction of boundary crossing, when
+there is one.** A null source means income; a null sink means expense; two internal endpoints
+can only be an expense; two external endpoints are unrouted.
+
+Derived constraints:
+
+- `reserve` implies `type === 'expense'` **and** `sink !== null`. A reserve accumulates
+  somewhere for future spending, so it is always one of the last two rows.
+- `(A, A)` implies `reserve`. An ordinary expense from an account into itself would mean
+  "spent but still there". In a single-account setup real expenses are still `(A, null)`.
+- **`(null, null)` must stay legal.** Every category in every existing budget is unrouted
+  today. Rejecting it would break every budget on the day the module is enabled.
+
+### Budget semantics vs accounting semantics
+
+The two legal reserve rows pass validation but carry a genuine meaning collision: they are
+typed `expense` while no money leaves net worth.
+
+`type` is a *budget* statement — this franc is spoken for. Source/sink is an *accounting*
+statement — the money moved from here to there. `Savings` is seeded as `type: 'expense'`
+(see `budgetEngine.ts`), and `plannedBalance = income − expenses`, so today the budget
+conflates rent (gone) with savings (still yours).
+
+Once routing exists both questions can be answered separately:
+
+```
+trueOutflow      = Σ expenses where sink === null    // actually left net worth
+internalTransfer = Σ expenses where sink !== null    // merely moved
+
+plannedBalance = income − allExpenses   // "am I fully allocated?" — zero-based discipline
+netChange      = income − trueOutflow   // "did my net worth grow?"
+```
+
+**Do not add `type: 'transfer'`.** Savings must stay visible as a budget line — that is the
+point of budgeting for reserves — and a third type would break the zero-based reading of
+`balance ≈ 0`, touch existing grouping and totals code, and duplicate what `sink !== null`
+already tells us. Keep `type` binary; derive the accounting view from routing.
+
 ## Reserves
 
 Obligations and amortizations share one definition. Both are: accumulate `targetAmount` over
@@ -305,11 +360,66 @@ Two, built in parallel:
 2. **Allocations** — the monthly flow view. Which budget entries move money from where to
    where, and what accumulates in Reserves this month.
 
-### Progressive disclosure
+## UX workflow
 
-Source/sink fields stay hidden while only one account exists — both default to it. The
-fields appear once a second account is added. This keeps the simple setup simple, per the
-project's progressive-disclosure principle, without a second data model.
+The four contradictory combinations should be **unrepresentable**, not validated after the
+fact. `AddCategoryModal` is already opened with `type` fixed by which section the user
+clicked, so type is known before any routing question is asked — and the routing controls
+can differ by type.
+
+### Income: one question
+
+> **Which account does this land in?**  → sets `sink`
+
+`source` is implicitly external. The three income contradictions cannot be expressed.
+
+### Expense: a source, then a mode choice
+
+> **Paid from which account?**  → sets `source`
+>
+> **Where does it go?**
+> - ○ Leaves my accounts → `sink = null`
+> - ○ Set aside into… [account] → `sink = account`
+
+Not a free dropdown — a mode choice. The expense contradiction cannot be expressed, and
+picking the same account as the source is naturally the `(A, A)` case.
+
+Choosing **Set aside** is also the gate that reveals the reserve fields (kind, target
+amount, period, anchor month). That enforces `reserve ⟹ expense ∧ sink !== null`
+structurally rather than by rule.
+
+### Progressive disclosure with one account
+
+The *account pickers* collapse when only one account exists — there is nothing to choose.
+The **leaves / set aside** question does not: it is meaningful even in a single-account
+setup, because that is exactly the `(A, A)` notional reserve. So with one account, income
+asks nothing at all, and an expense still asks whether the money leaves or is set aside.
+
+### Unrouted categories
+
+`(null, null)` is the state every existing budget starts in, so it is never blocked. Surface
+it instead: a quiet badge on unrouted rows and a dismissible prompt — "12 categories are not
+assigned to accounts yet" — leading to a bulk-assignment flow. Nudge, never gate.
+
+### Keeping it consistent over time
+
+- **Changing a category's type** invalidates its routing. Warn and reset routing rather than
+  silently leaving a contradiction behind.
+- **Deleting an account** that is referenced: offer reassignment of the affected categories
+  in the delete dialog, or mark them unrouted. Do not orphan the references.
+- **Archiving a category with a reserve** stops its accumulation and lowers the account's
+  required amount. Make that consequence explicit in the confirmation.
+
+### Making the model legible
+
+Three surfaces do the explaining, so the concept never has to be described in prose:
+
+- **Account card**: balance / reserved / available as three numbers, which makes "set aside"
+  tangible.
+- **Allocation screen**: the monthly flow view — income into accounts, outflows away from
+  them — so source and sink are seen rather than learned.
+- **Budget summary**: both totals side by side, "fully allocated" and "net worth change",
+  which is where the expense-vs-transfer distinction pays off visibly.
 
 ## Open questions
 
