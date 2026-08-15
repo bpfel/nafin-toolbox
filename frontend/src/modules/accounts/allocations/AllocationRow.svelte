@@ -92,8 +92,24 @@
 
   let isSetAside = $derived(category.type === 'expense' && category.sinkAccountId !== null)
 
+  // A set-aside with no reserve behind it is plain savings — money kept for
+  // nothing in particular. Worth naming differently from a targeted set-aside,
+  // since the two behave differently: only the targeted one accrues a required
+  // amount against its account.
+  let isPlainSavings = $derived(kind === 'setaside' && !category.reserve)
+
   let kindLabel = $derived(
-    kind === 'income' ? 'Income' : kind === 'spending' ? 'Spending' : kind === 'setaside' ? 'Set-aside' : 'Unrouted',
+    kind === 'income'
+      ? 'Income'
+      : kind === 'spending'
+        ? 'Spending'
+        : kind === 'setaside'
+          ? isPlainSavings ? 'Savings' : 'Set-aside'
+          : 'Unrouted',
+  )
+
+  let kindClass = $derived(
+    kind === 'setaside' && isPlainSavings ? 'savings' : (kind ?? 'none'),
   )
 
   let flowSummary = $derived.by(() => {
@@ -168,7 +184,7 @@
   <div class="row-head">
     <div class="identity">
       <span class="name">{category.name}</span>
-      <span class="kind kind-{kind ?? 'none'}">{kindLabel}</span>
+      <span class="kind kind-{kindClass}">{kindLabel}</span>
     </div>
     <span class="planned">CHF {money(plannedAmount)}</span>
     <button
@@ -280,6 +296,12 @@
   .kind-setaside {
     background: #e7f0fa;
     color: #1f5c99;
+  }
+  /* Plain savings: green, like income — the money is still yours, unlike a
+     targeted set-aside which is already spoken for. */
+  .kind-savings {
+    background: #e6f4ec;
+    color: #2d6a4f;
   }
   .kind-none {
     background: #fff3cd;
