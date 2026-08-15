@@ -37,7 +37,7 @@ function category(overrides: Partial<VaultCategory> & { id: string; name: string
 
 function makeVault(): VaultData {
   return {
-    version: 3,
+    version: 4,
     accounts: [
       {
         id: 'main',
@@ -45,8 +45,9 @@ function makeVault(): VaultData {
         kind: 'transactional',
         currency: 'CHF',
         currentAmount: '2000.00',
-        // Anchored this month, so no period is projected on top of it and the
-        // account figures stay independent of the planned amounts below.
+        // Anchored this month, so no month has elapsed and the plan is not
+        // projected on top of it — the account figures stay independent of the
+        // planned amounts below.
         lastCorrectedAt: `${CURRENT_MONTH}-01`,
       },
       {
@@ -83,18 +84,12 @@ function makeVault(): VaultData {
           },
         }),
       ],
-      periods: [
-        {
-          year: YEAR,
-          month: MONTH,
-          notes: '',
-          entries: [
-            { categoryId: 'salary', plannedAmount: '900.00', actualAmount: '0.00' },
-            { categoryId: 'rent', plannedAmount: '500.00', actualAmount: '0.00' },
-            { categoryId: 'laptop', plannedAmount: '100.00', actualAmount: '0.00' },
-          ],
-        },
+      plan: [
+        { categoryId: 'salary', plannedAmount: '900.00' },
+        { categoryId: 'rent', plannedAmount: '500.00' },
+        { categoryId: 'laptop', plannedAmount: '100.00' },
       ],
+      archives: [],
     },
   }
 }
@@ -114,17 +109,10 @@ function groupedVault(): VaultData {
     // Its group was deleted — the row must survive that.
     category({ id: 'orphan', name: 'Orphan', groupId: 'g-deleted', sortOrder: 2 }),
   ]
-  vault.budget.periods = [
-    {
-      year: YEAR,
-      month: MONTH,
-      notes: '',
-      entries: [
-        { categoryId: 'rent', plannedAmount: '500.00', actualAmount: '0.00' },
-        { categoryId: 'games', plannedAmount: '50.00', actualAmount: '0.00' },
-        { categoryId: 'orphan', plannedAmount: '25.00', actualAmount: '0.00' },
-      ],
-    },
+  vault.budget.plan = [
+    { categoryId: 'rent', plannedAmount: '500.00' },
+    { categoryId: 'games', plannedAmount: '50.00' },
+    { categoryId: 'orphan', plannedAmount: '25.00' },
   ]
   return vault
 }

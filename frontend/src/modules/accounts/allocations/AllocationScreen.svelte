@@ -18,12 +18,16 @@
   import AllocationSummary from './AllocationSummary.svelte'
   import PurchaseDialog from './PurchaseDialog.svelte'
 
-  // The monthly flow view: which budget entries move money from where to where,
+  // The monthly flow view: which budget lines move money from where to where,
   // and what accumulates this month.
   //
   // Reads the budget's categories and planned amounts but never writes them —
   // amounts stay the budget's business. What this screen owns is routing and
   // reserve definitions, which the budget never shows.
+  //
+  // There is one plan, so there is nothing to navigate. The month still matters
+  // — reserves cycle in months and obligations fall due in one — but it is
+  // simply today's, not a position in a timeline the user moves along.
 
   interface Routing {
     sourceAccountId: string | null
@@ -46,59 +50,22 @@
   }
 
   interface Props {
-    // Optional: when the module root drives the month, pass both. Left out, the
-    // screen navigates on its own.
-    year?: number
-    month?: number
-    onmonthchange?: (year: number, month: number) => void
+    /** 'YYYY-MM' the reserve and account figures are computed for. Defaults to now. */
+    currentMonth?: string
   }
 
-  let { year: yearProp, month: monthProp, onmonthchange }: Props = $props()
+  function thisMonth(): string {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  let { currentMonth = thisMonth() }: Props = $props()
 
   const vaultState = getVaultState()
-
-  const now = new Date()
-  const nowYear = now.getFullYear()
-  const nowMonth = now.getMonth() + 1
-
-  // Projections are meaningful ahead of time, but not indefinitely — a year of
-  // lookahead covers every reserve question worth asking now.
-  const MAX_LOOKAHEAD_MONTHS = 12
 
   // Reactivity trigger: the engines mutate the vault object in place, which
   // runes cannot observe. Every derived below reads `version` so it recomputes.
   let version = $state(0)
-
-  let internalYear = $state(nowYear)
-  let internalMonth = $state(nowMonth)
-
-  let controlled = $derived(yearProp !== undefined && monthProp !== undefined)
-  let year = $derived(yearProp ?? internalYear)
-  let month = $derived(monthProp ?? internalMonth)
-
-  let currentMonth = $derived(`${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`)
-
-  const MONTH_NAMES = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ]
-
-  let monthLabel = $derived(`${MONTH_NAMES[month - 1]} ${year}`)
-
-  let atMaxMonth = $derived(
-    (year - nowYear) * 12 + (month - nowMonth) >= MAX_LOOKAHEAD_MONTHS,
-  )
-
-  function changeMonth(offset: number) {
-    const index = year * 12 + (month - 1) + offset
-    const nextYear = Math.floor(index / 12)
-    const nextMonth = index - nextYear * 12 + 1
-    if (!controlled) {
-      internalYear = nextYear
-      internalMonth = nextMonth
-    }
-    onmonthchange?.(nextYear, nextMonth)
-  }
 
   let error = $state<string | null>(null)
   let purchaseCategoryId = $state<string | null>(null)
@@ -123,15 +90,14 @@
   )
   let accounts = $derived(vaultState.vault && version >= 0 ? vaultState.vault.accounts : [])
 
-  // Planned amounts are read straight from the period so a month the budget has
-  // never opened simply shows zeroes instead of being created here.
+  // Planned amounts come from the standing plan, read-only. A category the plan
+  // has no line for reads as zero rather than having one created here.
   let plannedById = $derived.by(() => {
     void version
     const map = new Map<string, string>()
     const vault = vaultState.vault
     if (!vault) return map
-    const period = engine.getPeriod(vault, year, month)
-    for (const entry of period?.entries ?? []) {
+    for (const entry of engine.getPlanSummary(vault).entries) {
       map.set(entry.categoryId, entry.plannedAmount)
     }
     return map
@@ -432,16 +398,6 @@
 {/snippet}
 
 <div class="allocation-screen">
-  <div class="header">
-    <div class="month-nav">
-      <button onclick={() => changeMonth(-1)} aria-label="Previous month">&larr;</button>
-      <span class="month-label">{monthLabel}</span>
-      <button onclick={() => changeMonth(1)} disabled={atMaxMonth} aria-label="Next month">
-        &rarr;
-      </button>
-    </div>
-  </div>
-
   {#if !vaultState.vault}
     <p class="empty">Loading…</p>
   {:else if categories.length === 0}
@@ -506,37 +462,6 @@
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
-  }
-  .header {
-    display: flex;
-    justify-content: flex-start;
-  }
-  .month-nav {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-  .month-nav button {
-    padding: 0.25rem 0.75rem;
-    font-size: 1rem;
-    background: #e9ecef;
-    color: #1a1a2e;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .month-nav button:hover:not(:disabled) {
-    background: #dee2e6;
-  }
-  .month-nav button:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-  .month-label {
-    font-size: 1.1rem;
-    font-weight: 600;
-    min-width: 160px;
-    text-align: center;
   }
   .flow-section {
     background: white;
@@ -640,10 +565,6 @@
   }
 
   @media (max-width: 640px) {
-    .month-nav button {
-      min-width: 44px;
-      min-height: 44px;
-    }
     .group-header {
       min-height: 40px;
     }

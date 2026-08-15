@@ -1,6 +1,6 @@
 <script lang="ts">
   import Sortable from 'sortablejs'
-  import type { PeriodEntryView } from '../../lib/budget/budgetEngine'
+  import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
@@ -11,24 +11,21 @@
   interface EntryGroup {
     groupName: string
     groupId: string
-    entries: PeriodEntryView[]
+    entries: PlanEntryView[]
     plannedTotal: number
-    actualTotal: number
   }
 
   interface Props {
-    entries: PeriodEntryView[]
+    entries: PlanEntryView[]
     vault: VaultData
-    year: number
-    month: number
-    onsave: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
+    onsave: (categoryId: string, amount: string) => void
     oncategorycreated: () => void
     oncategorydeleted: () => void
   }
 
-  let { entries, vault, year, month, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
+  let { entries, vault, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; presetGroupName?: string; editCategory?: { id: string; name: string; groupName: string; plannedAmount: string; actualAmount: string } } | null>(null)
+  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; presetGroupName?: string; editCategory?: { id: string; name: string; groupName: string; plannedAmount: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: string; categoryName: string } | null>(null)
 
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
@@ -49,7 +46,7 @@
   let incomeEntries = $derived(entries.filter(e => e.categoryType === 'income'))
   let expenseEntries = $derived(entries.filter(e => e.categoryType === 'expense'))
 
-  function groupEntries(list: PeriodEntryView[]): EntryGroup[] {
+  function groupEntries(list: PlanEntryView[]): EntryGroup[] {
     const map = new Map<string, EntryGroup>()
     for (const e of list) {
       const key = e.categoryGroupName || ''
@@ -59,13 +56,11 @@
           groupId: e.categoryGroupId,
           entries: [],
           plannedTotal: 0,
-          actualTotal: 0,
         })
       }
       const g = map.get(key)!
       g.entries.push(e)
       g.plannedTotal += Number(e.plannedAmount)
-      g.actualTotal += Number(e.actualAmount)
     }
     // Order by the group's own sortOrder. This used to be inferred from wherever
     // each group's first category landed in the category sort, which meant
@@ -96,8 +91,8 @@
     openAddModal(type, groupName)
   }
 
-  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string, actualAmount: string) {
-    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, groupName, plannedAmount, actualAmount } }
+  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string) {
+    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, groupName, plannedAmount } }
   }
 
   function openDeleteModal(categoryId: string, categoryName: string) {
@@ -183,7 +178,6 @@
         <th class="col-name">Income</th>
         <th class="right col-amount col-planned-mo">Planned/mo</th>
         <th class="right col-amount col-planned-yr">Planned/yr</th>
-        <th class="right col-amount">Actual/mo</th>
       </tr>
     </thead>
     {#each incomeGroups as group (group.groupName)}
@@ -216,7 +210,6 @@
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
-            <td class="right subtotal">{fmt(group.actualTotal)}</td>
           </tr>
         {/if}
         {#if !isCollapsed('income', group.groupName)}
@@ -237,7 +230,6 @@
         <th class="col-name">Expenses</th>
         <th class="right col-amount col-planned-mo">Planned/mo</th>
         <th class="right col-amount col-planned-yr">Planned/yr</th>
-        <th class="right col-amount">Actual/mo</th>
       </tr>
     </thead>
     {#each expenseGroups as group (group.groupName)}
@@ -270,7 +262,6 @@
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
-            <td class="right subtotal">{fmt(group.actualTotal)}</td>
           </tr>
         {/if}
         {#if !isCollapsed('expense', group.groupName)}
@@ -324,7 +315,7 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
   .col-name {
-    width: 40%;
+    width: 60%;
   }
   .col-amount {
     width: 20%;
@@ -450,11 +441,13 @@
       padding: 0.5rem;
       font-size: 0.8rem;
     }
+    /* Only one amount column survives on a narrow screen — the view toggle
+       swaps which of the two it is — so the name takes the rest. */
     .col-name {
-      width: 50%;
+      width: 60%;
     }
     .col-amount {
-      width: 25%;
+      width: 40%;
     }
     .col-planned-yr {
       display: none;

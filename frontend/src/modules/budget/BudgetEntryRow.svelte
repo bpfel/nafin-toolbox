@@ -1,15 +1,15 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { PeriodEntryView } from '../../lib/budget/budgetEngine'
+  import type { PlanEntryView } from '../../lib/budget/budgetEngine'
 
-  type Field = 'planned_mo' | 'planned_yr' | 'actual_mo'
+  type Field = 'planned_mo' | 'planned_yr'
 
   interface Props {
-    entry: PeriodEntryView
+    entry: PlanEntryView
     viewMode?: 'monthly' | 'yearly'
-    onsave: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
+    onsave: (categoryId: string, amount: string) => void
     ondelete: (categoryId: string, categoryName: string) => void
-    onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string, actualAmount: string) => void
+    onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string) => void
   }
 
   let { entry, viewMode = 'monthly', onsave, ondelete, onedit }: Props = $props()
@@ -18,15 +18,12 @@
 
   let plannedMoValue = $state('')
   let plannedYrValue = $state('')
-  let actualMoValue = $state('')
 
   let plannedMoOriginal = ''
   let plannedYrOriginal = ''
-  let actualMoOriginal = ''
 
   let plannedMoError = $state(false)
   let plannedYrError = $state(false)
-  let actualMoError = $state(false)
 
   let focusedField = $state<Field | null>(null)
 
@@ -57,7 +54,6 @@
 
   $effect(() => {
     const planned = Number(entry.plannedAmount)
-    const actual = Number(entry.actualAmount)
     const focused = untrack(() => focusedField)
 
     if (focused !== 'planned_mo') {
@@ -65,9 +61,6 @@
     }
     if (focused !== 'planned_yr') {
       plannedYrValue = fmt(planned * 12)
-    }
-    if (focused !== 'actual_mo') {
-      actualMoValue = fmt(actual)
     }
   })
 
@@ -79,8 +72,7 @@
     focusedField = field
     const input = event.target as HTMLInputElement
     if (field === 'planned_mo') plannedMoOriginal = plannedMoValue
-    else if (field === 'planned_yr') plannedYrOriginal = plannedYrValue
-    else if (field === 'actual_mo') actualMoOriginal = actualMoValue
+    else plannedYrOriginal = plannedYrValue
     requestAnimationFrame(() => input.select())
   }
 
@@ -122,27 +114,21 @@
   }
 
   function getValue(field: Field): string {
-    if (field === 'planned_mo') return plannedMoValue
-    if (field === 'planned_yr') return plannedYrValue
-    return actualMoValue
+    return field === 'planned_mo' ? plannedMoValue : plannedYrValue
   }
 
   function getOriginal(field: Field): string {
-    if (field === 'planned_mo') return plannedMoOriginal
-    if (field === 'planned_yr') return plannedYrOriginal
-    return actualMoOriginal
+    return field === 'planned_mo' ? plannedMoOriginal : plannedYrOriginal
   }
 
   function setError(field: Field, val: boolean) {
     if (field === 'planned_mo') plannedMoError = val
-    else if (field === 'planned_yr') plannedYrError = val
-    else actualMoError = val
+    else plannedYrError = val
   }
 
   function revertField(field: Field) {
     if (field === 'planned_mo') { plannedMoValue = plannedMoOriginal; plannedMoError = false }
-    else if (field === 'planned_yr') { plannedYrValue = plannedYrOriginal; plannedYrError = false }
-    else { actualMoValue = actualMoOriginal; actualMoError = false }
+    else { plannedYrValue = plannedYrOriginal; plannedYrError = false }
   }
 
   function parseInput(raw: string): number {
@@ -168,11 +154,9 @@
     setError(field, false)
 
     if (field === 'planned_mo') {
-      onsave(entry.categoryId, 'planned', val.toFixed(2))
-    } else if (field === 'planned_yr') {
-      onsave(entry.categoryId, 'planned', (val / 12).toFixed(4))
-    } else if (field === 'actual_mo') {
-      onsave(entry.categoryId, 'actual', val.toFixed(2))
+      onsave(entry.categoryId, val.toFixed(2))
+    } else {
+      onsave(entry.categoryId, (val / 12).toFixed(4))
     }
 
     return true
@@ -193,7 +177,7 @@
       <span class="drag-handle" aria-label="Drag to reorder">&#x2807;</span>
       <button
         class="name-text"
-        onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount, entry.actualAmount)}
+        onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount)}
       >
         {entry.categoryName}
       </button>
@@ -216,6 +200,7 @@
       class="cell-input"
       class:cell-error={plannedMoError}
       data-field="planned_mo"
+      aria-label="Planned per month for {entry.categoryName}"
       bind:value={plannedMoValue}
       onfocus={(e) => handleFocus('planned_mo', e)}
       onblur={() => handleBlur('planned_mo')}
@@ -229,23 +214,11 @@
       class="cell-input"
       class:cell-error={plannedYrError}
       data-field="planned_yr"
+      aria-label="Planned per year for {entry.categoryName}"
       bind:value={plannedYrValue}
       onfocus={(e) => handleFocus('planned_yr', e)}
       onblur={() => handleBlur('planned_yr')}
       onkeydown={(e) => handleKeydown('planned_yr', e)}
-    />
-  </td>
-  <td class="amount-cell">
-    <input
-      type="text"
-      inputmode="decimal"
-      class="cell-input"
-      class:cell-error={actualMoError}
-      data-field="actual_mo"
-      bind:value={actualMoValue}
-      onfocus={(e) => handleFocus('actual_mo', e)}
-      onblur={() => handleBlur('actual_mo')}
-      onkeydown={(e) => handleKeydown('actual_mo', e)}
     />
   </td>
 </tr>

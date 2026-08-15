@@ -1,0 +1,305 @@
+<script lang="ts">
+  import { untrack } from 'svelte'
+  import type { VaultArchive, VaultArchiveLine } from '../../lib/crypto/vault'
+  import { moneyInput, normalizeAmount } from '../../lib/util/money'
+
+  interface Props {
+    archive: VaultArchive
+    /**
+     * Commits a new name. May throw — the engine refuses an empty name — and the
+     * message is caught here so it lands next to the field the user typed in.
+     */
+    onrename: (name: string) => void
+    onamountchange: (lineIndex: number, amount: string) => void
+  }
+
+  let { archive, onrename, onamountchange }: Props = $props()
+
+  // Archive lines are mutated in place by the engine, which runes cannot observe.
+  let version = $state(0)
+
+  // Seeded once: the editor is mounted fresh per archive, and the draft must not
+  // be yanked out from under a half-typed rename.
+  let nameDraft = $state(untrack(() => archive.name))
+  let nameError = $state<string | null>(null)
+
+  interface LineRow {
+    line: VaultArchiveLine
+    /** Index into `archive.lines` — how `updateArchiveLine` addresses a line. */
+    index: number
+  }
+
+  interface LineGroup {
+    groupName: string
+    rows: LineRow[]
+  }
+
+  // `_version` is unused inside, and deliberately so: passing it in is what makes
+  // the surrounding $derived depend on it, which is the only way an in-place edit
+  // to a line reaches the DOM.
+  function groupsFor(type: 'income' | 'expense', _version: number): LineGroup[] {
+    const map = new Map<string, LineGroup>()
+    archive.lines.forEach((line, index) => {
+      if (line.type !== type) return
+      const key = line.groupName || ''
+      if (!map.has(key)) map.set(key, { groupName: key, rows: [] })
+      map.get(key)!.rows.push({ line, index })
+    })
+    return Array.from(map.values())
+  }
+
+  let incomeGroups = $derived(groupsFor('income', version))
+  let expenseGroups = $derived(groupsFor('expense', version))
+
+  function totalFor(type: 'income' | 'expense', _version: number): number {
+    return archive.lines
+      .filter(l => l.type === type)
+      .reduce((sum, l) => sum + Number(l.plannedAmount), 0)
+  }
+
+  let incomeTotal = $derived(totalFor('income', version))
+  let expenseTotal = $derived(totalFor('expense', version))
+  let balance = $derived(incomeTotal - expenseTotal)
+
+  function commitName() {
+    if (nameDraft.trim() === archive.name) {
+      nameError = null
+      return
+    }
+    try {
+      onrename(nameDraft)
+      nameError = null
+      version++
+    } catch (e) {
+      nameError = e instanceof Error ? e.message : 'could not rename this archive'
+    }
+  }
+
+  function handleNameKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      ;(e.target as HTMLInputElement).blur()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      nameDraft = archive.name
+      nameError = null
+      ;(e.target as HTMLInputElement).blur()
+    }
+  }
+
+  function commitAmount(index: number, raw: string) {
+    const normalised = normalizeAmount(raw)
+    // A field the user emptied, or filled with something that is not a number,
+    // leaves the recorded amount alone rather than overwriting history with NaN.
+    if (normalised === '' || !Number.isFinite(Number(normalised))) return
+    if (normalised === archive.lines[index]?.plannedAmount) return
+    onamountchange(index, normalised)
+    version++
+  }
+
+  function fmt(val: number): string {
+    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+</script>
+
+<div class="editor">
+  <label class="rename-field">
+    <span class="rename-label">Name</span>
+    <input
+      type="text"
+      class="rename-input"
+      bind:value={nameDraft}
+      onblur={commitName}
+      onkeydown={handleNameKeydown}
+    />
+  </label>
+  {#if nameError}
+    <p class="error" role="alert">{nameError}</p>
+  {/if}
+
+  {#if archive.lines.length === 0}
+    <p class="empty">This archive has no lines.</p>
+  {:else}
+    <table>
+      <thead>
+        <tr>
+          <th class="col-name">Category</th>
+          <th class="right col-amount">Planned/mo</th>
+        </tr>
+      </thead>
+      {#each [...incomeGroups, ...expenseGroups] as group (group.groupName + ':' + group.rows[0].line.type)}
+        <tbody>
+          <tr class="line-group">
+            <td colspan="2">{group.groupName || 'Other'}</td>
+          </tr>
+          {#each group.rows as row (row.index)}
+            <tr class="line-row" class:income={row.line.type === 'income'}>
+              <td class="line-name">{row.line.categoryName}</td>
+              <td class="line-amount">
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  class="amount-input"
+                  aria-label="Planned per month for {row.line.categoryName} in {archive.name}"
+                  value={row.line.plannedAmount}
+                  use:moneyInput
+                  onchange={(e) => commitAmount(row.index, (e.currentTarget as HTMLInputElement).value)}
+                />
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      {/each}
+      <tfoot>
+        <tr>
+          <td>Income</td>
+          <td class="right total income-total">{fmt(incomeTotal)}</td>
+        </tr>
+        <tr>
+          <td>Expenses</td>
+          <td class="right total expense-total">{fmt(expenseTotal)}</td>
+        </tr>
+        <tr>
+          <td>Savings</td>
+          <td class="right total" class:income-total={balance >= 0} class:expense-total={balance < 0}>
+            {fmt(balance)}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  {/if}
+</div>
+
+<style>
+  .editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 0 0.25rem;
+  }
+  .rename-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-width: 22rem;
+  }
+  .rename-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .rename-input {
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    outline: none;
+  }
+  .rename-input:focus {
+    border-color: #2d6a4f;
+    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
+  }
+  .error {
+    color: #c0392b;
+    font-size: 0.85rem;
+    margin: 0;
+    padding: 0.4rem 0.5rem;
+    background: #fdecea;
+    border-radius: 4px;
+  }
+  .empty {
+    color: #888;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+  table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .col-name {
+    width: 60%;
+  }
+  .col-amount {
+    width: 40%;
+  }
+  th {
+    text-align: left;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.7rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #dee2e6;
+  }
+  th.right {
+    text-align: right;
+  }
+  .line-group td {
+    padding: 0.35rem 0.5rem;
+    background: #f1f3f5;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #495057;
+  }
+  .line-row td {
+    padding: 0.2rem 0.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  .line-row.income td {
+    background: #f0fdf4;
+  }
+  .line-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .line-amount {
+    text-align: right;
+  }
+  .amount-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    text-align: right;
+    font-size: inherit;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    background: transparent;
+    color: inherit;
+    outline: none;
+  }
+  .amount-input:hover {
+    border-color: #ddd;
+  }
+  .amount-input:focus {
+    border-color: #2d6a4f;
+    background: white;
+    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.15);
+  }
+  tfoot td {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8rem;
+    color: #666;
+    border-top: 1px solid #dee2e6;
+  }
+  tfoot .right {
+    text-align: right;
+  }
+  .total {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .income-total { color: #2d6a4f; }
+  .expense-total { color: #c0392b; }
+
+  @media (max-width: 480px) {
+    .amount-input {
+      font-size: 16px;
+    }
+  }
+</style>

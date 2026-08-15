@@ -31,14 +31,15 @@ function legacyV1Vault(): unknown {
 }
 
 describe('createEmptyVault', () => {
-  test('creates a valid empty v3 vault structure', () => {
+  test('creates a valid empty v4 vault structure', () => {
     const vault = createEmptyVault()
 
-    expect(vault.version).toBe(3)
+    expect(vault.version).toBe(4)
     expect(vault.budget).toEqual({
       categoryGroups: [],
       categories: [],
-      periods: [],
+      plan: [],
+      archives: [],
     })
     expect(vault.accounts.length).toBe(1)
   })
@@ -81,13 +82,13 @@ describe('createEmptyVault', () => {
 })
 
 describe('version scrub', () => {
-  test('decrypting a v1 blob yields a fresh v3 vault with one Main account', async () => {
+  test('decrypting a v1 blob yields a fresh v4 vault with one Main account', async () => {
     const mek = await generateMEK()
 
     const encrypted = await encryptVault(legacyV1Vault() as VaultData, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.version).toBe(3)
+    expect(decrypted.version).toBe(4)
     expect(decrypted.accounts.length).toBe(1)
     expect(decrypted.accounts[0].name).toBe('Main')
     expect(decrypted.accounts[0].currentAmount).toBe('0.00')
@@ -101,21 +102,22 @@ describe('version scrub', () => {
 
     expect(decrypted.budget.categoryGroups).toEqual([])
     expect(decrypted.budget.categories).toEqual([])
-    expect(decrypted.budget.periods).toEqual([])
+    expect(decrypted.budget.plan).toEqual([])
+    expect(decrypted.budget.archives).toEqual([])
   })
 
   test('scrubs a blob with a missing or unknown version', async () => {
     const mek = await generateMEK()
 
-    const versionless = await encryptVault({ budget: { categoryGroups: [], categories: [], periods: [] } } as unknown as VaultData, mek)
+    const versionless = await encryptVault({ budget: { categoryGroups: [], categories: [], plan: [], archives: [] } } as unknown as VaultData, mek)
     const future = await encryptVault({ ...createEmptyVault(), version: 99 } as unknown as VaultData, mek)
 
     const fromVersionless = await decryptVault(versionless.ciphertext, versionless.nonce, mek)
     const fromFuture = await decryptVault(future.ciphertext, future.nonce, mek)
 
-    expect(fromVersionless.version).toBe(3)
+    expect(fromVersionless.version).toBe(4)
     expect(fromVersionless.accounts.length).toBe(1)
-    expect(fromFuture.version).toBe(3)
+    expect(fromFuture.version).toBe(4)
     expect(fromFuture.accounts.length).toBe(1)
   })
 
@@ -205,7 +207,7 @@ describe('encryptVault and decryptVault', () => {
   test('round-trip encryption and decryption preserves data', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -218,14 +220,18 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
           { id: 'c2', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g2', sourceAccountId: 'a1', sinkAccountId: null },
         ],
-        periods: [
+        plan: [
+          { categoryId: 'c1', plannedAmount: '5000.00' },
+          { categoryId: 'c2', plannedAmount: '400.00' },
+        ],
+        archives: [
           {
-            year: 2026,
-            month: 2,
-            notes: 'Test month',
-            entries: [
-              { categoryId: 'c1', plannedAmount: '5000.00', actualAmount: '5000.00' },
-              { categoryId: 'c2', plannedAmount: '400.00', actualAmount: '385.50' },
+            id: 'ar1',
+            name: 'February',
+            createdAt: '2026-02-01T00:00:00.000Z',
+            lines: [
+              { categoryName: 'Salary', groupName: 'Income', type: 'income', plannedAmount: '5000.00' },
+              { categoryName: 'Groceries', groupName: 'Expenses', type: 'expense', plannedAmount: '385.50' },
             ],
           },
         ],
@@ -340,14 +346,15 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted).toEqual(vault)
     expect(decrypted.budget.categoryGroups).toEqual([])
     expect(decrypted.budget.categories).toEqual([])
-    expect(decrypted.budget.periods).toEqual([])
+    expect(decrypted.budget.plan).toEqual([])
+    expect(decrypted.budget.archives).toEqual([])
     expect(decrypted.accounts).toEqual(vault.accounts)
   })
 
-  test('preserves complex vault with multiple periods', async () => {
+  test('preserves complex vault with multiple archives', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -358,24 +365,25 @@ describe('encryptVault and decryptVault', () => {
         categories: [
           { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
-        periods: [
+        plan: [{ categoryId: 'c1', plannedAmount: '5400.00' }],
+        archives: [
           {
-            year: 2026,
-            month: 1,
-            notes: 'January',
-            entries: [{ categoryId: 'c1', plannedAmount: '5000.00', actualAmount: '5000.00' }],
+            id: 'ar1',
+            name: 'January',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            lines: [{ categoryName: 'Salary', groupName: 'Income', type: 'income', plannedAmount: '5000.00' }],
           },
           {
-            year: 2026,
-            month: 2,
-            notes: 'February',
-            entries: [{ categoryId: 'c1', plannedAmount: '5200.00', actualAmount: '5200.00' }],
+            id: 'ar2',
+            name: 'February',
+            createdAt: '2026-02-01T00:00:00.000Z',
+            lines: [{ categoryName: 'Salary', groupName: 'Income', type: 'income', plannedAmount: '5200.00' }],
           },
           {
-            year: 2026,
-            month: 3,
-            notes: '',
-            entries: [],
+            id: 'ar3',
+            name: 'An archive of an empty plan',
+            createdAt: '2026-03-01T00:00:00.000Z',
+            lines: [],
           },
         ],
       },
@@ -384,17 +392,17 @@ describe('encryptVault and decryptVault', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.periods.length).toBe(3)
-    expect(decrypted.budget.periods[0].year).toBe(2026)
-    expect(decrypted.budget.periods[0].month).toBe(1)
-    expect(decrypted.budget.periods[2].notes).toBe('')
-    expect(decrypted.budget.periods[2].entries).toEqual([])
+    expect(decrypted.budget.archives.length).toBe(3)
+    expect(decrypted.budget.archives[0].name).toBe('January')
+    expect(decrypted.budget.archives[0].createdAt).toBe('2026-01-01T00:00:00.000Z')
+    expect(decrypted.budget.archives[0].lines[0].plannedAmount).toBe('5000.00')
+    expect(decrypted.budget.archives[2].lines).toEqual([])
   })
 
   test('preserves archived flag in categories', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -404,7 +412,8 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c1', name: 'Active', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
           { id: 'c2', name: 'Archived', type: 'expense', sortOrder: 1, archived: true, groupId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
         ],
-        periods: [],
+        plan: [],
+        archives: [],
       },
     }
 
@@ -418,7 +427,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '1234.05', lastCorrectedAt: '2026-08-15' },
       ],
@@ -427,14 +436,13 @@ describe('encryptVault and decryptVault', () => {
         categories: [
           { id: 'c1', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
         ],
-        periods: [
+        plan: [{ categoryId: 'c1', plannedAmount: '123.45' }],
+        archives: [
           {
-            year: 2026,
-            month: 2,
-            notes: '',
-            entries: [
-              { categoryId: 'c1', plannedAmount: '123.45', actualAmount: '67.89' },
-            ],
+            id: 'ar1',
+            name: 'Last year',
+            createdAt: '2025-12-31T00:00:00.000Z',
+            lines: [{ categoryName: 'Groceries', groupName: 'Expenses', type: 'expense', plannedAmount: '67.89' }],
           },
         ],
       },
@@ -443,15 +451,15 @@ describe('encryptVault and decryptVault', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.periods[0].entries[0].plannedAmount).toBe('123.45')
-    expect(decrypted.budget.periods[0].entries[0].actualAmount).toBe('67.89')
+    expect(decrypted.budget.plan[0].plannedAmount).toBe('123.45')
+    expect(decrypted.budget.archives[0].lines[0].plannedAmount).toBe('67.89')
     expect(decrypted.accounts[0].currentAmount).toBe('1234.05')
   })
 
   test('preserves special characters in text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: 'a1', name: 'Zürich «Haupt»', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -460,12 +468,13 @@ describe('encryptVault and decryptVault', () => {
         categories: [
           { id: 'c1', name: 'Salary (CHF)', type: 'income', sortOrder: 0, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
-        periods: [
+        plan: [],
+        archives: [
           {
-            year: 2026,
-            month: 2,
-            notes: 'Line 1\nLine 2\tTabbed',
-            entries: [],
+            id: 'ar1',
+            name: 'Line 1\nLine 2\tTabbed',
+            createdAt: '2026-02-01T00:00:00.000Z',
+            lines: [],
           },
         ],
       },
@@ -476,14 +485,14 @@ describe('encryptVault and decryptVault', () => {
 
     expect(decrypted.budget.categoryGroups[0].name).toBe('Émoji 🎉 & Special "chars"')
     expect(decrypted.budget.categories[0].name).toBe('Salary (CHF)')
-    expect(decrypted.budget.periods[0].notes).toBe('Line 1\nLine 2\tTabbed')
+    expect(decrypted.budget.archives[0].name).toBe('Line 1\nLine 2\tTabbed')
     expect(decrypted.accounts[0].name).toBe('Zürich «Haupt»')
   })
 
   test('preserves sortOrder values', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -497,7 +506,8 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c1', name: 'Cat1', type: 'income', sortOrder: 5, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
           { id: 'c2', name: 'Cat2', type: 'income', sortOrder: 10, archived: false, groupId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
-        periods: [],
+        plan: [],
+        archives: [],
       },
     }
 
@@ -516,7 +526,7 @@ describe('encryptVault and decryptVault', () => {
 
     // Create a large vault with many entries
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: Array.from({ length: 5 }, (_, i) => ({
         id: `a${i}`,
         name: `Account ${i}`,
@@ -542,14 +552,19 @@ describe('encryptVault and decryptVault', () => {
           sourceAccountId: i % 2 === 0 ? null : `a${i % 5}`,
           sinkAccountId: i % 2 === 0 ? `a${i % 5}` : null,
         })),
-        periods: Array.from({ length: 24 }, (_, monthIndex) => ({
-          year: 2025 + Math.floor(monthIndex / 12),
-          month: (monthIndex % 12) + 1,
-          notes: `Month ${monthIndex}`,
-          entries: Array.from({ length: 50 }, (_, entryIndex) => ({
-            categoryId: `c${entryIndex}`,
-            plannedAmount: `${1000 + entryIndex}.${monthIndex}0`,
-            actualAmount: `${900 + entryIndex}.${monthIndex}5`,
+        plan: Array.from({ length: 100 }, (_, i) => ({
+          categoryId: `c${i}`,
+          plannedAmount: `${1000 + i}.00`,
+        })),
+        archives: Array.from({ length: 24 }, (_, archiveIndex) => ({
+          id: `ar${archiveIndex}`,
+          name: `Snapshot ${archiveIndex}`,
+          createdAt: `2026-01-01T00:00:00.${String(archiveIndex).padStart(3, '0')}Z`,
+          lines: Array.from({ length: 30 }, (_, lineIndex) => ({
+            categoryName: `Category ${lineIndex}`,
+            groupName: `Group ${lineIndex % 10}`,
+            type: lineIndex % 2 === 0 ? ('income' as const) : ('expense' as const),
+            plannedAmount: `${1000 + lineIndex}.${archiveIndex}0`,
           })),
         })),
       },
@@ -561,14 +576,15 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.accounts.length).toBe(5)
     expect(decrypted.budget.categoryGroups.length).toBe(10)
     expect(decrypted.budget.categories.length).toBe(100)
-    expect(decrypted.budget.periods.length).toBe(24)
-    expect(decrypted.budget.periods[0].entries.length).toBe(50)
+    expect(decrypted.budget.plan.length).toBe(100)
+    expect(decrypted.budget.archives.length).toBe(24)
+    expect(decrypted.budget.archives[0].lines.length).toBe(30)
   })
 
   test('handles empty strings in all text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: '', name: '', kind: 'cash', currency: 'CHF', currentAmount: '', lastCorrectedAt: '' },
       ],
@@ -577,15 +593,9 @@ describe('encryptVault and decryptVault', () => {
         categories: [
           { id: '', name: '', type: 'income', sortOrder: 0, archived: false, groupId: '', sourceAccountId: null, sinkAccountId: '' },
         ],
-        periods: [
-          {
-            year: 2026,
-            month: 2,
-            notes: '',
-            entries: [
-              { categoryId: '', plannedAmount: '', actualAmount: '' },
-            ],
-          },
+        plan: [{ categoryId: '', plannedAmount: '' }],
+        archives: [
+          { id: '', name: '', createdAt: '', lines: [{ categoryName: '', groupName: '', type: 'income', plannedAmount: '' }] },
         ],
       },
     }
@@ -596,27 +606,28 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.budget.categoryGroups[0].id).toBe('')
     expect(decrypted.budget.categoryGroups[0].name).toBe('')
     expect(decrypted.budget.categories[0].name).toBe('')
-    expect(decrypted.budget.periods[0].notes).toBe('')
-    expect(decrypted.budget.periods[0].entries[0].plannedAmount).toBe('')
+    expect(decrypted.budget.archives[0].name).toBe('')
+    expect(decrypted.budget.plan[0].plannedAmount).toBe('')
     expect(decrypted.accounts[0].name).toBe('')
   })
 
   test('preserves exact JSON structure including whitespace in strings', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
       budget: {
         categoryGroups: [],
         categories: [],
-        periods: [
+        plan: [],
+        archives: [
           {
-            year: 2026,
-            month: 2,
-            notes: '  leading and trailing spaces  ',
-            entries: [],
+            id: 'ar1',
+            name: '  leading and trailing spaces  ',
+            createdAt: '2026-02-01T00:00:00.000Z',
+            lines: [],
           },
         ],
       },
@@ -625,7 +636,7 @@ describe('encryptVault and decryptVault', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.periods[0].notes).toBe('  leading and trailing spaces  ')
+    expect(decrypted.budget.archives[0].name).toBe('  leading and trailing spaces  ')
   })
 
   test('ciphertext length is proportional to plaintext size', async () => {
@@ -635,7 +646,7 @@ describe('encryptVault and decryptVault', () => {
     const encryptedSmall = await encryptVault(smallVault, mek)
 
     const largeVault: VaultData = {
-      version: 3,
+      version: 4,
       accounts: [],
       budget: {
         categoryGroups: Array.from({ length: 50 }, (_, i) => ({
@@ -645,7 +656,8 @@ describe('encryptVault and decryptVault', () => {
           sortOrder: i,
         })),
         categories: [],
-        periods: [],
+        plan: [],
+        archives: [],
       },
     }
     const encryptedLarge = await encryptVault(largeVault, mek)
@@ -658,10 +670,11 @@ describe('encryptVault and decryptVault', () => {
   })
 })
 
-describe('migrateVault — v2 to v3', () => {
-  // v3 removed the `fixed` flag from categories. A v2 vault must keep all of its
-  // data and lose only that field, which is what separates a migration from the
-  // scrub we used before v1.0.
+describe('migrateVault — legacy versions forward', () => {
+  // v3 removed the `fixed` flag from categories; v4 replaced monthly periods with
+  // a plan plus named archives. A v2 vault must be carried all the way forward
+  // keeping its data, which is what separates a migration from the scrub we used
+  // before v1.0.
   function v2Vault() {
     return {
       version: 2,
@@ -718,13 +731,19 @@ describe('migrateVault — v2 to v3', () => {
   test('keeps everything else — this is a migration, not a scrub', () => {
     const migrated = migrateVault(v2Vault())
 
-    expect(migrated.version).toBe(3)
+    expect(migrated.version).toBe(4)
     expect(migrated.budget.categories).toHaveLength(2)
     expect(migrated.budget.categories[0].name).toBe('Rent')
     expect(migrated.budget.categoryGroups).toHaveLength(1)
-    expect(migrated.budget.periods[0].entries[0].plannedAmount).toBe('1350.00')
     expect(migrated.accounts).toHaveLength(1)
     expect(migrated.accounts[0].currentAmount).toBe('500.00')
+  })
+
+  test('the only period becomes the plan, with no archive and no actual', () => {
+    const migrated = migrateVault(v2Vault())
+
+    expect(migrated.budget.plan).toEqual([{ categoryId: 'c1', plannedAmount: '1350.00' }])
+    expect(migrated.budget.archives).toEqual([])
   })
 
   test('preserves routing and reserve definitions', () => {
@@ -737,17 +756,54 @@ describe('migrateVault — v2 to v3', () => {
     expect(taxes.reserve?.anchorMonth).toBe('2026-09')
   })
 
-  test('a v3 vault passes through untouched', () => {
+  test('a v3 vault is carried forward to v4', () => {
     const v3 = { ...v2Vault(), version: 3 }
     const migrated = migrateVault(v3)
 
     expect(migrated.budget.categories).toHaveLength(2)
-    expect(migrated.version).toBe(3)
+    expect(migrated.budget.plan).toEqual([{ categoryId: 'c1', plannedAmount: '1350.00' }])
+    expect(migrated.version).toBe(4)
+  })
+
+  test('a v4 vault passes through untouched', () => {
+    const v4 = createEmptyVault()
+    v4.budget.plan.push({ categoryId: 'c1', plannedAmount: '42.00' })
+
+    expect(migrateVault(v4)).toEqual(v4)
   })
 
   test('an unknown version still scrubs', () => {
     expect(migrateVault({ version: 99, budget: { categories: [{}] } }).budget.categories).toHaveLength(0)
     expect(migrateVault(null).budget.categories).toHaveLength(0)
     expect(migrateVault('nonsense').budget.categories).toHaveLength(0)
+  })
+})
+
+describe('encryptVault — large vaults', () => {
+  // Regression: the old `String.fromCharCode(...bytes)` spread overflowed the
+  // call stack past roughly 100KB, so a vault with many archives could not be
+  // saved at all. Archives make vaults that size unremarkable.
+  test('encrypts a vault far past the old stack limit', async () => {
+    const mek = await generateMEK()
+    const vault = createEmptyVault()
+
+    // ~2000 archive lines: a few years of monthly snapshots.
+    vault.budget.archives = Array.from({ length: 40 }, (_, a) => ({
+      id: `archive-${a}`,
+      name: `Snapshot ${a}`,
+      createdAt: '2026-08-16',
+      lines: Array.from({ length: 50 }, (_, l) => ({
+        categoryName: `A reasonably long category name ${a}-${l}`,
+        groupName: `Group ${l}`,
+        type: (l % 2 === 0 ? 'income' : 'expense') as 'income' | 'expense',
+        plannedAmount: '1234.56',
+      })),
+    }))
+
+    const encrypted = await encryptVault(vault, mek)
+    const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
+
+    expect(decrypted.budget.archives).toHaveLength(40)
+    expect(decrypted.budget.archives[39].lines).toHaveLength(50)
   })
 })
