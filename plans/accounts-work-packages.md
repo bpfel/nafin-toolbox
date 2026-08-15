@@ -339,5 +339,4 @@ then UI. That hides the entire QR port behind the accounts critical path.
 
 ## Open questions
 
-1. **What happens when the Accounts module is disabled?** Carried over from the design doc,
-   still unanswered.
+None. Both packaging and disable behaviour are settled in the design doc.

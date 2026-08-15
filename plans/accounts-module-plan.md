@@ -547,11 +547,18 @@ The trade is deliberate: a user editing the budget will not see an account probl
 caused until they look at accounts. That is accepted in exchange for a budget view that never
 grows account concepts, and it costs nothing for the majority who run a single account.
 
-## Open questions
+## Disabling the module
 
-1. **What happens when the Accounts module is disabled?** Categories keep routing to accounts
-   that are no longer surfaced. Presumably inert and harmless, but the Set-aside kind depends
-   on accounts existing, so this needs an explicit answer.
+**The views disappear; the data stays and does nothing.** Account records, routing and reserve
+definitions remain in the vault untouched, and re-enabling restores the previous state exactly.
+
+Nothing else changes, because nothing else ever depended on the module being on: the budget
+never displayed account information, set-asides already total as expenses, and
+`plannedBalance` is unaffected. The only loss is visibility of required and available figures,
+which is the point of disabling.
+
+This matches the promise the module picker already makes — *"Data is kept when disabling"* —
+so it is the established convention rather than a new rule.
 
 ## QR encoder
 
