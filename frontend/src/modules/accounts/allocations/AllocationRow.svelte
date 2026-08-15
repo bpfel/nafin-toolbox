@@ -1,0 +1,347 @@
+<script lang="ts">
+  import type { ReserveDefinition, VaultAccount, VaultCategory } from '../../../lib/crypto/vault'
+  import { flowKindOf } from '../../../lib/accounts/routing'
+  import {
+    addMonths,
+    fromCents,
+    monthsBetween,
+    nextDue,
+    requiredForItem,
+    toCents,
+  } from '../../../lib/accounts/reserveMath'
+  import RoutingControls from './RoutingControls.svelte'
+  import ReserveFields from './ReserveFields.svelte'
+
+  interface Routing {
+    sourceAccountId: string | null
+    sinkAccountId: string | null
+  }
+
+  interface Props {
+    category: VaultCategory
+    plannedAmount: string
+    accounts: VaultAccount[]
+    currentMonth: string
+    // The sink account's available figure. Negative means that account cannot
+    // cover everything planned against it; an amortization uses it to move its
+    // affordability date instead of raising a warning.
+    sinkAvailable: string | null
+    onroutingchange: (routing: Routing) => void
+    onreservechange: (reserve: ReserveDefinition | undefined) => void
+    onpurchase: () => void
+  }
+
+  let {
+    category,
+    plannedAmount,
+    accounts,
+    currentMonth,
+    sinkAvailable,
+    onroutingchange,
+    onreservechange,
+    onpurchase,
+  }: Props = $props()
+
+  let expanded = $state(false)
+
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ]
+
+  function monthLabel(month: string): string {
+    const [year, index] = month.split('-')
+    return `${MONTH_NAMES[Number(index) - 1] ?? month} ${year}`
+  }
+
+  function money(amount: string): string {
+    return Number(amount).toLocaleString('de-CH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  }
+
+  function cents(amount: string | null): number {
+    if (amount === null) return 0
+    try {
+      return toCents(amount)
+    } catch {
+      return 0
+    }
+  }
+
+  function accountName(id: string | null): string {
+    if (id === null) return 'outside your accounts'
+    return accounts.find(a => a.id === id)?.name ?? 'a deleted account'
+  }
+
+  // A category with no endpoints at all is a broken record rather than a flow.
+  // Show it as needing attention instead of letting the classifier throw.
+  let kind = $derived.by(() => {
+    try {
+      return flowKindOf(category)
+    } catch {
+      return null
+    }
+  })
+
+  let isSetAside = $derived(category.type === 'expense' && category.sinkAccountId !== null)
+
+  let kindLabel = $derived(
+    kind === 'income' ? 'Income' : kind === 'spending' ? 'Spending' : kind === 'setaside' ? 'Set-aside' : 'Unrouted',
+  )
+
+  let flowSummary = $derived.by(() => {
+    switch (kind) {
+      case 'income':
+        return `From outside → ${accountName(category.sinkAccountId)}`
+      case 'spending':
+        return `${accountName(category.sourceAccountId)} → leaves your accounts`
+      case 'setaside':
+        return category.sourceAccountId === category.sinkAccountId
+          ? `Stays in ${accountName(category.sourceAccountId)}, set aside`
+          : `${accountName(category.sourceAccountId)} → ${accountName(category.sinkAccountId)}`
+      default:
+        return 'No routing — pick where this money comes from'
+    }
+  })
+
+  let reserve = $derived(category.reserve)
+
+  let requiredNow = $derived.by(() => {
+    if (!reserve) return null
+    try {
+      return requiredForItem(reserve, currentMonth)
+    } catch {
+      return null
+    }
+  })
+
+  // --- Obligation: money is the variable ---------------------------------
+  // The anchor is a recurring due month, so the requirement peaks at the full
+  // target in that month. What matters is how long is left to find the money.
+  let obligation = $derived.by(() => {
+    if (reserve?.kind !== 'obligation') return null
+    try {
+      const due = nextDue(reserve.anchorMonth, reserve.periodMonths, currentMonth)
+      return { due, monthsAway: monthsBetween(currentMonth, due) }
+    } catch {
+      return null
+    }
+  })
+
+  // --- Amortization: time is the variable --------------------------------
+  // Never a warning. If the account is short, the date moves out instead — the
+  // item is optional, so buying later or cheaper is the answer.
+  let amortization = $derived.by(() => {
+    if (reserve?.kind !== 'amortization' || requiredNow === null) return null
+
+    const targetCents = cents(reserve.targetAmount)
+    const plannedCents = cents(plannedAmount)
+    // What the user actually puts aside each month, falling back to the rate
+    // the definition implies when nothing is budgeted yet.
+    const rateCents = plannedCents > 0
+      ? plannedCents
+      : Math.round(targetCents / reserve.periodMonths)
+
+    // The nominal accumulation, reduced by whatever the sink account is short.
+    // A shortfall belongs to the account, so it is not attributed to any single
+    // item — it simply pushes every date on that account further out.
+    const shortfall = Math.min(0, cents(sinkAvailable))
+    const accumulated = Math.max(0, cents(requiredNow) + shortfall)
+    const remaining = targetCents - accumulated
+
+    if (remaining <= 0) return { rateCents, affordableFrom: null, monthsAway: 0 }
+    if (rateCents <= 0) return { rateCents: 0, affordableFrom: null, monthsAway: null }
+
+    const monthsAway = Math.ceil(remaining / rateCents)
+    return { rateCents, affordableFrom: addMonths(currentMonth, monthsAway), monthsAway }
+  })
+</script>
+
+<div class="allocation-row" class:unrouted={kind === null}>
+  <div class="row-head">
+    <div class="identity">
+      <span class="name">{category.name}</span>
+      <span class="kind kind-{kind ?? 'none'}">{kindLabel}</span>
+    </div>
+    <span class="planned">CHF {money(plannedAmount)}</span>
+    <button
+      class="toggle"
+      aria-expanded={expanded}
+      onclick={() => (expanded = !expanded)}
+    >
+      {expanded ? 'Done' : 'Edit routing'}
+    </button>
+  </div>
+
+  <p class="flow">{flowSummary}</p>
+
+  {#if reserve && requiredNow !== null}
+    <div class="reserve-status">
+      <span class="required">
+        CHF {money(requiredNow)} of CHF {money(reserve.targetAmount)} should be set aside by now
+      </span>
+      {#if obligation}
+        <span class="timing">
+          {obligation.monthsAway === 0
+            ? 'Due this month'
+            : `Due ${monthLabel(obligation.due)} — ${obligation.monthsAway} ${obligation.monthsAway === 1 ? 'month' : 'months'} to go`}
+        </span>
+      {/if}
+      {#if amortization}
+        <span class="timing">
+          {#if amortization.monthsAway === 0}
+            Affordable now
+          {:else if amortization.affordableFrom}
+            At CHF {money(fromCents(amortization.rateCents))}/month, affordable from
+            {monthLabel(amortization.affordableFrom)}
+          {:else}
+            No monthly amount planned — budget something towards this to get a date
+          {/if}
+        </span>
+        <button class="purchase" onclick={onpurchase}>Bought it…</button>
+      {/if}
+    </div>
+  {/if}
+
+  {#if expanded}
+    <div class="editor">
+      <RoutingControls
+        fieldId={category.id}
+        type={category.type}
+        sourceAccountId={category.sourceAccountId}
+        sinkAccountId={category.sinkAccountId}
+        {accounts}
+        onchange={onroutingchange}
+      />
+
+      {#if isSetAside}
+        <ReserveFields {reserve} {currentMonth} onchange={onreservechange} />
+      {/if}
+    </div>
+  {/if}
+</div>
+
+<style>
+  .allocation-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eee;
+  }
+  .allocation-row:last-child {
+    border-bottom: none;
+  }
+  .allocation-row.unrouted {
+    background: #fff8e1;
+  }
+  .row-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .identity {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kind {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .kind-income {
+    background: #e6f4ec;
+    color: #2d6a4f;
+  }
+  .kind-spending {
+    background: #fdecea;
+    color: #c0392b;
+  }
+  .kind-setaside {
+    background: #e7f0fa;
+    color: #1f5c99;
+  }
+  .kind-none {
+    background: #fff3cd;
+    color: #8a6d3b;
+  }
+  .planned {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .toggle {
+    padding: 0.25rem 0.7rem;
+    font-size: 0.8rem;
+    background: #f1f3f5;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    color: #333;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .toggle:hover {
+    background: #e9ecef;
+  }
+  .flow {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #666;
+  }
+  .reserve-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: #495057;
+  }
+  .required {
+    font-variant-numeric: tabular-nums;
+  }
+  .timing {
+    color: #1f5c99;
+  }
+  .purchase {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    background: white;
+    border: 1px solid #1f5c99;
+    border-radius: 6px;
+    color: #1f5c99;
+    cursor: pointer;
+  }
+  .purchase:hover {
+    background: #e7f0fa;
+  }
+  .editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem 0 0.25rem;
+  }
+
+  @media (max-width: 640px) {
+    .row-head {
+      flex-wrap: wrap;
+    }
+    .toggle {
+      min-height: 36px;
+    }
+  }
+</style>
