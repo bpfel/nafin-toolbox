@@ -31,10 +31,42 @@ cannot read this data (see the vault notes in CLAUDE.md).
 interface VaultAccount {
   id: string
   name: string
+  kind: AccountKind
+  currency: string           // ISO 4217, default 'CHF'
   currentAmount: string      // user-correctable
   lastCorrectedAt: string    // ISO date — surfaced in the UI
+
+  // Swiss QR bill payment details. Optional: an account is QR-capable
+  // only once iban and a complete holder address are present.
+  iban?: string
+  holder?: QRAddress
+}
+
+interface QRAddress {
+  name: string
+  street: string
+  buildingNumber: string
+  postalCode: string
+  city: string
+  country: string            // ISO 3166-1 alpha-2
 }
 ```
+
+### Account kinds
+
+Recorded now as data; no behaviour attached to it yet. Whether kind should drive behaviour is
+an open question, but the field needs to exist before we can find out.
+
+| Kind | Example | Notes |
+|---|---|---|
+| `transactional` | Salary / everyday account | Source of most expenses |
+| `reserves` | Obligation & amortization savings | Sink of reserve flows |
+| `savings` | General savings, nothing earmarked | |
+| `cash` | Physical cash | No IBAN, never QR-capable |
+| `retirement_3a` | Pillar 3a | In-sourced; cap logic stays with Provision3a |
+| `investment` | Brokerage | For the future investments module |
+
+### Categories
 
 `VaultCategory` gains source/sink and an optional reserve definition:
 
@@ -43,47 +75,71 @@ interface VaultCategory {
   // ...existing fields (id, name, type, sortOrder, archived, groupId, fixed)
   sourceAccountId: string | null   // null = external counterparty
   sinkAccountId: string | null     // null = external counterparty
-  reserve?: {
-    kind: 'obligation' | 'amortization'
-    targetAmount: string
-    periodMonths: number           // 12 for a yearly bill, ~72 for a laptop
-    dueMonth?: number              // 1–12, obligations only — anchors the cycle
-    cycleStartedAt?: string        // YYYY-MM, amortizations only
-  }
+  reserve?: ReserveDefinition
 }
 ```
 
-### Flow type is derived, not stored
+Source and sink live on the **category**, not the entry: a flow's endpoints are stable month
+to month, and `fixed` already lives there. One-off overrides are not supported; if they turn
+out to be needed, the fields move to `VaultEntry` at the cost of repeating them every period.
 
-| Source | Sink | Meaning |
+### Income vs spending
+
+`VaultCategory.type: 'income' | 'expense'` **already exists** and drives the existing budget
+grouping and totals in `budgetEngine.ts`. It stays the source of truth.
+
+Source/sink introduces a second, derivable way to express the same thing, so the two can
+contradict. Rule: `type` is authoritative, source/sink is routing detail, and the pair is
+validated against it.
+
+| Source | Sink | Consistent with |
 |---|---|---|
-| `null` | account | Income |
-| account | `null` | Expense |
-| account A | account B | Transfer / allocation |
-| account A | account A | No movement — the single-account setup |
+| `null` | account | `type: 'income'` |
+| account | `null` | `type: 'expense'` |
+| account A | account B | either — a transfer/allocation |
+| account A | account A | either — no movement, single-account setup |
 
-This is what generalizes the setup. A user running everything from one account sets source
-and sink to the same account everywhere; a user who splits salary from savings gets the
-multi-account behavior from the same model with no special cases.
+The last row is what generalizes the setup. A user running everything from one account sets
+source and sink to the same account everywhere; a user who splits salary from savings gets
+multi-account behaviour from the same model with no special cases.
 
-## The math
+## Reserves
 
-One formula covers obligations and amortizations:
+Obligations and amortizations share one definition. Both are: accumulate `targetAmount` over
+`periodMonths`, spend, repeat — anchored to a known month.
+
+```ts
+interface ReserveDefinition {
+  kind: 'obligation' | 'amortization'
+  targetAmount: string    // amount due per occurrence
+  periodMonths: number    // 3 = quarterly, 12 = yearly, ~72 = laptop
+  anchorMonth: string     // YYYY-MM. Obligation: a known due month.
+                          //          Amortization: start of the current cycle.
+}
+```
+
+`periodMonths` + `anchorMonth` generalizes yearly bills to any recurrence — quarterly Swiss
+tax instalments are `periodMonths: 3`, and the due months follow from the anchor rather than
+needing to be listed.
+
+### The math
 
 ```
-monthly_contribution = targetAmount / periodMonths
-required(item)       = k × monthly_contribution
+nextDue        = smallest (anchorMonth + n × periodMonths) that is >= currentMonth
+monthsUntilDue = nextDue − currentMonth
+k              = periodMonths − monthsUntilDue
+required(item) = k × (targetAmount / periodMonths)
 ```
 
-where `k` is months completed in the current cycle:
+At `currentMonth == nextDue`, `k = periodMonths` and the full target is required. One month
+later `nextDue` has rolled forward and `k = 1` — the new cycle has begun.
 
-- **Obligation** (anchored to `dueMonth` M, current month c):
-  `k = periodMonths − ((M − c) mod periodMonths)`
-  At `c = M` this yields the full target. At `c = M+1` it is 1 — the new cycle has begun.
-  Obligations reset **automatically** at the due month.
-- **Amortization** (anchored to `cycleStartedAt`):
-  `k = months elapsed since cycleStartedAt`, capped at `periodMonths`.
-  Amortizations reset **only** via the purchase dialogue.
+The only difference between the two kinds is how the cycle rolls:
+
+- **Obligation** — strictly. `nextDue` advances on its own; the bill arrives whether or not
+  the money is there.
+- **Amortization** — nominally. The date is an estimate, and the purchase dialogue rewrites
+  `anchorMonth` to the month of purchase.
 
 ### Per-account, not per-item
 
@@ -108,12 +164,12 @@ Same math, different meaning — which drives presentation, not calculation.
 
 | | Obligation | Amortization |
 |---|---|---|
-| Example | Health insurance, taxes | Laptop replacement |
+| Example | Health insurance, quarterly tax | Laptop replacement |
 | Timing | Fixed calendar month | Estimate |
 | Optional | No | Yes |
 | Shortfall means | A problem — the bill arrives regardless | Just buy later or cheaper |
 | Flexible variable | Money | Time |
-| Cycle reset | Automatic, at `dueMonth` | Explicit, via purchase dialogue |
+| Cycle reset | Automatic, at `nextDue` | Explicit, via purchase dialogue |
 
 So a shortfall on an obligation reads as "CHF 800 short, 3 months to go", while an
 amortization reads as "at CHF 33/month, affordable from March 2029" — the date moves instead
@@ -124,20 +180,39 @@ of a warning firing.
 Triggered when the user buys an amortized item. Deliberately narrow:
 
 - Records the **real price paid**.
-- The real price sets the **target for the next cycle** — replacement cost updates itself.
-- Restarts the cycle (`cycleStartedAt` = now).
+- The real price sets `targetAmount` for the **next** cycle — replacement cost updates itself.
+- Rewrites `anchorMonth` to the month of purchase.
 - May display "this leaves the account below its required amount" as **information only**.
 
 Explicitly no other effects. It does not move money, adjust other items, or block on a
 shortfall.
 
+## Swiss QR bills
+
+Accounts carry the full creditor data a Swiss QR bill needs, so a bill can be produced from
+an account without re-entering anything: `iban`, `currency`, and the six-field `holder`
+address. Per-bill values (amount, debtor, reference type, reference, additional info) are
+supplied at generation time, not stored on the account.
+
+Field set matches the preserved implementation in `plans/qrbill-feature-snapshot.md`.
+
+**Generate client-side.** The snapshot records both a Go backend route
+(`POST /api/qrbill/generate`) and a frontend dependency (`swissqrbill`). Given E2EE, the
+frontend library is the right choice — sending IBAN and holder address to the server to
+render a QR code would leak exactly the data the vault exists to protect. The server should
+not be in this path.
+
+Note: the Swiss QR bill standard permits only CHF and EUR, so a QR-capable account is further
+restricted to those currencies.
+
 ## Screens
 
 Two, built in parallel:
 
-1. **Account management** — list accounts; add, rename, remove. Per account: current amount
-   (editable), required amount, the difference, and `lastCorrectedAt` shown next to the
-   balance so a stale figure is visible rather than silently trusted.
+1. **Account management** — list accounts; add, rename, remove. Per account: kind, currency,
+   current amount (editable), required amount, the difference, and `lastCorrectedAt` shown
+   next to the balance so a stale figure is visible rather than silently trusted. QR payment
+   details are an advanced section, hidden until asked for.
 2. **Allocations** — the monthly flow view. Which budget entries move money from where to
    where, and what accumulates in Reserves this month.
 
@@ -149,18 +224,14 @@ project's progressive-disclosure principle, without a second data model.
 
 ## Open questions
 
-1. **Source/sink on category or entry?** Modelled above on `VaultCategory`, since a flow's
-   endpoints are stable month to month and `fixed` already lives there. Per-entry placement
-   would allow one-off overrides at the cost of repeating the data in every period. Noted
-   because the discussion said "each budget entry needs source and sink".
-2. **Do accounts need a type?** Not modelled. "Reserves" is currently a *role* — an account
-   becomes one by being the sink of reserve categories. A `kind` field may be wanted later
-   for grouping or for the in-sourced 3a account.
-3. **Balance drift.** Allocations post into `currentAmount` automatically. If the user never
-   actually moves the francs, the figure drifts optimistically; `lastCorrectedAt` is the
-   mitigation, but confirm-per-month is the alternative.
-4. **Sub-year obligations.** `periodMonths` supports quarterly or semi-annual bills, but
-   `dueMonth` as a single 1–12 value does not. Needs a second look if those matter.
+1. **Balance drift.** Allocations post into `currentAmount` automatically. If the user never
+   actually moves the francs, the figure drifts optimistically. `lastCorrectedAt` is the
+   agreed mitigation; confirm-per-month remains the alternative if it proves insufficient.
+2. **Does `kind` drive behaviour?** The field exists; nothing branches on it yet. Candidates:
+   restricting which kinds can be reserve sinks, or hiding QR fields for `cash`.
+3. **Multi-currency.** Accounts carry a currency, but nothing converts between them. The
+   required/available math assumes a single currency per account and does not aggregate
+   across them.
 
 ## Deliberately out of scope
 
