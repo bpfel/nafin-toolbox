@@ -9,6 +9,7 @@
   import SecuritySettings from './lib/auth/SecuritySettings.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
+  import AccountsModule from './modules/accounts/AccountsModule.svelte'
   import { focusTrap } from './lib/util/focusTrap'
 
   const authState = getAuthState()
@@ -48,8 +49,14 @@
 
   const availableModules = [
     { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
-    { id: 'accounts', name: 'Accounts', description: 'Manage bank and savings accounts' },
-    { id: 'allocations', name: 'Allocations', description: 'Plan monthly money allocation' },
+    // Allocations ships inside Accounts as a second view rather than as its own
+    // module: it is meaningless without accounts, and the flat module list has no
+    // way to express that dependency. The `allocations` registry id stays unused.
+    {
+      id: 'accounts',
+      name: 'Accounts',
+      description: 'Accounts, money flows between them, and reserves for future costs',
+    },
     { id: 'provision3a', name: 'Pillar 3a', description: 'Swiss retirement savings (3a)' },
     { id: 'investments', name: 'Investments', description: 'Track stocks, ETFs, and other assets' },
   ]
@@ -385,6 +392,8 @@
             </div>
           {:else if mod.id === 'budget'}
             <BudgetModule />
+          {:else if mod.id === 'accounts'}
+            <AccountsModule />
           {:else}
             <div class="module-card">
               <span class="module-id">{mod.id}</span>

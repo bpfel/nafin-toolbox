@@ -1,0 +1,345 @@
+<script lang="ts">
+  import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
+
+  interface Props {
+    account: VaultAccount
+    /** Balance projected from the anchor pair — see accountMath. */
+    projected: string
+    required: string
+    available: string
+    /** 'YYYY-MM' the figures were computed for. */
+    currentMonth: string
+    /** False for the last remaining account, which cannot be deleted at all. */
+    canDelete: boolean
+    onedit: () => void
+    ondelete: () => void
+    onqrbill: () => void
+    oncorrect: (amount: string, atDate: string) => void
+  }
+
+  let { account, projected, required, available, currentMonth, canDelete, onedit, ondelete, onqrbill, oncorrect }: Props = $props()
+
+  const KIND_LABELS: Record<AccountKind, string> = {
+    transactional: 'Transactional',
+    reserves: 'Reserves',
+    savings: 'Savings',
+    cash: 'Cash',
+    retirement_3a: 'Pillar 3a',
+    investment: 'Investment',
+  }
+
+  // QR capability follows from having an IBAN, never from the kind. A `cash`
+  // account simply never has one.
+  let qrCapable = $derived(Boolean(account.iban))
+
+  // ISO dates and 'YYYY-MM' compare correctly as strings.
+  let anchorMonth = $derived(account.lastCorrectedAt.slice(0, 7))
+  let stale = $derived(anchorMonth < currentMonth)
+
+  let correcting = $state(false)
+  let amountInput = $state('')
+  let dateInput = $state('')
+  let correctionError = $state<string | null>(null)
+
+  function fmt(value: string): string {
+    const n = Number(value)
+    if (!isFinite(n)) return value
+    return n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  function todayISO(): string {
+    return new Date().toISOString().slice(0, 10)
+  }
+
+  function formatDate(iso: string): string {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso
+    return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  /** Accepts 1234.5, 1'234.50 and 1234,50; returns a 2-decimal string. */
+  function normalizeAmount(raw: string): string | null {
+    const cleaned = raw.replace(/['\s]/g, '').replace(',', '.')
+    if (!/^-?\d+(\.\d{1,2})?$/.test(cleaned)) return null
+    return Number(cleaned).toFixed(2)
+  }
+
+  function startCorrection() {
+    amountInput = account.currentAmount
+    dateInput = todayISO()
+    correctionError = null
+    correcting = true
+  }
+
+  function cancelCorrection() {
+    correcting = false
+    correctionError = null
+  }
+
+  function submitCorrection() {
+    const amount = normalizeAmount(amountInput)
+    if (amount === null) {
+      correctionError = 'Enter an amount like 1234.50'
+      return
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+      correctionError = 'Enter the date the balance was true'
+      return
+    }
+    // The amount and the date it holds as of are set together, always.
+    oncorrect(amount, dateInput)
+    correcting = false
+    correctionError = null
+  }
+</script>
+
+<article class="card">
+  <header class="card-head">
+    <div class="identity">
+      <h3>{account.name}</h3>
+      <p class="meta">
+        <span class="kind">{KIND_LABELS[account.kind]}</span>
+        {#if account.bankName}<span class="bank">· {account.bankName}</span>{/if}
+      </p>
+    </div>
+    <span class="currency">{account.currency}</span>
+  </header>
+
+  <dl class="figures">
+    <div class="figure">
+      <dt>Projected balance</dt>
+      <dd class="amount">{fmt(projected)}</dd>
+    </div>
+    <div class="figure">
+      <dt>Required</dt>
+      <dd class="amount muted">{fmt(required)}</dd>
+    </div>
+    <div class="figure">
+      <dt>Available</dt>
+      <dd class="amount" class:negative={Number(available) < 0}>{fmt(available)}</dd>
+    </div>
+  </dl>
+
+  <p class="anchor" class:stale>
+    Corrected {formatDate(account.lastCorrectedAt)} to {fmt(account.currentAmount)}
+    {#if stale}<span class="stale-note">· projected forward since then</span>{/if}
+  </p>
+
+  {#if correcting}
+    <div class="correction">
+      <p class="correction-hint">
+        The balance and the date it is true as of are one entry — both are set together.
+      </p>
+      <div class="correction-fields">
+        <label class="field">
+          <span class="label">Balance</span>
+          <input
+            type="text"
+            inputmode="decimal"
+            bind:value={amountInput}
+            onkeydown={e => { if (e.key === 'Enter') submitCorrection() }}
+          />
+        </label>
+        <label class="field">
+          <span class="label">As at</span>
+          <input
+            type="date"
+            bind:value={dateInput}
+            onkeydown={e => { if (e.key === 'Enter') submitCorrection() }}
+          />
+        </label>
+      </div>
+      {#if correctionError}
+        <p class="error">{correctionError}</p>
+      {/if}
+      <div class="actions">
+        <button class="btn cancel" onclick={cancelCorrection}>Cancel</button>
+        <button class="btn primary" onclick={submitCorrection}>Save correction</button>
+      </div>
+    </div>
+  {:else}
+    <div class="actions">
+      <button class="btn ghost" onclick={startCorrection}>Correct balance</button>
+      <button class="btn ghost" onclick={onedit} aria-label="Edit {account.name}">Edit</button>
+      {#if qrCapable}
+        <button class="btn ghost" onclick={onqrbill} aria-label="QR bill for {account.name}">
+          QR bill
+        </button>
+      {/if}
+      <button
+        class="btn danger-ghost"
+        onclick={ondelete}
+        disabled={!canDelete}
+        aria-label="Delete {account.name}"
+        title={canDelete ? undefined : 'The last remaining account cannot be deleted'}
+      >
+        Delete
+      </button>
+    </div>
+  {/if}
+</article>
+
+<style>
+  .card {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem 1.1rem 1.1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  h3 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .meta {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    color: #888;
+  }
+  .currency {
+    font-size: 0.75rem;
+    color: #888;
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+  }
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin: 0;
+  }
+  .figure {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  dt {
+    font-size: 0.72rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  dd {
+    margin: 0;
+  }
+  .amount {
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    color: #222;
+  }
+  .amount.muted {
+    color: #666;
+  }
+  .amount.negative {
+    color: #c0392b;
+  }
+  .anchor {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #888;
+  }
+  .anchor.stale {
+    color: #b26a00;
+  }
+  .stale-note {
+    font-style: italic;
+  }
+  .correction {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-top: 1px solid #eee;
+    padding-top: 0.75rem;
+  }
+  .correction-hint {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #888;
+  }
+  .correction-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .label {
+    font-size: 0.75rem;
+    color: #666;
+  }
+  .field input {
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .field input:focus {
+    border-color: #2d6a4f;
+    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
+  }
+  .error {
+    margin: 0;
+    color: #c0392b;
+    font-size: 0.8rem;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .ghost {
+    background: #f1f3f5;
+    border: 1px solid #dee2e6;
+    color: #333;
+  }
+  .ghost:hover:not(:disabled) {
+    background: #e9ecef;
+  }
+  .danger-ghost {
+    background: none;
+    border: 1px solid #f0c9c3;
+    color: #c0392b;
+  }
+  .danger-ghost:hover:not(:disabled) {
+    background: #fdecea;
+  }
+  .cancel {
+    background: #f1f3f5;
+    border: 1px solid #dee2e6;
+    color: #333;
+  }
+  .primary {
+    background: #2d6a4f;
+    border: none;
+    color: white;
+  }
+  .primary:hover:not(:disabled) {
+    background: #245a42;
+  }
+</style>
