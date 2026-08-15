@@ -1,7 +1,8 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import type { AccountKind, QRAddress, VaultAccount } from '../../../lib/crypto/vault'
-  import { isQRIban } from '../../../lib/qrbill/validate'
+  import { isQRIban, ibanStatus } from '../../../lib/qrbill/validate'
+  import { formatIBANForDisplay } from '../../../lib/qrbill/format'
   import { focusTrap } from '../../../lib/util/focusTrap'
 
   type AccountDetails = Pick<VaultAccount, 'name' | 'kind'> &
@@ -35,7 +36,8 @@
   let kind = $state<AccountKind>(initial?.kind ?? 'transactional')
   let bankName = $state(initial?.bankName ?? '')
 
-  let iban = $state(initial?.iban ?? '')
+  // Held in grouped display form; cleanedIban is what gets stored and validated.
+  let iban = $state(formatIBANForDisplay(initial?.iban ?? ''))
   let holderName = $state(initial?.holder?.name ?? '')
   let street = $state(initial?.holder?.street ?? '')
   let buildingNumber = $state(initial?.holder?.buildingNumber ?? '')
@@ -52,6 +54,20 @@
   // Derived, never asked for: a mistyped kind would produce bills the bank
   // rejects, and the IBAN itself says which it is.
   let ibanKind = $derived<'iban' | 'qr-iban'>(isQRIban(cleanedIban) ? 'qr-iban' : 'iban')
+
+  let ibanState = $derived(ibanStatus(iban))
+
+  // Regroup as the user types. The caret is kept at the end rather than preserved
+  // mid-string: reflowing groups makes an exact caret restore fiddly, and IBANs are
+  // overwhelmingly pasted or typed straight through rather than edited in the middle.
+  function onIbanInput(event: Event) {
+    const input = event.currentTarget as HTMLInputElement
+    const atEnd = input.selectionStart === input.value.length
+    iban = formatIBANForDisplay(input.value)
+    if (atEnd) {
+      queueMicrotask(() => input.setSelectionRange(iban.length, iban.length))
+    }
+  }
 
   function save() {
     const trimmed = name.trim()
@@ -133,13 +149,30 @@
 
           <label class="field">
             <span class="label">IBAN</span>
-            <input type="text" bind:value={iban} placeholder="CH.. .. .." autocomplete="off" />
+            <input
+              type="text"
+              value={iban}
+              oninput={onIbanInput}
+              placeholder="CH00 0000 0000 0000 0000 0"
+              autocomplete="off"
+              spellcheck="false"
+              aria-invalid={ibanState === 'invalid'}
+              aria-describedby="iban-status"
+            />
           </label>
-          {#if cleanedIban}
-            <p class="hint">
-              Detected as {ibanKind === 'qr-iban' ? 'a QR-IBAN — bills will use a QR reference (QRR)' : 'a regular IBAN — bills will use no reference or SCOR'}.
-            </p>
-          {/if}
+          <p id="iban-status" class="hint" class:bad={ibanState === 'invalid'}>
+            {#if ibanState === 'invalid'}
+              Not a valid Swiss or Liechtenstein IBAN — check for a mistyped digit.
+            {:else if ibanState === 'incomplete'}
+              {21 - cleanedIban.length} more character{21 - cleanedIban.length === 1 ? '' : 's'} to go.
+            {:else if ibanState === 'valid'}
+              Checksum valid. Detected as {ibanKind === 'qr-iban'
+                ? 'a QR-IBAN — bills will use a QR reference (QRR)'
+                : 'a regular IBAN — bills will use no reference or SCOR'}.
+            {:else}
+              Only needed for QR bills.
+            {/if}
+          </p>
 
           <label class="field">
             <span class="label">Holder name</span>
@@ -268,6 +301,9 @@
     font-size: 0.78rem;
     color: #888;
     margin: 0 0 0.75rem;
+  }
+  .hint.bad {
+    color: #c0392b;
   }
   .actions {
     display: flex;
