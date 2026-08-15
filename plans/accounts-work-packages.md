@@ -337,6 +337,42 @@ then UI. That hides the entire QR port behind the accounts critical path.
 | Reserve math off-by-one at cycle boundaries | High | Worked examples from the design doc as test fixtures |
 | Scrub destroys data a user cared about | Med | Pre-v1.0 decision, accepted; warn loudly in the UI |
 
+## Spec conformance — verified against SIX IG v2.3
+
+Read from the actual Swiss Implementation Guidelines for the QR-bill, v2.3 (20.11.2023),
+chapter 6 "Parameters for generating the Swiss QR Codes". These are no longer second-hand.
+
+| Requirement | Spec says | Status |
+|---|---|---|
+| Error correction level | §6.1 — level **M**, ~15% redundancy | Confirmed; WP-9 pins `ecc: 'medium'` |
+| Printed size | §6.4 — always **46 × 46 mm**, any version | Confirmed; WP-8 emits `46mm` |
+| Quiet zone | §6.4.1 — **4 modules** (≥ 1.6 mm) | Confirmed; WP-8 adds it, WP-9 strips it |
+| Cross size | §6.4.2 — **7 × 7 mm** | Confirmed; ratio 7/46 correct |
+| Max payload | §6.2 — **997 characters** including separators | **Not yet validated — gap** |
+| Max version | §6.2 — version 25, 117 × 117 modules | Informational |
+| Min module size | §6.3 — 0.4 mm when printing | Informational |
+| Generation order | §6.4 — generate smallest version, *then* scale to 46 mm | Satisfied by vector output |
+
+### The cross geometry is not in the spec
+
+§6.4.2 specifies only that the code "is overlaid with a cross logo in black and white,
+measuring 7 x 7 mm" and states that **the logo file is available from the SIX Download
+Centre**. The internal proportions — border width, arm length, arm width — are not published.
+
+So WP-8's hand-drawn cross cannot be corrected against the document, because the document does
+not contain the numbers. Reconstructing it by eye is the wrong approach on two counts: it will
+not match, and page 5 of the guidelines records that the cross image is **legally protected by
+SIC Ltd**, with compliance defined as following the guidelines.
+
+**Action: replace the hand-drawn cross with the official asset**, embedded as an inline SVG
+symbol. Retain WP-8's ratio-based placement (7/46 of code width, centred) — only the glyph's
+internals change.
+
+### Added validation rule
+
+WP-7 must also reject payloads over **997 characters**. A bill that exceeds it is invalid and
+no encoder will warn about it.
+
 ## Open questions
 
 None. Both packaging and disable behaviour are settled in the design doc.
