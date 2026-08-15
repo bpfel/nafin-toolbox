@@ -32,7 +32,7 @@ interface VaultAccount {
   id: string
   name: string
   kind: AccountKind
-  currency: string           // ISO 4217, default 'CHF'
+  currency: 'CHF'            // CHF only for now; field kept so widening is additive
   currentAmount: string      // user-correctable
   lastCorrectedAt: string    // ISO date — surfaced in the UI
 
@@ -62,7 +62,7 @@ an open question, but the field needs to exist before we can find out.
 | `transactional` | Salary / everyday account | Source of most expenses |
 | `reserves` | Obligation & amortization savings | Sink of reserve flows |
 | `savings` | General savings, nothing earmarked | |
-| `cash` | Physical cash | No IBAN, never QR-capable |
+| `cash` | Physical cash | Has no IBAN, so never QR-capable |
 | `retirement_3a` | Pillar 3a | In-sourced; cap logic stays with Provision3a |
 | `investment` | Brokerage | For the future investments module |
 
@@ -196,14 +196,44 @@ supplied at generation time, not stored on the account.
 
 Field set matches the preserved implementation in `plans/qrbill-feature-snapshot.md`.
 
-**Generate client-side.** The snapshot records both a Go backend route
-(`POST /api/qrbill/generate`) and a frontend dependency (`swissqrbill`). Given E2EE, the
-frontend library is the right choice — sending IBAN and holder address to the server to
-render a QR code would leak exactly the data the vault exists to protect. The server should
-not be in this path.
+### What makes an account QR-capable
 
-Note: the Swiss QR bill standard permits only CHF and EUR, so a QR-capable account is further
-restricted to those currencies.
+**Having an IBAN — nothing else.** A QR bill encodes a payment instruction into a bank
+account, so any account reachable by bank transfer qualifies: transactional, savings,
+reserves, and 3a (3a accounts have IBANs and are funded by transfer). Brokerage accounts
+qualify if their cash leg has one. `cash` is the only kind that can never qualify, because
+physical cash has no IBAN — that is a consequence of the account, not a rule about kinds.
+
+### Direction of use
+
+Two distinct uses, same data:
+
+1. **Someone pays you** — you are the creditor. Split costs, invoice a client.
+2. **You pay into your own account** — a funding transfer, e.g. moving this month's CHF
+   391.67 into Reserves, or a 3a contribution. Generate the bill, scan it in your banking
+   app, done.
+
+The second is the more valuable one here: it makes an allocation actionable without any bank
+API. Either way the creditor is one of your own accounts, so the data model is unchanged.
+
+### Generate client-side
+
+The snapshot records both a Go backend route (`POST /api/qrbill/generate`) and a frontend
+dependency (`swissqrbill`). Given E2EE, the frontend library is the right choice — sending
+IBAN and holder address to the server to render a QR code would leak exactly the data the
+vault exists to protect. The server should not be in this path.
+
+Feasibility: generation is computationally trivial. The payload is ~31 lines of text and the
+encode produces a grid of a few thousand modules; this is a button-press operation, not a
+workload. Client CPU is a non-issue at any realistic volume.
+
+The real cost is **bundle size**. The frontend currently has exactly one runtime dependency
+(`sortablejs`), so `swissqrbill` would likely become the largest thing in it. Mitigation:
+load it with a dynamic `import()` when the QR dialogue opens, so users who never generate a
+bill never download it.
+
+To verify before committing: that `swissqrbill` v4 supports browser SVG output rather than
+being Node/PDF-oriented, and its actual bundle weight.
 
 ## Screens
 
@@ -229,9 +259,8 @@ project's progressive-disclosure principle, without a second data model.
    agreed mitigation; confirm-per-month remains the alternative if it proves insufficient.
 2. **Does `kind` drive behaviour?** The field exists; nothing branches on it yet. Candidates:
    restricting which kinds can be reserve sinks, or hiding QR fields for `cash`.
-3. **Multi-currency.** Accounts carry a currency, but nothing converts between them. The
-   required/available math assumes a single currency per account and does not aggregate
-   across them.
+3. **Browser support in `swissqrbill`.** Client-side SVG output needs verifying before the
+   dependency is committed to.
 
 ## Deliberately out of scope
 
@@ -241,3 +270,5 @@ project's progressive-disclosure principle, without a second data model.
   regular account so contributions are transfers between tracked accounts; the cap logic
   belongs to the future Provision3a module.
 - Vault migration. Records are scrubbed on version change until v1.0.
+- Multi-currency. CHF only. The `currency` field exists so widening later is additive, but
+  nothing converts or aggregates across currencies.
