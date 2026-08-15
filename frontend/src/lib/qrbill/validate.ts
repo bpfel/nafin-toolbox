@@ -1,4 +1,5 @@
 import type { QRAddress, QRBillRequest, ValidationError } from './types'
+import { buildPayload } from './payload'
 
 // Ported from backend/internal/qrbill/validate.go with three deliberate
 // corrections, each marked CORRECTION below:
@@ -9,6 +10,25 @@ import type { QRAddress, QRBillRequest, ValidationError } from './types'
 const amountRegex = /^\d{1,9}(\.\d{1,2})?$/
 const ibanRegex = /^(CH|LI)\d{19}$/
 const qrrRegex = /^\d{27}$/
+
+// Per-field maxima from SIX IG v2.3, pages 34-35. Country is checked separately
+// because it is an exact length, not a maximum.
+const ADDRESS_MAX_LENGTHS: ReadonlyArray<[keyof QRAddress, number]> = [
+  ['name', 70],
+  ['street', 70],
+  ['buildingNumber', 16],
+  ['postalCode', 16],
+  ['city', 35],
+]
+
+// IG v2.3 section 6.2: the encoded payload may not exceed 997 characters,
+// including element separators. With the per-field maxima above the theoretical
+// worst case is roughly 670, so this is a backstop rather than a live limit —
+// but it is the rule the standard states, and it is what fails at the bank.
+const MAX_PAYLOAD_CHARS = 997
+
+// IG v2.3 page 35: the amount must be between 0.01 and 999,999,999.99.
+const MIN_AMOUNT_CENTS = 1
 
 /** Code point count. CORRECTION 1: Go's len() counted bytes, so "Müller" was 7. */
 function charLength(s: string): number {
@@ -73,6 +93,9 @@ export function validate(req: QRBillRequest): ValidationError[] {
         field: 'amount',
         message: 'must be a decimal number with up to 9 integer digits and up to 2 decimal places',
       })
+    } else if (Math.round(parseFloat(req.amount) * 100) < MIN_AMOUNT_CENTS) {
+      // A zero amount passes the regex but the standard requires at least 0.01.
+      errs.push({ field: 'amount', message: 'must be at least 0.01' })
     }
   }
 
@@ -88,6 +111,19 @@ export function validate(req: QRBillRequest): ValidationError[] {
       field: 'additionalInfo',
       message: 'must be at most 140 characters',
     })
+  }
+
+  // Checked last, and only on an otherwise valid request: building the payload
+  // from a request that already failed field validation would report a length
+  // problem on top of the real cause.
+  if (errs.length === 0) {
+    const payloadLength = charLength(buildPayload(req))
+    if (payloadLength > MAX_PAYLOAD_CHARS) {
+      errs.push({
+        field: 'payload',
+        message: `assembled payload is ${payloadLength} characters, exceeding the ${MAX_PAYLOAD_CHARS} character limit`,
+      })
+    }
   }
 
   return errs
@@ -132,9 +168,15 @@ function validateAddress(
     if (!addr.city) errs.push({ field: `${prefix}.city`, message: 'is required' })
     if (!addr.country) errs.push({ field: `${prefix}.country`, message: 'is required' })
   }
-  if (charLength(addr.name ?? '') > 70) {
-    errs.push({ field: `${prefix}.name`, message: 'must be at most 70 characters' })
+  // Field lengths per SIX IG v2.3, "Data elements in the QR-bill" (pages 34-35).
+  // The Go original only checked the name; the other four were unbounded, which
+  // is what made the 997-character payload cap reachable at all.
+  for (const [field, max] of ADDRESS_MAX_LENGTHS) {
+    if (charLength(addr[field] ?? '') > max) {
+      errs.push({ field: `${prefix}.${field}`, message: `must be at most ${max} characters` })
+    }
   }
+
   const countryLength = charLength(addr.country ?? '')
   if (countryLength !== 0 && countryLength !== 2) {
     errs.push({ field: `${prefix}.country`, message: 'must be a 2-letter country code' })
