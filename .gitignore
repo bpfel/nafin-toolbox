@@ -10,6 +10,9 @@ frontend/dist/
 .vscode/
 .idea/
 
+# Claude Code — local config, shared across worktrees via symlink (see CLAUDE.md)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
