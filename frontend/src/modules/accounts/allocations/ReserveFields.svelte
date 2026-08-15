@@ -14,21 +14,45 @@
   interface Props {
     reserve: ReserveDefinition | undefined
     currentMonth: string
+    /** What the budget already plans monthly for this category. Used to propose a target. */
+    plannedAmount: string
     onchange: (reserve: ReserveDefinition | undefined) => void
   }
 
-  let { reserve, currentMonth, onchange }: Props = $props()
+  let { reserve, currentMonth, plannedAmount, onchange }: Props = $props()
 
   let error = $state<string | null>(null)
 
   let selectedKind = $derived(reserve?.kind ?? 'none')
 
+  // True while the target is still exactly what we proposed from the budgeted
+  // amount, so the label can say so and the user knows it is a starting point.
+  let isProposed = $derived(
+    reserve != null && reserve.targetAmount === proposedTarget(reserve.periodMonths),
+  )
+
+  const DEFAULT_PERIOD_MONTHS = 12
+
+  /**
+   * Proposes the target from what is already budgeted: the monthly amount times
+   * the period. For the default yearly period that is exactly the annual spend,
+   * which is the number the user would otherwise work out by hand.
+   *
+   * Computed in integer cents so 391.67 x 12 gives 4700.04 rather than a float
+   * artefact. A category with nothing planned proposes nothing.
+   */
+  function proposedTarget(periodMonths: number): string {
+    const monthlyCents = Math.round(Number(plannedAmount) * 100)
+    if (!Number.isFinite(monthlyCents) || monthlyCents <= 0) return '0.00'
+    return (monthlyCents * periodMonths / 100).toFixed(2)
+  }
+
   function base(): ReserveDefinition {
     return (
       reserve ?? {
         kind: 'obligation',
-        targetAmount: '0.00',
-        periodMonths: 12,
+        targetAmount: proposedTarget(DEFAULT_PERIOD_MONTHS),
+        periodMonths: DEFAULT_PERIOD_MONTHS,
         anchorMonth: currentMonth,
       }
     )
@@ -74,7 +98,18 @@
       error = 'Period must be a whole number of months, at least 1'
       return
     }
-    update({ periodMonths: months })
+    // Re-propose the target only while it is still the untouched proposal for the
+    // old period. Once the user has typed a real figure, changing the period must
+    // not overwrite it — a quarterly bill of 1200 is not 400 just because the
+    // period moved.
+    const current = reserve
+    const stillProposed =
+      current != null && current.targetAmount === proposedTarget(current.periodMonths)
+    update(
+      stillProposed
+        ? { periodMonths: months, targetAmount: proposedTarget(months) }
+        : { periodMonths: months },
+    )
   }
 
   function changeAnchor(raw: string) {
@@ -137,7 +172,10 @@
   {#if reserve}
     <div class="grid">
       <label class="control">
-        <span class="control-label">Target amount</span>
+        <span class="control-label">
+          Target amount
+          {#if isProposed}<span class="proposed">proposed</span>{/if}
+        </span>
         <input
           type="text"
           inputmode="decimal"
@@ -185,6 +223,14 @@
       </label>
     </div>
 
+    {#if isProposed && Number(plannedAmount) > 0}
+      <p class="hint">
+        Target proposed from the CHF {Number(plannedAmount).toLocaleString('de-CH', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} already budgeted each month. Overwrite it with the real figure if you know it.
+      </p>
+    {/if}
     <p class="hint">{anchorHint}</p>
   {/if}
 
@@ -239,6 +285,17 @@
   input[type='text'] {
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .proposed {
+    font-weight: 400;
+    font-size: 0.7rem;
+    color: #888;
+    background: #f1f3f5;
+    border-radius: 3px;
+    padding: 0.05rem 0.3rem;
+    margin-left: 0.35rem;
+    text-transform: none;
+    letter-spacing: 0;
   }
   .hint {
     margin: 0;

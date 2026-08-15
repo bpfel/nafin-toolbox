@@ -222,7 +222,7 @@
       />
 
       {#if isSetAside}
-        <ReserveFields {reserve} {currentMonth} onchange={onreservechange} />
+        <ReserveFields {reserve} {currentMonth} {plannedAmount} onchange={onreservechange} />
       {/if}
     </div>
   {/if}
