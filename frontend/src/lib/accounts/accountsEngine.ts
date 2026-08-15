@@ -1,0 +1,79 @@
+import type { VaultAccount, VaultData } from '../crypto/vault'
+
+// CRUD over the account list, with one rule the rest of the module leans on:
+// the vault always holds at least one account. Every other invariant here —
+// no unrouted category, no orphan reassignment target — follows from it.
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+// Defaults describe the ordinary case: a CHF transactional account, empty,
+// anchored today. `opts` overrides any of them, including the generated id.
+export function createAccount(
+  vault: VaultData,
+  opts: Partial<VaultAccount> & { name: string },
+): VaultAccount {
+  const account: VaultAccount = {
+    id: crypto.randomUUID(),
+    kind: 'transactional',
+    currency: 'CHF',
+    currentAmount: '0.00',
+    lastCorrectedAt: todayISO(),
+    ...opts,
+  }
+  vault.accounts.push(account)
+  return account
+}
+
+export function renameAccount(vault: VaultData, id: string, name: string): void {
+  const account = findAccount(vault, id)
+  account.name = name
+}
+
+// Deleting an account moves every category that referenced it onto
+// `reassignToId`. Reassignment only ever substitutes one id for another; it
+// never turns an endpoint null or non-null, and legality is decided purely by
+// which endpoints are null. So a legal routing stays legal — including
+// (deleted, reassignTo) collapsing to (reassignTo, reassignTo), which is the
+// set-aside-within-one-account case and legal by design.
+export function deleteAccount(vault: VaultData, id: string, reassignToId: string): void {
+  findAccount(vault, id)
+
+  // The core invariant: there is never zero accounts.
+  if (vault.accounts.length === 1) {
+    throw new Error(
+      `cannot delete account ${id}: it is the last remaining account and a vault must always hold at least one`,
+    )
+  }
+
+  if (reassignToId === id) {
+    throw new Error(`cannot reassign the categories of account ${id} to the account being deleted`)
+  }
+  findAccount(vault, reassignToId, 'reassignment target')
+
+  for (const category of vault.budget.categories) {
+    if (category.sourceAccountId === id) category.sourceAccountId = reassignToId
+    if (category.sinkAccountId === id) category.sinkAccountId = reassignToId
+  }
+
+  vault.accounts = vault.accounts.filter(a => a.id !== id)
+}
+
+// The anchor pair. `currentAmount` is only meaningful as at `lastCorrectedAt`,
+// so the two always move together — this is the sole way `currentAmount`
+// changes. Allocations never touch it; the working balance is projected from
+// this pair instead.
+export function correctBalance(vault: VaultData, id: string, amount: string, atDate: string): void {
+  const account = findAccount(vault, id)
+  account.currentAmount = amount
+  account.lastCorrectedAt = atDate
+}
+
+function findAccount(vault: VaultData, id: string, role = 'account'): VaultAccount {
+  const account = vault.accounts.find(a => a.id === id)
+  if (!account) {
+    throw new Error(`${role} ${id} not found`)
+  }
+  return account
+}

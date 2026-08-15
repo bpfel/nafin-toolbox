@@ -373,6 +373,41 @@ internals change.
 WP-7 must also reject payloads over **997 characters**. A bill that exceeds it is invalid and
 no encoder will warn about it.
 
+## Decisions taken during implementation
+
+Judgement calls made while building, recorded here because they are not derivable from the
+design doc. Merge into the design doc when it is no longer open in an editor.
+
+**`anchorMonth` means different things per reserve kind.** The design doc contradicts itself —
+its worked formula treats the anchor as a due month for both kinds, but the type comment and the
+purchase dialogue treat an amortization's anchor as the cycle start. Taken literally, the shared
+formula demands the full target in the month you bought the item. Resolved as two cases:
+
+- **Obligation** — anchor is a recurring due month. `k = periodMonths − monthsUntilDue`, so the
+  full target is required at the due month and `k = 1` the month after.
+- **Amortization** — anchor is the cycle start. `k = clamp(monthsBetween(anchor, now), 0,
+  periodMonths)`, so nothing is required in the purchase month, and the requirement stays at the
+  target past the period rather than rolling over — only the purchase dialogue resets it.
+
+**Archived categories are treated asymmetrically, deliberately.** They stop contributing to
+`requiredForAccount` but still count in `projectedBalance`. Archiving cancels a future
+*obligation*; it does not un-happen money that already moved. The pleasant consequence is that
+archiving a reserve frees the amount saved against it — required falls, so available rises.
+
+**`lastCorrectedAt` is compared at month granularity.** A correction dated 2026-03-15 excludes
+March's entries entirely rather than pro-rating them, because entries are monthly and there is no
+daily data to pro-rate with. Excluding is the conservative direction: including a partly-elapsed
+month risks double-counting flows the correction already reflects.
+
+**Rounding happens once, on the cumulative figure.** `round(target × k / period)`, never
+per-month, so twelve increments of `1000.00 / 12` sum to exactly `1000.00`. Covered by an
+explicit drift test.
+
+**Deleting an account silently collapses cross-account set-asides.** `(main, doomed)` becomes
+`(main, main)` — legal, and reassignment provably cannot produce an illegal routing, since
+legality depends only on which endpoints are null and reassignment never changes nullness. But
+the category's *meaning* changes, so the WP-10 delete dialog should say so.
+
 ## Open questions
 
 None. Both packaging and disable behaviour are settled in the design doc.
