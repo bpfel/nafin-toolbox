@@ -1,7 +1,12 @@
 <script lang="ts">
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/budget/budgetEngine'
-  import type { ReserveDefinition, VaultData } from '../../../lib/crypto/vault'
+  import type {
+    ReserveDefinition,
+    VaultCategory,
+    VaultCategoryGroup,
+    VaultData,
+  } from '../../../lib/crypto/vault'
   import { isLegalCategoryRouting, isLegalRouting } from '../../../lib/accounts/routing'
   import {
     availableForAccount,
@@ -23,6 +28,21 @@
   interface Routing {
     sourceAccountId: string | null
     sinkAccountId: string | null
+  }
+
+  // What a row needs to render. The category is a snapshot, never the vault's
+  // own object — see `rows` below for why that matters.
+  interface RowView {
+    category: VaultCategory
+    plannedAmount: string
+    sinkAvailable: string | null
+  }
+
+  interface RowGroup {
+    groupId: string
+    groupName: string
+    rows: RowView[]
+    plannedTotal: string
   }
 
   interface Props {
@@ -125,7 +145,7 @@
   // is changed by mutating that object in place, which runes cannot observe: a
   // row handed the same object reference would never re-render. Rebuilding the
   // snapshots whenever `version` moves is what makes a routing change visible.
-  let rows = $derived.by(() => {
+  let rows = $derived.by((): RowView[] => {
     void version
     return categories.map(category => ({
       category: { ...category },
@@ -136,6 +156,73 @@
 
   let incomeRows = $derived(rows.filter(r => r.category.type === 'income'))
   let expenseRows = $derived(rows.filter(r => r.category.type === 'expense'))
+
+  // --- Grouping ----------------------------------------------------------
+  // Same shape as the budget table: rows are grouped by their budget group and
+  // ordered by the group's own `sortOrder`, so a user who has arranged their
+  // groups in the budget sees that same arrangement here.
+
+  let groupsById = $derived.by((): Map<string, VaultCategoryGroup> => {
+    void version
+    const vault = vaultState.vault
+    if (!vault) return new Map()
+    return new Map(engine.listGroups(vault).map(g => [g.id, g]))
+  })
+
+  function groupOrder(groupId: string): number {
+    return groupsById.get(groupId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
+  }
+
+  // A category whose group was deleted still has to show up, so an unknown
+  // group id collapses into the unnamed "Other" bucket that sorts last.
+  function groupRows(list: RowView[]): RowGroup[] {
+    const map = new Map<string, { groupId: string; groupName: string; rows: RowView[]; cents: number }>()
+    for (const row of list) {
+      const group = groupsById.get(row.category.groupId)
+      const name = group?.name ?? ''
+      let bucket = map.get(name)
+      if (!bucket) {
+        bucket = { groupId: group?.id ?? '', groupName: name, rows: [], cents: 0 }
+        map.set(name, bucket)
+      }
+      bucket.rows.push(row)
+      bucket.cents += cents(row.plannedAmount)
+    }
+    return Array.from(map.values())
+      .sort((a, b) => groupOrder(a.groupId) - groupOrder(b.groupId))
+      .map(b => ({
+        groupId: b.groupId,
+        groupName: b.groupName,
+        rows: b.rows,
+        plannedTotal: fromCents(b.cents),
+      }))
+  }
+
+  let incomeGroups = $derived(groupRows(incomeRows))
+  let expenseGroups = $derived(groupRows(expenseRows))
+
+  // Collapse is a view preference of this screen alone: not persisted, not
+  // shared with the budget table. Keyed by type so "Other" under income and
+  // "Other" under expenses fold independently.
+  let collapsedGroups = $state(new Set<string>())
+
+  function toggleGroup(type: 'income' | 'expense', groupName: string) {
+    const key = `${type}:${groupName}`
+    const next = new Set(collapsedGroups)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    collapsedGroups = next
+  }
+
+  function isCollapsed(type: 'income' | 'expense', groupName: string): boolean {
+    return collapsedGroups.has(`${type}:${groupName}`)
+  }
+
+  // A lone unnamed group is not a grouping — showing a header for it would add
+  // a row of chrome that says nothing. Matches the budget table.
+  function showsHeaders(groups: RowGroup[]): boolean {
+    return groups.length > 1 || groups[0]?.groupName !== ''
+  }
 
   // The two totals. They differ by exactly the set-asides: budgeted as
   // expenses, but they never leave your net worth.
@@ -305,6 +392,45 @@
   })
 </script>
 
+{#snippet groupBlock(type: 'income' | 'expense', group: RowGroup, withHeader: boolean)}
+  <div class="group">
+    {#if withHeader}
+      <button
+        type="button"
+        class="group-header"
+        class:collapsed={isCollapsed(type, group.groupName)}
+        data-testid="allocation-group"
+        aria-expanded={!isCollapsed(type, group.groupName)}
+        onclick={() => toggleGroup(type, group.groupName)}
+      >
+        <span class="group-chevron">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <path d="M2 4 L6 10 L10 4 Z" />
+          </svg>
+        </span>
+        <span class="group-name">{group.groupName || 'Other'}</span>
+        <span class="group-subtotal">CHF {money(group.plannedTotal)}</span>
+      </button>
+    {/if}
+    {#if !withHeader || !isCollapsed(type, group.groupName)}
+      <div class="rows">
+        {#each group.rows as row (row.category.id)}
+          <AllocationRow
+            category={row.category}
+            plannedAmount={row.plannedAmount}
+            {accounts}
+            {currentMonth}
+            sinkAvailable={row.sinkAvailable}
+            onroutingchange={(routing) => applyRouting(row.category.id, routing)}
+            onreservechange={(reserve) => applyReserve(row.category.id, reserve)}
+            onpurchase={() => (purchaseCategoryId = row.category.id)}
+          />
+        {/each}
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
 <div class="allocation-screen">
   <div class="header">
     <div class="month-nav">
@@ -338,43 +464,21 @@
       <p class="error">{error}</p>
     {/if}
 
-    {#if incomeRows.length > 0}
+    {#if incomeGroups.length > 0}
       <section class="flow-section">
         <h3>Money in</h3>
-        <div class="rows">
-          {#each incomeRows as row (row.category.id)}
-            <AllocationRow
-              category={row.category}
-              plannedAmount={row.plannedAmount}
-              {accounts}
-              {currentMonth}
-              sinkAvailable={row.sinkAvailable}
-              onroutingchange={(routing) => applyRouting(row.category.id, routing)}
-              onreservechange={(reserve) => applyReserve(row.category.id, reserve)}
-              onpurchase={() => (purchaseCategoryId = row.category.id)}
-            />
-          {/each}
-        </div>
+        {#each incomeGroups as group (group.groupName)}
+          {@render groupBlock('income', group, showsHeaders(incomeGroups))}
+        {/each}
       </section>
     {/if}
 
-    {#if expenseRows.length > 0}
+    {#if expenseGroups.length > 0}
       <section class="flow-section">
         <h3>Money out and money set aside</h3>
-        <div class="rows">
-          {#each expenseRows as row (row.category.id)}
-            <AllocationRow
-              category={row.category}
-              plannedAmount={row.plannedAmount}
-              {accounts}
-              {currentMonth}
-              sinkAvailable={row.sinkAvailable}
-              onroutingchange={(routing) => applyRouting(row.category.id, routing)}
-              onreservechange={(reserve) => applyReserve(row.category.id, reserve)}
-              onpurchase={() => (purchaseCategoryId = row.category.id)}
-            />
-          {/each}
-        </div>
+        {#each expenseGroups as group (group.groupName)}
+          {@render groupBlock('expense', group, showsHeaders(expenseGroups))}
+        {/each}
         <p class="section-note">
           Set-asides total CHF {money(totals.setAside)} this month. They count as budgeted expenses
           but stay in your accounts.
@@ -455,6 +559,56 @@
     display: flex;
     flex-direction: column;
   }
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    background: #f1f3f5;
+    border: none;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #495057;
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+  }
+  .group-header.collapsed {
+    border-bottom: 2px solid #ced4da;
+  }
+  .group-header:hover {
+    background: #e9ecef;
+  }
+  .group-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .group-subtotal {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  /* The chevron stays faint until the header is hovered or the group is folded,
+     so a header reads as a label rather than a control. Same as the budget. */
+  .group-chevron {
+    display: inline-flex;
+    align-items: center;
+    color: #868e96;
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s;
+  }
+  .group-header.collapsed .group-chevron {
+    transform: rotate(-90deg);
+  }
+  .group-header:hover .group-chevron,
+  .group-header:focus-visible .group-chevron,
+  .group-header.collapsed .group-chevron {
+    opacity: 1;
+  }
   .section-note {
     margin: 0;
     padding: 0.6rem 1rem;
@@ -479,10 +633,19 @@
     border-radius: 6px;
   }
 
+  @media (hover: none) and (pointer: coarse) {
+    .group-chevron {
+      opacity: 1;
+    }
+  }
+
   @media (max-width: 640px) {
     .month-nav button {
       min-width: 44px;
       min-height: 44px;
+    }
+    .group-header {
+      min-height: 40px;
     }
   }
 </style>

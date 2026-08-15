@@ -99,6 +99,44 @@ function makeVault(): VaultData {
   }
 }
 
+// Three expense categories across two named groups plus one whose group is
+// gone. The groups are declared in the *opposite* order to their sortOrder, so
+// a screen that grouped by encounter order would get this wrong.
+function groupedVault(): VaultData {
+  const vault = makeVault()
+  vault.budget.categoryGroups = [
+    { id: 'g-housing', name: 'Housing', type: 'expense', sortOrder: 20 },
+    { id: 'g-fun', name: 'Fun', type: 'expense', sortOrder: 10 },
+  ]
+  vault.budget.categories = [
+    category({ id: 'rent', name: 'Rent', groupId: 'g-housing', sortOrder: 0 }),
+    category({ id: 'games', name: 'Games', groupId: 'g-fun', sortOrder: 1 }),
+    // Its group was deleted — the row must survive that.
+    category({ id: 'orphan', name: 'Orphan', groupId: 'g-deleted', sortOrder: 2 }),
+  ]
+  vault.budget.periods = [
+    {
+      year: YEAR,
+      month: MONTH,
+      notes: '',
+      entries: [
+        { categoryId: 'rent', plannedAmount: '500.00', actualAmount: '0.00' },
+        { categoryId: 'games', plannedAmount: '50.00', actualAmount: '0.00' },
+        { categoryId: 'orphan', plannedAmount: '25.00', actualAmount: '0.00' },
+      ],
+    },
+  ]
+  return vault
+}
+
+function groupHeaders() {
+  return screen.getAllByTestId('allocation-group')
+}
+
+function groupNames() {
+  return groupHeaders().map(el => el.querySelector('.group-name')!.textContent!.trim())
+}
+
 function totals() {
   return {
     allocated: screen.getByTestId('total-allocated').textContent?.trim(),
@@ -230,5 +268,82 @@ describe('AllocationScreen', () => {
 
     expect(screen.getByText(/affordable from/i)).toBeTruthy()
     expect(screen.queryByText(/short of what is planned/)).toBeNull()
+  })
+
+  describe('grouping', () => {
+    beforeEach(() => {
+      testVault = groupedVault()
+    })
+
+    test("groups follow the budget group's sortOrder, not the order they are met", () => {
+      render(AllocationScreen)
+
+      // Fun sorts at 10, Housing at 20, and a vanished group has no order at
+      // all, so it lands last.
+      expect(groupNames()).toEqual(['Fun', 'Housing', 'Other'])
+    })
+
+    test('each group header carries its own planned subtotal', () => {
+      render(AllocationScreen)
+
+      const subtotals = groupHeaders().map(el =>
+        el.querySelector('.group-subtotal')!.textContent!.trim(),
+      )
+      expect(subtotals).toEqual(['CHF 50.00', 'CHF 500.00', 'CHF 25.00'])
+    })
+
+    test('collapsing a group hides only that group’s rows', async () => {
+      render(AllocationScreen)
+
+      expect(screen.queryByText('Games')).toBeTruthy()
+      expect(screen.queryByText('Rent')).toBeTruthy()
+
+      await fireEvent.click(groupHeaders()[0]) // Fun
+
+      expect(screen.queryByText('Games')).toBeNull()
+      expect(screen.queryByText('Rent')).toBeTruthy()
+      expect(screen.queryByText('Orphan')).toBeTruthy()
+      // The header itself stays, subtotal and all — that is the point of it.
+      expect(groupNames()).toEqual(['Fun', 'Housing', 'Other'])
+      expect(groupHeaders()[0].getAttribute('aria-expanded')).toBe('false')
+
+      // And it folds back open.
+      await fireEvent.click(groupHeaders()[0])
+      expect(screen.queryByText('Games')).toBeTruthy()
+    })
+
+    test('a category whose group was deleted still appears, under Other', () => {
+      render(AllocationScreen)
+
+      expect(screen.getByText('Orphan')).toBeTruthy()
+      expect(groupNames()).toContain('Other')
+    })
+
+    test('income and expenses stay separate sections, each grouped on its own', () => {
+      testVault!.budget.categoryGroups.push({
+        id: 'g-pay',
+        name: 'Pay',
+        type: 'income',
+        sortOrder: 5,
+      })
+      testVault!.budget.categories.push(
+        category({
+          id: 'salary',
+          name: 'Salary',
+          type: 'income',
+          groupId: 'g-pay',
+          sortOrder: 3,
+          sourceAccountId: null,
+          sinkAccountId: 'main',
+        }),
+      )
+
+      render(AllocationScreen)
+
+      // The income group is listed inside "Money in", ahead of every expense
+      // group, rather than merged into the expense ordering.
+      expect(groupNames()).toEqual(['Pay', 'Fun', 'Housing', 'Other'])
+      expect(screen.getByText('Money in')).toBeTruthy()
+    })
   })
 })
