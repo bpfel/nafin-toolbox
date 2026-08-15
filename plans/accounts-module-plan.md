@@ -33,8 +33,9 @@ interface VaultAccount {
   name: string
   kind: AccountKind
   currency: 'CHF'            // CHF only for now; field kept so widening is additive
-  currentAmount: string      // user-correctable
-  lastCorrectedAt: string    // ISO date — surfaced in the UI
+  // Anchor pair. Only the user changes these; allocations never mutate them.
+  currentAmount: string      // balance as at lastCorrectedAt
+  lastCorrectedAt: string    // ISO date — the point the projection sums from
 
   bankName?: string          // institution holding the account; absent for cash
 
@@ -232,11 +233,29 @@ They sum into a single required figure for whichever account they sink into:
 
 ```
 required(account)  = Σ required(item) for every reserve item whose sink is this account
-available(account) = currentAmount − required(account)
+available(account) = projectedBalance(account) − required(account)
 ```
 
 `available` is the "what you may actually spend from this account" figure, and the basis for
 the spendable-amount graphic.
+
+### The balance is derived, not accumulated
+
+Allocations never mutate a stored balance. The account holds an **anchor pair** —
+`currentAmount` as at `lastCorrectedAt` — and the working figure is recomputed from it:
+
+```
+projectedBalance(account) = currentAmount
+                          + Σ net allocations for months in (lastCorrectedAt, now]
+```
+
+This is idempotent. Opening the app twice in a month cannot post twice, there is no
+month-rollover job, and no "already posted?" flag to keep. It also removes the drift failure
+mode: the projection is only ever as stale as the anchor, and `lastCorrectedAt` makes that
+staleness visible rather than silent.
+
+Correcting a balance is therefore one action with two effects: set `currentAmount`, stamp
+`lastCorrectedAt`.
 
 Because the requirement is a single per-account sum, there is no shortfall-attribution
 problem and no funding-priority rule to define. A shortfall is a property of the account,
@@ -379,10 +398,11 @@ Own the Swiss layer, where the logic is verifiable string assembly; delegate the
 
 Two, built in parallel:
 
-1. **Account management** — list accounts; add, rename, remove. Per account: kind, currency,
-   current amount (editable), required amount, the difference, and `lastCorrectedAt` shown
-   next to the balance so a stale figure is visible rather than silently trusted. QR payment
-   details are an advanced section, hidden until asked for.
+1. **Account management** — list accounts; add, rename, remove. Per account: kind, bank,
+   projected balance, required amount, and the difference — with `lastCorrectedAt` shown next
+   to the balance so a stale anchor is visible rather than silently trusted. Correcting the
+   balance sets the anchor. QR payment details are an advanced section, hidden until asked
+   for.
 2. **Allocations** — the monthly flow view. Which budget entries move money from where to
    where, and what accumulates in Reserves this month.
 
@@ -453,18 +473,36 @@ Three surfaces do the explaining, so the concept never has to be described in pr
 - **Budget summary**: both totals side by side, "fully allocated" and "net worth change",
   which is where the expense-vs-transfer distinction pays off visibly.
 
+## Settled
+
+- **Balance drift** — resolved by deriving the balance from an anchor pair rather than
+  accumulating into a stored figure. See *The balance is derived, not accumulated*.
+- **`kind` does not drive behaviour.** It is metadata for grouping and labelling only. The
+  two candidate behaviours are better keyed off the underlying facts: QR fields follow
+  *has an IBAN*, not kind, and restricting which kinds may be reserve sinks would encode a
+  guess. Revisit only if a real need appears.
+- **`bankName` stays typed.** Deriving it from the IBAN's clearing number would require
+  shipping and maintaining a Swiss bank registry — real weight for a cosmetic label on an
+  optional field entered once.
+
 ## Open questions
 
-1. **Balance drift.** Allocations post into `currentAmount` automatically. If the user never
-   actually moves the francs, the figure drifts optimistically. `lastCorrectedAt` is the
-   agreed mitigation; confirm-per-month remains the alternative if it proves insufficient.
-2. **Does `kind` drive behaviour?** The field exists; nothing branches on it yet. Candidates:
-   restricting which kinds can be reserve sinks, or hiding QR fields for `cash`.
-3. **Which generic QR encoder.** Needs to be well-tested and small; it is the only new
-   runtime dependency the port introduces.
-4. **Is `bankName` worth typing?** For Swiss IBANs the institution is derivable from the
-   clearing number embedded in the IBAN, so the field could be inferred rather than entered.
-   Kept explicit for now because cash and foreign accounts have no IBAN to derive from.
+1. **What happens when the Accounts module is disabled?** Categories keep routing to accounts
+   that are no longer surfaced. Presumably inert and harmless, but the Set-aside kind depends
+   on accounts existing, so this needs an explicit answer.
+
+## Tasks before implementation
+
+- **Choose a QR encoder.** Criteria: small, well-tested, browser-native, ideally
+  zero-dependency, error correction level M, and it must expose a boolean module matrix so we
+  emit the SVG ourselves rather than accept its rendering.
+- **Verify the Übertrag behaviour with a real bank.** Whether a QR bill paid to your own IBAN
+  routes as an internal transfer or an ordinary payment could not be confirmed from
+  documentation. A five-minute real-world test validates the scan-to-fund-Reserves premise
+  that much of the QR work rests on.
+- **Note the modularity deviation in CLAUDE.md** once the module ships: one account record is
+  foundational, which softens "any module works without the others". The module stays opt-in;
+  the record does not.
 
 ## Deliberately out of scope
 
