@@ -1,7 +1,9 @@
 # nafin-toolbox - Project Context
 
 ## What This Is
-A self-hosted personal finance web app for a Swiss user. Covers budgeting, account management, monthly allocations, pillar 3a retirement provisions, and pillar 3b investments.
+A self-hosted personal finance web app for a Swiss audience. Covers budgeting, account management, allocations, pillar 3a retirement provisions, and pillar 3b investments.
+
+**Multi-user.** The app already serves several users and the goal is to make it easily available to more. It is not a single-person tool, and design decisions should not assume one. In particular: anything shown to a user as a number they might act on — a tax estimate, an insurance premium — carries real weight, because users will trust it rather than eyeball it. Prefer asking for a figure the user already has over estimating one for them.
 
 ## Key Domain Knowledge
 - **Pillar 3a:** Swiss tax-advantaged retirement savings. Has a legal annual contribution cap. Funds are locked until retirement (with exceptions like home purchase).
