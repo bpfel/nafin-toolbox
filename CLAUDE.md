@@ -5,6 +5,13 @@ A self-hosted personal finance web app for a Swiss audience. Covers budgeting, a
 
 **Multi-user.** The app already serves several users and the goal is to make it easily available to more. It is not a single-person tool, and design decisions should not assume one. In particular: anything shown to a user as a number they might act on — a tax estimate, an insurance premium — carries real weight, because users will trust it rather than eyeball it. Prefer asking for a figure the user already has over estimating one for them.
 
+**Swiss-specific by design.** Being built for the Swiss financial landscape is the point, not a
+localisation detail. Pillar 3a and its annual cap, QR bills, cantonal tax structure, Grundversicherung
+and its franchise — these are features, and more will be added. When a generic design and a
+Swiss-accurate one diverge, prefer the Swiss one and name the specificity explicitly rather than
+abstracting it away. Conversely, do not invent Swiss facts: figures that vary by canton, year or
+personal situation should be asked for, not estimated (see above).
+
 ## Key Domain Knowledge
 - **Pillar 3a:** Swiss tax-advantaged retirement savings. Has a legal annual contribution cap. Funds are locked until retirement (with exceptions like home purchase).
 - **Pillar 3b:** Flexible savings/investment category. No contribution cap. Includes traded securities, physical gold, and unlisted stocks.
