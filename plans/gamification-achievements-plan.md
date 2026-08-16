@@ -1,5 +1,18 @@
 # Gamification & Achievement System — Implementation Plan
 
+> **Superseded by `onboarding-and-progression-plan.md` (2026-08-16). Do not implement as
+> written.**
+>
+> The architecture below does not work: it evaluates unlock conditions server-side, but user
+> data lives in an opaque encrypted vault the server cannot read. Only the five
+> *enable a module* achievements are server-visible. Chapter 3 also treats allocations as its
+> own module, which no longer exists, and `002_achievements.sql` collides with an existing
+> migration.
+>
+> Kept for its **content**, which remains good and is not reproduced in the successor: the
+> chapter framing, the ~17 achievement definitions, and the Swiss-finance lesson text attached
+> to each. Mine this file for those; take the mechanism from the new plan.
+
 ## Context
 
 The app currently starts with an empty dashboard and no guidance. The modular, opt-in architecture maps naturally to a personal finance learning journey. This plan adds an achievement system that:
