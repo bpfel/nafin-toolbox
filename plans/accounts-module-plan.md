@@ -1,6 +1,16 @@
-# Accounts & Allocations Module — Design Draft
+# Accounts & Allocations Module — Design Record
 
-Drafted 2026-08-15 on `feature/accounts`. Design discussion captured; not yet implementation-ready.
+**Status: shipped.** Drafted 2026-08-15, implemented and merged 2026-08-16 (PR #12).
+
+Kept as the record of *why* the module is shaped the way it is — the four legal
+source/sink combinations, the obligation-versus-amortization split, the one-month payment
+lead, and the two deliberate departures from the modularity principle in CLAUDE.md (one
+account record always exists; allocations ship inside the `accounts` module rather than as
+their own). The code is the authority on *what* it does; this file explains the reasoning
+behind decisions that would otherwise look arbitrary.
+
+Where this document and the code disagree, the code is correct — the design was refined
+during implementation.
 
 ## Concept
 
