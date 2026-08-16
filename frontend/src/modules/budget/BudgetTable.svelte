@@ -1,8 +1,9 @@
 <script lang="ts">
   import Sortable from 'sortablejs'
-  import type { PeriodEntryView } from '../../lib/budget/budgetEngine'
+  import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
+  import { isEditing } from '../../lib/util/editMode.svelte'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
   import AddCategoryRow from './AddCategoryRow.svelte'
   import AddCategoryModal from './AddCategoryModal.svelte'
@@ -11,24 +12,25 @@
   interface EntryGroup {
     groupName: string
     groupId: string
-    entries: PeriodEntryView[]
+    entries: PlanEntryView[]
     plannedTotal: number
-    actualTotal: number
   }
 
   interface Props {
-    entries: PeriodEntryView[]
+    entries: PlanEntryView[]
     vault: VaultData
-    year: number
-    month: number
-    onsave: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
+    onsave: (categoryId: string, amount: string) => void
     oncategorycreated: () => void
     oncategorydeleted: () => void
   }
 
-  let { entries, vault, year, month, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
+  let { entries, vault, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; editCategory?: { id: string; name: string; fixed: boolean; groupName: string; plannedAmount: string; actualAmount: string } } | null>(null)
+  // Structural affordances — dragging, adding, deleting — appear only in edit
+  // mode. Reading the plan and typing amounts stay available always.
+  let editing = $derived(isEditing('budget'))
+
+  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; presetGroupName?: string; editCategory?: { id: string; name: string; groupName: string; plannedAmount: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: string; categoryName: string } | null>(null)
 
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
@@ -49,7 +51,7 @@
   let incomeEntries = $derived(entries.filter(e => e.categoryType === 'income'))
   let expenseEntries = $derived(entries.filter(e => e.categoryType === 'expense'))
 
-  function groupEntries(list: PeriodEntryView[]): EntryGroup[] {
+  function groupEntries(list: PlanEntryView[]): EntryGroup[] {
     const map = new Map<string, EntryGroup>()
     for (const e of list) {
       const key = e.categoryGroupName || ''
@@ -59,19 +61,20 @@
           groupId: e.categoryGroupId,
           entries: [],
           plannedTotal: 0,
-          actualTotal: 0,
         })
       }
       const g = map.get(key)!
       g.entries.push(e)
       g.plannedTotal += Number(e.plannedAmount)
-      g.actualTotal += Number(e.actualAmount)
     }
-    return Array.from(map.values()).sort((a, b) => {
-      const ai = list.indexOf(a.entries[0])
-      const bi = list.indexOf(b.entries[0])
-      return ai - bi
-    })
+    // Order by the group's own sortOrder. This used to be inferred from wherever
+    // each group's first category landed in the category sort, which meant
+    // dragging a category could silently reshuffle whole groups.
+    return Array.from(map.values()).sort((a, b) => groupOrder(a.groupId) - groupOrder(b.groupId))
+  }
+
+  function groupOrder(groupId: string): number {
+    return vault.budget.categoryGroups.find(g => g.id === groupId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
   }
 
   let incomeGroups = $derived(groupEntries(incomeEntries))
@@ -82,12 +85,19 @@
     return groups.map(g => ({ name: g.groupName, id: g.groupId }))
   }
 
-  function openAddModal(type: 'income' | 'expense') {
-    addModalContext = { type, groups: groupsForType(type) }
+  function openAddModal(type: 'income' | 'expense', presetGroupName?: string) {
+    addModalContext = { type, groups: groupsForType(type), presetGroupName }
   }
 
-  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, fixed: boolean, plannedAmount: string, actualAmount: string) {
-    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, fixed, groupName, plannedAmount, actualAmount } }
+  // The group header toggles collapse on click, so the "+" has to stop the event
+  // reaching it — otherwise adding to a group also folds it away underneath you.
+  function addToGroup(event: MouseEvent, type: 'income' | 'expense', groupName: string) {
+    event.stopPropagation()
+    openAddModal(type, groupName)
+  }
+
+  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string) {
+    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, groupName, plannedAmount } }
   }
 
   function openDeleteModal(categoryId: string, categoryName: string) {
@@ -102,6 +112,30 @@
     engine.deleteCategory(vault, categoryId)
     oncategorydeleted()
   }
+
+  // Hiding a handle removes the affordance but leaves the Sortable instance live,
+  // so a drag started by other means (a touch on the row, a stray handle left in
+  // the DOM) would still reorder a read-only plan. Every instance is registered
+  // here and its `disabled` option follows edit mode.
+  const sortables = new Set<Sortable>()
+
+  function register(instance: Sortable) {
+    instance.option('disabled', !isEditing('budget'))
+    sortables.add(instance)
+    return {
+      destroy() {
+        sortables.delete(instance)
+        instance.destroy()
+      },
+    }
+  }
+
+  $effect(() => {
+    const disabled = !editing
+    for (const instance of sortables) {
+      instance.option('disabled', disabled)
+    }
+  })
 
   function sortable(node: HTMLElement) {
     const instance = Sortable.create(node, {
@@ -119,11 +153,29 @@
         }
       },
     })
-    return {
-      destroy() {
-        instance.destroy()
+    return register(instance)
+  }
+
+  // Groups are <tbody> elements, so the sortable lives on the <table> and drags
+  // whole tbodies. Separate from the per-group `sortable` above, which drags rows
+  // within one group.
+  function groupSortable(node: HTMLElement) {
+    const instance = Sortable.create(node, {
+      animation: 150,
+      handle: '.group-drag-handle',
+      draggable: 'tbody',
+      ghostClass: 'drag-ghost',
+      onEnd() {
+        const ids = Array.from(node.querySelectorAll('tbody'))
+          .map(b => (b as HTMLElement).dataset.groupId)
+          .filter((id): id is string => Boolean(id))
+        if (ids.length > 0) {
+          engine.reorderGroups(vault, ids)
+          oncategorycreated()
+        }
       },
-    }
+    })
+    return register(instance)
   }
 
   function fmt(val: number): string {
@@ -135,26 +187,34 @@
   <div class="table-toolbar">
     <button
       class="view-toggle"
+      aria-label="Showing {viewMode} amounts — switch to {viewMode === 'monthly' ? 'yearly' : 'monthly'}"
       onclick={() => viewMode = viewMode === 'monthly' ? 'yearly' : 'monthly'}
     >
-      {viewMode === 'monthly' ? 'mo' : 'yr'}
+      {viewMode === 'monthly' ? 'Month' : 'Year'}
     </button>
   </div>
 
-  <table>
+  <table use:groupSortable>
     <thead>
       <tr>
         <th class="col-name">Income</th>
         <th class="right col-amount col-planned-mo">Planned/mo</th>
         <th class="right col-amount col-planned-yr">Planned/yr</th>
-        <th class="right col-amount">Actual/mo</th>
       </tr>
     </thead>
     {#each incomeGroups as group (group.groupName)}
-      <tbody use:sortable>
-        {#if incomeGroups.length > 1 || group.groupName}
-          <tr class="group-header" class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
+      <tbody use:sortable data-group-id={group.groupId}>
+        {#if incomeGroups.length > 1}
+          <tr class="group-header" class:editing class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
             <td>
+              {#if editing}
+                <span
+                  class="group-drag-handle"
+                  title="Drag to reorder"
+                  role="presentation"
+                  onclick={(e) => e.stopPropagation()}
+                >⠿</span>
+              {/if}
               <span class="group-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
                   {#if isCollapsed('income', group.groupName)}
@@ -164,11 +224,18 @@
                   {/if}
                 </svg>
               </span>
-              {group.groupName || 'Other'}
+              <span class="group-name">{group.groupName || 'Other'}</span>
+              {#if editing}
+                <button
+                  class="group-add"
+                  title="Add a category to {group.groupName || 'Other'}"
+                  aria-label="Add a category to {group.groupName || 'Other'}"
+                  onclick={(e) => addToGroup(e, 'income', group.groupName)}
+                >+</button>
+              {/if}
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
-            <td class="right subtotal">{fmt(group.actualTotal)}</td>
           </tr>
         {/if}
         {#if !isCollapsed('income', group.groupName)}
@@ -179,24 +246,33 @@
       </tbody>
     {/each}
     <tfoot>
-      <AddCategoryRow onadd={() => openAddModal('income')} />
+      {#if editing}
+        <AddCategoryRow onadd={() => openAddModal('income')} />
+      {/if}
     </tfoot>
   </table>
 
-  <table>
+  <table use:groupSortable>
     <thead>
       <tr>
         <th class="col-name">Expenses</th>
         <th class="right col-amount col-planned-mo">Planned/mo</th>
         <th class="right col-amount col-planned-yr">Planned/yr</th>
-        <th class="right col-amount">Actual/mo</th>
       </tr>
     </thead>
     {#each expenseGroups as group (group.groupName)}
-      <tbody use:sortable>
-        {#if expenseGroups.length > 1 || group.groupName}
-          <tr class="group-header" class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
+      <tbody use:sortable data-group-id={group.groupId}>
+        {#if expenseGroups.length > 1}
+          <tr class="group-header" class:editing class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
             <td>
+              {#if editing}
+                <span
+                  class="group-drag-handle"
+                  title="Drag to reorder"
+                  role="presentation"
+                  onclick={(e) => e.stopPropagation()}
+                >⠿</span>
+              {/if}
               <span class="group-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
                   {#if isCollapsed('expense', group.groupName)}
@@ -206,11 +282,18 @@
                   {/if}
                 </svg>
               </span>
-              {group.groupName || 'Other'}
+              <span class="group-name">{group.groupName || 'Other'}</span>
+              {#if editing}
+                <button
+                  class="group-add"
+                  title="Add a category to {group.groupName || 'Other'}"
+                  aria-label="Add a category to {group.groupName || 'Other'}"
+                  onclick={(e) => addToGroup(e, 'expense', group.groupName)}
+                >+</button>
+              {/if}
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
-            <td class="right subtotal">{fmt(group.actualTotal)}</td>
           </tr>
         {/if}
         {#if !isCollapsed('expense', group.groupName)}
@@ -221,7 +304,9 @@
       </tbody>
     {/each}
     <tfoot>
-      <AddCategoryRow onadd={() => openAddModal('expense')} />
+      {#if editing}
+        <AddCategoryRow onadd={() => openAddModal('expense')} />
+      {/if}
     </tfoot>
   </table>
 </div>
@@ -231,6 +316,7 @@
     type={addModalContext.type}
     groups={addModalContext.groups}
     editCategory={addModalContext.editCategory}
+    presetGroupName={addModalContext.presetGroupName}
     {vault}
     oncreated={handleCategoryCreated}
     onclose={() => addModalContext = null}
@@ -263,7 +349,7 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
   .col-name {
-    width: 40%;
+    width: 60%;
   }
   .col-amount {
     width: 20%;
@@ -303,6 +389,61 @@
   :global(.group-header) .yearly {
     color: #888;
   }
+  /* These two exist only inside edit mode — outside it they are not rendered at
+     all, so the header still reads as a label. That makes a hover-reveal pure
+     cost: on a touchscreen there is no hover, so the controls edit mode just
+     unlocked were invisible. Visible whenever they exist; hover only shifts
+     the colour. */
+  .group-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    color: #adb5bd;
+    margin-right: 0.3rem;
+    transition: color 0.12s;
+    user-select: none;
+  }
+  .group-drag-handle:hover {
+    color: #495057;
+  }
+  .group-drag-handle:active {
+    cursor: grabbing;
+  }
+  .group-add {
+    background: none;
+    border: none;
+    color: #868e96;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.35rem;
+    margin-left: 0.2rem;
+    transition: color 0.12s;
+  }
+  .group-add:hover {
+    color: #2d6a4f;
+  }
+  .group-add:focus-visible {
+    outline: 2px solid #2d6a4f;
+    outline-offset: 2px;
+    border-radius: 4px;
+    color: #2d6a4f;
+  }
+  /* table-layout is fixed, so the name column cannot borrow slack from the
+     amount columns. Without this a name like "Abgaben und Versicherungen"
+     wraps and doubles the row height. Entry names already behave this way. */
+  .group-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  :global(.group-header) td:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+  }
   .group-chevron {
     display: inline-flex;
     align-items: center;
@@ -312,7 +453,12 @@
     vertical-align: middle;
     color: #868e96;
   }
+  /* The chevron is not an edit-mode control — it collapses the group in either
+     mode — so outside edit mode it keeps the hover-reveal and relies on the
+     coarse-pointer rule below. Inside edit mode it sits between two now-permanent
+     controls, and a gap that fills in on hover would only look like a glitch. */
   :global(.group-header:hover) .group-chevron,
+  :global(.group-header.editing) .group-chevron,
   :global(.group-header.collapsed) .group-chevron {
     opacity: 1;
   }
@@ -342,23 +488,50 @@
     .group-chevron {
       opacity: 1;
     }
+    /* Both glyphs are about 14px across — visible, but a fingertip needs more
+       than that. Widen the hit area, not the glyph. Keyed on the pointer rather
+       than the viewport: a wide touchscreen has the same fingers. */
+    .group-drag-handle,
+    .group-add {
+      min-width: 32px;
+      min-height: 32px;
+      margin: 0;
+      padding: 0;
+    }
   }
 
   @media (max-width: 768px) {
+    /* Sticks once scrolled past, so switching month/year does not mean
+       scrolling back to the top of a long budget. `top: 0` is relative to the
+       nearest scroll container, which here is the page. */
     .table-toolbar {
       display: flex;
       justify-content: flex-end;
       margin-bottom: 0.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      /* The toolbar is transparent, so without a backdrop the table scrolls
+         visibly underneath the button. */
+      background: linear-gradient(to bottom, #f8f9fa 70%, rgba(248, 249, 250, 0));
+      padding: 0.4rem 0 0.6rem;
+    }
+    .view-toggle {
+      min-height: 34px;
+      padding: 0.3rem 0.9rem;
+      font-size: 0.8rem;
     }
     th {
       padding: 0.5rem;
       font-size: 0.8rem;
     }
+    /* Only one amount column survives on a narrow screen — the view toggle
+       swaps which of the two it is — so the name takes the rest. */
     .col-name {
-      width: 50%;
+      width: 60%;
     }
     .col-amount {
-      width: 25%;
+      width: 40%;
     }
     .col-planned-yr {
       display: none;

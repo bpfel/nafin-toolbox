@@ -1,11 +1,11 @@
 import type {
   VaultData,
-  BudgetVaultData,
   VaultCategoryGroup,
   VaultCategory,
-  VaultPeriod,
-  VaultEntry,
+  VaultArchive,
+  VaultArchiveLine,
 } from '../crypto/vault'
+import { defaultRouting, primaryAccountId } from '../accounts/routing'
 
 // --- Category Groups ---
 
@@ -56,13 +56,15 @@ export function createCategory(
     name: string
     type: 'income' | 'expense'
     groupName: string
-    fixed?: boolean
     sortOrder?: number
   },
 ): VaultCategory {
   const group = getOrCreateGroup(vault, opts.groupName, opts.type)
   const cats = vault.budget.categories
   const order = opts.sortOrder ?? (cats.length > 0 ? Math.max(...cats.map(c => c.sortOrder)) + 10 : 10)
+  // Categories are born routed: the default is legal for both types, so no
+  // category ever exists unrouted or contradictory.
+  const routing = defaultRouting(opts.type, primaryAccountId(vault))
   const cat: VaultCategory = {
     id: crypto.randomUUID(),
     name: opts.name,
@@ -70,7 +72,8 @@ export function createCategory(
     sortOrder: order,
     archived: false,
     groupId: group.id,
-    fixed: opts.fixed ?? false,
+    sourceAccountId: routing.sourceAccountId,
+    sinkAccountId: routing.sinkAccountId,
   }
   cats.push(cat)
   return cat
@@ -79,16 +82,28 @@ export function createCategory(
 export function updateCategory(
   vault: VaultData,
   categoryId: string,
-  update: Partial<Pick<VaultCategory, 'name' | 'type' | 'sortOrder' | 'archived' | 'fixed'>> & { groupName?: string },
+  update: Partial<Pick<VaultCategory, 'name' | 'type' | 'sortOrder' | 'archived'>> & { groupName?: string },
 ): VaultCategory | null {
   const cat = vault.budget.categories.find(c => c.id === categoryId)
   if (!cat) return null
 
   if (update.name !== undefined) cat.name = update.name
-  if (update.type !== undefined) cat.type = update.type
+
+  // Changing the type invalidates the existing routing: an income category
+  // routed (null, A) would become an expense on the same endpoints, which is
+  // an illegal combination. Re-derive the defaults rather than leave a
+  // contradiction behind. A reserve cannot survive a move to income either,
+  // since a reserve implies an expense with a non-null sink.
+  if (update.type !== undefined && update.type !== cat.type) {
+    cat.type = update.type
+    const routing = defaultRouting(cat.type, primaryAccountId(vault))
+    cat.sourceAccountId = routing.sourceAccountId
+    cat.sinkAccountId = routing.sinkAccountId
+    if (cat.type === 'income') delete cat.reserve
+  }
+
   if (update.sortOrder !== undefined) cat.sortOrder = update.sortOrder
   if (update.archived !== undefined) cat.archived = update.archived
-  if (update.fixed !== undefined) cat.fixed = update.fixed
   if (update.groupName !== undefined) {
     const group = getOrCreateGroup(vault, update.groupName, cat.type)
     cat.groupId = group.id
@@ -99,10 +114,11 @@ export function updateCategory(
 
 export function deleteCategory(vault: VaultData, categoryId: string): void {
   vault.budget.categories = vault.budget.categories.filter(c => c.id !== categoryId)
-  // Also remove entries for this category from all periods
-  for (const period of vault.budget.periods) {
-    period.entries = period.entries.filter(e => e.categoryId !== categoryId)
-  }
+  // The plan is keyed by category, so a deleted category's line would otherwise
+  // linger as an amount nothing can display or edit. Archives are deliberately
+  // left alone: they hold names, not references, and a record of a past plan
+  // must not lose lines because a category was deleted afterwards.
+  vault.budget.plan = vault.budget.plan.filter(e => e.categoryId !== categoryId)
 }
 
 export function reorderCategories(vault: VaultData, categoryIds: string[]): void {
@@ -112,100 +128,85 @@ export function reorderCategories(vault: VaultData, categoryIds: string[]): void
   }
 }
 
-// --- Periods ---
-
-export function listPeriods(vault: VaultData): VaultPeriod[] {
-  return [...vault.budget.periods].sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year
-    return a.month - b.month
-  })
-}
-
-export function getPeriod(vault: VaultData, year: number, month: number): VaultPeriod | null {
-  return vault.budget.periods.find(p => p.year === year && p.month === month) ?? null
-}
-
-export function createPeriod(vault: VaultData, year: number, month: number): VaultPeriod {
-  const existing = getPeriod(vault, year, month)
-  if (existing) return existing
-
-  const period: VaultPeriod = {
-    year,
-    month,
-    notes: '',
-    entries: [],
+/**
+ * Reorders category groups. `groupIds` is the full new order for one side of the
+ * budget (income or expense); groups of the other type keep their sortOrder.
+ *
+ * Group order used to be inferred from wherever each group's first category
+ * happened to land in the category sort, which meant reordering categories could
+ * silently reshuffle groups. `sortOrder` on the group has always existed and is
+ * what `listGroups` uses, so this makes the table read the same field rather
+ * than deriving the order a second, conflicting way.
+ */
+export function reorderGroups(vault: VaultData, groupIds: string[]): void {
+  for (let i = 0; i < groupIds.length; i++) {
+    const group = vault.budget.categoryGroups.find(g => g.id === groupIds[i])
+    if (group) group.sortOrder = (i + 1) * 10
   }
-  vault.budget.periods.push(period)
-  return period
 }
 
-export function copyPeriod(
-  vault: VaultData,
-  toYear: number,
-  toMonth: number,
-  fromYear: number,
-  fromMonth: number,
-): VaultPeriod {
-  const source = getPeriod(vault, fromYear, fromMonth)
-  const target = createPeriod(vault, toYear, toMonth)
+// --- The plan ---
 
-  if (source && target.entries.length === 0) {
-    target.entries = source.entries.map(e => ({
-      categoryId: e.categoryId,
-      plannedAmount: e.plannedAmount,
-      actualAmount: e.actualAmount,
-    }))
+/**
+ * The planned amount for one category, '0.00' when the plan has no line for it.
+ *
+ * A missing line and a zero line mean the same thing to every reader, so the
+ * plan stays sparse rather than carrying a row per category.
+ */
+export function plannedFor(vault: VaultData, categoryId: string): string {
+  const entry = vault.budget.plan.find(e => e.categoryId === categoryId)
+  return entry?.plannedAmount ?? '0.00'
+}
+
+/** Sets the planned amount for one category, creating its line if absent. */
+export function setPlanned(vault: VaultData, categoryId: string, amount: string): void {
+  const entry = vault.budget.plan.find(e => e.categoryId === categoryId)
+  if (entry) {
+    entry.plannedAmount = amount
+    return
   }
-
-  return target
+  vault.budget.plan.push({ categoryId, plannedAmount: amount })
 }
 
-// --- Period Summary ---
+// --- Plan summary ---
 
-export interface PeriodSummary {
-  year: number
-  month: number
-  notes: string
-  entries: PeriodEntryView[]
-  totalPlannedIncome: string
-  totalActualIncome: string
-  totalPlannedExpenses: string
-  totalActualExpenses: string
-  plannedBalance: string
-  actualBalance: string
-}
-
-export interface PeriodEntryView {
+export interface PlanEntryView {
   categoryId: string
   categoryName: string
   categoryType: 'income' | 'expense'
   categoryGroupId: string
   categoryGroupName: string
-  categoryFixed: boolean
   plannedAmount: string
-  actualAmount: string
 }
 
-export function getPeriodSummary(vault: VaultData, year: number, month: number): PeriodSummary | null {
-  const period = getPeriod(vault, year, month)
-  if (!period) return null
+export interface PlanSummary {
+  entries: PlanEntryView[]
+  totalPlannedIncome: string
+  totalPlannedExpenses: string
+  plannedBalance: string
+}
 
-  const cats = vault.budget.categories
+/**
+ * One row per non-archived category, in category sort order, whether or not the
+ * plan has a line for it — a category with nothing planned is still part of the
+ * budget and must be visible to be filled in.
+ *
+ * `plannedBalance` is income minus expenses, which keeps the zero-based reading
+ * the budget is built around: every franc of income is meant to be assigned, so
+ * a balanced plan reads 0.00 rather than "some surplus somewhere".
+ */
+export function getPlanSummary(vault: VaultData): PlanSummary {
   const groups = vault.budget.categoryGroups
 
   let totalPlannedIncome = 0
-  let totalActualIncome = 0
   let totalPlannedExpenses = 0
-  let totalActualExpenses = 0
 
-  const entries: PeriodEntryView[] = []
+  const entries: PlanEntryView[] = []
 
-  // Build entries from categories (show all non-archived, even if no entry exists)
   for (const cat of listCategories(vault)) {
-    const entry = period.entries.find(e => e.categoryId === cat.id)
     const group = groups.find(g => g.id === cat.groupId)
-    const planned = Number(entry?.plannedAmount ?? '0')
-    const actual = Number(entry?.actualAmount ?? '0')
+    const plannedAmount = plannedFor(vault, cat.id)
+    const planned = Number(plannedAmount)
 
     entries.push({
       categoryId: cat.id,
@@ -213,69 +214,105 @@ export function getPeriodSummary(vault: VaultData, year: number, month: number):
       categoryType: cat.type,
       categoryGroupId: cat.groupId,
       categoryGroupName: group?.name ?? '',
-      categoryFixed: cat.fixed,
-      plannedAmount: (entry?.plannedAmount ?? '0.00'),
-      actualAmount: (entry?.actualAmount ?? '0.00'),
+      plannedAmount,
     })
 
     if (cat.type === 'income') {
       totalPlannedIncome += planned
-      totalActualIncome += actual
     } else {
       totalPlannedExpenses += planned
-      totalActualExpenses += actual
     }
   }
 
   return {
-    year,
-    month,
-    notes: period.notes,
     entries,
     totalPlannedIncome: totalPlannedIncome.toFixed(2),
-    totalActualIncome: totalActualIncome.toFixed(2),
     totalPlannedExpenses: totalPlannedExpenses.toFixed(2),
-    totalActualExpenses: totalActualExpenses.toFixed(2),
     plannedBalance: (totalPlannedIncome - totalPlannedExpenses).toFixed(2),
-    actualBalance: (totalActualIncome - totalActualExpenses).toFixed(2),
   }
 }
 
-// --- Entries ---
+// --- Archives ---
 
-export function upsertEntry(
+/** Archives, newest first. */
+export function listArchives(vault: VaultData): VaultArchive[] {
+  // Stable sort over an already newest-first array, so two archives created in
+  // the same millisecond keep the order they were made in.
+  return [...vault.budget.archives].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+/**
+ * Snapshots the current plan under a name.
+ *
+ * The lines are DENORMALISED — category and group names are copied in, not
+ * referenced. An archive that pointed at live categories would be rewritten by
+ * the next rename and would lose lines to the next delete, which would make it
+ * a view of the present rather than a record of the past.
+ *
+ * The snapshot covers what the plan summary shows: every non-archived category,
+ * including those left at 0.00, so an archive reads the same as the plan it was
+ * taken from.
+ */
+export function archivePlan(vault: VaultData, name: string): VaultArchive {
+  const trimmed = name.trim()
+  if (trimmed === '') {
+    // An unnamed snapshot cannot be told apart from any other, so it could never
+    // be found again — better to refuse than to store something unusable.
+    throw new Error('an archive needs a name')
+  }
+
+  const groupNameById = new Map(vault.budget.categoryGroups.map(g => [g.id, g.name]))
+
+  const lines: VaultArchiveLine[] = listCategories(vault).map(cat => ({
+    categoryName: cat.name,
+    groupName: groupNameById.get(cat.groupId) ?? '',
+    type: cat.type,
+    plannedAmount: plannedFor(vault, cat.id),
+  }))
+
+  const archive: VaultArchive = {
+    id: crypto.randomUUID(),
+    name: trimmed,
+    createdAt: new Date().toISOString(),
+    lines,
+  }
+  vault.budget.archives.unshift(archive)
+  return archive
+}
+
+/** Renames an archive. An empty name is rejected, as it is on creation. */
+export function renameArchive(vault: VaultData, id: string, name: string): void {
+  const trimmed = name.trim()
+  if (trimmed === '') {
+    throw new Error('an archive needs a name')
+  }
+  const archive = vault.budget.archives.find(a => a.id === id)
+  if (archive) archive.name = trimmed
+}
+
+/**
+ * Corrects one line of an archive in place.
+ *
+ * Editing an archive never touches the plan: the two are separate records, and
+ * fixing a typo in last year's snapshot must not change what is budgeted today.
+ * Lines are addressed by index because they have no ids — that is the price of
+ * denormalisation, and it is paid here rather than by pointing at categories.
+ */
+export function updateArchiveLine(
   vault: VaultData,
-  year: number,
-  month: number,
-  categoryId: string,
-  field: 'planned' | 'actual',
-  amount: string,
+  archiveId: string,
+  lineIndex: number,
+  plannedAmount: string,
 ): void {
-  const period = createPeriod(vault, year, month)
-  const cat = vault.budget.categories.find(c => c.id === categoryId)
-
-  let entry = period.entries.find(e => e.categoryId === categoryId)
-  if (!entry) {
-    entry = { categoryId, plannedAmount: '0.00', actualAmount: '0.00' }
-    period.entries.push(entry)
-  }
-
-  if (field === 'planned') {
-    entry.plannedAmount = amount
-    // Fixed categories: actual always equals planned
-    if (cat?.fixed) {
-      entry.actualAmount = amount
-    }
-  } else {
-    entry.actualAmount = amount
-  }
+  const archive = vault.budget.archives.find(a => a.id === archiveId)
+  if (!archive) return
+  const line = archive.lines[lineIndex]
+  if (!line) return
+  line.plannedAmount = plannedAmount
 }
 
-export function deleteEntry(vault: VaultData, year: number, month: number, categoryId: string): void {
-  const period = getPeriod(vault, year, month)
-  if (period) {
-    period.entries = period.entries.filter(e => e.categoryId !== categoryId)
-  }
+export function deleteArchive(vault: VaultData, id: string): void {
+  vault.budget.archives = vault.budget.archives.filter(a => a.id !== id)
 }
 
 // --- Seed Defaults ---
@@ -291,7 +328,6 @@ interface DefaultCategory {
   type: 'income' | 'expense'
   sortOrder: number
   groupName: string
-  fixed: boolean
   amount: string
 }
 
@@ -308,19 +344,23 @@ function bfsDefaultGroups(): DefaultGroup[] {
 
 function bfsDefaults(): DefaultCategory[] {
   return [
-    { name: 'Salary (net)', type: 'income', sortOrder: 10, groupName: 'Employment', fixed: true, amount: '6000.00' },
-    { name: 'Rent', type: 'expense', sortOrder: 10, groupName: 'Housing', fixed: true, amount: '1350.00' },
-    { name: 'Utilities', type: 'expense', sortOrder: 20, groupName: 'Housing', fixed: false, amount: '150.00' },
-    { name: 'Health Insurance', type: 'expense', sortOrder: 10, groupName: 'Insurance & Taxes', fixed: true, amount: '391.67' },
-    { name: 'Other Insurance', type: 'expense', sortOrder: 20, groupName: 'Insurance & Taxes', fixed: true, amount: '166.67' },
-    { name: 'Taxes', type: 'expense', sortOrder: 30, groupName: 'Insurance & Taxes', fixed: true, amount: '833.33' },
-    { name: 'Food & Groceries', type: 'expense', sortOrder: 10, groupName: 'Living', fixed: false, amount: '500.00' },
-    { name: 'Transportation', type: 'expense', sortOrder: 20, groupName: 'Living', fixed: false, amount: '400.00' },
-    { name: 'Telecommunications', type: 'expense', sortOrder: 30, groupName: 'Living', fixed: true, amount: '80.00' },
-    { name: 'Clothing & Footwear', type: 'expense', sortOrder: 10, groupName: 'Lifestyle', fixed: false, amount: '100.00' },
-    { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, groupName: 'Lifestyle', fixed: false, amount: '250.00' },
-    { name: 'Dining Out', type: 'expense', sortOrder: 30, groupName: 'Lifestyle', fixed: false, amount: '250.00' },
-    { name: 'Savings', type: 'expense', sortOrder: 10, groupName: 'Savings', fixed: false, amount: '500.00' },
+    { name: 'Salary (net)', type: 'income', sortOrder: 10, groupName: 'Employment', amount: '6000.00' },
+    { name: 'Rent', type: 'expense', sortOrder: 10, groupName: 'Housing', amount: '1350.00' },
+    { name: 'Utilities', type: 'expense', sortOrder: 20, groupName: 'Housing', amount: '150.00' },
+    { name: 'Health Insurance', type: 'expense', sortOrder: 10, groupName: 'Insurance & Taxes', amount: '391.67' },
+    { name: 'Other Insurance', type: 'expense', sortOrder: 20, groupName: 'Insurance & Taxes', amount: '166.67' },
+    { name: 'Taxes', type: 'expense', sortOrder: 30, groupName: 'Insurance & Taxes', amount: '833.33' },
+    { name: 'Food & Groceries', type: 'expense', sortOrder: 10, groupName: 'Living', amount: '500.00' },
+    { name: 'Transportation', type: 'expense', sortOrder: 20, groupName: 'Living', amount: '400.00' },
+    { name: 'Telecommunications', type: 'expense', sortOrder: 30, groupName: 'Living', amount: '80.00' },
+    { name: 'Clothing & Footwear', type: 'expense', sortOrder: 10, groupName: 'Lifestyle', amount: '100.00' },
+    { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, groupName: 'Lifestyle', amount: '250.00' },
+    { name: 'Dining Out', type: 'expense', sortOrder: 30, groupName: 'Lifestyle', amount: '250.00' },
+    { name: 'Savings', type: 'expense', sortOrder: 10, groupName: 'Savings', amount: '500.00' },
+    // Pillar 3a is budgeted like any other set-aside: the money leaves the
+    // spending plan but stays yours. 588.00 is the 2026 employee cap (7'056)
+    // spread over twelve months — a starting point, not a rule.
+    { name: 'Pillar 3a', type: 'expense', sortOrder: 20, groupName: 'Savings', amount: '588.00' },
   ]
 }
 
@@ -332,34 +372,15 @@ export function seedDefaults(vault: VaultData): void {
     createGroup(vault, dg.name, dg.type, dg.sortOrder)
   }
 
-  // Create categories
-  const categories: VaultCategory[] = []
+  // Create categories, and give each one its suggested amount in the plan.
+  // There is no month to seed and no actual to record: the plan is the budget.
   for (const d of bfsDefaults()) {
     const cat = createCategory(vault, {
       name: d.name,
       type: d.type,
       groupName: d.groupName,
-      fixed: d.fixed,
       sortOrder: d.sortOrder,
     })
-    categories.push(cat)
-  }
-
-  // Create current month period with entries
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-  const period = createPeriod(vault, year, month)
-
-  const defaults = bfsDefaults()
-  for (let i = 0; i < categories.length; i++) {
-    const cat = categories[i]
-    const d = defaults[i]
-    const entry: VaultEntry = {
-      categoryId: cat.id,
-      plannedAmount: d.amount,
-      actualAmount: cat.fixed ? d.amount : '0.00',
-    }
-    period.entries.push(entry)
+    setPlanned(vault, cat.id, d.amount)
   }
 }

@@ -9,6 +9,9 @@
   import SecuritySettings from './lib/auth/SecuritySettings.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
+  import AccountsModule from './modules/accounts/AccountsModule.svelte'
+  import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
+  import { isExpanded, toggleExpanded } from './lib/util/collapse.svelte'
   import { focusTrap } from './lib/util/focusTrap'
 
   const authState = getAuthState()
@@ -48,8 +51,14 @@
 
   const availableModules = [
     { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
-    { id: 'accounts', name: 'Accounts', description: 'Manage bank and savings accounts' },
-    { id: 'allocations', name: 'Allocations', description: 'Plan monthly money allocation' },
+    // Allocations ships inside Accounts as a second view rather than as its own
+    // module: it is meaningless without accounts, and the flat module list has no
+    // way to express that dependency. The `allocations` registry id stays unused.
+    {
+      id: 'accounts',
+      name: 'Accounts',
+      description: 'Accounts, money flows between them, and reserves for future costs',
+    },
     { id: 'provision3a', name: 'Pillar 3a', description: 'Swiss retirement savings (3a)' },
     { id: 'investments', name: 'Investments', description: 'Track stocks, ETFs, and other assets' },
   ]
@@ -143,6 +152,7 @@
     showConfig = false
     showSecurity = false
     show2FAEnforcement = false
+    clearEditing()
   }
 
   async function handleVaultSetup() {
@@ -377,20 +387,75 @@
       </div>
     {:else}
       {#each modules as mod}
-        <section class="module-section">
-          <h2>{mod.name}</h2>
-          {#if isAdmin}
-            <div class="module-card admin-notice">
-              <p>Sign in with a regular account to use encrypted modules.</p>
-            </div>
-          {:else if mod.id === 'budget'}
-            <BudgetModule />
-          {:else}
-            <div class="module-card">
-              <span class="module-id">{mod.id}</span>
-              <p>Coming soon.</p>
-            </div>
-          {/if}
+        <section class="module-section" class:collapsed={!isExpanded(mod.id)}>
+          <div class="module-heading">
+            <h2>
+              <!--
+                The disclosure control carries the heading text and stretches
+                across the row, so nearly all of the heading is clickable — but
+                the Edit button sits beside it as a sibling, never inside it.
+                That keeps the two controls from fighting without needing
+                stopPropagation, and avoids nesting a button within a button.
+              -->
+              <button
+                class="collapse-toggle"
+                aria-expanded={isExpanded(mod.id)}
+                aria-controls="module-body-{mod.id}"
+                onclick={() => toggleExpanded(mod.id)}
+              >
+                <span class="chevron" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    {#if isExpanded(mod.id)}
+                      <path d="M2 4 L6 10 L10 4 Z" />
+                    {:else}
+                      <path d="M4 2 L10 6 L4 10 Z" />
+                    {/if}
+                  </svg>
+                </span>
+                {mod.name}
+              </button>
+            </h2>
+            <!--
+              Edit is hidden while the module is folded: a mode switch acting on
+              a body nobody can see is only a way to be surprised later. The
+              mode itself is untouched, so unfolding brings back "Done".
+            -->
+            {#if !isAdmin && isExpanded(mod.id) && (mod.id === 'budget' || mod.id === 'accounts')}
+              <button
+                class="edit-toggle"
+                class:active={isEditing(mod.id)}
+                aria-pressed={isEditing(mod.id)}
+                onclick={() => toggleEditing(mod.id)}
+              >
+                {isEditing(mod.id) ? 'Done' : 'Edit'}
+              </button>
+            {/if}
+          </div>
+          <!--
+            Hidden, not removed. `{#if}` here would destroy every module's
+            component state on each fold: a half-typed amount in a budget row,
+            the accounts/allocations tab the user was on, which category groups
+            they had open, an in-flight modal. None of that is in the vault, so
+            none of it would come back. `hidden` takes the body out of the
+            accessibility tree and the tab order exactly as removal would, while
+            leaving the components mounted and their state intact.
+          -->
+          <div class="module-body" id="module-body-{mod.id}" hidden={!isExpanded(mod.id)}>
+            {#if isAdmin}
+              <div class="module-card admin-notice">
+                <p>Sign in with a regular account to use encrypted modules.</p>
+              </div>
+            {:else if mod.id === 'budget'}
+              <BudgetModule />
+            {:else if mod.id === 'accounts'}
+              <AccountsModule />
+            {:else}
+              <div class="module-card">
+                <span class="module-id">{mod.id}</span>
+                <p>Coming soon.</p>
+              </div>
+            {/if}
+          </div>
         </section>
       {/each}
     {/if}
@@ -653,11 +718,89 @@
       display: none;
     }
   }
+  .module-heading {
+    display: flex;
+    /* Centre, not baseline: the disclosure control is itself a flex box, and
+       its baseline is that of the chevron rather than the heading text. */
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .collapse-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* Fills the heading row so the click target is the whole line, stopping
+       short of the Edit button. */
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    padding: 0.15rem 0.4rem;
+    margin-left: -0.4rem;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .collapse-toggle:hover {
+    background: #ececf0;
+  }
+  .collapse-toggle:focus-visible {
+    outline: 2px solid #2d6a4f;
+    outline-offset: 2px;
+  }
+  .chevron {
+    display: flex;
+    flex-shrink: 0;
+    color: #999;
+  }
+  .edit-toggle {
+    background: none;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    color: #555;
+  }
+  .edit-toggle:hover {
+    border-color: #2d6a4f;
+    color: #2d6a4f;
+  }
+  .edit-toggle.active {
+    background: #2d6a4f;
+    border-color: #2d6a4f;
+    color: white;
+  }
+  /* A hairline and a generous gutter, not a card. The module bodies already
+     carry white surfaces of their own; boxing those inside a second box would
+     turn a page of modules into a dashboard of panels competing for the eye. */
   .module-section {
-    margin-bottom: 2rem;
+    padding-top: 1.75rem;
+    margin-bottom: 1.75rem;
+    border-top: 1px solid #e3e3e8;
+  }
+  .module-section:first-of-type {
+    padding-top: 0;
+    border-top: none;
+  }
+  /* Folded away, a section is a single line of text — the full gutter would
+     leave it adrift between its neighbours. */
+  .module-section.collapsed {
+    margin-bottom: 1.25rem;
   }
   .module-section h2 {
-    margin-bottom: 1rem;
+    margin: 0;
+  }
+  .module-body {
+    margin-top: 1rem;
+  }
+  /* The UA stylesheet already does this; stating it keeps a future layout rule
+     on .module-body from quietly resurrecting a folded module. */
+  .module-body[hidden] {
+    display: none;
   }
   .module-card {
     background: white;

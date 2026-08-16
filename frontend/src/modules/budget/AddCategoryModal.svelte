@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
@@ -6,27 +7,31 @@
   interface Props {
     type: 'income' | 'expense'
     groups: { name: string; id: string }[]
-    editCategory?: { id: string; name: string; fixed: boolean; groupName: string; plannedAmount?: string; actualAmount?: string } | null
+    editCategory?: { id: string; name: string; groupName: string; plannedAmount?: string } | null
+    /** Preselects the group when adding — set by the "+" on a group header. */
+    presetGroupName?: string
     vault: VaultData
     oncreated: () => void
     onclose: () => void
-    onsave?: (categoryId: string, field: 'planned' | 'actual', amount: string) => void
+    onsave?: (categoryId: string, amount: string) => void
   }
 
-  let { type, groups, editCategory = null, vault, oncreated, onclose, onsave }: Props = $props()
+  let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave }: Props = $props()
 
   let isEdit = $derived(editCategory != null)
   let name = $state(editCategory?.name ?? '')
-  let fixed = $state(editCategory?.fixed ?? false)
-  let selectedGroup = $state(editCategory?.groupName ?? groups[0]?.name ?? '')
+  // Seeded once: the modal is created fresh each time it opens, so these are
+  // deliberately initial values rather than reactive reads.
+  let selectedGroup = $state(
+    untrack(() => editCategory?.groupName ?? presetGroupName ?? groups[0]?.name ?? ''),
+  )
   let newGroupName = $state('')
   let useNewGroup = $state(false)
   let error = $state<string | null>(null)
 
   let plannedMoValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')
   let plannedYrValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')
-  let actualMoValue = $state(editCategory?.actualAmount ? fmt(Number(editCategory.actualAmount)) : '')
-  let valueFocusedField = $state<'planned_mo' | 'planned_yr' | 'actual_mo' | null>(null)
+  let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
 
   function fmt(val: number): string {
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -37,31 +42,28 @@
     return Number(cleaned)
   }
 
-  function handleValueFocus(field: 'planned_mo' | 'planned_yr' | 'actual_mo', event: FocusEvent) {
+  function handleValueFocus(field: 'planned_mo' | 'planned_yr', event: FocusEvent) {
     valueFocusedField = field
     const input = event.target as HTMLInputElement
     requestAnimationFrame(() => input.select())
   }
 
-  function handleValueBlur(field: 'planned_mo' | 'planned_yr' | 'actual_mo') {
+  function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
     valueFocusedField = null
     if (!editCategory || !onsave) return
-    const raw = field === 'planned_mo' ? plannedMoValue : field === 'planned_yr' ? plannedYrValue : actualMoValue
+    const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
     const val = parseInput(raw)
     if (isNaN(val) || !isFinite(val)) return
 
     if (field === 'planned_mo') {
       plannedMoValue = fmt(val)
       plannedYrValue = fmt(val * 12)
-      onsave(editCategory.id, 'planned', val.toFixed(2))
-    } else if (field === 'planned_yr') {
+      onsave(editCategory.id, val.toFixed(2))
+    } else {
       const monthly = val / 12
       plannedYrValue = fmt(val)
       plannedMoValue = fmt(monthly)
-      onsave(editCategory.id, 'planned', monthly.toFixed(4))
-    } else {
-      actualMoValue = fmt(val)
-      onsave(editCategory.id, 'actual', val.toFixed(2))
+      onsave(editCategory.id, monthly.toFixed(4))
     }
   }
 
@@ -89,7 +91,6 @@
       if (isEdit && editCategory) {
         engine.updateCategory(vault, editCategory.id, {
           name: trimmed,
-          fixed,
           groupName: resolvedGroupName,
         })
       } else {
@@ -97,7 +98,6 @@
           name: trimmed,
           type,
           groupName: resolvedGroupName,
-          fixed,
         })
       }
       oncreated()
@@ -159,12 +159,6 @@
       />
     </label>
 
-    <label class="field checkbox-field">
-      <input type="checkbox" bind:checked={fixed} />
-      <span>Fixed amount</span>
-      <span class="hint">Actual always equals planned</span>
-    </label>
-
     {#if isEdit && editCategory?.plannedAmount != null}
       <div class="values-section">
         <span class="label">Values</span>
@@ -192,21 +186,6 @@
               onblur={() => handleValueBlur('planned_yr')}
               oninput={() => handleValueInput('planned_yr')}
             />
-          </label>
-          <label class="value-field">
-            <span class="value-label">Actual/mo</span>
-            {#if fixed}
-              <span class="value-fixed">{actualMoValue}</span>
-            {:else}
-              <input
-                type="text"
-                inputmode="decimal"
-                class="value-input"
-                bind:value={actualMoValue}
-                onfocus={(e) => handleValueFocus('actual_mo', e)}
-                onblur={() => handleValueBlur('actual_mo')}
-              />
-            {/if}
           </label>
         </div>
       </div>
@@ -301,20 +280,6 @@
     border-color: #2d6a4f;
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }
-  .checkbox-field {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .checkbox-field input[type="checkbox"] {
-    width: 1.1rem;
-    height: 1.1rem;
-    accent-color: #2d6a4f;
-  }
-  .hint {
-    font-size: 0.8rem;
-    color: #888;
-  }
   .error {
     color: #c0392b;
     font-size: 0.85rem;
@@ -360,7 +325,7 @@
   }
   .values-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
     margin-top: 0.25rem;
   }
@@ -390,15 +355,6 @@
   }
   .value-input.yearly {
     color: #888;
-  }
-  .value-fixed {
-    display: block;
-    padding: 0.5rem;
-    color: #888;
-    font-style: italic;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.95rem;
   }
 
   @media (max-width: 480px) {

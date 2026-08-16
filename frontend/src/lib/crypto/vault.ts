@@ -1,16 +1,94 @@
 const NONCE_LENGTH = 12
 
+export const VAULT_VERSION = 4
+
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 1
+  version: 4
   budget: BudgetVaultData
+  accounts: VaultAccount[]
 }
 
 export interface BudgetVaultData {
   categoryGroups: VaultCategoryGroup[]
   categories: VaultCategory[]
-  periods: VaultPeriod[]
+  /**
+   * The current plan: one planned amount per category. There is exactly one.
+   *
+   * v4 removed monthly periods. The budget is a standing plan rather than a
+   * per-month ledger — which is what it always was in practice, since the
+   * calculator never tracked real money movement. Points in time are captured
+   * deliberately, as named archives, instead of accruing one row per month.
+   */
+  plan: VaultPlanEntry[]
+  archives: VaultArchive[]
+}
+
+export interface VaultPlanEntry {
+  categoryId: string
+  plannedAmount: string
+}
+
+/**
+ * A named snapshot of the plan.
+ *
+ * Deliberately DENORMALISED: it stores the names and amounts as they were,
+ * rather than pointing at live categories. An archive that referenced
+ * categories would be rewritten by a later rename and would lose lines to a
+ * later delete — it would stop being a record of anything. The cost is that an
+ * archive cannot be diffed against the plan by id, which is not something we
+ * need.
+ */
+export interface VaultArchive {
+  id: string
+  name: string
+  createdAt: string
+  lines: VaultArchiveLine[]
+}
+
+export interface VaultArchiveLine {
+  categoryName: string
+  groupName: string
+  type: 'income' | 'expense'
+  plannedAmount: string
+}
+
+export type AccountKind =
+  | 'transactional'
+  | 'reserves'
+  | 'savings'
+  | 'cash'
+  | 'retirement_3a'
+  | 'investment'
+
+export interface QRAddress {
+  name: string
+  street: string
+  buildingNumber: string
+  postalCode: string
+  city: string
+  country: string
+}
+
+export interface VaultAccount {
+  id: string
+  name: string
+  kind: AccountKind
+  currency: 'CHF'
+  currentAmount: string          // balance as at lastCorrectedAt
+  lastCorrectedAt: string        // ISO date
+  bankName?: string
+  iban?: string
+  ibanKind?: 'iban' | 'qr-iban'
+  holder?: QRAddress
+}
+
+export interface ReserveDefinition {
+  kind: 'obligation' | 'amortization'
+  targetAmount: string
+  periodMonths: number
+  anchorMonth: string            // 'YYYY-MM'
 }
 
 export interface VaultCategoryGroup {
@@ -27,20 +105,9 @@ export interface VaultCategory {
   sortOrder: number
   archived: boolean
   groupId: string
-  fixed: boolean
-}
-
-export interface VaultPeriod {
-  year: number
-  month: number
-  notes: string
-  entries: VaultEntry[]
-}
-
-export interface VaultEntry {
-  categoryId: string
-  plannedAmount: string
-  actualAmount: string
+  sourceAccountId: string | null
+  sinkAccountId: string | null
+  reserve?: ReserveDefinition
 }
 
 // --- Encrypt / decrypt ---
@@ -59,9 +126,27 @@ export async function encryptVault(
   )
 
   return {
-    ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
-    nonce: btoa(String.fromCharCode(...nonce)),
+    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
+    nonce: bytesToBase64(nonce),
   }
+}
+
+/**
+ * Base64-encodes bytes in chunks.
+ *
+ * `String.fromCharCode(...bytes)` spreads every byte as a separate argument and
+ * overflows the call stack somewhere around a hundred kilobytes — which is to
+ * say, it fails on a large vault by throwing while SAVING. Archives make large
+ * vaults ordinary, so this is the difference between growing a vault and being
+ * unable to persist it.
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 0x8000
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK_SIZE))
+  }
+  return btoa(binary)
 }
 
 export async function decryptVault(
@@ -78,16 +163,158 @@ export async function decryptVault(
     ciphertextBytes,
   )
 
-  return JSON.parse(new TextDecoder().decode(decrypted))
+  const parsed = JSON.parse(new TextDecoder().decode(decrypted))
+
+  return migrateVault(parsed)
+}
+
+/**
+ * Brings a decrypted vault up to the current version.
+ *
+ * Versions with a known upgrade path are migrated in place, preserving the
+ * user's data. Anything else — a version predating migrations, a missing
+ * version, a non-object — is scrubbed and replaced by a fresh vault. That
+ * scrub remains the pre-v1.0 fallback; it is no longer the only behaviour.
+ */
+export function migrateVault(parsed: unknown): VaultData {
+  if (!parsed || typeof parsed !== 'object') return createEmptyVault()
+
+  const vault = parsed as { version?: unknown; budget?: { categories?: unknown } }
+
+  if (vault.version === VAULT_VERSION) return vault as unknown as VaultData
+  // Chained, so a v2 vault is carried all the way forward rather than scrubbed
+  // for being two steps behind.
+  if (vault.version === 2) return migrateV3ToV4(migrateV2ToV3(vault) as unknown as V3Shape)
+  if (vault.version === 3) return migrateV3ToV4(vault as unknown as V3Shape)
+
+  return createEmptyVault()
+}
+
+interface V3Period {
+  year: number
+  month: number
+  entries?: { categoryId: string; plannedAmount: string; actualAmount?: string }[]
+}
+
+interface V3Shape {
+  version: number
+  budget?: {
+    categoryGroups?: { id: string; name: string }[]
+    categories?: { id: string; name: string; type: 'income' | 'expense'; groupId: string }[]
+    periods?: V3Period[]
+  }
+}
+
+const MIGRATION_MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+/**
+ * v3 -> v4: monthly periods become a single plan plus named archives, and the
+ * `actual` amount is dropped.
+ *
+ * The most recent period becomes the plan — it is the one the user was last
+ * working in. Every earlier period becomes an archive named for its month, so
+ * nothing entered is lost: it stops being a timeline and becomes a set of
+ * snapshots, which is what the months were serving as anyway.
+ *
+ * Archives are denormalised here using the category and group names as they
+ * stand now. Periods never stored names, so today's are the only ones available.
+ */
+function migrateV3ToV4(vault: V3Shape): VaultData {
+  const budget = vault.budget ?? {}
+  const categories = budget.categories ?? []
+  const groups = budget.categoryGroups ?? []
+  const periods = [...(budget.periods ?? [])].sort(
+    (a, b) => a.year - b.year || a.month - b.month,
+  )
+
+  const groupNameById = new Map(groups.map(g => [g.id, g.name]))
+  const categoryById = new Map(categories.map(c => [c.id, c]))
+
+  const latest = periods.pop()
+  const plan: VaultPlanEntry[] = (latest?.entries ?? []).map(e => ({
+    categoryId: e.categoryId,
+    plannedAmount: e.plannedAmount,
+  }))
+
+  const archives: VaultArchive[] = periods.map(period => ({
+    id: crypto.randomUUID(),
+    name: `${MIGRATION_MONTH_NAMES[period.month - 1] ?? period.month} ${period.year}`,
+    createdAt: `${period.year}-${String(period.month).padStart(2, '0')}-01`,
+    lines: (period.entries ?? []).flatMap(entry => {
+      const category = categoryById.get(entry.categoryId)
+      // An entry whose category was deleted has no name left to record, so
+      // there is nothing meaningful to archive.
+      if (!category) return []
+      return [{
+        categoryName: category.name,
+        groupName: groupNameById.get(category.groupId) ?? '',
+        type: category.type,
+        plannedAmount: entry.plannedAmount,
+      }]
+    }),
+  }))
+
+  const migrated = vault as unknown as VaultData
+  migrated.version = VAULT_VERSION
+  migrated.budget = {
+    categoryGroups: (budget.categoryGroups ?? []) as unknown as VaultCategoryGroup[],
+    categories: (budget.categories ?? []) as unknown as VaultCategory[],
+    plan,
+    archives,
+  }
+  return migrated
+}
+
+/**
+ * v2 -> v3: the `fixed` flag was removed from categories.
+ *
+ * Dropping a field is backward-compatible at runtime, so nothing breaks without
+ * this — but the key would linger in stored data, describing a feature that no
+ * longer exists. Strip it explicitly; everything else carries over untouched, so
+ * budgets, accounts, routing and reserves all survive.
+ */
+function migrateV2ToV3(vault: { version?: unknown; budget?: { categories?: unknown } }): VaultData {
+  const categories = vault.budget?.categories
+  if (Array.isArray(categories)) {
+    for (const category of categories) {
+      if (category && typeof category === 'object') {
+        delete (category as Record<string, unknown>).fixed
+      }
+    }
+  }
+  vault.version = VAULT_VERSION
+  return vault as unknown as VaultData
 }
 
 export function createEmptyVault(): VaultData {
   return {
-    version: 1,
+    version: VAULT_VERSION,
     budget: {
       categoryGroups: [],
       categories: [],
-      periods: [],
+      plan: [],
+      archives: [],
     },
+    // Invariant: a vault always holds at least one account, so every category
+    // can be routed from the moment it is created.
+    accounts: [createMainAccount()],
   }
+}
+
+function createMainAccount(): VaultAccount {
+  return {
+    id: crypto.randomUUID(),
+    name: 'Main',
+    kind: 'transactional',
+    currency: 'CHF',
+    currentAmount: '0.00',
+    lastCorrectedAt: todayISO(),
+  }
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10)
 }
