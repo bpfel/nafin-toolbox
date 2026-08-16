@@ -129,7 +129,7 @@ function groupNames() {
 
 function totals() {
   return {
-    allocated: screen.getByTestId('total-allocated').textContent?.trim(),
+    unallocated: screen.getByTestId('total-unallocated').textContent?.trim(),
     netChange: screen.getByTestId('total-net-change').textContent?.trim(),
   }
 }
@@ -153,9 +153,9 @@ describe('AllocationScreen', () => {
   test('shows both totals, and they differ by exactly the set-aside', () => {
     render(AllocationScreen)
 
-    // plannedBalance = 900 − (500 rent + 100 laptop) = 300 — zero-based reading.
+    // unallocated = 900 − (500 rent + 100 laptop) = 300 — zero-based reading.
     // netChange = 900 − 500, because the laptop set-aside never leaves net worth.
-    expect(totals()).toEqual({ allocated: 'CHF 300.00', netChange: 'CHF 400.00' })
+    expect(totals()).toEqual({ unallocated: '300.00', netChange: '400.00' })
   })
 
   test('an income category is asked only where money lands, never where it comes from', async () => {
@@ -187,16 +187,16 @@ describe('AllocationScreen', () => {
     expect(testVault!.budget.categories.find(c => c.id === 'rent')!.sinkAccountId).toBe('main')
   })
 
-  test('routing an expense into an account moves netChange but not plannedBalance', async () => {
+  test('routing an expense into an account moves netChange but not unallocated', async () => {
     render(AllocationScreen)
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
     await fireEvent.click(editButtons[1])
     await fireEvent.click(screen.getByLabelText('Set aside into'))
 
-    // Still fully allocated the same way: rent is budgeted either way. But
+    // Just as much is left unallocated: rent is budgeted either way. But
     // nothing leaves the accounts any more, so net worth grows by the lot.
-    expect(totals()).toEqual({ allocated: 'CHF 300.00', netChange: 'CHF 900.00' })
+    expect(totals()).toEqual({ unallocated: '300.00', netChange: '900.00' })
   })
 
   test('an under-funded account is reported, and never blocks anything', async () => {
@@ -219,7 +219,7 @@ describe('AllocationScreen', () => {
     render(AllocationScreen)
 
     // Reserves holds 0.00 against a 3000.00 obligation falling due this month.
-    expect(screen.getByText(/is CHF 3'000\.00 short|is CHF 3’000\.00 short/)).toBeTruthy()
+    expect(screen.getByText(/is 3'000\.00 short|is 3’000\.00 short/)).toBeTruthy()
     expect(screen.getByText(/Nothing is blocked/)).toBeTruthy()
   })
 
@@ -286,7 +286,7 @@ describe('AllocationScreen', () => {
       const subtotals = groupHeaders().map(el =>
         el.querySelector('.group-subtotal')!.textContent!.trim(),
       )
-      expect(subtotals).toEqual(['CHF 50.00', 'CHF 500.00', 'CHF 25.00'])
+      expect(subtotals).toEqual(['50.00', '500.00', '25.00'])
     })
 
     test('collapsing a group hides only that group’s rows', async () => {
@@ -371,7 +371,7 @@ describe('AllocationScreen edit mode', () => {
   test('the figures and the flow lines read fine read-only', () => {
     render(AllocationScreen)
 
-    expect(totals()).toEqual({ allocated: 'CHF 300.00', netChange: 'CHF 400.00' })
+    expect(totals()).toEqual({ unallocated: '300.00', netChange: '400.00' })
     expect(screen.getByText('Rent')).toBeTruthy()
     expect(screen.getByText(/leaves your accounts/)).toBeTruthy()
   })
@@ -393,6 +393,27 @@ describe('AllocationScreen edit mode', () => {
       periodMonths: 60,
       anchorMonth: '2026-04',
     })
+  })
+
+  // The row splits into general information (name, kind, amount, flow) and
+  // detail (reserve status, timing, purchase). The rule between the two only
+  // exists when there is a detail half to separate.
+  test('only a row with a detail half gets the separator', async () => {
+    render(AllocationScreen)
+
+    const rows = Array.from(document.querySelectorAll('.allocation-row'))
+    const detailed = rows.map(row => row.querySelector('.row-detail') !== null)
+
+    // Salary (income) and Rent (plain spending) have nothing below the flow
+    // line; the Laptop amortization does.
+    expect(detailed).toEqual([false, false, true])
+
+    // Opening the routing editor gives a bare row a detail half of its own.
+    toggleEditing('accounts')
+    await tick()
+    await fireEvent.click(screen.getAllByRole('button', { name: 'Edit routing' })[1]) // Rent
+
+    expect(document.querySelectorAll('.allocation-row')[1].querySelector('.row-detail')).toBeTruthy()
   })
 
   test('leaving edit mode folds an open routing editor away', async () => {

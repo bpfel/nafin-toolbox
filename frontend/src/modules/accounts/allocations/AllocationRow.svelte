@@ -185,6 +185,13 @@
     const monthsAway = Math.ceil(remaining / rateCents)
     return { rateCents, affordableFrom: addMonths(currentMonth, monthsAway), monthsAway }
   })
+
+  // The row has two halves: what this line *is* (name, kind, amount, flow) and
+  // what it is *doing* (reserve status, timing, purchase). The hairline only
+  // earns its place when there is a second half to separate — a plain spending
+  // row with no reserve has nothing below it.
+  let showStatus = $derived(reserve != null && requiredNow !== null)
+  let hasDetail = $derived(showStatus || showEditor)
 </script>
 
 <div class="allocation-row" class:unrouted={kind === null}>
@@ -193,7 +200,7 @@
       <span class="name">{category.name}</span>
       <span class="kind kind-{kindClass}">{kindLabel}</span>
     </div>
-    <span class="planned">CHF {money(plannedAmount)}</span>
+    <span class="planned">{money(plannedAmount)}</span>
     {#if editing}
       <button
         class="toggle"
@@ -207,47 +214,51 @@
 
   <p class="flow">{flowSummary}</p>
 
-  {#if reserve && requiredNow !== null}
-    <div class="reserve-status">
-      <span class="required">
-        CHF {money(requiredNow)} of CHF {money(reserve.targetAmount)} should be set aside by now
-      </span>
-      {#if obligation}
-        <span class="timing">
-          {obligation.monthsAway === 0
-            ? 'Due this month'
-            : `Due ${monthLabel(obligation.due)} — ${obligation.monthsAway} ${obligation.monthsAway === 1 ? 'month' : 'months'} to go`}
-        </span>
-      {/if}
-      {#if amortization}
-        <span class="timing">
-          {#if amortization.monthsAway === 0}
-            Affordable now
-          {:else if amortization.affordableFrom}
-            At CHF {money(fromCents(amortization.rateCents))}/month, affordable from
-            {monthLabel(amortization.affordableFrom)}
-          {:else}
-            No monthly amount planned — budget something towards this to get a date
+  {#if hasDetail}
+    <div class="row-detail">
+      {#if showStatus}
+        <div class="reserve-status">
+          <span class="required">
+            {money(requiredNow!)} of {money(reserve!.targetAmount)} should be set aside by now
+          </span>
+          {#if obligation}
+            <span class="timing">
+              {obligation.monthsAway === 0
+                ? 'Due this month'
+                : `Due ${monthLabel(obligation.due)} — ${obligation.monthsAway} ${obligation.monthsAway === 1 ? 'month' : 'months'} to go`}
+            </span>
           {/if}
-        </span>
-        <button class="purchase" onclick={onpurchase}>Bought it…</button>
+          {#if amortization}
+            <span class="timing">
+              {#if amortization.monthsAway === 0}
+                Affordable now
+              {:else if amortization.affordableFrom}
+                At {money(fromCents(amortization.rateCents))}/month, affordable from
+                {monthLabel(amortization.affordableFrom)}
+              {:else}
+                No monthly amount planned — budget something towards this to get a date
+              {/if}
+            </span>
+            <button class="purchase" onclick={onpurchase}>Bought it…</button>
+          {/if}
+        </div>
       {/if}
-    </div>
-  {/if}
 
-  {#if showEditor}
-    <div class="editor">
-      <RoutingControls
-        fieldId={category.id}
-        type={category.type}
-        sourceAccountId={category.sourceAccountId}
-        sinkAccountId={category.sinkAccountId}
-        {accounts}
-        onchange={onroutingchange}
-      />
+      {#if showEditor}
+        <div class="editor">
+          <RoutingControls
+            fieldId={category.id}
+            type={category.type}
+            sourceAccountId={category.sourceAccountId}
+            sinkAccountId={category.sinkAccountId}
+            {accounts}
+            onchange={onroutingchange}
+          />
 
-      {#if isSetAside}
-        <ReserveFields {reserve} {currentMonth} {plannedAmount} onchange={onreservechange} />
+          {#if isSetAside}
+            <ReserveFields {reserve} {currentMonth} {plannedAmount} onchange={onreservechange} />
+          {/if}
+        </div>
       {/if}
     </div>
   {/if}
@@ -339,6 +350,16 @@
     font-size: 0.85rem;
     color: #666;
   }
+  /* The detail half, set off from the general information above it by a
+     hairline and a little extra air. Subtle on purpose: this is a dense list,
+     and the rule between rows is already doing the heavier work. */
+  .row-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f1f3f5;
+  }
   .reserve-status {
     display: flex;
     align-items: center;
@@ -369,7 +390,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 0.75rem 0 0.25rem;
+    padding: 0.25rem 0;
   }
 
   @media (max-width: 640px) {

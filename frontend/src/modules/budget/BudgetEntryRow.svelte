@@ -255,14 +255,21 @@
   }
   .drag-handle {
     cursor: grab;
-    color: #ccc;
+    color: #adb5bd;
     font-size: 1rem;
     line-height: 1;
     user-select: none;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
   }
   .drag-handle:hover {
-    color: #888;
+    color: #495057;
+  }
+  .drag-handle:active {
+    cursor: grabbing;
   }
   .name-text {
     font-weight: 500;
@@ -291,28 +298,28 @@
   .name-static:hover {
     text-decoration: none;
   }
+  /* Rendered only in edit mode, so it is already hidden when it would be noise.
+     Fading it in on row hover made it unreachable on a touchscreen — the one
+     input where edit mode is the only signal you have. */
   .trash-btn {
     background: none;
     border: none;
-    color: #ccc;
+    color: #adb5bd;
     cursor: pointer;
     padding: 0.15rem;
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
-  .entry-row:hover .trash-btn {
-    opacity: 1;
+    transition: color 0.15s;
   }
   .trash-btn:hover {
     color: #c0392b;
   }
-  @media (hover: none) and (min-width: 769px) {
-    .trash-btn {
-      opacity: 0.6;
-    }
+  .trash-btn:focus-visible {
+    outline: 2px solid #c0392b;
+    outline-offset: 2px;
+    border-radius: 4px;
+    color: #c0392b;
   }
   .amount-cell {
     text-align: right;
@@ -356,6 +363,17 @@
   :global(.drag-ghost) {
     opacity: 0.5;
     background: #e3f2fd !important;
+  }
+
+  /* Wide touchscreens keep both controls (the narrow-screen rules below drop
+     them in favour of long-press), so they need finger-sized targets. */
+  @media (hover: none) and (pointer: coarse) {
+    .drag-handle,
+    .trash-btn {
+      min-width: 32px;
+      min-height: 32px;
+      justify-content: center;
+    }
   }
 
   @media (max-width: 768px) {

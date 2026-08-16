@@ -121,7 +121,7 @@
       <p class="error">Enter the price as a number, e.g. 1249.00</p>
     {:else}
       <p class="effect">
-        The next cycle saves towards CHF {money(normalizedPrice)} over {reserve.periodMonths}
+        The next cycle saves towards {money(normalizedPrice)} over {reserve.periodMonths}
         {reserve.periodMonths === 1 ? 'month' : 'months'}, starting
         {validMonth ? monthLabel(purchaseMonth) : 'the month you pick'}. Nothing is required in that
         first month, and the amount climbs from there.
@@ -130,7 +130,7 @@
 
     {#if leavesShort}
       <p class="info">
-        This leaves {accountName} CHF {money(leavesShort)} below its required amount.
+        This leaves {accountName} {money(leavesShort)} below its required amount.
         <span class="advice">Information only — the purchase is recorded either way.</span>
       </p>
     {/if}

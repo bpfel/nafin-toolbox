@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/svelte'
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tick } from 'svelte'
 import Sortable from 'sortablejs'
-import type { VaultAccount, VaultData } from '../../../lib/crypto/vault'
+import type { VaultAccount, VaultCategory, VaultData } from '../../../lib/crypto/vault'
 
 // The vault is a plain object mutated in place by the engine, so the store is
 // stubbed with a live getter rather than a snapshot.
@@ -25,13 +25,13 @@ function editMode() {
   toggleEditing('accounts')
 }
 
-function account(id: string, name: string): VaultAccount {
+function account(id: string, name: string, currentAmount = '100.00'): VaultAccount {
   return {
     id,
     name,
     kind: 'transactional',
     currency: 'CHF',
-    currentAmount: '100.00',
+    currentAmount,
     lastCorrectedAt: '2026-08-01',
   }
 }
@@ -42,6 +42,29 @@ function vault(...accounts: VaultAccount[]): VaultData {
     budget: { categoryGroups: [], categories: [], plan: [], archives: [] },
     accounts,
   }
+}
+
+// An obligation whose anchor month IS the month under test is due now, so the
+// whole target is already required — the simplest way to put a known figure in
+// `requiredForAccount` without reaching into the reserve maths.
+function dueReserve(id: string, sinkAccountId: string, targetAmount: string): VaultCategory {
+  return {
+    id,
+    name: `${id} reserve`,
+    type: 'expense',
+    sortOrder: 0,
+    archived: false,
+    groupId: 'g1',
+    sourceAccountId: null,
+    sinkAccountId,
+    reserve: { kind: 'obligation', targetAmount, periodMonths: 12, anchorMonth: '2026-08' },
+  }
+}
+
+// de-CH groups thousands with a character that has changed with the ICU data
+// more than once, so the assertions compare the digits rather than the glyph.
+function totalAt(testId: string): string {
+  return (screen.getByTestId(testId).textContent ?? '').replace(/[^\d.-]/g, '')
 }
 
 beforeEach(() => {
@@ -141,7 +164,7 @@ describe('AccountManagement edit mode', () => {
     const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
     expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
-    expect(screen.queryByRole('button', { name: '+ Add account' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Edit Main' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Delete Main' })).toBeNull()
   })
@@ -153,7 +176,7 @@ describe('AccountManagement edit mode', () => {
     const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
     expect(container.querySelectorAll('.drag-handle')).toHaveLength(2)
-    expect(screen.getByRole('button', { name: '+ Add account' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Main' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Delete Main' })).toBeTruthy()
   })
@@ -203,6 +226,123 @@ describe('AccountManagement edit mode', () => {
     editMode()
     await tick()
     expect(instance.option('disabled')).toBe(true)
+  })
+})
+
+describe('AccountManagement totals row', () => {
+  // The three sums, one of which is built from a per-account figure that is
+  // already negative — a shortfall on one account must pull the total down
+  // rather than being clamped at zero somewhere along the way.
+  test('sums projected, required and available across every account', () => {
+    const main = account('a', 'Main', '1200.50')
+    const reserves = account('b', 'Reserves', '300.25')
+    const v = vault(main, reserves)
+    // Reserves: required 1200.00 against 300.25 projected, i.e. -899.75 available.
+    v.budget.categories.push(dueReserve('c1', 'b', '1200.00'))
+    store.vault = v
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(totalAt('total-projected')).toBe('1500.75')
+    expect(totalAt('total-required')).toBe('1200.00')
+    // 1200.50 + (-899.75); also 1500.75 - 1200.00, which is the check.
+    expect(totalAt('total-available')).toBe('300.75')
+  })
+
+  // 0.10 + 0.20 + 0.10 is 0.4000000000000001 in binary floating point. Summing
+  // in cents makes the total exactly 40, and this pins the rendered figure so
+  // that drift can never reach the screen — printing a raw float sum, or
+  // formatting one without a fraction-digit clamp, fails here.
+  test('sums in cents, not in floats', () => {
+    store.vault = vault(
+      account('a', 'One', '0.10'),
+      account('b', 'Two', '0.20'),
+      account('c', 'Three', '0.10'),
+    )
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(totalAt('total-projected')).toBe('0.40')
+    expect(totalAt('total-available')).toBe('0.40')
+  })
+
+  test('a total available below zero is shown as a shortfall', () => {
+    const main = account('a', 'Main', '100.00')
+    const v = vault(main)
+    v.budget.categories.push(dueReserve('c1', 'a', '500.00'))
+    store.vault = v
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(totalAt('total-available')).toBe('-400.00')
+    expect(screen.getByTestId('total-available').classList.contains('negative')).toBe(true)
+  })
+
+  test('a non-negative total is not marked as a shortfall', () => {
+    store.vault = vault(account('a', 'Main', '100.00'))
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(screen.getByTestId('total-available').classList.contains('negative')).toBe(false)
+  })
+
+  // Nothing to sum until the vault is open, and a row of zeroes would read as
+  // a real answer.
+  test('no totals row before the vault has loaded', () => {
+    store.vault = null
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(screen.queryByTestId('account-totals')).toBeNull()
+  })
+
+  // The totals live outside the sortable container, so a drop can never land a
+  // card past them.
+  test('the totals row is not inside the sortable container', () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(container.querySelector('.cards [data-testid="account-totals"]')).toBeNull()
+    expect(container.querySelector('[data-testid="account-totals"]')).toBeTruthy()
+  })
+})
+
+describe('AccountManagement reordering inside the scroller', () => {
+  test('the sortable row is told it runs horizontally', () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    const cards = container.querySelector('.cards') as HTMLElement
+    expect(Sortable.get(cards)!.options.direction).toBe('horizontal')
+  })
+
+  // Sortable moves the DOM nodes itself and the handler reads the new order
+  // back off them, so a drop is reproduced by doing exactly that. This is what
+  // proves reordering survived the move into a scroll container: the handler
+  // never measures or positions anything, it only reads `data-account-id`.
+  test('a drop still writes the new order back to the vault', async () => {
+    const v = vault(account('a', 'Main'), account('b', 'Reserves'))
+    store.vault = v
+    editMode()
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+    const cards = container.querySelector('.cards') as HTMLElement
+    const instance = Sortable.get(cards)!
+
+    // What sortable does on drop: the node moves, then onEnd fires.
+    const [first, second] = Array.from(cards.querySelectorAll('.account-card'))
+    cards.insertBefore(second, first)
+    instance.options.onEnd?.({} as Sortable.SortableEvent)
+    await tick()
+
+    expect(v.accounts.map(a => a.id)).toEqual(['b', 'a'])
+    expect(
+      Array.from(cards.querySelectorAll('.account-card')).map(
+        c => (c as HTMLElement).dataset.accountId,
+      ),
+    ).toEqual(['b', 'a'])
   })
 })
 

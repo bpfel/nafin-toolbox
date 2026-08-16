@@ -22,22 +22,22 @@
   <div class="summary-grid">
     <div class="summary-item">
       <span class="label">Income /yr</span>
-      <span class="value income">CHF {fmtYr(summary.totalPlannedIncome)}</span>
+      <span class="value income">{fmtYr(summary.totalPlannedIncome)}</span>
     </div>
     <div class="summary-item">
       <span class="label">Expenses /yr</span>
-      <span class="value expense">CHF {fmtYr(summary.totalPlannedExpenses)}</span>
+      <span class="value expense">{fmtYr(summary.totalPlannedExpenses)}</span>
     </div>
     <div class="summary-item">
       <span class="label">Unallocated /mo</span>
       <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
-        CHF {fmt(summary.plannedBalance)}
+        {fmt(summary.plannedBalance)}
       </span>
     </div>
     <div class="summary-item">
       <span class="label">Unallocated /yr</span>
       <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
-        CHF {fmtYr(summary.plannedBalance)}
+        {fmtYr(summary.plannedBalance)}
       </span>
     </div>
   </div>
