@@ -214,7 +214,7 @@
       expenses: fromCents(expenses),
       outflow: fromCents(outflow),
       setAside: fromCents(setAside),
-      plannedBalance: fromCents(income - expenses),
+      unallocated: fromCents(income - expenses),
       netChange: fromCents(income - outflow),
     }
   })
@@ -375,7 +375,7 @@
           </svg>
         </span>
         <span class="group-name">{group.groupName || 'Other'}</span>
-        <span class="group-subtotal">CHF {money(group.plannedTotal)}</span>
+        <span class="group-subtotal">{money(group.plannedTotal)}</span>
       </button>
     {/if}
     {#if !withHeader || !isCollapsed(type, group.groupName)}
@@ -411,7 +411,7 @@
       plannedExpenses={totals.expenses}
       trueOutflow={totals.outflow}
       setAside={totals.setAside}
-      plannedBalance={totals.plannedBalance}
+      unallocated={totals.unallocated}
       netChange={totals.netChange}
       accounts={accountStatuses}
     />
@@ -436,7 +436,7 @@
           {@render groupBlock('expense', group, showsHeaders(expenseGroups))}
         {/each}
         <p class="section-note">
-          Set-asides total CHF {money(totals.setAside)} this month. They count as budgeted expenses
+          Set-asides total {money(totals.setAside)} this month. They count as budgeted expenses
           but stay in your accounts.
         </p>
       </section>
@@ -517,14 +517,17 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  /* The chevron stays faint until the header is hovered or the group is folded,
-     so a header reads as a label rather than a control. Same as the budget. */
+  /* Always visible. It used to fade in on hover so a header read as a label
+     rather than a control — but a touchscreen has no hover, so the only hint
+     that a group folds was invisible on exactly the devices where a long list
+     most needs folding. A muted colour keeps the restraint without hiding the
+     affordance. */
   .group-chevron {
     display: inline-flex;
     align-items: center;
-    color: #868e96;
-    opacity: 0;
-    transition: opacity 0.15s, transform 0.15s;
+    color: #adb5bd;
+    opacity: 1;
+    transition: color 0.15s, transform 0.15s;
   }
   .group-header.collapsed .group-chevron {
     transform: rotate(-90deg);
@@ -532,7 +535,7 @@
   .group-header:hover .group-chevron,
   .group-header:focus-visible .group-chevron,
   .group-header.collapsed .group-chevron {
-    opacity: 1;
+    color: #495057;
   }
   .section-note {
     margin: 0;

@@ -205,7 +205,7 @@
     {#each incomeGroups as group (group.groupName)}
       <tbody use:sortable data-group-id={group.groupId}>
         {#if incomeGroups.length > 1}
-          <tr class="group-header" class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
+          <tr class="group-header" class:editing class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
             <td>
               {#if editing}
                 <span
@@ -263,7 +263,7 @@
     {#each expenseGroups as group (group.groupName)}
       <tbody use:sortable data-group-id={group.groupId}>
         {#if expenseGroups.length > 1}
-          <tr class="group-header" class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
+          <tr class="group-header" class:editing class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
             <td>
               {#if editing}
                 <span
@@ -389,16 +389,23 @@
   :global(.group-header) .yearly {
     color: #888;
   }
-  /* Both group affordances stay invisible until the row is hovered, so the
-     header reads as a label rather than a toolbar. */
+  /* These two exist only inside edit mode — outside it they are not rendered at
+     all, so the header still reads as a label. That makes a hover-reveal pure
+     cost: on a touchscreen there is no hover, so the controls edit mode just
+     unlocked were invisible. Visible whenever they exist; hover only shifts
+     the colour. */
   .group-drag-handle {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: grab;
-    color: #ced4da;
+    color: #adb5bd;
     margin-right: 0.3rem;
-    opacity: 0;
-    transition: opacity 0.12s;
+    transition: color 0.12s;
     user-select: none;
+  }
+  .group-drag-handle:hover {
+    color: #495057;
   }
   .group-drag-handle:active {
     cursor: grabbing;
@@ -406,23 +413,22 @@
   .group-add {
     background: none;
     border: none;
-    color: #adb5bd;
+    color: #868e96;
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
     padding: 0 0.35rem;
     margin-left: 0.2rem;
-    opacity: 0;
-    transition: opacity 0.12s;
+    transition: color 0.12s;
   }
   .group-add:hover {
     color: #2d6a4f;
   }
-  :global(.group-header:hover) .group-drag-handle,
-  :global(.group-header:hover) .group-add,
-  .group-drag-handle:focus-visible,
   .group-add:focus-visible {
-    opacity: 1;
+    outline: 2px solid #2d6a4f;
+    outline-offset: 2px;
+    border-radius: 4px;
+    color: #2d6a4f;
   }
   /* table-layout is fixed, so the name column cannot borrow slack from the
      amount columns. Without this a name like "Abgaben und Versicherungen"
@@ -447,7 +453,12 @@
     vertical-align: middle;
     color: #868e96;
   }
+  /* The chevron is not an edit-mode control — it collapses the group in either
+     mode — so outside edit mode it keeps the hover-reveal and relies on the
+     coarse-pointer rule below. Inside edit mode it sits between two now-permanent
+     controls, and a gap that fills in on hover would only look like a glitch. */
   :global(.group-header:hover) .group-chevron,
+  :global(.group-header.editing) .group-chevron,
   :global(.group-header.collapsed) .group-chevron {
     opacity: 1;
   }
@@ -476,6 +487,16 @@
   @media (hover: none) and (pointer: coarse) {
     .group-chevron {
       opacity: 1;
+    }
+    /* Both glyphs are about 14px across — visible, but a fingertip needs more
+       than that. Widen the hit area, not the glyph. Keyed on the pointer rather
+       than the viewport: a wide touchscreen has the same fingers. */
+    .group-drag-handle,
+    .group-add {
+      min-width: 32px;
+      min-height: 32px;
+      margin: 0;
+      padding: 0;
     }
   }
 

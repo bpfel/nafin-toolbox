@@ -117,7 +117,6 @@
         {#if account.bankName}<span class="bank">· {account.bankName}</span>{/if}
       </p>
     </div>
-    <span class="currency">{account.currency}</span>
   </header>
 
   <dl class="figures">
@@ -233,25 +232,33 @@
   .drag-handle:active {
     cursor: grabbing;
   }
+  /* A touchscreen never hovers, so the faint resting state is the only state it
+     would ever have. The handle only exists in edit mode, where it should read
+     as a control rather than as decoration. */
+  @media (hover: none) {
+    .drag-handle {
+      color: #888;
+    }
+  }
   /* Scoped to this card so it cannot collide with another module's ghost. */
   :global(.account-card.drag-ghost) {
     opacity: 0.4;
   }
+  /* The card sits in a fixed-width scrolling row, so the identity takes the
+     leftover space and a long name wraps inside it rather than widening it. */
+  .identity {
+    flex: 1;
+    min-width: 0;
+  }
   h3 {
     margin: 0;
     font-size: 1.05rem;
+    overflow-wrap: anywhere;
   }
   .meta {
     margin: 0.15rem 0 0;
     font-size: 0.8rem;
     color: #888;
-  }
-  .currency {
-    font-size: 0.75rem;
-    color: #888;
-    border: 1px solid #e5e5e5;
-    border-radius: 4px;
-    padding: 0.1rem 0.35rem;
   }
   .figures {
     display: grid;
