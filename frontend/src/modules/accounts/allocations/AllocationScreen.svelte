@@ -184,10 +184,11 @@
     return collapsedGroups.has(`${type}:${groupName}`)
   }
 
-  // A lone unnamed group is not a grouping — showing a header for it would add
-  // a row of chrome that says nothing. Matches the budget table.
+  // A lone group is not a grouping — a header for it adds a row of chrome that
+  // says nothing, named or not. Matches the budget table, which dropped the
+  // "or it has a name" half of this condition for the same reason.
   function showsHeaders(groups: RowGroup[]): boolean {
-    return groups.length > 1 || groups[0]?.groupName !== ''
+    return groups.length > 1
   }
 
   // The two totals. They differ by exactly the set-asides: budgeted as

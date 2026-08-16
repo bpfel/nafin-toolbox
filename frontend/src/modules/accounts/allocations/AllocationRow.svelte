@@ -269,8 +269,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #eee;
+    padding: 0.9rem 1rem;
+    /* Each entry can be four lines tall, and a hairline between them was too
+       faint to tell one entry's detail from the next entry's summary. A heavier
+       rule plus more breathing room reads as a boundary rather than a ruling. */
+    border-bottom: 2px solid #e9ecef;
   }
   .allocation-row:last-child {
     border-bottom: none;
