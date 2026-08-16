@@ -10,6 +10,7 @@
     requiredForItem,
     toCents,
   } from '../../../lib/accounts/reserveMath'
+  import { isEditing } from '../../../lib/util/editMode.svelte'
   import RoutingControls from './RoutingControls.svelte'
   import ReserveFields from './ReserveFields.svelte'
 
@@ -44,6 +45,12 @@
   }: Props = $props()
 
   let expanded = $state(false)
+
+  // Changing where a flow goes — or what it is saving towards — restructures the
+  // plan, so the expander waits for edit mode. Leaving edit mode with the editor
+  // open folds it away rather than stranding live controls on the row.
+  let editing = $derived(isEditing('accounts'))
+  let showEditor = $derived(expanded && editing)
 
   const MONTH_NAMES = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -187,13 +194,15 @@
       <span class="kind kind-{kindClass}">{kindLabel}</span>
     </div>
     <span class="planned">CHF {money(plannedAmount)}</span>
-    <button
-      class="toggle"
-      aria-expanded={expanded}
-      onclick={() => (expanded = !expanded)}
-    >
-      {expanded ? 'Done' : 'Edit routing'}
-    </button>
+    {#if editing}
+      <button
+        class="toggle"
+        aria-expanded={expanded}
+        onclick={() => (expanded = !expanded)}
+      >
+        {expanded ? 'Done' : 'Edit routing'}
+      </button>
+    {/if}
   </div>
 
   <p class="flow">{flowSummary}</p>
@@ -226,7 +235,7 @@
     </div>
   {/if}
 
-  {#if expanded}
+  {#if showEditor}
     <div class="editor">
       <RoutingControls
         fieldId={category.id}

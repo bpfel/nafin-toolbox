@@ -8,6 +8,7 @@
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
   import type { VaultAccount } from '../../../lib/crypto/vault'
+  import { isEditing } from '../../../lib/util/editMode.svelte'
   import AccountCard from './AccountCard.svelte'
   import AccountFormModal from './AccountFormModal.svelte'
   import DeleteAccountModal from './DeleteAccountModal.svelte'
@@ -64,6 +65,10 @@
   // it is hidden rather than shown inert.
   let canReorder = $derived(rows.length > 1)
 
+  // Adding an account is structural, so it waits for edit mode. Everything the
+  // cards show — and correcting a balance — stays available at all times.
+  let editing = $derived(isEditing('accounts'))
+
   // `vault.accounts` carries no sortOrder — the array order is the display
   // order. So the new order is read straight back off the DOM after a drop and
   // handed to the engine, which is defensive about anything missing or stale.
@@ -73,6 +78,8 @@
       handle: '.drag-handle',
       draggable: '.account-card',
       ghostClass: 'drag-ghost',
+      // Read-only until proven otherwise; the effect below syncs it from here on.
+      disabled: true,
       onEnd() {
         const cards = node.querySelectorAll('.account-card')
         const ids = Array.from(cards)
@@ -81,6 +88,15 @@
         if (ids.length > 0) reorder(ids)
       },
     })
+
+    // Hiding the handle removes the affordance, but the instance would still be
+    // live and a drag could start from a stray element. Tracking edit mode here
+    // — rather than only at creation — is what makes the toggle take effect
+    // without a remount.
+    $effect(() => {
+      instance.option('disabled', !isEditing('accounts'))
+    })
+
     return {
       destroy() {
         instance.destroy()
@@ -192,7 +208,9 @@
       <h2>Accounts</h2>
       <p class="sub">Balances are projected from the last correction, not accumulated.</p>
     </div>
-    <button class="btn add" onclick={openCreate}>+ Add account</button>
+    {#if editing}
+      <button class="btn add" onclick={openCreate}>+ Add account</button>
+    {/if}
   </header>
 
   {#if error}

@@ -10,6 +10,7 @@
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
   import AccountsModule from './modules/accounts/AccountsModule.svelte'
+  import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
   import { focusTrap } from './lib/util/focusTrap'
 
   const authState = getAuthState()
@@ -150,6 +151,7 @@
     showConfig = false
     showSecurity = false
     show2FAEnforcement = false
+    clearEditing()
   }
 
   async function handleVaultSetup() {
@@ -385,7 +387,19 @@
     {:else}
       {#each modules as mod}
         <section class="module-section">
-          <h2>{mod.name}</h2>
+          <div class="module-heading">
+            <h2>{mod.name}</h2>
+            {#if !isAdmin && (mod.id === 'budget' || mod.id === 'accounts')}
+              <button
+                class="edit-toggle"
+                class:active={isEditing(mod.id)}
+                aria-pressed={isEditing(mod.id)}
+                onclick={() => toggleEditing(mod.id)}
+              >
+                {isEditing(mod.id) ? 'Done' : 'Edit'}
+              </button>
+            {/if}
+          </div>
           {#if isAdmin}
             <div class="module-card admin-notice">
               <p>Sign in with a regular account to use encrypted modules.</p>
@@ -661,6 +675,30 @@
     .user-info {
       display: none;
     }
+  }
+  .module-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .edit-toggle {
+    background: none;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    color: #555;
+  }
+  .edit-toggle:hover {
+    border-color: #2d6a4f;
+    color: #2d6a4f;
+  }
+  .edit-toggle.active {
+    background: #2d6a4f;
+    border-color: #2d6a4f;
+    color: white;
   }
   .module-section {
     margin-bottom: 2rem;

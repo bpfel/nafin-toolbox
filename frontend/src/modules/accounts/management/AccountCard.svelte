@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
   import { moneyInput } from '../../../lib/util/money'
+  import { isEditing } from '../../../lib/util/editMode.svelte'
 
   interface Props {
     account: VaultAccount
@@ -34,6 +35,11 @@
   // QR capability follows from having an IBAN, never from the kind. A `cash`
   // account simply never has one.
   let qrCapable = $derived(Boolean(account.iban))
+
+  // Restructuring the account — reordering it, renaming it, deleting it — is
+  // gated. Reading its figures and correcting its balance are not: a correction
+  // is how the projection stays honest, and it is expected to happen often.
+  let editing = $derived(isEditing('accounts'))
 
   // ISO dates and 'YYYY-MM' compare correctly as strings.
   let anchorMonth = $derived(account.lastCorrectedAt.slice(0, 7))
@@ -98,7 +104,7 @@
 
 <article class="card account-card" data-account-id={account.id}>
   <header class="card-head">
-    {#if canReorder}
+    {#if canReorder && editing}
       <!-- The sole drag affordance: `handle: '.drag-handle'` confines dragging
            to this element, so the buttons and the correction inputs below stay
            clickable and selectable. -->
@@ -170,22 +176,29 @@
     </div>
   {:else}
     <div class="actions">
+      <!-- Never gated: the anchor going stale is the failure the anchor pair
+           exists to avoid, so correcting it must always be one click away. -->
       <button class="btn ghost" onclick={startCorrection}>Correct balance</button>
-      <button class="btn ghost" onclick={onedit} aria-label="Edit {account.name}">Edit</button>
+      {#if editing}
+        <button class="btn ghost" onclick={onedit} aria-label="Edit {account.name}">Edit</button>
+      {/if}
+      <!-- Generating a bill reads the account; it changes nothing. -->
       {#if qrCapable}
         <button class="btn ghost" onclick={onqrbill} aria-label="QR bill for {account.name}">
           QR bill
         </button>
       {/if}
-      <button
-        class="btn danger-ghost"
-        onclick={ondelete}
-        disabled={!canDelete}
-        aria-label="Delete {account.name}"
-        title={canDelete ? undefined : 'The last remaining account cannot be deleted'}
-      >
-        Delete
-      </button>
+      {#if editing}
+        <button
+          class="btn danger-ghost"
+          onclick={ondelete}
+          disabled={!canDelete}
+          aria-label="Delete {account.name}"
+          title={canDelete ? undefined : 'The last remaining account cannot be deleted'}
+        >
+          Delete
+        </button>
+      {/if}
     </div>
   {/if}
 </article>
