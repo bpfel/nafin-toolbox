@@ -81,12 +81,14 @@ describe('ArchivePanel — archiving the plan', () => {
     await openPanel(user)
     await createArchive(user, 'Before the raise')
 
-    // The new archive is listed and opened, showing the amounts as they stood.
-    expect(screen.getByRole('button', { name: 'Before the raise' })).toBeTruthy()
-    const salary = screen.getByLabelText(
+    // findBy, not getBy: creating the archive re-renders the panel, and Svelte
+    // flushes in a microtask. A synchronous query races that flush and fails
+    // intermittently under parallel load — which it did, once, in a full run.
+    expect(await screen.findByRole('button', { name: 'Before the raise' })).toBeTruthy()
+    const salary = await screen.findByLabelText(
       'Planned per month for Salary in Before the raise',
     ) as HTMLInputElement
-    const rent = screen.getByLabelText(
+    const rent = await screen.findByLabelText(
       'Planned per month for Rent in Before the raise',
     ) as HTMLInputElement
     expect(salary.value).toBe('6000.00')

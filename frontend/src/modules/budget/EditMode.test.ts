@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/svelte'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { PlanEntryView } from '../../lib/budget/budgetEngine'
+import type { VaultData } from '../../lib/crypto/vault'
 import { isEditing, toggleEditing, clearEditing } from '../../lib/util/editMode.svelte'
 
 vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
@@ -8,6 +9,7 @@ vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
 }))
 
 import BudgetEntryRow from './BudgetEntryRow.svelte'
+import BudgetTable from './BudgetTable.svelte'
 
 // Edit mode is module-global, so a test that leaves it on would leak into the
 // next one. Reset alongside the DOM.
@@ -94,5 +96,88 @@ describe('editMode store', () => {
 
     expect(isEditing('budget')).toBe(false)
     expect(isEditing('accounts')).toBe(false)
+  })
+})
+
+describe('single-group budgets hide the group name', () => {
+  // "Employment / Salary" is noise when Employment is the only group there is.
+  // Rendered for real: the rule lives in the table's markup, so asserting it
+  // anywhere else would only be restating the implementation.
+  function vaultWith(groups: { id: string; name: string; type: 'income' | 'expense' }[]): VaultData {
+    return {
+      version: 4,
+      accounts: [{
+        id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
+        currentAmount: '0.00', lastCorrectedAt: '2026-01-01',
+      }],
+      budget: {
+        categoryGroups: groups.map((g, i) => ({ ...g, sortOrder: (i + 1) * 10 })),
+        categories: [],
+        plan: [],
+        archives: [],
+      },
+    }
+  }
+
+  function row(id: string, name: string, type: 'income' | 'expense', groupId: string, groupName: string): PlanEntryView {
+    return {
+      categoryId: id,
+      categoryName: name,
+      categoryType: type,
+      categoryGroupId: groupId,
+      categoryGroupName: groupName,
+      plannedAmount: '100.00',
+    }
+  }
+
+  test('one group on a side renders no header for it', () => {
+    const vault = vaultWith([
+      { id: 'g1', name: 'Employment', type: 'income' },
+      { id: 'g2', name: 'Housing', type: 'expense' },
+    ])
+    render(BudgetTable, {
+      props: {
+        vault,
+        entries: [
+          row('i1', 'Salary', 'income', 'g1', 'Employment'),
+          row('e1', 'Rent', 'expense', 'g2', 'Housing'),
+        ],
+        onsave: vi.fn(),
+        oncategorycreated: vi.fn(),
+        oncategorydeleted: vi.fn(),
+      },
+    })
+
+    expect(screen.queryByText('Employment')).toBeNull()
+    expect(screen.queryByText('Housing')).toBeNull()
+    // The categories themselves are of course still listed.
+    expect(screen.getByText('Salary')).toBeTruthy()
+    expect(screen.getByText('Rent')).toBeTruthy()
+  })
+
+  test('a second group on a side brings both its headers back', () => {
+    const vault = vaultWith([
+      { id: 'g1', name: 'Employment', type: 'income' },
+      { id: 'g2', name: 'Housing', type: 'expense' },
+      { id: 'g3', name: 'Living', type: 'expense' },
+    ])
+    render(BudgetTable, {
+      props: {
+        vault,
+        entries: [
+          row('i1', 'Salary', 'income', 'g1', 'Employment'),
+          row('e1', 'Rent', 'expense', 'g2', 'Housing'),
+          row('e2', 'Food', 'expense', 'g3', 'Living'),
+        ],
+        onsave: vi.fn(),
+        oncategorycreated: vi.fn(),
+        oncategorydeleted: vi.fn(),
+      },
+    })
+
+    expect(screen.getByText('Housing')).toBeTruthy()
+    expect(screen.getByText('Living')).toBeTruthy()
+    // Income still has only one group, so it stays unheaded.
+    expect(screen.queryByText('Employment')).toBeNull()
   })
 })
