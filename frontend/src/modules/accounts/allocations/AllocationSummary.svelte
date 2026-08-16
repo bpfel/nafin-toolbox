@@ -228,12 +228,18 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
+  /* The ring hugs the glyph instead of floating around it. A literal half of
+     the old 1rem would be 8px, which cannot contain a 10.4px "i" — so the
+     circle shrinks to just larger than the letter and the letter itself is
+     unchanged. The tap target is restored separately below, since a 12px
+     button is not one. */
   .info-toggle {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1rem;
-    height: 1rem;
+    width: 0.78rem;
+    height: 0.78rem;
     padding: 0;
     font-size: 0.65rem;
     font-weight: 700;
@@ -244,6 +250,17 @@
     border: 1px solid #ccc;
     border-radius: 999px;
     cursor: pointer;
+  }
+  /* An invisible 32px hit area centred on the ring: the control reads as small
+     but is still reliably tappable. */
+  .info-toggle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    transform: translate(-50%, -50%);
   }
   .info-toggle:hover {
     color: #2d6a4f;
@@ -333,8 +350,8 @@
       gap: 1rem;
     }
     .info-toggle {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 0.9rem;
+      height: 0.9rem;
       font-size: 0.75rem;
     }
   }

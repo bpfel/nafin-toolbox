@@ -317,12 +317,13 @@ describe('AllocationScreen', () => {
     })
 
     test('income and expenses stay separate sections, each grouped on its own', () => {
-      testVault!.budget.categoryGroups.push({
-        id: 'g-pay',
-        name: 'Pay',
-        type: 'income',
-        sortOrder: 5,
-      })
+      // Two income groups, because a side with only one renders no header at
+      // all — a lone group is not a grouping. One would leave nothing to
+      // observe about income's ordering.
+      testVault!.budget.categoryGroups.push(
+        { id: 'g-pay', name: 'Pay', type: 'income', sortOrder: 5 },
+        { id: 'g-side', name: 'Side work', type: 'income', sortOrder: 6 },
+      )
       testVault!.budget.categories.push(
         category({
           id: 'salary',
@@ -333,14 +334,31 @@ describe('AllocationScreen', () => {
           sourceAccountId: null,
           sinkAccountId: 'main',
         }),
+        category({
+          id: 'freelance',
+          name: 'Freelance',
+          type: 'income',
+          groupId: 'g-side',
+          sortOrder: 4,
+          sourceAccountId: null,
+          sinkAccountId: 'main',
+        }),
       )
 
       render(AllocationScreen)
 
-      // The income group is listed inside "Money in", ahead of every expense
+      // Income groups are listed inside "Money in", ahead of every expense
       // group, rather than merged into the expense ordering.
-      expect(groupNames()).toEqual(['Pay', 'Fun', 'Housing', 'Other'])
+      expect(groupNames()).toEqual(['Pay', 'Side work', 'Fun', 'Housing', 'Other'])
       expect(screen.getByText('Money in')).toBeTruthy()
+    })
+
+    test('a side with a single group renders no header for it', () => {
+      // The default fixture has exactly one income category, so income has one
+      // group. Expenses have three and keep theirs.
+      render(AllocationScreen)
+
+      expect(groupNames()).toEqual(['Fun', 'Housing', 'Other'])
     })
   })
 })
