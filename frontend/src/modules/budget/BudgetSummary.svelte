@@ -7,7 +7,7 @@
 
   let { summary }: Props = $props()
 
-  let savingsPositive = $derived(Number(summary.plannedBalance) >= 0)
+  let unallocatedPositive = $derived(Number(summary.plannedBalance) >= 0)
 
   function fmt(val: string): string {
     return Number(val).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -29,14 +29,14 @@
       <span class="value expense">CHF {fmtYr(summary.totalPlannedExpenses)}</span>
     </div>
     <div class="summary-item">
-      <span class="label">Savings /mo</span>
-      <span class="value" class:savings-positive={savingsPositive} class:savings-negative={!savingsPositive}>
+      <span class="label">Unallocated /mo</span>
+      <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
         CHF {fmt(summary.plannedBalance)}
       </span>
     </div>
     <div class="summary-item">
-      <span class="label">Savings /yr</span>
-      <span class="value" class:savings-positive={savingsPositive} class:savings-negative={!savingsPositive}>
+      <span class="label">Unallocated /yr</span>
+      <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
         CHF {fmtYr(summary.plannedBalance)}
       </span>
     </div>
@@ -76,8 +76,8 @@
   }
   .income { color: #2d6a4f; }
   .expense { color: #c0392b; }
-  .savings-positive { color: #2d6a4f; }
-  .savings-negative { color: #c0392b; }
+  .unallocated-positive { color: #2d6a4f; }
+  .unallocated-negative { color: #c0392b; }
 
   @media (max-width: 640px) {
     .summary-bar {

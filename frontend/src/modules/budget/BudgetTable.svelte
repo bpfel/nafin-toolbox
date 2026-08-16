@@ -187,9 +187,10 @@
   <div class="table-toolbar">
     <button
       class="view-toggle"
+      aria-label="Showing {viewMode} amounts — switch to {viewMode === 'monthly' ? 'yearly' : 'monthly'}"
       onclick={() => viewMode = viewMode === 'monthly' ? 'yearly' : 'monthly'}
     >
-      {viewMode === 'monthly' ? 'mo' : 'yr'}
+      {viewMode === 'monthly' ? 'Month' : 'Year'}
     </button>
   </div>
 
@@ -203,7 +204,7 @@
     </thead>
     {#each incomeGroups as group (group.groupName)}
       <tbody use:sortable data-group-id={group.groupId}>
-        {#if incomeGroups.length > 1 || group.groupName}
+        {#if incomeGroups.length > 1}
           <tr class="group-header" class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
             <td>
               {#if editing}
@@ -223,7 +224,7 @@
                   {/if}
                 </svg>
               </span>
-              {group.groupName || 'Other'}
+              <span class="group-name">{group.groupName || 'Other'}</span>
               {#if editing}
                 <button
                   class="group-add"
@@ -261,7 +262,7 @@
     </thead>
     {#each expenseGroups as group (group.groupName)}
       <tbody use:sortable data-group-id={group.groupId}>
-        {#if expenseGroups.length > 1 || group.groupName}
+        {#if expenseGroups.length > 1}
           <tr class="group-header" class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
             <td>
               {#if editing}
@@ -281,7 +282,7 @@
                   {/if}
                 </svg>
               </span>
-              {group.groupName || 'Other'}
+              <span class="group-name">{group.groupName || 'Other'}</span>
               {#if editing}
                 <button
                   class="group-add"
@@ -423,6 +424,20 @@
   .group-add:focus-visible {
     opacity: 1;
   }
+  /* table-layout is fixed, so the name column cannot borrow slack from the
+     amount columns. Without this a name like "Abgaben und Versicherungen"
+     wraps and doubles the row height. Entry names already behave this way. */
+  .group-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  :global(.group-header) td:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+  }
   .group-chevron {
     display: inline-flex;
     align-items: center;
@@ -465,10 +480,25 @@
   }
 
   @media (max-width: 768px) {
+    /* Sticks once scrolled past, so switching month/year does not mean
+       scrolling back to the top of a long budget. `top: 0` is relative to the
+       nearest scroll container, which here is the page. */
     .table-toolbar {
       display: flex;
       justify-content: flex-end;
       margin-bottom: 0.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      /* The toolbar is transparent, so without a backdrop the table scrolls
+         visibly underneath the button. */
+      background: linear-gradient(to bottom, #f8f9fa 70%, rgba(248, 249, 250, 0));
+      padding: 0.4rem 0 0.6rem;
+    }
+    .view-toggle {
+      min-height: 34px;
+      padding: 0.3rem 0.9rem;
+      font-size: 0.8rem;
     }
     th {
       padding: 0.5rem;
