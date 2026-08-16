@@ -1,7 +1,12 @@
+# Keep in sync with frontend/.nvmrc, which pins the same major for CI.
 FROM node:22-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install
+# No glob on the lockfile: a missing one must fail the build, not silently
+# fall back to resolving fresh. `npm ci` installs the locked tree exactly, so
+# the image ships the versions CI tested rather than whatever satisfies the
+# ranges on build day.
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 RUN npm run build
 
