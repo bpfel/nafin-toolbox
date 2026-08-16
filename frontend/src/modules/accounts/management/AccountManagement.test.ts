@@ -1,5 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/svelte'
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { tick } from 'svelte'
+import Sortable from 'sortablejs'
 import type { VaultAccount, VaultData } from '../../../lib/crypto/vault'
 
 // The vault is a plain object mutated in place by the engine, so the store is
@@ -15,7 +17,13 @@ vi.mock('../../../lib/crypto/vaultStore.svelte', () => ({
   markDirty: vi.fn(),
 }))
 
+import { clearEditing, toggleEditing } from '../../../lib/util/editMode.svelte'
 import AccountManagement from './AccountManagement.svelte'
+
+/** Puts the accounts module into edit mode for the rest of the test. */
+function editMode() {
+  toggleEditing('accounts')
+}
 
 function account(id: string, name: string): VaultAccount {
   return {
@@ -38,6 +46,9 @@ function vault(...accounts: VaultAccount[]): VaultData {
 
 beforeEach(() => {
   store.vault = null
+  // Edit mode is module state shared by every test in the file, so each one
+  // starts read-only — the default the module actually ships with.
+  clearEditing()
 })
 
 // Vitest runs without globals, so testing-library's automatic cleanup never
@@ -50,6 +61,7 @@ describe('AccountManagement delete affordance', () => {
   // only possible outcome is an error.
   test('delete is disabled when only one account remains', () => {
     store.vault = vault(account('a', 'Main'))
+    editMode()
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
@@ -59,6 +71,7 @@ describe('AccountManagement delete affordance', () => {
 
   test('delete is enabled once a second account exists', () => {
     store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+    editMode()
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
@@ -96,8 +109,9 @@ describe('AccountManagement reorder affordance', () => {
     expect(ids).toEqual(['b', 'a'])
   })
 
-  test('each card exposes a labelled drag handle', () => {
+  test('each card exposes a labelled drag handle in edit mode', () => {
     store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+    editMode()
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
@@ -110,10 +124,85 @@ describe('AccountManagement reorder affordance', () => {
   // Dragging the only account can only put it back where it was.
   test('no drag handle is offered when a single account exists', () => {
     store.vault = vault(account('a', 'Main'))
+    editMode()
 
     const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
     expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
+  })
+})
+
+describe('AccountManagement edit mode', () => {
+  // The module is read-only by default: you can read your figures and keep them
+  // truthful, but you cannot restructure anything until you ask to.
+  test('the structural affordances are absent by default', () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: '+ Add account' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit Main' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete Main' })).toBeNull()
+  })
+
+  test('edit mode reveals every one of them', () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+    editMode()
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(container.querySelectorAll('.drag-handle')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: '+ Add account' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Edit Main' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Delete Main' })).toBeTruthy()
+  })
+
+  // The one exception worth pinning down. Correcting the balance is how the
+  // projection stays honest; burying it behind a mode would let the anchor go
+  // stale, which is the exact failure the anchor pair exists to prevent.
+  test('correcting a balance is available in both modes', () => {
+    store.vault = vault(account('a', 'Main'))
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+    expect(screen.getAllByRole('button', { name: 'Correct balance' })).toHaveLength(1)
+
+    cleanup()
+    editMode()
+
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+    expect(screen.getAllByRole('button', { name: 'Correct balance' })).toHaveLength(1)
+  })
+
+  test('toggling edit mode after render takes effect without a remount', async () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+    expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
+
+    editMode()
+    await tick()
+
+    expect(container.querySelectorAll('.drag-handle')).toHaveLength(2)
+  })
+
+  // Hiding the handle removes the affordance; only the instance option stops a
+  // drag from being started at all.
+  test('the sortable instance is disabled until edit mode, and re-enabled with it', async () => {
+    store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
+
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+    const instance = Sortable.get(container.querySelector('.cards') as HTMLElement)!
+    expect(instance.option('disabled')).toBe(true)
+
+    editMode()
+    await tick()
+    expect(instance.option('disabled')).toBe(false)
+
+    // …and locks again on the way out.
+    editMode()
+    await tick()
+    expect(instance.option('disabled')).toBe(true)
   })
 })
 

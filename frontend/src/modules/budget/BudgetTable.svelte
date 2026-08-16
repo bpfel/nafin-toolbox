@@ -3,6 +3,7 @@
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
+  import { isEditing } from '../../lib/util/editMode.svelte'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
   import AddCategoryRow from './AddCategoryRow.svelte'
   import AddCategoryModal from './AddCategoryModal.svelte'
@@ -24,6 +25,10 @@
   }
 
   let { entries, vault, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
+
+  // Structural affordances — dragging, adding, deleting — appear only in edit
+  // mode. Reading the plan and typing amounts stay available always.
+  let editing = $derived(isEditing('budget'))
 
   let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; presetGroupName?: string; editCategory?: { id: string; name: string; groupName: string; plannedAmount: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: string; categoryName: string } | null>(null)
@@ -108,6 +113,30 @@
     oncategorydeleted()
   }
 
+  // Hiding a handle removes the affordance but leaves the Sortable instance live,
+  // so a drag started by other means (a touch on the row, a stray handle left in
+  // the DOM) would still reorder a read-only plan. Every instance is registered
+  // here and its `disabled` option follows edit mode.
+  const sortables = new Set<Sortable>()
+
+  function register(instance: Sortable) {
+    instance.option('disabled', !isEditing('budget'))
+    sortables.add(instance)
+    return {
+      destroy() {
+        sortables.delete(instance)
+        instance.destroy()
+      },
+    }
+  }
+
+  $effect(() => {
+    const disabled = !editing
+    for (const instance of sortables) {
+      instance.option('disabled', disabled)
+    }
+  })
+
   function sortable(node: HTMLElement) {
     const instance = Sortable.create(node, {
       animation: 150,
@@ -124,11 +153,7 @@
         }
       },
     })
-    return {
-      destroy() {
-        instance.destroy()
-      },
-    }
+    return register(instance)
   }
 
   // Groups are <tbody> elements, so the sortable lives on the <table> and drags
@@ -150,11 +175,7 @@
         }
       },
     })
-    return {
-      destroy() {
-        instance.destroy()
-      },
-    }
+    return register(instance)
   }
 
   function fmt(val: number): string {
@@ -185,12 +206,14 @@
         {#if incomeGroups.length > 1 || group.groupName}
           <tr class="group-header" class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
             <td>
-              <span
-                class="group-drag-handle"
-                title="Drag to reorder"
-                role="presentation"
-                onclick={(e) => e.stopPropagation()}
-              >⠿</span>
+              {#if editing}
+                <span
+                  class="group-drag-handle"
+                  title="Drag to reorder"
+                  role="presentation"
+                  onclick={(e) => e.stopPropagation()}
+                >⠿</span>
+              {/if}
               <span class="group-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
                   {#if isCollapsed('income', group.groupName)}
@@ -201,12 +224,14 @@
                 </svg>
               </span>
               {group.groupName || 'Other'}
-              <button
-                class="group-add"
-                title="Add a category to {group.groupName || 'Other'}"
-                aria-label="Add a category to {group.groupName || 'Other'}"
-                onclick={(e) => addToGroup(e, 'income', group.groupName)}
-              >+</button>
+              {#if editing}
+                <button
+                  class="group-add"
+                  title="Add a category to {group.groupName || 'Other'}"
+                  aria-label="Add a category to {group.groupName || 'Other'}"
+                  onclick={(e) => addToGroup(e, 'income', group.groupName)}
+                >+</button>
+              {/if}
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
@@ -220,7 +245,9 @@
       </tbody>
     {/each}
     <tfoot>
-      <AddCategoryRow onadd={() => openAddModal('income')} />
+      {#if editing}
+        <AddCategoryRow onadd={() => openAddModal('income')} />
+      {/if}
     </tfoot>
   </table>
 
@@ -237,12 +264,14 @@
         {#if expenseGroups.length > 1 || group.groupName}
           <tr class="group-header" class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
             <td>
-              <span
-                class="group-drag-handle"
-                title="Drag to reorder"
-                role="presentation"
-                onclick={(e) => e.stopPropagation()}
-              >⠿</span>
+              {#if editing}
+                <span
+                  class="group-drag-handle"
+                  title="Drag to reorder"
+                  role="presentation"
+                  onclick={(e) => e.stopPropagation()}
+                >⠿</span>
+              {/if}
               <span class="group-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
                   {#if isCollapsed('expense', group.groupName)}
@@ -253,12 +282,14 @@
                 </svg>
               </span>
               {group.groupName || 'Other'}
-              <button
-                class="group-add"
-                title="Add a category to {group.groupName || 'Other'}"
-                aria-label="Add a category to {group.groupName || 'Other'}"
-                onclick={(e) => addToGroup(e, 'expense', group.groupName)}
-              >+</button>
+              {#if editing}
+                <button
+                  class="group-add"
+                  title="Add a category to {group.groupName || 'Other'}"
+                  aria-label="Add a category to {group.groupName || 'Other'}"
+                  onclick={(e) => addToGroup(e, 'expense', group.groupName)}
+                >+</button>
+              {/if}
             </td>
             <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
             <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
@@ -272,7 +303,9 @@
       </tbody>
     {/each}
     <tfoot>
-      <AddCategoryRow onadd={() => openAddModal('expense')} />
+      {#if editing}
+        <AddCategoryRow onadd={() => openAddModal('expense')} />
+      {/if}
     </tfoot>
   </table>
 </div>

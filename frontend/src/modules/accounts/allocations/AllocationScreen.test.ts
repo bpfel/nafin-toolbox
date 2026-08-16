@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, cleanup } from '@testing-library/svelte'
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vitest'
+import { tick } from 'svelte'
 import type { VaultCategory, VaultData } from '../../../lib/crypto/vault'
 
 // The screen reads the vault through the store, and the store is module state.
@@ -16,6 +17,7 @@ vi.mock('../../../lib/crypto/vaultStore.svelte', () => ({
   markDirty: vi.fn(),
 }))
 
+import { clearEditing, toggleEditing } from '../../../lib/util/editMode.svelte'
 import AllocationScreen from './AllocationScreen.svelte'
 
 const now = new Date()
@@ -135,11 +137,18 @@ function totals() {
 describe('AllocationScreen', () => {
   beforeEach(() => {
     testVault = makeVault()
+    // Routing is structural, so its expander only exists in edit mode. Most of
+    // these tests are about what routing does, so they open it there.
+    clearEditing()
+    toggleEditing('accounts')
   })
 
   // Vitest runs without `globals`, so @testing-library's automatic cleanup
   // never registers and renders would otherwise stack up in one document.
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    clearEditing()
+  })
 
   test('shows both totals, and they differ by exactly the set-aside', () => {
     render(AllocationScreen)
@@ -333,5 +342,69 @@ describe('AllocationScreen', () => {
       expect(groupNames()).toEqual(['Pay', 'Fun', 'Housing', 'Other'])
       expect(screen.getByText('Money in')).toBeTruthy()
     })
+  })
+})
+
+describe('AllocationScreen edit mode', () => {
+  beforeEach(() => {
+    testVault = makeVault()
+    clearEditing()
+  })
+
+  afterEach(() => {
+    cleanup()
+    clearEditing()
+  })
+
+  test('the routing expander is absent by default and present in edit mode', async () => {
+    render(AllocationScreen)
+    expect(screen.queryAllByRole('button', { name: 'Edit routing' })).toHaveLength(0)
+
+    toggleEditing('accounts')
+    await tick()
+
+    expect(screen.queryAllByRole('button', { name: 'Edit routing' })).toHaveLength(3)
+  })
+
+  // Reading the plan is never gated: the flow lines, the figures and the group
+  // headers are all there before anything is unlocked.
+  test('the figures and the flow lines read fine read-only', () => {
+    render(AllocationScreen)
+
+    expect(totals()).toEqual({ allocated: 'CHF 300.00', netChange: 'CHF 400.00' })
+    expect(screen.getByText('Rent')).toBeTruthy()
+    expect(screen.getByText(/leaves your accounts/)).toBeTruthy()
+  })
+
+  // A purchase records something that actually happened; it restructures nothing.
+  test('recording a purchase stays available read-only', async () => {
+    render(AllocationScreen)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Bought it…' }))
+    await fireEvent.input(screen.getByLabelText('Price paid'), { target: { value: '1450.00' } })
+    await fireEvent.input(screen.getByLabelText('Month of purchase'), {
+      target: { value: '2026-04' },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Record purchase' }))
+
+    expect(testVault!.budget.categories.find(c => c.id === 'laptop')!.reserve).toEqual({
+      kind: 'amortization',
+      targetAmount: '1450.00',
+      periodMonths: 60,
+      anchorMonth: '2026-04',
+    })
+  })
+
+  test('leaving edit mode folds an open routing editor away', async () => {
+    toggleEditing('accounts')
+    render(AllocationScreen)
+
+    await fireEvent.click(screen.getAllByRole('button', { name: 'Edit routing' })[1]) // Rent
+    expect(screen.getByLabelText('Paid from')).toBeTruthy()
+
+    toggleEditing('accounts')
+    await tick()
+
+    expect(screen.queryByLabelText('Paid from')).toBeNull()
   })
 })

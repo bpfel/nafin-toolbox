@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
+  import { isEditing } from '../../lib/util/editMode.svelte'
 
   type Field = 'planned_mo' | 'planned_yr'
 
@@ -13,6 +14,10 @@
   }
 
   let { entry, viewMode = 'monthly', onsave, ondelete, onedit }: Props = $props()
+
+  // Reordering, renaming and deleting are structural; typing amounts is not. Only
+  // the former wait for edit mode, so the everyday act of budgeting stays direct.
+  let editing = $derived(isEditing('budget'))
 
   const MAX_MONTHLY = 9_999_999_999.99
 
@@ -31,6 +36,9 @@
   let longPressTriggered = false
 
   function handleTouchStart() {
+    // The trash button is hidden on narrow screens, so long-press is the touch
+    // equivalent of it — and gated the same way.
+    if (!editing) return
     longPressTriggered = false
     longPressTimer = setTimeout(() => {
       longPressTriggered = true
@@ -174,23 +182,28 @@
 >
   <td class="name-cell">
     <div class="name-cell-inner">
-      <span class="drag-handle" aria-label="Drag to reorder">&#x2807;</span>
-      <button
-        class="name-text"
-        onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount)}
-      >
-        {entry.categoryName}
-      </button>
-      <button
-        class="trash-btn"
-        onclick={() => ondelete(entry.categoryId, entry.categoryName)}
-        aria-label="Delete {entry.categoryName}"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-      </button>
+      {#if editing}
+        <span class="drag-handle" aria-label="Drag to reorder">&#x2807;</span>
+        <button
+          class="name-text"
+          onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount)}
+        >
+          {entry.categoryName}
+        </button>
+        <button
+          class="trash-btn"
+          onclick={() => ondelete(entry.categoryId, entry.categoryName)}
+          aria-label="Delete {entry.categoryName}"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+      {:else}
+        <!-- Read-only: a button that opens nothing would only invite a click. -->
+        <span class="name-text name-static">{entry.categoryName}</span>
+      {/if}
     </div>
   </td>
   <td class="amount-cell planned-mo-cell">
@@ -270,6 +283,13 @@
     text-decoration: underline;
     text-decoration-color: #aaa;
     text-underline-offset: 2px;
+  }
+  /* Same box, none of the invitations to click it. */
+  .name-static {
+    cursor: default;
+  }
+  .name-static:hover {
+    text-decoration: none;
   }
   .trash-btn {
     background: none;
