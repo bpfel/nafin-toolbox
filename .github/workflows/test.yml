@@ -34,8 +34,34 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      - run: npm audit --audit-level=moderate
       - run: npm test
+
+  # Deliberately its own job rather than a step inside "Frontend tests".
+  #
+  # A dependency audit fails for reasons that have nothing to do with the code:
+  # someone publishes an advisory against a transitive dev dependency and a green
+  # build turns red with no commit. As a step it also ran BEFORE `npm test`, so a
+  # single advisory hid whether the tests passed at all — which is how this repo
+  # sat with red CI from April to August without anyone able to see the suite.
+  #
+  # Split out, the run summary answers both questions at a glance: "Frontend
+  # tests" is about our code, "npm audit" is about the supply chain. This job is
+  # still allowed to fail loudly — that is the point of having it.
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=moderate
 
   integration-tests:
     name: Integration tests
