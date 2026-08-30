@@ -253,6 +253,22 @@ export const en = {
 
   'field.name': 'Name',
 
+  // --- Destructive confirmations ---
+  //
+  // Whole sentences with slots, not fragments: the counted forms sit in the
+  // translation so a language can put the number where it belongs.
+  'reset.title': 'Reset budget',
+  'reset.explain.one': 'This removes all {count} entry, its category and every planned amount. You start again from an empty budget.',
+  'reset.explain.other': 'This removes all {count} entries, their categories and every planned amount. You start again from an empty budget.',
+  'reset.archivesKept.one': 'Your {count} archive is a record of what was budgeted and is kept.',
+  'reset.archivesKept.other': 'Your {count} archives are records of what was budgeted and are kept.',
+  'reset.noArchives': 'Nothing is archived, so no record of this plan will remain. Cancel and archive it first if you want to keep one.',
+
+  'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Any archive that already recorded it keeps its copy.',
+
+  'archive.deleteExplain.one': 'Delete {name} and its {count} line?',
+  'archive.deleteExplain.other': 'Delete {name} and its {count} lines?',
+
   // --- Common states ---
   'state.loading': 'Loading...',
   'state.saving': 'Saving...',

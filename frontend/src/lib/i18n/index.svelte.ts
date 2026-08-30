@@ -138,6 +138,31 @@ export function tn(
   return fill(lookup(form), { count, ...params })
 }
 
+/**
+ * A translated sentence split around one placeholder, so the caller can render
+ * that slot as an element — bold on the thing about to be deleted, say.
+ *
+ * The alternative is splitting the sentence in the source and concatenating
+ * fragments, which puts English word order into the markup: a language that
+ * needs the name first, or last, or inflected can then no longer be translated
+ * into. Here the translator still writes one whole sentence with a slot in it,
+ * and only the rendering is split.
+ *
+ * Returns the text before and after the slot. Everything else is filled in
+ * first, so other placeholders behave normally.
+ */
+const SLOT = '\u0000'
+
+export function tAround(
+  key: MessageKey,
+  slot: string,
+  params?: Record<string, string | number>,
+): [string, string] {
+  const filled = fill(lookup(key), { ...params, [slot]: SLOT })
+  const [before, after = ''] = filled.split(SLOT)
+  return [before, after]
+}
+
 /** Test seam: forget the stored choice and re-detect. */
 export function resetLocale(): void {
   try {

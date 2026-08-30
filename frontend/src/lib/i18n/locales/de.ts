@@ -235,6 +235,19 @@ export const de: Messages = {
 
   'field.name': 'Name',
 
+  // --- Destructive confirmations ---
+  'reset.title': 'Budget zurücksetzen',
+  'reset.explain.one': 'Damit werden der eine Eintrag, seine Kategorie und alle geplanten Beträge entfernt. Sie beginnen wieder mit einem leeren Budget.',
+  'reset.explain.other': 'Damit werden alle {count} Einträge, ihre Kategorien und alle geplanten Beträge entfernt. Sie beginnen wieder mit einem leeren Budget.',
+  'reset.archivesKept.one': 'Ihr {count} Archiv ist eine Aufzeichnung des damals Budgetierten und bleibt erhalten.',
+  'reset.archivesKept.other': 'Ihre {count} Archive sind Aufzeichnungen des damals Budgetierten und bleiben erhalten.',
+  'reset.noArchives': 'Es ist nichts archiviert, daher bleibt keine Aufzeichnung dieses Plans zurück. Brechen Sie ab und archivieren Sie ihn zuerst, wenn Sie eine behalten möchten.',
+
+  'entry.deleteExplain': 'Soll {name} aus Ihrem Budget entfernt werden? Der geplante Betrag geht mit. Ein Archiv, das ihn bereits erfasst hat, behält seine Kopie.',
+
+  'archive.deleteExplain.one': '{name} und die {count} Zeile löschen?',
+  'archive.deleteExplain.other': '{name} und seine {count} Zeilen löschen?',
+
   // --- Common states ---
   'state.loading': 'Wird geladen...',
   'state.saving': 'Wird gespeichert...',

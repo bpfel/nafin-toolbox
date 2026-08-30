@@ -209,3 +209,34 @@ describe('a partial locale', () => {
     expect(isProvisional('de')).toBe(false)
   })
 })
+
+describe('splitting a sentence around a slot', () => {
+  // So the emphasised word can be an element without the sentence being
+  // assembled from fragments in the markup.
+  test('gives the text either side of the placeholder', async () => {
+    const { tAround } = await load()
+
+    const [before, after] = tAround('archive.deleteOne', 'name')
+
+    expect(before).toBe('Delete archive ')
+    expect(after).toBe('')
+  })
+
+  test('fills the other placeholders as usual', async () => {
+    const { tAround } = await load()
+
+    const [before, after] = tAround('budget.viewToggle', 'mode', { other: 'yearly' })
+
+    expect(before).toBe('Showing ')
+    expect(after).toBe(' amounts — switch to yearly')
+  })
+
+  test('a sentence without that placeholder comes back whole', async () => {
+    const { tAround } = await load()
+
+    const [before, after] = tAround('menu.security', 'name')
+
+    expect(before).toBe('Security')
+    expect(after).toBe('')
+  })
+})

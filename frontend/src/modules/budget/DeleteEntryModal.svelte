@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tAround } from '../../lib/i18n/index.svelte'
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
@@ -9,6 +10,10 @@
   }
 
   let { entryId, entryName, ondeleted, onclose }: Props = $props()
+
+  // Split rather than concatenated, so the sentence stays one translatable
+  // whole and only its rendering puts the name in bold.
+  let explain = $derived(tAround('entry.deleteExplain', 'name'))
 
   function confirm() {
     ondeleted()
@@ -27,21 +32,20 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Delete entry" use:focusTrap>
-    <h3>Delete entry</h3>
+  <div class="modal" role="dialog" aria-label={t('entry.deleteTitle')} use:focusTrap>
+    <h3>{t('entry.deleteTitle')}</h3>
     <!-- v4 replaced monthly periods with one plan plus named archives, so there
          is no longer a set of periods to be removed from. What actually happens:
          the entry and its planned amount go, and archives keep the copy they
          recorded, because they hold names rather than references to it. -->
     <p>
-      Remove <strong>{entryName}</strong> from your budget? Its planned amount goes
-      with it. Any archive that already recorded it keeps its copy.
+      {explain[0]}<strong>{entryName}</strong>{explain[1]}
     </p>
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn delete" onclick={confirm}>
-        Delete
+        {t('action.delete')}
       </button>
     </div>
   </div>
