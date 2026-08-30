@@ -2,13 +2,13 @@
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
-    categoryId: string
-    categoryName: string
+    entryId: string
+    entryName: string
     ondeleted: () => void
     onclose: () => void
   }
 
-  let { categoryId, categoryName, ondeleted, onclose }: Props = $props()
+  let { entryId, entryName, ondeleted, onclose }: Props = $props()
 
   function confirm() {
     ondeleted()
@@ -27,14 +27,14 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Delete category" use:focusTrap>
-    <h3>Delete category</h3>
+  <div class="modal" role="dialog" aria-label="Delete entry" use:focusTrap>
+    <h3>Delete entry</h3>
     <!-- v4 replaced monthly periods with one plan plus named archives, so there
          is no longer a set of periods to be removed from. What actually happens:
-         the category and its planned amount go, and archives keep the copy they
+         the entry and its planned amount go, and archives keep the copy they
          recorded, because they hold names rather than references to it. -->
     <p>
-      Remove <strong>{categoryName}</strong> from your budget? Its planned amount goes
+      Remove <strong>{entryName}</strong> from your budget? Its planned amount goes
       with it. Any archive that already recorded it keeps its copy.
     </p>
 

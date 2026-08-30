@@ -7,14 +7,14 @@
 
   interface Props {
     type: 'income' | 'expense'
-    groups: { name: string; id: string }[]
-    editCategory?: { id: string; name: string; groupName: string; plannedAmount?: string } | null
-    /** Preselects the group when adding — set by the "+" on a group header. */
-    presetGroupName?: string
+    categories: { name: string; id: string }[]
+    editEntry?: { id: string; name: string; categoryName: string; plannedAmount?: string } | null
+    /** Preselects the category when adding — set by the "+" on a category header. */
+    presetCategoryName?: string
     vault: VaultData
     oncreated: () => void
     onclose: () => void
-    onsave?: (categoryId: string, amount: string) => void
+    onsave?: (entryId: string, amount: string) => void
     /**
      * Hands off to the delete confirmation. Only meaningful when editing, and
      * the reason the table row needs no delete control of its own on a narrow
@@ -23,25 +23,25 @@
     ondelete?: () => void
   }
 
-  let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
+  let { type, categories, editEntry = null, presetCategoryName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
 
-  let isEdit = $derived(editCategory != null)
+  let isEdit = $derived(editEntry != null)
   // Seeded once: the modal is created fresh each time it opens, so every read of
-  // `editCategory` below is deliberately an initial value rather than a reactive
+  // `editEntry` below is deliberately an initial value rather than a reactive
   // one. `untrack` says so out loud, to Svelte and to the next reader.
-  let name = $state(untrack(() => editCategory?.name ?? ''))
-  let selectedGroup = $state(
-    untrack(() => editCategory?.groupName ?? presetGroupName ?? groups[0]?.name ?? ''),
+  let name = $state(untrack(() => editEntry?.name ?? ''))
+  let selectedCategory = $state(
+    untrack(() => editEntry?.categoryName ?? presetCategoryName ?? categories[0]?.name ?? ''),
   )
-  let newGroupName = $state('')
-  let useNewGroup = $state(false)
+  let newCategoryName = $state('')
+  let useNewCategory = $state(false)
   let error = $state<string | null>(null)
 
   let plannedMoValue = $state(
-    untrack(() => (editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')),
+    untrack(() => (editEntry?.plannedAmount ? fmt(Number(editEntry.plannedAmount)) : '')),
   )
   let plannedYrValue = $state(
-    untrack(() => (editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')),
+    untrack(() => (editEntry?.plannedAmount ? fmt(Number(editEntry.plannedAmount) * 12) : '')),
   )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
 
@@ -57,7 +57,7 @@
 
   function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
     valueFocusedField = null
-    if (!editCategory || !onsave) return
+    if (!editEntry || !onsave) return
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
     const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return
@@ -65,12 +65,12 @@
     if (field === 'planned_mo') {
       plannedMoValue = fmt(val)
       plannedYrValue = fmt(val * 12)
-      onsave(editCategory.id, val.toFixed(2))
+      onsave(editEntry.id, val.toFixed(2))
     } else {
       const monthly = val / 12
       plannedYrValue = fmt(val)
       plannedMoValue = fmt(monthly)
-      onsave(editCategory.id, monthly.toFixed(4))
+      onsave(editEntry.id, monthly.toFixed(4))
     }
   }
 
@@ -86,31 +86,31 @@
     }
   }
 
-  let resolvedGroupName = $derived(useNewGroup ? newGroupName.trim() : selectedGroup)
+  let resolvedCategoryName = $derived(useNewCategory ? newCategoryName.trim() : selectedCategory)
 
   function save() {
     const trimmed = name.trim()
     if (!trimmed) return
-    if (!isEdit && !resolvedGroupName) return
+    if (!isEdit && !resolvedCategoryName) return
     error = null
 
     try {
-      if (isEdit && editCategory) {
-        engine.updateCategory(vault, editCategory.id, {
+      if (isEdit && editEntry) {
+        engine.updateEntry(vault, editEntry.id, {
           name: trimmed,
-          groupName: resolvedGroupName,
+          categoryName: resolvedCategoryName,
         })
       } else {
-        engine.createCategory(vault, {
+        engine.createEntry(vault, {
           name: trimmed,
           type,
-          groupName: resolvedGroupName,
+          categoryName: resolvedCategoryName,
         })
       }
       oncreated()
       onclose()
     } catch (e) {
-      error = e instanceof Error ? e.message : isEdit ? 'Failed to update category' : 'Failed to create category'
+      error = e instanceof Error ? e.message : isEdit ? 'Failed to update entry' : 'Failed to create entry'
     }
   }
 
@@ -126,30 +126,30 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit category' : 'Add category'} use:focusTrap>
-    <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} category</h3>
+  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit entry' : 'Add entry'} use:focusTrap>
+    <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} entry</h3>
 
     <label class="field">
-      <span class="label">Group</span>
-      {#if useNewGroup}
-        <div class="group-input-row">
+      <span class="label">Category</span>
+      {#if useNewCategory}
+        <div class="category-input-row">
           <input
             type="text"
-            bind:value={newGroupName}
-            placeholder="New group name"
+            bind:value={newCategoryName}
+            placeholder="New category name"
           />
-          <button class="link-btn" onclick={() => { useNewGroup = false; newGroupName = '' }}>
+          <button class="link-btn" onclick={() => { useNewCategory = false; newCategoryName = '' }}>
             existing
           </button>
         </div>
       {:else}
-        <div class="group-input-row">
-          <select bind:value={selectedGroup}>
-            {#each groups as g}
+        <div class="category-input-row">
+          <select bind:value={selectedCategory}>
+            {#each categories as g}
               <option value={g.name}>{g.name || 'Other'}</option>
             {/each}
           </select>
-          <button class="link-btn" onclick={() => (useNewGroup = true)}>
+          <button class="link-btn" onclick={() => (useNewCategory = true)}>
             + new
           </button>
         </div>
@@ -166,7 +166,7 @@
       />
     </label>
 
-    {#if isEdit && editCategory?.plannedAmount != null}
+    {#if isEdit && editEntry?.plannedAmount != null}
       <div class="values-section">
         <span class="label">Values</span>
         <div class="values-grid">
@@ -208,7 +208,7 @@
       {/if}
       <span class="spacer"></span>
       <button class="btn cancel" onclick={onclose}>Cancel</button>
-      <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedGroupName}>
+      <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedCategoryName}>
         {isEdit ? 'Save' : 'Add'}
       </button>
     </div>
@@ -238,13 +238,13 @@
     margin: 0 0 0.25rem;
     font-size: 1.1rem;
   }
-  .group-input-row {
+  .category-input-row {
     display: flex;
     gap: 0.5rem;
     align-items: center;
   }
-  .group-input-row select,
-  .group-input-row input[type="text"] {
+  .category-input-row select,
+  .category-input-row input[type="text"] {
     flex: 1;
     padding: 0.6rem 0.75rem;
     border: 1px solid #ccc;
@@ -252,8 +252,8 @@
     font-size: 1rem;
     outline: none;
   }
-  .group-input-row select:focus,
-  .group-input-row input[type="text"]:focus {
+  .category-input-row select:focus,
+  .category-input-row input[type="text"]:focus {
     border-color: #2d6a4f;
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }

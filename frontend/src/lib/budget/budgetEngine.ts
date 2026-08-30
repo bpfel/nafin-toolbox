@@ -1,190 +1,190 @@
 import type {
   VaultData,
-  VaultCategoryGroup,
   VaultCategory,
+  VaultEntry,
   VaultArchive,
   VaultArchiveLine,
 } from '../crypto/vault'
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
 
-// --- Category Groups ---
+// --- Entry Categories ---
 
-export function listGroups(vault: VaultData): VaultCategoryGroup[] {
-  return [...vault.budget.categoryGroups].sort((a, b) => a.sortOrder - b.sortOrder)
+export function listCategories(vault: VaultData): VaultCategory[] {
+  return [...vault.budget.categories].sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
-export function createGroup(
+export function createCategory(
   vault: VaultData,
   name: string,
   type: 'income' | 'expense',
   sortOrder?: number,
-): VaultCategoryGroup {
-  const groups = vault.budget.categoryGroups
-  const order = sortOrder ?? (groups.length > 0 ? Math.max(...groups.map(g => g.sortOrder)) + 10 : 10)
-  const group: VaultCategoryGroup = {
+): VaultCategory {
+  const categories = vault.budget.categories
+  const order = sortOrder ?? (categories.length > 0 ? Math.max(...categories.map(g => g.sortOrder)) + 10 : 10)
+  const category: VaultCategory = {
     id: crypto.randomUUID(),
     name,
     type,
     sortOrder: order,
   }
-  groups.push(group)
-  return group
+  categories.push(category)
+  return category
 }
 
-export function getOrCreateGroup(
+export function getOrCreateCategory(
   vault: VaultData,
   name: string,
   type: 'income' | 'expense',
-): VaultCategoryGroup {
-  const existing = vault.budget.categoryGroups.find(
+): VaultCategory {
+  const existing = vault.budget.categories.find(
     g => g.name === name && g.type === type,
   )
   if (existing) return existing
-  return createGroup(vault, name, type)
+  return createCategory(vault, name, type)
 }
 
 /**
- * Drops any group no category points at any more.
+ * Drops any category no entry points at any more.
  *
- * Groups are created in two places: getOrCreateGroup, which is only reachable by
- * creating a category, and seedDefaults, which fills every group it makes in the
- * same pass. Neither leaves an empty one behind on purpose, so a group with no
- * categories is residue from the last one leaving. The table already builds its
- * headers from categories and stops drawing it, so this only makes the stored
+ * Categories are created in two places: getOrCreateCategory, which is only reachable by
+ * creating an entry, and seedDefaults, which fills every category it makes in the
+ * same pass. Neither leaves an empty one behind on purpose, so a category with no
+ * entries is residue from the last one leaving. The table already builds its
+ * headers from entries and stops drawing it, so this only makes the stored
  * vault agree with what the user is looking at.
  *
- * It is not merely tidiness. findGroupConflict searches every stored group, so a
+ * It is not merely tidiness. findCategoryConflict searches every stored category, so a
  * lingering empty one collides with a rename while being invisible on screen:
- * "an expense group called Housing already exists", about a group the user
+ * "an expense category called Housing already exists", about a category the user
  * cannot find anywhere to do anything about.
  *
- * Archived categories still count as occupants — they can come back, and their
- * group should be waiting for them.
+ * Archived entries still count as occupants — they can come back, and their
+ * category should be waiting for them.
  *
- * If a future feature ever lets someone create a group before filling it, this
- * has to become targeted at the group just emptied instead of a sweep.
+ * If a future feature ever lets someone create a category before filling it, this
+ * has to become targeted at the category just emptied instead of a sweep.
  */
-function pruneEmptyGroups(vault: VaultData): void {
-  const occupied = new Set(vault.budget.categories.map(c => c.groupId))
-  vault.budget.categoryGroups = vault.budget.categoryGroups.filter(g => occupied.has(g.id))
+function pruneEmptyCategories(vault: VaultData): void {
+  const occupied = new Set(vault.budget.entries.map(c => c.categoryId))
+  vault.budget.categories = vault.budget.categories.filter(g => occupied.has(g.id))
 }
 
-/** Every category filed under a group, archived ones included. */
-export function categoriesInGroup(vault: VaultData, groupId: string): VaultCategory[] {
-  return vault.budget.categories.filter(c => c.groupId === groupId)
+/** Every entry filed under a category, archived ones included. */
+export function entriesInCategory(vault: VaultData, categoryId: string): VaultEntry[] {
+  return vault.budget.entries.filter(c => c.categoryId === categoryId)
 }
 
 /**
- * The group a rename or type change would collide with, if any.
+ * The category a rename or type change would collide with, if any.
  *
- * Name and type together are already a group's identity everywhere else:
- * getOrCreateGroup matches on the pair, so no normal path can produce two
- * same-named expense groups. A rename must not manufacture the duplicate that
+ * Name and type together are already a category's identity everywhere else:
+ * getOrCreateCategory matches on the pair, so no normal path can produce two
+ * same-named expense categories. A rename must not manufacture the duplicate that
  * creation refuses to make, so the caller is expected to offer a merge instead.
  */
-export function findGroupConflict(
+export function findCategoryConflict(
   vault: VaultData,
-  groupId: string,
+  categoryId: string,
   name: string,
   type: 'income' | 'expense',
-): VaultCategoryGroup | null {
+): VaultCategory | null {
   const trimmed = name.trim()
   return (
-    vault.budget.categoryGroups.find(
-      g => g.id !== groupId && g.type === type && g.name === trimmed,
+    vault.budget.categories.find(
+      g => g.id !== categoryId && g.type === type && g.name === trimmed,
     ) ?? null
   )
 }
 
 /**
- * Renames a group, moves it to the other side of the budget, or both.
+ * Renames a category, moves it to the other side of the budget, or both.
  *
- * A type change carries every category in the group across with it. It has to:
- * getPlanSummary reads each category's own type, so an income group holding
- * expense categories would be counted on the wrong side. updateCategory does the
+ * A type change carries every entry in the category across with it. It has to:
+ * getPlanSummary reads each entry's own type, so an income category holding
+ * expense entries would be counted on the wrong side. updateEntry does the
  * carrying, which means routing is re-derived and reserves are dropped by
- * exactly the same code that handles one category changing type on its own.
+ * exactly the same code that handles one entry changing type on its own.
  *
  * Throws on an empty name or a collision, for the caller to show against the
  * field the user typed in — the same contract renameArchive has.
  */
-export function updateGroup(
+export function updateCategory(
   vault: VaultData,
-  groupId: string,
+  categoryId: string,
   update: { name?: string; type?: 'income' | 'expense' },
 ): void {
-  const group = vault.budget.categoryGroups.find(g => g.id === groupId)
-  if (!group) return
+  const category = vault.budget.categories.find(g => g.id === categoryId)
+  if (!category) return
 
-  const name = (update.name ?? group.name).trim()
+  const name = (update.name ?? category.name).trim()
   if (name === '') {
-    throw new Error('a group needs a name')
+    throw new Error('a category needs a name')
   }
 
-  const type = update.type ?? group.type
-  if (findGroupConflict(vault, groupId, name, type)) {
-    throw new Error(`a ${type} group called "${name}" already exists`)
+  const type = update.type ?? category.type
+  if (findCategoryConflict(vault, categoryId, name, type)) {
+    throw new Error(`a ${type} category called "${name}" already exists`)
   }
 
-  if (type !== group.type) {
-    for (const cat of categoriesInGroup(vault, groupId)) {
-      updateCategory(vault, cat.id, { type })
+  if (type !== category.type) {
+    for (const cat of entriesInCategory(vault, categoryId)) {
+      updateEntry(vault, cat.id, { type })
     }
-    group.type = type
+    category.type = type
   }
-  group.name = name
+  category.name = name
 }
 
 /**
- * Empties one group into another and removes it.
+ * Empties one category into another and removes it.
  *
- * Offered when a rename collides, because re-filing every category by hand is
- * the workflow this whole feature exists to replace. Categories crossing between
- * an income and an expense group change type on the way, through updateCategory,
- * so they arrive routed correctly rather than contradicting their new group.
+ * Offered when a rename collides, because re-filing every entry by hand is
+ * the workflow this whole feature exists to replace. Entries crossing between
+ * an income and an expense category change type on the way, through updateEntry,
+ * so they arrive routed correctly rather than contradicting their new category.
  */
-export function mergeGroup(vault: VaultData, fromId: string, intoId: string): void {
+export function mergeCategory(vault: VaultData, fromId: string, intoId: string): void {
   if (fromId === intoId) return
-  const from = vault.budget.categoryGroups.find(g => g.id === fromId)
-  const into = vault.budget.categoryGroups.find(g => g.id === intoId)
+  const from = vault.budget.categories.find(g => g.id === fromId)
+  const into = vault.budget.categories.find(g => g.id === intoId)
   if (!from || !into) return
 
-  for (const cat of categoriesInGroup(vault, fromId)) {
-    if (cat.type !== into.type) updateCategory(vault, cat.id, { type: into.type })
-    cat.groupId = into.id
+  for (const cat of entriesInCategory(vault, fromId)) {
+    if (cat.type !== into.type) updateEntry(vault, cat.id, { type: into.type })
+    cat.categoryId = into.id
   }
-  vault.budget.categoryGroups = vault.budget.categoryGroups.filter(g => g.id !== fromId)
+  vault.budget.categories = vault.budget.categories.filter(g => g.id !== fromId)
 }
 
-// --- Categories ---
+// --- Entries ---
 
-export function listCategories(vault: VaultData, includeArchived = false): VaultCategory[] {
-  const cats = vault.budget.categories.filter(c => includeArchived || !c.archived)
+export function listEntries(vault: VaultData, includeArchived = false): VaultEntry[] {
+  const cats = vault.budget.entries.filter(c => includeArchived || !c.archived)
   return cats.sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
-export function createCategory(
+export function createEntry(
   vault: VaultData,
   opts: {
     name: string
     type: 'income' | 'expense'
-    groupName: string
+    categoryName: string
     sortOrder?: number
   },
-): VaultCategory {
-  const group = getOrCreateGroup(vault, opts.groupName, opts.type)
-  const cats = vault.budget.categories
+): VaultEntry {
+  const category = getOrCreateCategory(vault, opts.categoryName, opts.type)
+  const cats = vault.budget.entries
   const order = opts.sortOrder ?? (cats.length > 0 ? Math.max(...cats.map(c => c.sortOrder)) + 10 : 10)
-  // Categories are born routed: the default is legal for both types, so no
-  // category ever exists unrouted or contradictory.
+  // Entries are born routed: the default is legal for both types, so no
+  // entry ever exists unrouted or contradictory.
   const routing = defaultRouting(opts.type, primaryAccountId(vault))
-  const cat: VaultCategory = {
+  const cat: VaultEntry = {
     id: crypto.randomUUID(),
     name: opts.name,
     type: opts.type,
     sortOrder: order,
     archived: false,
-    groupId: group.id,
+    categoryId: category.id,
     sourceAccountId: routing.sourceAccountId,
     sinkAccountId: routing.sinkAccountId,
   }
@@ -192,17 +192,17 @@ export function createCategory(
   return cat
 }
 
-export function updateCategory(
+export function updateEntry(
   vault: VaultData,
-  categoryId: string,
-  update: Partial<Pick<VaultCategory, 'name' | 'type' | 'sortOrder' | 'archived'>> & { groupName?: string },
-): VaultCategory | null {
-  const cat = vault.budget.categories.find(c => c.id === categoryId)
+  entryId: string,
+  update: Partial<Pick<VaultEntry, 'name' | 'type' | 'sortOrder' | 'archived'>> & { categoryName?: string },
+): VaultEntry | null {
+  const cat = vault.budget.entries.find(c => c.id === entryId)
   if (!cat) return null
 
   if (update.name !== undefined) cat.name = update.name
 
-  // Changing the type invalidates the existing routing: an income category
+  // Changing the type invalidates the existing routing: an income entry
   // routed (null, A) would become an expense on the same endpoints, which is
   // an illegal combination. Re-derive the defaults rather than leave a
   // contradiction behind. A reserve cannot survive a move to income either,
@@ -217,81 +217,81 @@ export function updateCategory(
 
   if (update.sortOrder !== undefined) cat.sortOrder = update.sortOrder
   if (update.archived !== undefined) cat.archived = update.archived
-  if (update.groupName !== undefined) {
-    const group = getOrCreateGroup(vault, update.groupName, cat.type)
-    cat.groupId = group.id
-    // Moving the last category out empties the group it came from.
-    pruneEmptyGroups(vault)
+  if (update.categoryName !== undefined) {
+    const category = getOrCreateCategory(vault, update.categoryName, cat.type)
+    cat.categoryId = category.id
+    // Moving the last entry out empties the category it came from.
+    pruneEmptyCategories(vault)
   }
 
   return cat
 }
 
-export function deleteCategory(vault: VaultData, categoryId: string): void {
-  vault.budget.categories = vault.budget.categories.filter(c => c.id !== categoryId)
-  // The plan is keyed by category, so a deleted category's line would otherwise
+export function deleteEntry(vault: VaultData, entryId: string): void {
+  vault.budget.entries = vault.budget.entries.filter(c => c.id !== entryId)
+  // The plan is keyed by entry, so a deleted entry's line would otherwise
   // linger as an amount nothing can display or edit. Archives are deliberately
   // left alone: they hold names, not references, and a record of a past plan
-  // must not lose lines because a category was deleted afterwards.
-  vault.budget.plan = vault.budget.plan.filter(e => e.categoryId !== categoryId)
-  pruneEmptyGroups(vault)
+  // must not lose lines because an entry was deleted afterwards.
+  vault.budget.plan = vault.budget.plan.filter(e => e.entryId !== entryId)
+  pruneEmptyCategories(vault)
 }
 
-export function reorderCategories(vault: VaultData, categoryIds: string[]): void {
-  for (let i = 0; i < categoryIds.length; i++) {
-    const cat = vault.budget.categories.find(c => c.id === categoryIds[i])
+export function reorderEntries(vault: VaultData, entryIds: string[]): void {
+  for (let i = 0; i < entryIds.length; i++) {
+    const cat = vault.budget.entries.find(c => c.id === entryIds[i])
     if (cat) cat.sortOrder = (i + 1) * 10
   }
 }
 
 /**
- * Reorders category groups. `groupIds` is the full new order for one side of the
- * budget (income or expense); groups of the other type keep their sortOrder.
+ * Reorders entry categories. `categoryIds` is the full new order for one side of the
+ * budget (income or expense); categories of the other type keep their sortOrder.
  *
- * Group order used to be inferred from wherever each group's first category
- * happened to land in the category sort, which meant reordering categories could
- * silently reshuffle groups. `sortOrder` on the group has always existed and is
- * what `listGroups` uses, so this makes the table read the same field rather
+ * Category order used to be inferred from wherever each category's first entry
+ * happened to land in the entry sort, which meant reordering entries could
+ * silently reshuffle categories. `sortOrder` on the category has always existed and is
+ * what `listCategories` uses, so this makes the table read the same field rather
  * than deriving the order a second, conflicting way.
  */
-export function reorderGroups(vault: VaultData, groupIds: string[]): void {
-  for (let i = 0; i < groupIds.length; i++) {
-    const group = vault.budget.categoryGroups.find(g => g.id === groupIds[i])
-    if (group) group.sortOrder = (i + 1) * 10
+export function reorderCategories(vault: VaultData, categoryIds: string[]): void {
+  for (let i = 0; i < categoryIds.length; i++) {
+    const category = vault.budget.categories.find(g => g.id === categoryIds[i])
+    if (category) category.sortOrder = (i + 1) * 10
   }
 }
 
 // --- The plan ---
 
 /**
- * The planned amount for one category, '0.00' when the plan has no line for it.
+ * The planned amount for one entry, '0.00' when the plan has no line for it.
  *
  * A missing line and a zero line mean the same thing to every reader, so the
- * plan stays sparse rather than carrying a row per category.
+ * plan stays sparse rather than carrying a row per entry.
  */
-export function plannedFor(vault: VaultData, categoryId: string): string {
-  const entry = vault.budget.plan.find(e => e.categoryId === categoryId)
+export function plannedFor(vault: VaultData, entryId: string): string {
+  const entry = vault.budget.plan.find(e => e.entryId === entryId)
   return entry?.plannedAmount ?? '0.00'
 }
 
-/** Sets the planned amount for one category, creating its line if absent. */
-export function setPlanned(vault: VaultData, categoryId: string, amount: string): void {
-  const entry = vault.budget.plan.find(e => e.categoryId === categoryId)
+/** Sets the planned amount for one entry, creating its line if absent. */
+export function setPlanned(vault: VaultData, entryId: string, amount: string): void {
+  const entry = vault.budget.plan.find(e => e.entryId === entryId)
   if (entry) {
     entry.plannedAmount = amount
     return
   }
-  vault.budget.plan.push({ categoryId, plannedAmount: amount })
+  vault.budget.plan.push({ entryId, plannedAmount: amount })
 }
 
 // --- Plan summary ---
 
 export interface PlanEntryView {
+  entryId: string
+  entryName: string
+  entryType: 'income' | 'expense'
   categoryId: string
   categoryName: string
-  categoryType: 'income' | 'expense'
-  categoryGroupId: string
-  categoryGroupName: string
   plannedAmount: string
 }
 
@@ -303,8 +303,8 @@ export interface PlanSummary {
 }
 
 /**
- * One row per non-archived category, in category sort order, whether or not the
- * plan has a line for it — a category with nothing planned is still part of the
+ * One row per non-archived entry, in entry sort order, whether or not the
+ * plan has a line for it — an entry with nothing planned is still part of the
  * budget and must be visible to be filled in.
  *
  * `plannedBalance` is income minus expenses, which keeps the zero-based reading
@@ -312,24 +312,24 @@ export interface PlanSummary {
  * a balanced plan reads 0.00 rather than "some surplus somewhere".
  */
 export function getPlanSummary(vault: VaultData): PlanSummary {
-  const groups = vault.budget.categoryGroups
+  const categories = vault.budget.categories
 
   let totalPlannedIncome = 0
   let totalPlannedExpenses = 0
 
   const entries: PlanEntryView[] = []
 
-  for (const cat of listCategories(vault)) {
-    const group = groups.find(g => g.id === cat.groupId)
+  for (const cat of listEntries(vault)) {
+    const category = categories.find(g => g.id === cat.categoryId)
     const plannedAmount = plannedFor(vault, cat.id)
     const planned = Number(plannedAmount)
 
     entries.push({
-      categoryId: cat.id,
-      categoryName: cat.name,
-      categoryType: cat.type,
-      categoryGroupId: cat.groupId,
-      categoryGroupName: group?.name ?? '',
+      entryId: cat.id,
+      entryName: cat.name,
+      entryType: cat.type,
+      categoryId: cat.categoryId,
+      categoryName: category?.name ?? '',
       plannedAmount,
     })
 
@@ -360,12 +360,12 @@ export function listArchives(vault: VaultData): VaultArchive[] {
 /**
  * Snapshots the current plan under a name.
  *
- * The lines are DENORMALISED — category and group names are copied in, not
- * referenced. An archive that pointed at live categories would be rewritten by
+ * The lines are DENORMALISED — entry and category names are copied in, not
+ * referenced. An archive that pointed at live entries would be rewritten by
  * the next rename and would lose lines to the next delete, which would make it
  * a view of the present rather than a record of the past.
  *
- * The snapshot covers what the plan summary shows: every non-archived category,
+ * The snapshot covers what the plan summary shows: every non-archived entry,
  * including those left at 0.00, so an archive reads the same as the plan it was
  * taken from.
  */
@@ -377,11 +377,11 @@ export function archivePlan(vault: VaultData, name: string): VaultArchive {
     throw new Error('an archive needs a name')
   }
 
-  const groupNameById = new Map(vault.budget.categoryGroups.map(g => [g.id, g.name]))
+  const categoryNameById = new Map(vault.budget.categories.map(g => [g.id, g.name]))
 
-  const lines: VaultArchiveLine[] = listCategories(vault).map(cat => ({
-    categoryName: cat.name,
-    groupName: groupNameById.get(cat.groupId) ?? '',
+  const lines: VaultArchiveLine[] = listEntries(vault).map(cat => ({
+    entryName: cat.name,
+    categoryName: categoryNameById.get(cat.categoryId) ?? '',
     type: cat.type,
     plannedAmount: plannedFor(vault, cat.id),
   }))
@@ -411,37 +411,37 @@ export function deleteArchive(vault: VaultData, id: string): void {
 }
 
 /**
- * Empties the budget: every category, every group, and the plan itself.
+ * Empties the budget: every entry, every category, and the plan itself.
  *
  * Archives are deliberately left standing. They are records of what was
  * budgeted, denormalised down to names rather than references (see archivePlan),
- * so nothing in them breaks when the categories they describe cease to exist —
- * the same bargain deleteCategory already makes. A reset is for starting the
+ * so nothing in them breaks when the entries they describe cease to exist —
+ * the same bargain deleteEntry already makes. A reset is for starting the
  * plan over, not for erasing what the plan used to say.
  */
 export function resetBudget(vault: VaultData): void {
+  vault.budget.entries = []
   vault.budget.categories = []
-  vault.budget.categoryGroups = []
   vault.budget.plan = []
 }
 
 // --- Seed Defaults ---
 
-interface DefaultGroup {
-  name: string
-  type: 'income' | 'expense'
-  sortOrder: number
-}
-
 interface DefaultCategory {
   name: string
   type: 'income' | 'expense'
   sortOrder: number
-  groupName: string
+}
+
+interface DefaultEntry {
+  name: string
+  type: 'income' | 'expense'
+  sortOrder: number
+  categoryName: string
   amount: string
 }
 
-function bfsDefaultGroups(): DefaultGroup[] {
+function bfsDefaultCategories(): DefaultCategory[] {
   return [
     { name: 'Employment', type: 'income', sortOrder: 1 },
     { name: 'Housing', type: 'expense', sortOrder: 10 },
@@ -452,43 +452,43 @@ function bfsDefaultGroups(): DefaultGroup[] {
   ]
 }
 
-function bfsDefaults(): DefaultCategory[] {
+function bfsDefaults(): DefaultEntry[] {
   return [
-    { name: 'Salary (net)', type: 'income', sortOrder: 10, groupName: 'Employment', amount: '6000.00' },
-    { name: 'Rent', type: 'expense', sortOrder: 10, groupName: 'Housing', amount: '1350.00' },
-    { name: 'Utilities', type: 'expense', sortOrder: 20, groupName: 'Housing', amount: '150.00' },
-    { name: 'Health Insurance', type: 'expense', sortOrder: 10, groupName: 'Insurance & Taxes', amount: '391.67' },
-    { name: 'Other Insurance', type: 'expense', sortOrder: 20, groupName: 'Insurance & Taxes', amount: '166.67' },
-    { name: 'Taxes', type: 'expense', sortOrder: 30, groupName: 'Insurance & Taxes', amount: '833.33' },
-    { name: 'Food & Groceries', type: 'expense', sortOrder: 10, groupName: 'Living', amount: '500.00' },
-    { name: 'Transportation', type: 'expense', sortOrder: 20, groupName: 'Living', amount: '400.00' },
-    { name: 'Telecommunications', type: 'expense', sortOrder: 30, groupName: 'Living', amount: '80.00' },
-    { name: 'Clothing & Footwear', type: 'expense', sortOrder: 10, groupName: 'Lifestyle', amount: '100.00' },
-    { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, groupName: 'Lifestyle', amount: '250.00' },
-    { name: 'Dining Out', type: 'expense', sortOrder: 30, groupName: 'Lifestyle', amount: '250.00' },
-    { name: 'Savings', type: 'expense', sortOrder: 10, groupName: 'Savings', amount: '500.00' },
+    { name: 'Salary (net)', type: 'income', sortOrder: 10, categoryName: 'Employment', amount: '6000.00' },
+    { name: 'Rent', type: 'expense', sortOrder: 10, categoryName: 'Housing', amount: '1350.00' },
+    { name: 'Utilities', type: 'expense', sortOrder: 20, categoryName: 'Housing', amount: '150.00' },
+    { name: 'Health Insurance', type: 'expense', sortOrder: 10, categoryName: 'Insurance & Taxes', amount: '391.67' },
+    { name: 'Other Insurance', type: 'expense', sortOrder: 20, categoryName: 'Insurance & Taxes', amount: '166.67' },
+    { name: 'Taxes', type: 'expense', sortOrder: 30, categoryName: 'Insurance & Taxes', amount: '833.33' },
+    { name: 'Food & Groceries', type: 'expense', sortOrder: 10, categoryName: 'Living', amount: '500.00' },
+    { name: 'Transportation', type: 'expense', sortOrder: 20, categoryName: 'Living', amount: '400.00' },
+    { name: 'Telecommunications', type: 'expense', sortOrder: 30, categoryName: 'Living', amount: '80.00' },
+    { name: 'Clothing & Footwear', type: 'expense', sortOrder: 10, categoryName: 'Lifestyle', amount: '100.00' },
+    { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, categoryName: 'Lifestyle', amount: '250.00' },
+    { name: 'Dining Out', type: 'expense', sortOrder: 30, categoryName: 'Lifestyle', amount: '250.00' },
+    { name: 'Savings', type: 'expense', sortOrder: 10, categoryName: 'Savings', amount: '500.00' },
     // Pillar 3a is budgeted like any other set-aside: the money leaves the
     // spending plan but stays yours. 588.00 is the 2026 employee cap (7'056)
     // spread over twelve months — a starting point, not a rule.
-    { name: 'Pillar 3a', type: 'expense', sortOrder: 20, groupName: 'Savings', amount: '588.00' },
+    { name: 'Pillar 3a', type: 'expense', sortOrder: 20, categoryName: 'Savings', amount: '588.00' },
   ]
 }
 
 export function seedDefaults(vault: VaultData): void {
-  if (vault.budget.categories.length > 0) return
+  if (vault.budget.entries.length > 0) return
 
-  // Create groups
-  for (const dg of bfsDefaultGroups()) {
-    createGroup(vault, dg.name, dg.type, dg.sortOrder)
+  // Create categories
+  for (const dg of bfsDefaultCategories()) {
+    createCategory(vault, dg.name, dg.type, dg.sortOrder)
   }
 
-  // Create categories, and give each one its suggested amount in the plan.
+  // Create entries, and give each one its suggested amount in the plan.
   // There is no month to seed and no actual to record: the plan is the budget.
   for (const d of bfsDefaults()) {
-    const cat = createCategory(vault, {
+    const cat = createEntry(vault, {
       name: d.name,
       type: d.type,
-      groupName: d.groupName,
+      categoryName: d.categoryName,
       sortOrder: d.sortOrder,
     })
     setPlanned(vault, cat.id, d.amount)

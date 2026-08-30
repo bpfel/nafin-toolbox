@@ -9,7 +9,7 @@
 
 <div class="setup">
   <h3>Set up your budget</h3>
-  <p>Start with default Swiss budget categories based on BFS household survey data (HABE 2023, single person). You can customize everything later.</p>
+  <p>Start with default Swiss budget entries based on BFS household survey data (HABE 2023, single person). You can customize everything later.</p>
   <div class="actions">
     <button class="primary" onclick={onseeded}>
       Load Swiss defaults

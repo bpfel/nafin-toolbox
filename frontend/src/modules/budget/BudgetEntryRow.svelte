@@ -5,20 +5,20 @@
   interface Props {
     entry: PlanEntryView
     viewMode?: 'monthly' | 'yearly'
-    onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string) => void
+    onedit: (entryId: string, entryName: string, entryType: 'income' | 'expense', categoryName: string, plannedAmount: string) => void
   }
 
   let { entry, viewMode = 'monthly', onedit }: Props = $props()
 
   // Amounts are read-only here. Changing one is an edit like renaming or
-  // reordering is, so it goes through edit mode and the category dialog -- one
+  // reordering is, so it goes through edit mode and the entry dialog -- one
   // way in, rather than a dialog field and a table cell that set the same value.
   let editing = $derived(isEditing('budget'))
 
   let planned = $derived(Number(entry.plannedAmount))
 
   function openEditor() {
-    onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount)
+    onedit(entry.entryId, entry.entryName, entry.entryType, entry.categoryName, entry.plannedAmount)
   }
 
   function fmt(val: number): string {
@@ -29,8 +29,8 @@
 
 <tr
   class="entry-row"
-  class:income={entry.categoryType === 'income'}
-  data-category-id={entry.categoryId}
+  class:income={entry.entryType === 'income'}
+  data-entry-id={entry.entryId}
 >
   <td class="name-cell">
     <div class="name-cell-inner">
@@ -40,17 +40,17 @@
           class="name-text"
           onclick={openEditor}
         >
-          {entry.categoryName}
+          {entry.entryName}
         </button>
       {:else}
         <!-- Read-only: a button that opens nothing would only invite a click. -->
-        <span class="name-text name-static">{entry.categoryName}</span>
+        <span class="name-text name-static">{entry.entryName}</span>
       {/if}
     </div>
   </td>
   <td class="amount-cell planned-mo-cell">
     {#if editing}
-      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per month for {entry.categoryName}">
+      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per month for {entry.entryName}">
         {fmt(planned)}
       </button>
     {:else}
@@ -59,7 +59,7 @@
   </td>
   <td class="amount-cell yearly planned-yr-cell">
     {#if editing}
-      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per year for {entry.categoryName}">
+      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per year for {entry.entryName}">
         {fmt(planned * 12)}
       </button>
     {:else}
@@ -148,7 +148,7 @@
     font-variant-numeric: tabular-nums;
   }
   /* Reaching for the number you want to change is the obvious move, so in edit
-     mode it opens the same dialog the category name does. Marked the same way,
+     mode it opens the same dialog the entry name does. Marked the same way,
      because it means the same thing. */
   .cell-button {
     background: none;

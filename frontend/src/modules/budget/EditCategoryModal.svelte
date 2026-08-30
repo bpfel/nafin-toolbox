@@ -1,53 +1,53 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { VaultCategoryGroup, VaultData } from '../../lib/crypto/vault'
+  import type { VaultCategory, VaultData } from '../../lib/crypto/vault'
   import * as engine from '../../lib/budget/budgetEngine'
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
-    group: VaultCategoryGroup
+    category: VaultCategory
     vault: VaultData
     onsaved: () => void
     onclose: () => void
   }
 
-  let { group, vault, onsaved, onclose }: Props = $props()
+  let { category, vault, onsaved, onclose }: Props = $props()
 
   // Seeded once: the dialog is created fresh each time it opens.
-  let name = $state(untrack(() => group.name))
-  let type = $state<'income' | 'expense'>(untrack(() => group.type))
+  let name = $state(untrack(() => category.name))
+  let type = $state<'income' | 'expense'>(untrack(() => category.type))
   let error = $state<string | null>(null)
 
   let trimmed = $derived(name.trim())
-  let members = $derived(engine.categoriesInGroup(vault, group.id))
-  let movingSides = $derived(type !== group.type)
+  let members = $derived(engine.entriesInCategory(vault, category.id))
+  let movingSides = $derived(type !== category.type)
 
   // A reserve is an expense idea — it says money is being set aside towards a
-  // target. updateCategory drops it on the way to income, so say so first.
+  // target. updateEntry drops it on the way to income, so say so first.
   let reservesLost = $derived(
     movingSides && type === 'income' ? members.filter(c => c.reserve).length : 0,
   )
 
   let conflict = $derived(
-    trimmed === '' ? null : engine.findGroupConflict(vault, group.id, trimmed, type),
+    trimmed === '' ? null : engine.findCategoryConflict(vault, category.id, trimmed, type),
   )
 
-  let changed = $derived(trimmed !== group.name || movingSides)
+  let changed = $derived(trimmed !== category.name || movingSides)
 
   function save() {
     error = null
     try {
-      engine.updateGroup(vault, group.id, { name: trimmed, type })
+      engine.updateCategory(vault, category.id, { name: trimmed, type })
       onsaved()
       onclose()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'could not save this group'
+      error = e instanceof Error ? e.message : 'could not save this category'
     }
   }
 
   function merge() {
     if (!conflict) return
-    engine.mergeGroup(vault, group.id, conflict.id)
+    engine.mergeCategory(vault, category.id, conflict.id)
     onsaved()
     onclose()
   }
@@ -64,8 +64,8 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Edit group" use:focusTrap>
-    <h3>Edit group</h3>
+  <div class="modal" role="dialog" aria-label="Edit category" use:focusTrap>
+    <h3>Edit category</h3>
 
     <label class="field">
       <span class="label">Name</span>
@@ -83,8 +83,8 @@
     {#if movingSides}
       <div class="notice">
         <p>
-          Moving this group to {type} takes its {members.length}
-          {members.length === 1 ? 'category' : 'categories'} with it. Their account
+          Moving this category to {type} takes its {members.length}
+          {members.length === 1 ? 'entry' : 'entries'} with it. Their account
           routing resets to the default.
           {#if reservesLost > 0}
             {reservesLost}
@@ -98,13 +98,13 @@
     {#if conflict}
       <div class="notice">
         <p>
-          A{type === 'income' ? 'n' : ''} {type} group called <strong>{conflict.name}</strong>
-          already exists. Two groups cannot share a name on the same side of the budget.
+          A{type === 'income' ? 'n' : ''} {type} category called <strong>{conflict.name}</strong>
+          already exists. Two categories cannot share a name on the same side of the budget.
         </p>
         <p>
-          Merging moves this group's {members.length}
-          {members.length === 1 ? 'category' : 'categories'} into it and removes
-          <strong>{group.name}</strong>.
+          Merging moves this category's {members.length}
+          {members.length === 1 ? 'entry' : 'entries'} into it and removes
+          <strong>{category.name}</strong>.
         </p>
       </div>
     {/if}

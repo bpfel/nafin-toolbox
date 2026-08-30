@@ -18,41 +18,41 @@ afterEach(() => {
 
 function makeVault(): VaultData {
   const vault = createEmptyVault()
-  engine.createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
-  engine.createCategory(vault, { name: 'Food', type: 'expense', groupName: 'Living' })
-  engine.createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+  engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+  engine.createEntry(vault, { name: 'Food', type: 'expense', categoryName: 'Living' })
+  engine.createEntry(vault, { name: 'Salary', type: 'income', categoryName: 'Employment' })
   return vault
 }
 
 function show(vault: VaultData) {
-  const ongroupchanged = vi.fn()
+  const oncategorychanged = vi.fn()
   render(BudgetTable, {
     props: {
       entries: engine.getPlanSummary(vault).entries,
       vault,
       onsave: vi.fn(),
-      oncategorycreated: vi.fn(),
-      oncategorydeleted: vi.fn(),
-      ongroupchanged,
+      onentrycreated: vi.fn(),
+      onentrydeleted: vi.fn(),
+      oncategorychanged,
     },
   })
-  return { ongroupchanged }
+  return { oncategorychanged }
 }
 
-const groupButton = (name: string) => screen.queryByRole('button', { name: `Edit group ${name}` })
-const dialog = () => screen.getByRole('dialog', { name: 'Edit group' })
+const categoryButton = (name: string) => screen.queryByRole('button', { name: `Edit category ${name}` })
+const dialog = () => screen.getByRole('dialog', { name: 'Edit category' })
 
 async function openEditor(name: string) {
-  await fireEvent.click(groupButton(name)!)
+  await fireEvent.click(categoryButton(name)!)
   return dialog()
 }
 
-describe('renaming a group', () => {
-  test('the group name is inert until edit mode is on', async () => {
+describe('renaming a category', () => {
+  test('the category name is inert until edit mode is on', async () => {
     const vault = makeVault()
     show(vault)
 
-    expect(groupButton('Housing')).toBeNull()
+    expect(categoryButton('Housing')).toBeNull()
     expect(screen.getByText('Housing')).toBeTruthy()
   })
 
@@ -65,11 +65,11 @@ describe('renaming a group', () => {
     await fireEvent.input(within(d).getByLabelText('Name'), { target: { value: 'Home' } })
     await fireEvent.click(within(d).getByRole('button', { name: 'Save' }))
 
-    expect(engine.listGroups(vault).map(g => g.name).sort()).toEqual(['Employment', 'Home', 'Living'])
+    expect(engine.listCategories(vault).map(g => g.name).sort()).toEqual(['Employment', 'Home', 'Living'])
   })
 
   // The header row toggles collapse; the name button must not do both.
-  test('opening the dialog does not fold the group away', async () => {
+  test('opening the dialog does not fold the category away', async () => {
     const vault = makeVault()
     toggleEditing('budget')
     show(vault)
@@ -79,9 +79,9 @@ describe('renaming a group', () => {
     expect(screen.getByText('Rent')).toBeTruthy()
   })
 
-  test('a lone group has a header in edit mode, and none without', async () => {
+  test('a lone category has a header in edit mode, and none without', async () => {
     const vault = createEmptyVault()
-    engine.createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
 
     show(vault)
     expect(screen.queryByText('Housing')).toBeNull()
@@ -89,7 +89,7 @@ describe('renaming a group', () => {
 
     toggleEditing('budget')
     show(vault)
-    expect(groupButton('Housing')).toBeTruthy()
+    expect(categoryButton('Housing')).toBeTruthy()
   })
 })
 
@@ -106,7 +106,7 @@ describe('a name that is already taken', () => {
     expect(within(d).getByRole('button', { name: 'Merge into Living' })).toBeTruthy()
   })
 
-  test('merging re-files the categories and removes the group', async () => {
+  test('merging re-files the entries and removes the category', async () => {
     const vault = makeVault()
     toggleEditing('budget')
     show(vault)
@@ -115,9 +115,9 @@ describe('a name that is already taken', () => {
     await fireEvent.input(within(d).getByLabelText('Name'), { target: { value: 'Living' } })
     await fireEvent.click(within(d).getByRole('button', { name: 'Merge into Living' }))
 
-    const living = engine.listGroups(vault).find(g => g.name === 'Living')!
-    expect(engine.categoriesInGroup(vault, living.id).map(c => c.name).sort()).toEqual(['Food', 'Rent'])
-    expect(engine.listGroups(vault).map(g => g.name).sort()).toEqual(['Employment', 'Living'])
+    const living = engine.listCategories(vault).find(g => g.name === 'Living')!
+    expect(engine.entriesInCategory(vault, living.id).map(c => c.name).sort()).toEqual(['Food', 'Rent'])
+    expect(engine.listCategories(vault).map(g => g.name).sort()).toEqual(['Employment', 'Living'])
   })
 
   test('a clash only counts on the same side of the budget', async () => {
@@ -125,7 +125,7 @@ describe('a name that is already taken', () => {
     toggleEditing('budget')
     show(vault)
 
-    // Employment is an income group; an expense group may take the name freely.
+    // Employment is an income category; an expense category may take the name freely.
     const d = await openEditor('Housing')
     await fireEvent.input(within(d).getByLabelText('Name'), { target: { value: 'Employment' } })
 
@@ -133,7 +133,7 @@ describe('a name that is already taken', () => {
   })
 })
 
-describe('moving a group to the other side', () => {
+describe('moving a category to the other side', () => {
   test('warns what it costs before doing it', async () => {
     const vault = makeVault()
     toggleEditing('budget')
@@ -147,8 +147,8 @@ describe('moving a group to the other side', () => {
 
   test('names the reserves it would remove', async () => {
     const vault = makeVault()
-    const housing = engine.listGroups(vault).find(g => g.name === 'Housing')!
-    engine.categoriesInGroup(vault, housing.id)[0].reserve = {
+    const housing = engine.listCategories(vault).find(g => g.name === 'Housing')!
+    engine.entriesInCategory(vault, housing.id)[0].reserve = {
       kind: 'obligation', targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-01',
     }
     toggleEditing('budget')
@@ -160,7 +160,7 @@ describe('moving a group to the other side', () => {
     expect(within(d).getByText(/1 reserve is removed/i)).toBeTruthy()
   })
 
-  test('carries its categories across on save', async () => {
+  test('carries its entries across on save', async () => {
     const vault = makeVault()
     toggleEditing('budget')
     show(vault)
@@ -169,24 +169,24 @@ describe('moving a group to the other side', () => {
     await fireEvent.change(within(d).getByLabelText('Type'), { target: { value: 'income' } })
     await fireEvent.click(within(d).getByRole('button', { name: 'Save' }))
 
-    const housing = engine.listGroups(vault).find(g => g.name === 'Housing')!
+    const housing = engine.listCategories(vault).find(g => g.name === 'Housing')!
     expect(housing.type).toBe('income')
-    expect(engine.categoriesInGroup(vault, housing.id).every(c => c.type === 'income')).toBe(true)
+    expect(engine.entriesInCategory(vault, housing.id).every(c => c.type === 'income')).toBe(true)
   })
 
   test('cancelling changes nothing', async () => {
     const vault = makeVault()
     toggleEditing('budget')
-    const { ongroupchanged } = show(vault)
+    const { oncategorychanged } = show(vault)
 
     const d = await openEditor('Housing')
     await fireEvent.input(within(d).getByLabelText('Name'), { target: { value: 'Home' } })
     await fireEvent.change(within(d).getByLabelText('Type'), { target: { value: 'income' } })
     await fireEvent.click(within(d).getByRole('button', { name: 'Cancel' }))
 
-    const housing = engine.listGroups(vault).find(g => g.name === 'Housing')!
+    const housing = engine.listCategories(vault).find(g => g.name === 'Housing')!
     expect(housing.name).toBe('Housing')
     expect(housing.type).toBe('expense')
-    expect(ongroupchanged).not.toHaveBeenCalled()
+    expect(oncategorychanged).not.toHaveBeenCalled()
   })
 })

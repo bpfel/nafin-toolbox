@@ -53,7 +53,7 @@
   const isAdmin = $derived(authState.currentUser?.role === 'admin')
 
   const availableModules = [
-    { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
+    { id: 'budget', name: 'Budget', description: 'Track income and expenses by entry' },
     // Allocations ships inside Accounts as a second view rather than as its own
     // module: it is meaningless without accounts, and the flat module list has no
     // way to express that dependency. The `allocations` registry id stays unused.
@@ -445,7 +445,7 @@
           <!--
             Hidden, not removed. `{#if}` here would destroy every module's
             component state on each fold: a half-typed amount in a budget row,
-            the accounts/allocations tab the user was on, which category groups
+            the accounts/allocations tab the user was on, which entry categories
             they had open, an in-flight modal. None of that is in the vault, so
             none of it would come back. `hidden` takes the body out of the
             accessibility tree and the tab order exactly as removal would, while

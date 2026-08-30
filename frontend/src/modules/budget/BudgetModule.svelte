@@ -20,7 +20,7 @@
 
   let needsSetup = $derived(
     vaultState.vault
-      ? vaultState.vault.budget.categories.length === 0 && !dismissedSetup && version >= 0
+      ? vaultState.vault.budget.entries.length === 0 && !dismissedSetup && version >= 0
       : false
   )
 
@@ -28,14 +28,14 @@
     vaultState.vault && version >= 0 ? engine.getPlanSummary(vaultState.vault) : null
   )
 
-  function handleSave(categoryId: string, amount: string) {
+  function handleSave(entryId: string, amount: string) {
     if (!vaultState.vault) return
-    engine.setPlanned(vaultState.vault, categoryId, amount)
+    engine.setPlanned(vaultState.vault, entryId, amount)
     markDirty()
     version++
   }
 
-  function handleCategoryChange() {
+  function handleEntryChange() {
     markDirty()
     version++
   }
@@ -82,15 +82,15 @@
       entries={summary.entries}
       vault={vaultState.vault}
       onsave={handleSave}
-      oncategorycreated={handleCategoryChange}
-      oncategorydeleted={handleCategoryChange}
-      ongroupchanged={handleCategoryChange}
+      onentrycreated={handleEntryChange}
+      onentrydeleted={handleEntryChange}
+      oncategorychanged={handleEntryChange}
     />
     <ArchivePanel vault={vaultState.vault} />
 
     {#if confirmingReset}
       <ResetBudgetModal
-        categoryCount={vaultState.vault.budget.categories.length}
+        entryCount={vaultState.vault.budget.entries.length}
         archiveCount={vaultState.vault.budget.archives.length}
         onreset={handleReset}
         onclose={() => confirmingReset = false}

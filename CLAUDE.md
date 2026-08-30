@@ -100,11 +100,21 @@ nafin-toolbox/
 - `modules` — enabled module registry per user
 - `user_vaults` — encrypted vault blobs (opaque to server)
 
-### Encrypted Vault (frontend, inside `VaultData`)
-- `VaultCategoryGroup` — name, type (income/expense), sort order
-- `VaultCategory` — name, type, group, fixed flag, archived flag
-- `VaultPeriod` — year, month, notes, entries
-- `VaultEntry` — category reference, planned/actual amounts
+### Encrypted Vault (frontend, inside `VaultData`, currently v5)
+
+**Naming, since it changed in v5 and older commits will read differently.**
+A **category** is a heading — Housing, Employment. An **entry** is a line under
+it — Rent, Salary. Before v5 these were called a *group* and a *category*, which
+collided with the accounts module's own use of "category". Anything written
+before v5 means the old pair.
+
+- `VaultCategory` — name, type (income/expense), sort order
+- `VaultEntry` — name, type, sort order, archived flag, `categoryId`, routing
+  (`sourceAccountId` / `sinkAccountId`), optional reserve
+- `VaultPlanEntry` — `entryId`, planned amount. One standing plan, not per month
+- `VaultArchive` — a named snapshot; its lines are denormalised to
+  `entryName` / `categoryName` so they survive a later rename or delete
+- `VaultAccount` — name, kind, currency, current amount, last corrected at
 
 ### Future modules (not yet implemented)
 - `Account` — name, type (bank/savings/cash), currency, balance

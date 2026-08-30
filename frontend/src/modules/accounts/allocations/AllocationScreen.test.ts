@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, cleanup } from '@testing-library/svelte'
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vitest'
 import { tick } from 'svelte'
-import type { VaultCategory, VaultData } from '../../../lib/crypto/vault'
+import type { VaultEntry, VaultData } from '../../../lib/crypto/vault'
 
 // The screen reads the vault through the store, and the store is module state.
 // Swapping it for a plain object lets the tests drive real vault data without
@@ -25,12 +25,12 @@ const YEAR = now.getFullYear()
 const MONTH = now.getMonth() + 1
 const CURRENT_MONTH = `${String(YEAR).padStart(4, '0')}-${String(MONTH).padStart(2, '0')}`
 
-function category(overrides: Partial<VaultCategory> & { id: string; name: string }): VaultCategory {
+function entry(overrides: Partial<VaultEntry> & { id: string; name: string }): VaultEntry {
   return {
     type: 'expense',
     sortOrder: 0,
     archived: false,
-    groupId: 'g1',
+    categoryId: 'g1',
     sourceAccountId: 'main',
     sinkAccountId: null,
     ...overrides,
@@ -39,7 +39,7 @@ function category(overrides: Partial<VaultCategory> & { id: string; name: string
 
 function makeVault(): VaultData {
   return {
-    version: 4,
+    version: 5,
     accounts: [
       {
         id: 'main',
@@ -62,9 +62,9 @@ function makeVault(): VaultData {
       },
     ],
     budget: {
-      categoryGroups: [{ id: 'g1', name: 'Everything', type: 'expense', sortOrder: 0 }],
-      categories: [
-        category({
+      categories: [{ id: 'g1', name: 'Everything', type: 'expense', sortOrder: 0 }],
+      entries: [
+        entry({
           id: 'salary',
           name: 'Salary',
           type: 'income',
@@ -72,8 +72,8 @@ function makeVault(): VaultData {
           sourceAccountId: null,
           sinkAccountId: 'main',
         }),
-        category({ id: 'rent', name: 'Rent', sortOrder: 1 }),
-        category({
+        entry({ id: 'rent', name: 'Rent', sortOrder: 1 }),
+        entry({
           id: 'laptop',
           name: 'Laptop',
           sortOrder: 2,
@@ -87,44 +87,44 @@ function makeVault(): VaultData {
         }),
       ],
       plan: [
-        { categoryId: 'salary', plannedAmount: '900.00' },
-        { categoryId: 'rent', plannedAmount: '500.00' },
-        { categoryId: 'laptop', plannedAmount: '100.00' },
+        { entryId: 'salary', plannedAmount: '900.00' },
+        { entryId: 'rent', plannedAmount: '500.00' },
+        { entryId: 'laptop', plannedAmount: '100.00' },
       ],
       archives: [],
     },
   }
 }
 
-// Three expense categories across two named groups plus one whose group is
-// gone. The groups are declared in the *opposite* order to their sortOrder, so
+// Three expense entries across two named categories plus one whose category is
+// gone. The categories are declared in the *opposite* order to their sortOrder, so
 // a screen that grouped by encounter order would get this wrong.
 function groupedVault(): VaultData {
   const vault = makeVault()
-  vault.budget.categoryGroups = [
+  vault.budget.categories = [
     { id: 'g-housing', name: 'Housing', type: 'expense', sortOrder: 20 },
     { id: 'g-fun', name: 'Fun', type: 'expense', sortOrder: 10 },
   ]
-  vault.budget.categories = [
-    category({ id: 'rent', name: 'Rent', groupId: 'g-housing', sortOrder: 0 }),
-    category({ id: 'games', name: 'Games', groupId: 'g-fun', sortOrder: 1 }),
-    // Its group was deleted — the row must survive that.
-    category({ id: 'orphan', name: 'Orphan', groupId: 'g-deleted', sortOrder: 2 }),
+  vault.budget.entries = [
+    entry({ id: 'rent', name: 'Rent', categoryId: 'g-housing', sortOrder: 0 }),
+    entry({ id: 'games', name: 'Games', categoryId: 'g-fun', sortOrder: 1 }),
+    // Its category was deleted — the row must survive that.
+    entry({ id: 'orphan', name: 'Orphan', categoryId: 'g-deleted', sortOrder: 2 }),
   ]
   vault.budget.plan = [
-    { categoryId: 'rent', plannedAmount: '500.00' },
-    { categoryId: 'games', plannedAmount: '50.00' },
-    { categoryId: 'orphan', plannedAmount: '25.00' },
+    { entryId: 'rent', plannedAmount: '500.00' },
+    { entryId: 'games', plannedAmount: '50.00' },
+    { entryId: 'orphan', plannedAmount: '25.00' },
   ]
   return vault
 }
 
-function groupHeaders() {
-  return screen.getAllByTestId('allocation-group')
+function categoryHeaders() {
+  return screen.getAllByTestId('allocation-category')
 }
 
-function groupNames() {
-  return groupHeaders().map(el => el.querySelector('.group-name')!.textContent!.trim())
+function categoryNames() {
+  return categoryHeaders().map(el => el.querySelector('.category-name')!.textContent!.trim())
 }
 
 function totals() {
@@ -158,11 +158,11 @@ describe('AllocationScreen', () => {
     expect(totals()).toEqual({ unallocated: '300.00', netChange: '400.00' })
   })
 
-  test('an income category is asked only where money lands, never where it comes from', async () => {
+  test('an income entry is asked only where money lands, never where it comes from', async () => {
     render(AllocationScreen)
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
-    await fireEvent.click(editButtons[0]) // Salary, the only income category
+    await fireEvent.click(editButtons[0]) // Salary, the only income entry
 
     expect(screen.getByLabelText('Lands in')).toBeTruthy()
     expect(screen.queryByLabelText('Paid from')).toBeNull()
@@ -184,7 +184,7 @@ describe('AllocationScreen', () => {
     // Routing the expense into an account is what makes a reserve possible.
     expect(screen.getByLabelText('Saving towards')).toBeTruthy()
     // …and the sink is a real account, never null.
-    expect(testVault!.budget.categories.find(c => c.id === 'rent')!.sinkAccountId).toBe('main')
+    expect(testVault!.budget.entries.find(c => c.id === 'rent')!.sinkAccountId).toBe('main')
   })
 
   test('routing an expense into an account moves netChange but not unallocated', async () => {
@@ -201,8 +201,8 @@ describe('AllocationScreen', () => {
 
   test('an under-funded account is reported, and never blocks anything', async () => {
     // An obligation far larger than the account can cover.
-    testVault!.budget.categories.push(
-      category({
+    testVault!.budget.entries.push(
+      entry({
         id: 'tax',
         name: 'Tax',
         sortOrder: 3,
@@ -234,7 +234,7 @@ describe('AllocationScreen', () => {
 
     // A reserve has to accumulate somewhere, so a null sink cannot keep one.
     expect(screen.queryByLabelText('Saving towards')).toBeNull()
-    expect(testVault!.budget.categories.find(c => c.id === 'laptop')!.reserve).toBeUndefined()
+    expect(testVault!.budget.entries.find(c => c.id === 'laptop')!.reserve).toBeUndefined()
   })
 
   test('recording a purchase re-prices the next cycle and restarts it', async () => {
@@ -249,7 +249,7 @@ describe('AllocationScreen', () => {
 
     // The real price paid becomes the next cycle's target — replacement cost
     // keeps itself up to date — and the cycle restarts at the purchase month.
-    expect(testVault!.budget.categories.find(c => c.id === 'laptop')!.reserve).toEqual({
+    expect(testVault!.budget.entries.find(c => c.id === 'laptop')!.reserve).toEqual({
       kind: 'amortization',
       targetAmount: '1450.00',
       periodMonths: 60,
@@ -272,73 +272,73 @@ describe('AllocationScreen', () => {
       testVault = groupedVault()
     })
 
-    test("groups follow the budget group's sortOrder, not the order they are met", () => {
+    test("categories follow the budget category's sortOrder, not the order they are met", () => {
       render(AllocationScreen)
 
-      // Fun sorts at 10, Housing at 20, and a vanished group has no order at
+      // Fun sorts at 10, Housing at 20, and a vanished category has no order at
       // all, so it lands last.
-      expect(groupNames()).toEqual(['Fun', 'Housing', 'Other'])
+      expect(categoryNames()).toEqual(['Fun', 'Housing', 'Other'])
     })
 
-    test('each group header carries its own planned subtotal', () => {
+    test('each category header carries its own planned subtotal', () => {
       render(AllocationScreen)
 
-      const subtotals = groupHeaders().map(el =>
-        el.querySelector('.group-subtotal')!.textContent!.trim(),
+      const subtotals = categoryHeaders().map(el =>
+        el.querySelector('.category-subtotal')!.textContent!.trim(),
       )
       expect(subtotals).toEqual(['50.00', '500.00', '25.00'])
     })
 
-    test('collapsing a group hides only that group’s rows', async () => {
+    test('collapsing a category hides only that category’s rows', async () => {
       render(AllocationScreen)
 
       expect(screen.queryByText('Games')).toBeTruthy()
       expect(screen.queryByText('Rent')).toBeTruthy()
 
-      await fireEvent.click(groupHeaders()[0]) // Fun
+      await fireEvent.click(categoryHeaders()[0]) // Fun
 
       expect(screen.queryByText('Games')).toBeNull()
       expect(screen.queryByText('Rent')).toBeTruthy()
       expect(screen.queryByText('Orphan')).toBeTruthy()
       // The header itself stays, subtotal and all — that is the point of it.
-      expect(groupNames()).toEqual(['Fun', 'Housing', 'Other'])
-      expect(groupHeaders()[0].getAttribute('aria-expanded')).toBe('false')
+      expect(categoryNames()).toEqual(['Fun', 'Housing', 'Other'])
+      expect(categoryHeaders()[0].getAttribute('aria-expanded')).toBe('false')
 
       // And it folds back open.
-      await fireEvent.click(groupHeaders()[0])
+      await fireEvent.click(categoryHeaders()[0])
       expect(screen.queryByText('Games')).toBeTruthy()
     })
 
-    test('a category whose group was deleted still appears, under Other', () => {
+    test('an entry whose category was deleted still appears, under Other', () => {
       render(AllocationScreen)
 
       expect(screen.getByText('Orphan')).toBeTruthy()
-      expect(groupNames()).toContain('Other')
+      expect(categoryNames()).toContain('Other')
     })
 
     test('income and expenses stay separate sections, each grouped on its own', () => {
-      // Two income groups, because a side with only one renders no header at
-      // all — a lone group is not a grouping. One would leave nothing to
+      // Two income categories, because a side with only one renders no header at
+      // all — a lone category is not a grouping. One would leave nothing to
       // observe about income's ordering.
-      testVault!.budget.categoryGroups.push(
+      testVault!.budget.categories.push(
         { id: 'g-pay', name: 'Pay', type: 'income', sortOrder: 5 },
         { id: 'g-side', name: 'Side work', type: 'income', sortOrder: 6 },
       )
-      testVault!.budget.categories.push(
-        category({
+      testVault!.budget.entries.push(
+        entry({
           id: 'salary',
           name: 'Salary',
           type: 'income',
-          groupId: 'g-pay',
+          categoryId: 'g-pay',
           sortOrder: 3,
           sourceAccountId: null,
           sinkAccountId: 'main',
         }),
-        category({
+        entry({
           id: 'freelance',
           name: 'Freelance',
           type: 'income',
-          groupId: 'g-side',
+          categoryId: 'g-side',
           sortOrder: 4,
           sourceAccountId: null,
           sinkAccountId: 'main',
@@ -347,18 +347,18 @@ describe('AllocationScreen', () => {
 
       render(AllocationScreen)
 
-      // Income groups are listed inside "Money in", ahead of every expense
-      // group, rather than merged into the expense ordering.
-      expect(groupNames()).toEqual(['Pay', 'Side work', 'Fun', 'Housing', 'Other'])
+      // Income categories are listed inside "Money in", ahead of every expense
+      // category, rather than merged into the expense ordering.
+      expect(categoryNames()).toEqual(['Pay', 'Side work', 'Fun', 'Housing', 'Other'])
       expect(screen.getByText('Money in')).toBeTruthy()
     })
 
-    test('a side with a single group renders no header for it', () => {
-      // The default fixture has exactly one income category, so income has one
-      // group. Expenses have three and keep theirs.
+    test('a side with a single category renders no header for it', () => {
+      // The default fixture has exactly one income entry, so income has one
+      // category. Expenses have three and keep theirs.
       render(AllocationScreen)
 
-      expect(groupNames()).toEqual(['Fun', 'Housing', 'Other'])
+      expect(categoryNames()).toEqual(['Fun', 'Housing', 'Other'])
     })
   })
 })
@@ -384,7 +384,7 @@ describe('AllocationScreen edit mode', () => {
     expect(screen.queryAllByRole('button', { name: 'Edit routing' })).toHaveLength(3)
   })
 
-  // Reading the plan is never gated: the flow lines, the figures and the group
+  // Reading the plan is never gated: the flow lines, the figures and the category
   // headers are all there before anything is unlocked.
   test('the figures and the flow lines read fine read-only', () => {
     render(AllocationScreen)
@@ -405,7 +405,7 @@ describe('AllocationScreen edit mode', () => {
     })
     await fireEvent.click(screen.getByRole('button', { name: 'Record purchase' }))
 
-    expect(testVault!.budget.categories.find(c => c.id === 'laptop')!.reserve).toEqual({
+    expect(testVault!.budget.entries.find(c => c.id === 'laptop')!.reserve).toEqual({
       kind: 'amortization',
       targetAmount: '1450.00',
       periodMonths: 60,

@@ -19,32 +19,32 @@ afterEach(() => {
 
 function makeVault(): VaultData {
   const vault = createEmptyVault()
-  engine.createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
-  engine.createCategory(vault, { name: 'Food', type: 'expense', groupName: 'Housing' })
+  engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+  engine.createEntry(vault, { name: 'Food', type: 'expense', categoryName: 'Housing' })
   return vault
 }
 
 function show(vault: VaultData) {
-  const oncategorydeleted = vi.fn()
+  const onentrydeleted = vi.fn()
   render(BudgetTable, {
     props: {
       entries: engine.getPlanSummary(vault).entries,
       vault,
       onsave: vi.fn(),
-      oncategorycreated: vi.fn(),
-      oncategorydeleted,
-      ongroupchanged: vi.fn(),
+      onentrycreated: vi.fn(),
+      onentrydeleted,
+      oncategorychanged: vi.fn(),
     },
   })
-  return { oncategorydeleted }
+  return { onentrydeleted }
 }
 
-async function openEditor(categoryName: string) {
-  await fireEvent.click(screen.getByRole('button', { name: categoryName }))
-  return screen.getByRole('dialog', { name: 'Edit category' })
+async function openEditor(entryName: string) {
+  await fireEvent.click(screen.getByRole('button', { name: entryName }))
+  return screen.getByRole('dialog', { name: 'Edit entry' })
 }
 
-describe('deleting a category from the dialog', () => {
+describe('deleting an entry from the dialog', () => {
   // The row's trash button is display:none below 768px, where there is no width
   // for it. The dialog is the path that exists at every size, and the whole row
   // opens it.
@@ -58,13 +58,13 @@ describe('deleting a category from the dialog', () => {
     expect(within(editor).getByRole('button', { name: 'Delete' })).toBeTruthy()
   })
 
-  test('adding a category offers no Delete', async () => {
+  test('adding an entry offers no Delete', async () => {
     const vault = makeVault()
     toggleEditing('budget')
     show(vault)
 
-    await fireEvent.click(screen.getAllByRole('button', { name: '+ Add category' })[0])
-    const dialog = screen.getByRole('dialog', { name: 'Add category' })
+    await fireEvent.click(screen.getAllByRole('button', { name: '+ Add entry' })[0])
+    const dialog = screen.getByRole('dialog', { name: 'Add entry' })
 
     expect(within(dialog).queryByRole('button', { name: 'Delete' })).toBeNull()
   })
@@ -72,16 +72,16 @@ describe('deleting a category from the dialog', () => {
   test('Delete hands over to the confirmation rather than deleting', async () => {
     const vault = makeVault()
     toggleEditing('budget')
-    const { oncategorydeleted } = show(vault)
+    const { onentrydeleted } = show(vault)
 
     const editor = await openEditor('Rent')
     await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
 
-    expect(await screen.findByRole('dialog', { name: 'Delete category' })).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: 'Delete entry' })).toBeTruthy()
     // The editor gets out of the way, and nothing is gone yet.
-    expect(screen.queryByRole('dialog', { name: 'Edit category' })).toBeNull()
-    expect(engine.listCategories(vault)).toHaveLength(2)
-    expect(oncategorydeleted).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'Edit entry' })).toBeNull()
+    expect(engine.listEntries(vault)).toHaveLength(2)
+    expect(onentrydeleted).not.toHaveBeenCalled()
   })
 
   // The budget stopped having periods when v4 replaced them with one plan plus
@@ -94,13 +94,13 @@ describe('deleting a category from the dialog', () => {
 
     const editor = await openEditor('Rent')
     await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
-    const confirm = await screen.findByRole('dialog', { name: 'Delete category' })
+    const confirm = await screen.findByRole('dialog', { name: 'Delete entry' })
 
     expect(confirm.textContent).toMatch(/archive/i)
     expect(confirm.textContent).not.toMatch(/periods/i)
   })
 
-  test('archives really do keep the category after it is deleted', async () => {
+  test('archives really do keep the entry after it is deleted', async () => {
     const vault = makeVault()
     const archive = engine.archivePlan(vault, 'Before the cull')
     toggleEditing('budget')
@@ -108,24 +108,24 @@ describe('deleting a category from the dialog', () => {
 
     const editor = await openEditor('Rent')
     await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
-    const confirm = await screen.findByRole('dialog', { name: 'Delete category' })
+    const confirm = await screen.findByRole('dialog', { name: 'Delete entry' })
     await fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }))
 
-    expect(engine.listCategories(vault).map(c => c.name)).toEqual(['Food'])
-    expect(archive.lines.map(l => l.categoryName)).toContain('Rent')
+    expect(engine.listEntries(vault).map(c => c.name)).toEqual(['Food'])
+    expect(archive.lines.map(l => l.entryName)).toContain('Rent')
   })
 
-  test('confirming removes the category', async () => {
+  test('confirming removes the entry', async () => {
     const vault = makeVault()
     toggleEditing('budget')
     show(vault)
 
     const editor = await openEditor('Rent')
     await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
-    const confirm = await screen.findByRole('dialog', { name: 'Delete category' })
+    const confirm = await screen.findByRole('dialog', { name: 'Delete entry' })
     await fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }))
 
-    expect(engine.listCategories(vault).map(c => c.name)).toEqual(['Food'])
+    expect(engine.listEntries(vault).map(c => c.name)).toEqual(['Food'])
   })
 
   test('cancelling the confirmation keeps it', async () => {
@@ -135,10 +135,10 @@ describe('deleting a category from the dialog', () => {
 
     const editor = await openEditor('Rent')
     await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
-    const confirm = await screen.findByRole('dialog', { name: 'Delete category' })
+    const confirm = await screen.findByRole('dialog', { name: 'Delete entry' })
     await fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
 
-    expect(engine.listCategories(vault)).toHaveLength(2)
+    expect(engine.listEntries(vault)).toHaveLength(2)
   })
 })
 
@@ -151,11 +151,11 @@ describe('the long press is gone', () => {
     toggleEditing('budget')
     show(vault)
 
-    const row = document.querySelector('[data-category-id]') as HTMLElement
+    const row = document.querySelector('[data-entry-id]') as HTMLElement
     await fireEvent.touchStart(row)
     await vi.advanceTimersByTimeAsync(2000)
 
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(engine.listCategories(vault)).toHaveLength(2)
+    expect(engine.listEntries(vault)).toHaveLength(2)
   })
 })

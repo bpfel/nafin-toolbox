@@ -3,11 +3,11 @@
   import * as engine from '../../../lib/budget/budgetEngine'
   import type {
     ReserveDefinition,
+    VaultEntry,
     VaultCategory,
-    VaultCategoryGroup,
     VaultData,
   } from '../../../lib/crypto/vault'
-  import { isLegalCategoryRouting, isLegalRouting } from '../../../lib/accounts/routing'
+  import { isLegalEntryRouting, isLegalRouting } from '../../../lib/accounts/routing'
   import {
     availableForAccount,
     projectedBalance,
@@ -21,7 +21,7 @@
   // The monthly flow view: which budget lines move money from where to where,
   // and what accumulates this month.
   //
-  // Reads the budget's categories and planned amounts but never writes them —
+  // Reads the budget's entries and planned amounts but never writes them —
   // amounts stay the budget's business. What this screen owns is routing and
   // reserve definitions, which the budget never shows.
   //
@@ -34,17 +34,17 @@
     sinkAccountId: string | null
   }
 
-  // What a row needs to render. The category is a snapshot, never the vault's
+  // What a row needs to render. The entry is a snapshot, never the vault's
   // own object — see `rows` below for why that matters.
   interface RowView {
-    category: VaultCategory
+    entry: VaultEntry
     plannedAmount: string
     sinkAvailable: string | null
   }
 
-  interface RowGroup {
-    groupId: string
-    groupName: string
+  interface RowCategory {
+    categoryId: string
+    categoryName: string
     rows: RowView[]
     plannedTotal: string
   }
@@ -68,7 +68,7 @@
   let version = $state(0)
 
   let error = $state<string | null>(null)
-  let purchaseCategoryId = $state<string | null>(null)
+  let purchaseEntryId = $state<string | null>(null)
 
   function money(amount: string): string {
     return Number(amount).toLocaleString('de-CH', {
@@ -85,12 +85,12 @@
     }
   }
 
-  let categories = $derived(
-    vaultState.vault && version >= 0 ? engine.listCategories(vaultState.vault) : [],
+  let entries = $derived(
+    vaultState.vault && version >= 0 ? engine.listEntries(vaultState.vault) : [],
   )
   let accounts = $derived(vaultState.vault && version >= 0 ? vaultState.vault.accounts : [])
 
-  // Planned amounts come from the standing plan, read-only. A category the plan
+  // Planned amounts come from the standing plan, read-only. An entry the plan
   // has no line for reads as zero rather than having one created here.
   let plannedById = $derived.by(() => {
     void version
@@ -98,97 +98,97 @@
     const vault = vaultState.vault
     if (!vault) return map
     for (const entry of engine.getPlanSummary(vault).entries) {
-      map.set(entry.categoryId, entry.plannedAmount)
+      map.set(entry.entryId, entry.plannedAmount)
     }
     return map
   })
 
-  function plannedFor(categoryId: string): string {
-    return plannedById.get(categoryId) ?? '0.00'
+  function plannedFor(entryId: string): string {
+    return plannedById.get(entryId) ?? '0.00'
   }
 
-  // Rows get a *snapshot* of the category, not the vault's own object. Routing
+  // Rows get a *snapshot* of the entry, not the vault's own object. Routing
   // is changed by mutating that object in place, which runes cannot observe: a
   // row handed the same object reference would never re-render. Rebuilding the
   // snapshots whenever `version` moves is what makes a routing change visible.
   let rows = $derived.by((): RowView[] => {
     void version
-    return categories.map(category => ({
-      category: { ...category },
-      plannedAmount: plannedFor(category.id),
-      sinkAvailable: sinkAvailable(category.sinkAccountId),
+    return entries.map(entry => ({
+      entry: { ...entry },
+      plannedAmount: plannedFor(entry.id),
+      sinkAvailable: sinkAvailable(entry.sinkAccountId),
     }))
   })
 
-  let incomeRows = $derived(rows.filter(r => r.category.type === 'income'))
-  let expenseRows = $derived(rows.filter(r => r.category.type === 'expense'))
+  let incomeRows = $derived(rows.filter(r => r.entry.type === 'income'))
+  let expenseRows = $derived(rows.filter(r => r.entry.type === 'expense'))
 
   // --- Grouping ----------------------------------------------------------
-  // Same shape as the budget table: rows are grouped by their budget group and
-  // ordered by the group's own `sortOrder`, so a user who has arranged their
-  // groups in the budget sees that same arrangement here.
+  // Same shape as the budget table: rows are grouped by their budget category and
+  // ordered by the category's own `sortOrder`, so a user who has arranged their
+  // categories in the budget sees that same arrangement here.
 
-  let groupsById = $derived.by((): Map<string, VaultCategoryGroup> => {
+  let categoriesById = $derived.by((): Map<string, VaultCategory> => {
     void version
     const vault = vaultState.vault
     if (!vault) return new Map()
-    return new Map(engine.listGroups(vault).map(g => [g.id, g]))
+    return new Map(engine.listCategories(vault).map(g => [g.id, g]))
   })
 
-  function groupOrder(groupId: string): number {
-    return groupsById.get(groupId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
+  function categoryOrder(categoryId: string): number {
+    return categoriesById.get(categoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
   }
 
-  // A category whose group was deleted still has to show up, so an unknown
-  // group id collapses into the unnamed "Other" bucket that sorts last.
-  function groupRows(list: RowView[]): RowGroup[] {
-    const map = new Map<string, { groupId: string; groupName: string; rows: RowView[]; cents: number }>()
+  // An entry whose category was deleted still has to show up, so an unknown
+  // category id collapses into the unnamed "Other" bucket that sorts last.
+  function categoryRows(list: RowView[]): RowCategory[] {
+    const map = new Map<string, { categoryId: string; categoryName: string; rows: RowView[]; cents: number }>()
     for (const row of list) {
-      const group = groupsById.get(row.category.groupId)
-      const name = group?.name ?? ''
+      const category = categoriesById.get(row.entry.categoryId)
+      const name = category?.name ?? ''
       let bucket = map.get(name)
       if (!bucket) {
-        bucket = { groupId: group?.id ?? '', groupName: name, rows: [], cents: 0 }
+        bucket = { categoryId: category?.id ?? '', categoryName: name, rows: [], cents: 0 }
         map.set(name, bucket)
       }
       bucket.rows.push(row)
       bucket.cents += cents(row.plannedAmount)
     }
     return Array.from(map.values())
-      .sort((a, b) => groupOrder(a.groupId) - groupOrder(b.groupId))
+      .sort((a, b) => categoryOrder(a.categoryId) - categoryOrder(b.categoryId))
       .map(b => ({
-        groupId: b.groupId,
-        groupName: b.groupName,
+        categoryId: b.categoryId,
+        categoryName: b.categoryName,
         rows: b.rows,
         plannedTotal: fromCents(b.cents),
       }))
   }
 
-  let incomeGroups = $derived(groupRows(incomeRows))
-  let expenseGroups = $derived(groupRows(expenseRows))
+  let incomeCategories = $derived(categoryRows(incomeRows))
+  let expenseCategories = $derived(categoryRows(expenseRows))
 
   // Collapse is a view preference of this screen alone: not persisted, not
   // shared with the budget table. Keyed by type so "Other" under income and
   // "Other" under expenses fold independently.
-  let collapsedGroups = $state(new Set<string>())
+  let collapsedCategories = $state(new Set<string>())
 
-  function toggleGroup(type: 'income' | 'expense', groupName: string) {
-    const key = `${type}:${groupName}`
-    const next = new Set(collapsedGroups)
+  function toggleCategory(type: 'income' | 'expense', categoryName: string) {
+    const key = `${type}:${categoryName}`
+    const next = new Set(collapsedCategories)
     if (next.has(key)) next.delete(key)
     else next.add(key)
-    collapsedGroups = next
+    collapsedCategories = next
   }
 
-  function isCollapsed(type: 'income' | 'expense', groupName: string): boolean {
-    return collapsedGroups.has(`${type}:${groupName}`)
+  function isCollapsed(type: 'income' | 'expense', categoryName: string): boolean {
+    return collapsedCategories.has(`${type}:${categoryName}`)
   }
 
-  // A lone group is not a grouping — a header for it adds a row of chrome that
+  // A lone category is not a grouping — a header for it adds a row of chrome that
   // says nothing, named or not. Matches the budget table, which dropped the
   // "or it has a name" half of this condition for the same reason.
-  function showsHeaders(groups: RowGroup[]): boolean {
-    return groups.length > 1
+  function showsHeaders(categories: RowCategory[]): boolean {
+    return categories.length > 1
   }
 
   // The two totals. They differ by exactly the set-asides: budgeted as
@@ -199,14 +199,14 @@
     let outflow = 0
     let setAside = 0
 
-    for (const category of categories) {
-      const planned = cents(plannedFor(category.id))
-      if (category.type === 'income') {
+    for (const entry of entries) {
+      const planned = cents(plannedFor(entry.id))
+      if (entry.type === 'income') {
         income += planned
         continue
       }
       expenses += planned
-      if (category.sinkAccountId === null) outflow += planned
+      if (entry.sinkAccountId === null) outflow += planned
       else setAside += planned
     }
 
@@ -224,12 +224,12 @@
   // deadline. Amortizations are deliberately excluded — their date moves.
   function soonestObligation(vault: VaultData, accountId: string) {
     let best: { month: string; monthsAway: number } | null = null
-    for (const category of vault.budget.categories) {
-      if (category.archived) continue
-      if (category.reserve?.kind !== 'obligation') continue
-      if (category.sinkAccountId !== accountId) continue
+    for (const entry of vault.budget.entries) {
+      if (entry.archived) continue
+      if (entry.reserve?.kind !== 'obligation') continue
+      if (entry.sinkAccountId !== accountId) continue
       try {
-        const due = nextDue(category.reserve.anchorMonth, category.reserve.periodMonths, currentMonth)
+        const due = nextDue(entry.reserve.anchorMonth, entry.reserve.periodMonths, currentMonth)
         const monthsAway = monthsBetween(currentMonth, due)
         if (!best || monthsAway < best.monthsAway) best = { month: due, monthsAway }
       } catch {
@@ -277,46 +277,46 @@
     return availableByAccount.get(sinkAccountId) ?? null
   }
 
-  function findCategory(categoryId: string) {
-    return vaultState.vault?.budget.categories.find(c => c.id === categoryId) ?? null
+  function findEntry(entryId: string) {
+    return vaultState.vault?.budget.entries.find(c => c.id === entryId) ?? null
   }
 
-  function applyRouting(categoryId: string, routing: Routing) {
-    const category = findCategory(categoryId)
-    if (!category) return
+  function applyRouting(entryId: string, routing: Routing) {
+    const entry = findEntry(entryId)
+    if (!entry) return
 
     // The controls cannot produce an illegal pair; this is the assertion that
     // keeps that true if they ever change.
-    if (!isLegalRouting(category.type, routing.sourceAccountId, routing.sinkAccountId)) {
-      error = `${category.name} cannot be routed that way.`
+    if (!isLegalRouting(entry.type, routing.sourceAccountId, routing.sinkAccountId)) {
+      error = `${entry.name} cannot be routed that way.`
       return
     }
 
     error = null
-    category.sourceAccountId = routing.sourceAccountId
-    category.sinkAccountId = routing.sinkAccountId
+    entry.sourceAccountId = routing.sourceAccountId
+    entry.sinkAccountId = routing.sinkAccountId
     // A reserve has to accumulate somewhere. Routing back to spending removes
     // the sink, so the reserve goes with it rather than lingering illegally.
-    if (category.sinkAccountId === null) delete category.reserve
+    if (entry.sinkAccountId === null) delete entry.reserve
 
     markDirty()
     version++
   }
 
-  function applyReserve(categoryId: string, reserve: ReserveDefinition | undefined) {
-    const category = findCategory(categoryId)
-    if (!category) return
+  function applyReserve(entryId: string, reserve: ReserveDefinition | undefined) {
+    const entry = findEntry(entryId)
+    if (!entry) return
 
-    const previous = category.reserve
-    if (reserve === undefined) delete category.reserve
-    else category.reserve = reserve
+    const previous = entry.reserve
+    if (reserve === undefined) delete entry.reserve
+    else entry.reserve = reserve
 
     // `reserve` implies expense with a non-null sink. The set-aside gate makes
     // that structural; this catches any other route in.
-    if (!isLegalCategoryRouting(category)) {
-      if (previous === undefined) delete category.reserve
-      else category.reserve = previous
-      error = `${category.name} must be set aside into an account before it can have a target.`
+    if (!isLegalEntryRouting(entry)) {
+      if (previous === undefined) delete entry.reserve
+      else entry.reserve = previous
+      error = `${entry.name} must be set aside into an account before it can have a target.`
       return
     }
 
@@ -328,69 +328,69 @@
   // The whole of the purchase: the real price becomes the next cycle's target,
   // and the anchor moves to the month of purchase so the cycle restarts. No
   // money moves, nothing else is touched.
-  function applyPurchase(categoryId: string, pricePaid: string, purchaseMonth: string) {
-    const category = findCategory(categoryId)
-    if (!category?.reserve) return
+  function applyPurchase(entryId: string, pricePaid: string, purchaseMonth: string) {
+    const entry = findEntry(entryId)
+    if (!entry?.reserve) return
 
-    category.reserve = {
-      ...category.reserve,
+    entry.reserve = {
+      ...entry.reserve,
       targetAmount: pricePaid,
       anchorMonth: purchaseMonth,
     }
 
     markDirty()
     version++
-    purchaseCategoryId = null
+    purchaseEntryId = null
   }
 
   let purchaseContext = $derived.by(() => {
     void version
-    if (purchaseCategoryId === null) return null
-    const category = findCategory(purchaseCategoryId)
-    if (!category?.reserve || category.reserve.kind !== 'amortization') return null
-    const sink = category.sinkAccountId
+    if (purchaseEntryId === null) return null
+    const entry = findEntry(purchaseEntryId)
+    if (!entry?.reserve || entry.reserve.kind !== 'amortization') return null
+    const sink = entry.sinkAccountId
     return {
-      categoryId: category.id,
-      categoryName: category.name,
-      reserve: category.reserve,
+      entryId: entry.id,
+      entryName: entry.name,
+      reserve: entry.reserve,
       accountName: accounts.find(a => a.id === sink)?.name ?? 'the account',
       available: sinkAvailable(sink) ?? '0.00',
     }
   })
 </script>
 
-{#snippet groupBlock(type: 'income' | 'expense', group: RowGroup, withHeader: boolean)}
-  <div class="group">
+{#snippet categoryBlock(type: 'income' | 'expense', category: RowCategory, withHeader: boolean)}
+  <div class="category">
     {#if withHeader}
       <button
         type="button"
-        class="group-header"
-        class:collapsed={isCollapsed(type, group.groupName)}
-        data-testid="allocation-group"
-        aria-expanded={!isCollapsed(type, group.groupName)}
-        onclick={() => toggleGroup(type, group.groupName)}
+        class="category-header"
+        class:collapsed={isCollapsed(type, category.categoryName)}
+        data-testid="allocation-category"
+        aria-expanded={!isCollapsed(type, category.categoryName)}
+        onclick={() => toggleCategory(type, category.categoryName)}
       >
-        <span class="group-chevron">
+        <span class="category-chevron">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
             <path d="M2 4 L6 10 L10 4 Z" />
           </svg>
         </span>
-        <span class="group-name">{group.groupName || 'Other'}</span>
-        <span class="group-subtotal">{money(group.plannedTotal)}</span>
+        <span class="category-name">{category.categoryName || 'Other'}</span>
+        <span class="category-subtotal">{money(category.plannedTotal)}</span>
       </button>
     {/if}
-    {#if !withHeader || !isCollapsed(type, group.groupName)}
+    {#if !withHeader || !isCollapsed(type, category.categoryName)}
       <div class="rows">
-        {#each group.rows as row (row.category.id)}
+        {#each category.rows as row (row.entry.id)}
           <AllocationRow
-            category={row.category}
+            entry={row.entry}
             plannedAmount={row.plannedAmount}
             {accounts}
             {currentMonth}
             sinkAvailable={row.sinkAvailable}
-            onroutingchange={(routing) => applyRouting(row.category.id, routing)}
-            onreservechange={(reserve) => applyReserve(row.category.id, reserve)}
-            onpurchase={() => (purchaseCategoryId = row.category.id)}
+            onroutingchange={(routing) => applyRouting(row.entry.id, routing)}
+            onreservechange={(reserve) => applyReserve(row.entry.id, reserve)}
+            onpurchase={() => (purchaseEntryId = row.entry.id)}
           />
         {/each}
       </div>
@@ -401,9 +401,9 @@
 <div class="allocation-screen">
   {#if !vaultState.vault}
     <p class="empty">Loading…</p>
-  {:else if categories.length === 0}
+  {:else if entries.length === 0}
     <p class="empty">
-      No budget categories yet. Add them in the Budget module and they will appear here, ready to
+      No budget entries yet. Add them in the Budget module and they will appear here, ready to
       route.
     </p>
   {:else}
@@ -421,20 +421,20 @@
       <p class="error">{error}</p>
     {/if}
 
-    {#if incomeGroups.length > 0}
+    {#if incomeCategories.length > 0}
       <section class="flow-section">
         <h3>Money in</h3>
-        {#each incomeGroups as group (group.groupName)}
-          {@render groupBlock('income', group, showsHeaders(incomeGroups))}
+        {#each incomeCategories as category (category.categoryName)}
+          {@render categoryBlock('income', category, showsHeaders(incomeCategories))}
         {/each}
       </section>
     {/if}
 
-    {#if expenseGroups.length > 0}
+    {#if expenseCategories.length > 0}
       <section class="flow-section">
         <h3>Money out and money set aside</h3>
-        {#each expenseGroups as group (group.groupName)}
-          {@render groupBlock('expense', group, showsHeaders(expenseGroups))}
+        {#each expenseCategories as category (category.categoryName)}
+          {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
         {/each}
         <p class="section-note">
           Set-asides total {money(totals.setAside)} this month. They count as budgeted expenses
@@ -447,14 +447,14 @@
 
 {#if purchaseContext}
   <PurchaseDialog
-    categoryName={purchaseContext.categoryName}
+    entryName={purchaseContext.entryName}
     reserve={purchaseContext.reserve}
     accountName={purchaseContext.accountName}
     available={purchaseContext.available}
     {currentMonth}
     onconfirm={(price, purchaseMonth) =>
-      applyPurchase(purchaseContext!.categoryId, price, purchaseMonth)}
-    onclose={() => (purchaseCategoryId = null)}
+      applyPurchase(purchaseContext!.entryId, price, purchaseMonth)}
+    onclose={() => (purchaseEntryId = null)}
   />
 {/if}
 
@@ -485,7 +485,7 @@
     display: flex;
     flex-direction: column;
   }
-  .group-header {
+  .category-header {
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -501,41 +501,41 @@
     cursor: pointer;
     user-select: none;
   }
-  .group-header.collapsed {
+  .category-header.collapsed {
     border-bottom: 2px solid #ced4da;
   }
-  .group-header:hover {
+  .category-header:hover {
     background: #e9ecef;
   }
-  .group-name {
+  .category-name {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .group-subtotal {
+  .category-subtotal {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
   /* Always visible. It used to fade in on hover so a header read as a label
      rather than a control — but a touchscreen has no hover, so the only hint
-     that a group folds was invisible on exactly the devices where a long list
+     that a category folds was invisible on exactly the devices where a long list
      most needs folding. A muted colour keeps the restraint without hiding the
      affordance. */
-  .group-chevron {
+  .category-chevron {
     display: inline-flex;
     align-items: center;
     color: #adb5bd;
     opacity: 1;
     transition: color 0.15s, transform 0.15s;
   }
-  .group-header.collapsed .group-chevron {
+  .category-header.collapsed .category-chevron {
     transform: rotate(-90deg);
   }
-  .group-header:hover .group-chevron,
-  .group-header:focus-visible .group-chevron,
-  .group-header.collapsed .group-chevron {
+  .category-header:hover .category-chevron,
+  .category-header:focus-visible .category-chevron,
+  .category-header.collapsed .category-chevron {
     color: #495057;
   }
   .section-note {
@@ -563,13 +563,13 @@
   }
 
   @media (hover: none) and (pointer: coarse) {
-    .group-chevron {
+    .category-chevron {
       opacity: 1;
     }
   }
 
   @media (max-width: 640px) {
-    .group-header {
+    .category-header {
       min-height: 40px;
     }
   }

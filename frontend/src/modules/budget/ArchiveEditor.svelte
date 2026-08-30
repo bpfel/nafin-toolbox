@@ -24,24 +24,24 @@
     index: number
   }
 
-  interface LineGroup {
-    groupName: string
+  interface LineCategory {
+    categoryName: string
     rows: LineRow[]
   }
 
-  function groupsFor(type: 'income' | 'expense'): LineGroup[] {
-    const map = new Map<string, LineGroup>()
+  function categoriesFor(type: 'income' | 'expense'): LineCategory[] {
+    const map = new Map<string, LineCategory>()
     archive.lines.forEach((line, index) => {
       if (line.type !== type) return
-      const key = line.groupName || ''
-      if (!map.has(key)) map.set(key, { groupName: key, rows: [] })
+      const key = line.categoryName || ''
+      if (!map.has(key)) map.set(key, { categoryName: key, rows: [] })
       map.get(key)!.rows.push({ line, index })
     })
     return Array.from(map.values())
   }
 
-  let incomeGroups = $derived(groupsFor('income'))
-  let expenseGroups = $derived(groupsFor('expense'))
+  let incomeCategories = $derived(categoriesFor('income'))
+  let expenseCategories = $derived(categoriesFor('expense'))
 
   function totalFor(type: 'income' | 'expense'): number {
     return archive.lines
@@ -104,18 +104,18 @@
     <table>
       <thead>
         <tr>
-          <th class="col-name">Category</th>
+          <th class="col-name">Entry</th>
           <th class="right col-amount">Planned/mo</th>
         </tr>
       </thead>
-      {#each [...incomeGroups, ...expenseGroups] as group (group.groupName + ':' + group.rows[0].line.type)}
+      {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + category.rows[0].line.type)}
         <tbody>
-          <tr class="line-group">
-            <td colspan="2">{group.groupName || 'Other'}</td>
+          <tr class="line-category">
+            <td colspan="2">{category.categoryName || 'Other'}</td>
           </tr>
-          {#each group.rows as row (row.index)}
+          {#each category.rows as row (row.index)}
             <tr class="line-row" class:income={row.line.type === 'income'}>
-              <td class="line-name">{row.line.categoryName}</td>
+              <td class="line-name">{row.line.entryName}</td>
               <td class="line-amount">{fmt(Number(row.line.plannedAmount))}</td>
             </tr>
           {/each}
@@ -208,7 +208,7 @@
   th.right {
     text-align: right;
   }
-  .line-group td {
+  .line-category td {
     padding: 0.35rem 0.5rem;
     background: #f1f3f5;
     font-weight: 600;

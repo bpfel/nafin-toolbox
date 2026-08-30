@@ -20,11 +20,11 @@ afterEach(() => {
 
 function entry(): PlanEntryView {
   return {
-    categoryId: 'c1',
-    categoryName: 'Rent',
-    categoryType: 'expense',
-    categoryGroupId: 'g1',
-    categoryGroupName: 'Housing',
+    entryId: 'c1',
+    entryName: 'Rent',
+    entryType: 'expense',
+    categoryId: 'g1',
+    categoryName: 'Housing',
     plannedAmount: '1350.00',
   }
 }
@@ -62,7 +62,7 @@ describe('edit mode — the budget is read-only by default', () => {
   })
 
   // Reaching for the number is the obvious way to change it, so in edit mode the
-  // amount opens the same dialog the category name does. In read-only it is text,
+  // amount opens the same dialog the entry name does. In read-only it is text,
   // with nothing to click.
   test('the amount opens the dialog in edit mode', async () => {
     toggleEditing('budget')
@@ -80,7 +80,7 @@ describe('edit mode — the budget is read-only by default', () => {
     expect(screen.getByText('1\u2019350.00')).toBeTruthy()
   })
 
-  // Amounts are not editable from the table in either mode. The category dialog
+  // Amounts are not editable from the table in either mode. The entry dialog
   // is the only place a planned amount is set, so there is no second field
   // writing the same value.
   test('the table never offers an amount field', () => {
@@ -122,38 +122,38 @@ describe('editMode store', () => {
   })
 })
 
-describe('single-group budgets hide the group name', () => {
-  // "Employment / Salary" is noise when Employment is the only group there is.
+describe('single-category budgets hide the category name', () => {
+  // "Employment / Salary" is noise when Employment is the only category there is.
   // Rendered for real: the rule lives in the table's markup, so asserting it
   // anywhere else would only be restating the implementation.
-  function vaultWith(groups: { id: string; name: string; type: 'income' | 'expense' }[]): VaultData {
+  function vaultWith(categories: { id: string; name: string; type: 'income' | 'expense' }[]): VaultData {
     return {
-      version: 4,
+      version: 5,
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',
       }],
       budget: {
-        categoryGroups: groups.map((g, i) => ({ ...g, sortOrder: (i + 1) * 10 })),
-        categories: [],
+        categories: categories.map((g, i) => ({ ...g, sortOrder: (i + 1) * 10 })),
+        entries: [],
         plan: [],
         archives: [],
       },
     }
   }
 
-  function row(id: string, name: string, type: 'income' | 'expense', groupId: string, groupName: string): PlanEntryView {
+  function row(id: string, name: string, type: 'income' | 'expense', categoryId: string, categoryName: string): PlanEntryView {
     return {
-      categoryId: id,
-      categoryName: name,
-      categoryType: type,
-      categoryGroupId: groupId,
-      categoryGroupName: groupName,
+      entryId: id,
+      entryName: name,
+      entryType: type,
+      categoryId: categoryId,
+      categoryName: categoryName,
       plannedAmount: '100.00',
     }
   }
 
-  test('one group on a side renders no header for it', () => {
+  test('one category on a side renders no header for it', () => {
     const vault = vaultWith([
       { id: 'g1', name: 'Employment', type: 'income' },
       { id: 'g2', name: 'Housing', type: 'expense' },
@@ -166,20 +166,20 @@ describe('single-group budgets hide the group name', () => {
           row('e1', 'Rent', 'expense', 'g2', 'Housing'),
         ],
         onsave: vi.fn(),
-        oncategorycreated: vi.fn(),
-        oncategorydeleted: vi.fn(),
-        ongroupchanged: vi.fn(),
+        onentrycreated: vi.fn(),
+        onentrydeleted: vi.fn(),
+        oncategorychanged: vi.fn(),
       },
     })
 
     expect(screen.queryByText('Employment')).toBeNull()
     expect(screen.queryByText('Housing')).toBeNull()
-    // The categories themselves are of course still listed.
+    // The entries themselves are of course still listed.
     expect(screen.getByText('Salary')).toBeTruthy()
     expect(screen.getByText('Rent')).toBeTruthy()
   })
 
-  test('a second group on a side brings both its headers back', () => {
+  test('a second category on a side brings both its headers back', () => {
     const vault = vaultWith([
       { id: 'g1', name: 'Employment', type: 'income' },
       { id: 'g2', name: 'Housing', type: 'expense' },
@@ -194,15 +194,15 @@ describe('single-group budgets hide the group name', () => {
           row('e2', 'Food', 'expense', 'g3', 'Living'),
         ],
         onsave: vi.fn(),
-        oncategorycreated: vi.fn(),
-        oncategorydeleted: vi.fn(),
-        ongroupchanged: vi.fn(),
+        onentrycreated: vi.fn(),
+        onentrydeleted: vi.fn(),
+        oncategorychanged: vi.fn(),
       },
     })
 
     expect(screen.getByText('Housing')).toBeTruthy()
     expect(screen.getByText('Living')).toBeTruthy()
-    // Income still has only one group, so it stays unheaded.
+    // Income still has only one category, so it stays unheaded.
     expect(screen.queryByText('Employment')).toBeNull()
   })
 })

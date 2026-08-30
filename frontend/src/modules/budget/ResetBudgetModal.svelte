@@ -2,13 +2,13 @@
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
-    categoryCount: number
+    entryCount: number
     archiveCount: number
     onreset: () => void
     onclose: () => void
   }
 
-  let { categoryCount, archiveCount, onreset, onclose }: Props = $props()
+  let { entryCount, archiveCount, onreset, onclose }: Props = $props()
 
   function confirm() {
     onreset()
@@ -30,8 +30,8 @@
   <div class="modal" role="dialog" aria-label="Reset budget" use:focusTrap>
     <h3>Reset budget</h3>
     <p>
-      This removes all {categoryCount}
-      {categoryCount === 1 ? 'category' : 'categories'}, their groups and every
+      This removes all {entryCount}
+      {entryCount === 1 ? 'entry' : 'entries'}, their categories and every
       planned amount. You start again from an empty budget.
     </p>
 

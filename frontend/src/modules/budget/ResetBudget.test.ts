@@ -7,7 +7,7 @@ const markDirty = vi.fn()
 
 // The real store, with only the save stubbed out. A hand-rolled fake would be a
 // plain object, and the module leans on `$state` deep-proxying the vault so an
-// emptied category list re-renders — reactivity a fake cannot model.
+// emptied entry list re-renders — reactivity a fake cannot model.
 vi.mock('../../lib/crypto/vaultStore.svelte', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/crypto/vaultStore.svelte')>()),
   markDirty: () => markDirty(),
@@ -36,20 +36,20 @@ function load(archives: VaultData['budget']['archives'] = []) {
 
 function makeVault(archives: VaultData['budget']['archives'] = []): VaultData {
   return {
-    version: 4,
+    version: 5,
     accounts: [],
     budget: {
-      categoryGroups: [
+      categories: [
         { id: 'g-income', name: 'Employment', type: 'income', sortOrder: 10 },
         { id: 'g-housing', name: 'Housing', type: 'expense', sortOrder: 20 },
       ],
-      categories: [
-        { id: 'salary', name: 'Salary', type: 'income', sortOrder: 10, archived: false, groupId: 'g-income', sourceAccountId: null, sinkAccountId: null },
-        { id: 'rent', name: 'Rent', type: 'expense', sortOrder: 20, archived: false, groupId: 'g-housing', sourceAccountId: null, sinkAccountId: null },
+      entries: [
+        { id: 'salary', name: 'Salary', type: 'income', sortOrder: 10, archived: false, categoryId: 'g-income', sourceAccountId: null, sinkAccountId: null },
+        { id: 'rent', name: 'Rent', type: 'expense', sortOrder: 20, archived: false, categoryId: 'g-housing', sourceAccountId: null, sinkAccountId: null },
       ],
       plan: [
-        { categoryId: 'salary', plannedAmount: '6000.00' },
-        { categoryId: 'rent', plannedAmount: '1350.00' },
+        { entryId: 'salary', plannedAmount: '6000.00' },
+        { entryId: 'rent', plannedAmount: '1350.00' },
       ],
       archives,
     },
@@ -77,7 +77,7 @@ describe('resetting the budget', () => {
     await fireEvent.click(resetButton()!)
 
     expect(await screen.findByRole('dialog', { name: 'Reset budget' })).toBeTruthy()
-    expect(current().budget.categories).toHaveLength(2)
+    expect(current().budget.entries).toHaveLength(2)
     expect(markDirty).not.toHaveBeenCalled()
   })
 
@@ -89,7 +89,7 @@ describe('resetting the budget', () => {
     await fireEvent.click(resetButton()!)
     await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    expect(current().budget.categories).toHaveLength(2)
+    expect(current().budget.entries).toHaveLength(2)
     expect(current().budget.plan).toHaveLength(2)
     expect(markDirty).not.toHaveBeenCalled()
   })
@@ -104,8 +104,8 @@ describe('resetting the budget', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Reset budget' })
     await fireEvent.click(dialog.querySelector('.delete') as HTMLElement)
 
+    expect(current().budget.entries).toEqual([])
     expect(current().budget.categories).toEqual([])
-    expect(current().budget.categoryGroups).toEqual([])
     expect(current().budget.plan).toEqual([])
     expect(markDirty).toHaveBeenCalled()
   })

@@ -3,7 +3,7 @@ import { requiredForAccount, projectedBalance, availableForAccount } from './acc
 import type {
   ReserveDefinition,
   VaultAccount,
-  VaultCategory,
+  VaultEntry,
   VaultData,
   VaultPlanEntry,
 } from '../crypto/vault'
@@ -23,14 +23,14 @@ function account(id: string, overrides: Partial<VaultAccount> = {}): VaultAccoun
   }
 }
 
-function category(id: string, overrides: Partial<VaultCategory> = {}): VaultCategory {
+function entry(id: string, overrides: Partial<VaultEntry> = {}): VaultEntry {
   return {
     id,
     name: id,
     type: 'expense',
     sortOrder: 10,
     archived: false,
-    groupId: 'group-1',
+    categoryId: 'category-1',
     sourceAccountId: MAIN,
     sinkAccountId: null,
     ...overrides,
@@ -49,12 +49,12 @@ function reserve(overrides: Partial<ReserveDefinition> = {}): ReserveDefinition 
 
 function vaultWith(
   accounts: VaultAccount[],
-  categories: VaultCategory[],
+  entries: VaultEntry[],
   plan: VaultPlanEntry[] = [],
 ): VaultData {
   return {
-    version: 4,
-    budget: { categoryGroups: [], categories, plan, archives: [] },
+    version: 5,
+    budget: { categories: [], entries, plan, archives: [] },
     accounts,
   }
 }
@@ -66,24 +66,24 @@ describe('requiredForAccount', () => {
       [
         // Two reserves into Reserves: 1200/12 and 900/3, both one month into
         // their cycle at 2027-01 → 100.00 + 300.00.
-        category('tax', {
+        entry('tax', {
           sourceAccountId: MAIN,
           sinkAccountId: RESERVES,
           reserve: reserve({ targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-12' }),
         }),
-        category('insurance', {
+        entry('insurance', {
           sourceAccountId: MAIN,
           sinkAccountId: RESERVES,
           reserve: reserve({ targetAmount: '900.00', periodMonths: 3, anchorMonth: '2026-12' }),
         }),
         // Sinks somewhere else — must not count towards Reserves.
-        category('holiday', {
+        entry('holiday', {
           sourceAccountId: RESERVES,
           sinkAccountId: MAIN,
           reserve: reserve({ targetAmount: '6000.00', periodMonths: 12, anchorMonth: '2026-12' }),
         }),
         // No reserve at all.
-        category('groceries', { sourceAccountId: MAIN, sinkAccountId: null }),
+        entry('groceries', { sourceAccountId: MAIN, sinkAccountId: null }),
       ],
     )
 
@@ -93,13 +93,13 @@ describe('requiredForAccount', () => {
     expect(requiredForAccount(vault, MAIN, '2027-01')).toBe('545.45') // 6000/11
   })
 
-  test('an archived category with a reserve contributes nothing', () => {
-    const live = category('tax', {
+  test('an archived entry with a reserve contributes nothing', () => {
+    const live = entry('tax', {
       sourceAccountId: MAIN,
       sinkAccountId: RESERVES,
       reserve: reserve(),
     })
-    const archived = category('old-tax', {
+    const archived = entry('old-tax', {
       archived: true,
       sourceAccountId: MAIN,
       sinkAccountId: RESERVES,
@@ -112,7 +112,7 @@ describe('requiredForAccount', () => {
   })
 
   test('is 0.00 for an account with no reserves', () => {
-    const vault = vaultWith([account(MAIN)], [category('groceries')])
+    const vault = vaultWith([account(MAIN)], [entry('groceries')])
     expect(requiredForAccount(vault, MAIN, '2027-01')).toBe('0.00')
   })
 
@@ -123,24 +123,24 @@ describe('requiredForAccount', () => {
 })
 
 describe('projectedBalance', () => {
-  const categories = [
-    category('salary', { type: 'income', sourceAccountId: null, sinkAccountId: MAIN }),
-    category('rent', { sourceAccountId: MAIN, sinkAccountId: null }),
-    category('tax-setaside', { sourceAccountId: MAIN, sinkAccountId: RESERVES }),
+  const entries = [
+    entry('salary', { type: 'income', sourceAccountId: null, sinkAccountId: MAIN }),
+    entry('rent', { sourceAccountId: MAIN, sinkAccountId: null }),
+    entry('tax-setaside', { sourceAccountId: MAIN, sinkAccountId: RESERVES }),
   ]
 
   // The plan is a standing monthly flow: +6000 in, -1800 out, -200 set aside,
   // so Main nets +4000 every month.
   const plan: VaultPlanEntry[] = [
-    { categoryId: 'salary', plannedAmount: '6000.00' },
-    { categoryId: 'rent', plannedAmount: '1800.00' },
-    { categoryId: 'tax-setaside', plannedAmount: '200.00' },
+    { entryId: 'salary', plannedAmount: '6000.00' },
+    { entryId: 'rent', plannedAmount: '1800.00' },
+    { entryId: 'tax-setaside', plannedAmount: '200.00' },
   ]
 
   test('adds one month of the plan for every month after lastCorrectedAt', () => {
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '1000.00', lastCorrectedAt: '2026-03-15' })],
-      categories,
+      entries,
       plan,
     )
 
@@ -155,7 +155,7 @@ describe('projectedBalance', () => {
   test('a month before the anchor never runs the plan backwards', () => {
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '1000.00', lastCorrectedAt: '2026-03-15' })],
-      categories,
+      entries,
       plan,
     )
 
@@ -171,8 +171,8 @@ describe('projectedBalance', () => {
     // months elapsed means eleven months of flow.
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '0.00', lastCorrectedAt: '2026-01-31' })],
-      [category('salary', { type: 'income', sourceAccountId: null, sinkAccountId: MAIN })],
-      [{ categoryId: 'salary', plannedAmount: '1000.00' }],
+      [entry('salary', { type: 'income', sourceAccountId: null, sinkAccountId: MAIN })],
+      [{ entryId: 'salary', plannedAmount: '1000.00' }],
     )
 
     expect(projectedBalance(vault, MAIN, '2026-12')).toBe('11000.00')
@@ -184,8 +184,8 @@ describe('projectedBalance', () => {
         account(MAIN, { currentAmount: '0.00', lastCorrectedAt: '2026-01-01' }),
         account(RESERVES, { currentAmount: '50.00', lastCorrectedAt: '2026-01-01' }),
       ],
-      categories,
-      [{ categoryId: 'tax-setaside', plannedAmount: '200.00' }],
+      entries,
+      [{ entryId: 'tax-setaside', plannedAmount: '200.00' }],
     )
 
     expect(projectedBalance(vault, RESERVES, '2026-02')).toBe('250.00')
@@ -195,8 +195,8 @@ describe('projectedBalance', () => {
   test('a set-aside into its own account nets to nothing', () => {
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '100.00', lastCorrectedAt: '2026-01-01' })],
-      [category('circular', { sourceAccountId: MAIN, sinkAccountId: MAIN })],
-      [{ categoryId: 'circular', plannedAmount: '75.00' }],
+      [entry('circular', { sourceAccountId: MAIN, sinkAccountId: MAIN })],
+      [{ entryId: 'circular', plannedAmount: '75.00' }],
     )
 
     expect(projectedBalance(vault, MAIN, '2026-02')).toBe('100.00')
@@ -204,11 +204,11 @@ describe('projectedBalance', () => {
     expect(projectedBalance(vault, MAIN, '2027-01')).toBe('100.00')
   })
 
-  test('ignores plan lines whose category no longer exists', () => {
+  test('ignores plan lines whose entry no longer exists', () => {
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '100.00', lastCorrectedAt: '2026-01-01' })],
-      categories,
-      [{ categoryId: 'deleted', plannedAmount: '500.00' }],
+      entries,
+      [{ entryId: 'deleted', plannedAmount: '500.00' }],
     )
 
     expect(projectedBalance(vault, MAIN, '2026-02')).toBe('100.00')
@@ -217,10 +217,10 @@ describe('projectedBalance', () => {
   test('is idempotent and does not mutate the vault', () => {
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '1000.00', lastCorrectedAt: '2026-01-31' }), account(RESERVES)],
-      categories,
+      entries,
       [
-        { categoryId: 'salary', plannedAmount: '6000.00' },
-        { categoryId: 'rent', plannedAmount: '1800.00' },
+        { entryId: 'salary', plannedAmount: '6000.00' },
+        { entryId: 'rent', plannedAmount: '1800.00' },
       ],
     )
     const before = structuredClone(vault)
@@ -239,8 +239,8 @@ describe('projectedBalance', () => {
   test('months are zero-padded, so December is not confused with February', () => {
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '0.00', lastCorrectedAt: '2026-11-30' })],
-      categories,
-      [{ categoryId: 'salary', plannedAmount: '500.00' }],
+      entries,
+      [{ entryId: 'salary', plannedAmount: '500.00' }],
     )
 
     expect(projectedBalance(vault, MAIN, '2026-12')).toBe('500.00')
@@ -256,13 +256,13 @@ describe('availableForAccount', () => {
         account(RESERVES, { currentAmount: '1000.00', lastCorrectedAt: '2026-12-01' }),
       ],
       [
-        category('tax-setaside', {
+        entry('tax-setaside', {
           sourceAccountId: MAIN,
           sinkAccountId: RESERVES,
           reserve: reserve({ targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-12' }),
         }),
       ],
-      [{ categoryId: 'tax-setaside', plannedAmount: '100.00' }],
+      [{ entryId: 'tax-setaside', plannedAmount: '100.00' }],
     )
 
     const projected = projectedBalance(vault, RESERVES, '2027-01')
@@ -278,7 +278,7 @@ describe('availableForAccount', () => {
     const vault = vaultWith(
       [account(RESERVES, { currentAmount: '100.00', lastCorrectedAt: '2026-12-01' })],
       [
-        category('tax-setaside', {
+        entry('tax-setaside', {
           sourceAccountId: MAIN,
           sinkAccountId: RESERVES,
           // Due now, so the full 1200.00 is required against a 100.00 balance.

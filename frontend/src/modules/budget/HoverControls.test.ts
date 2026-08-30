@@ -57,8 +57,8 @@ describe('edit-mode controls do not hide behind hover', () => {
   // hover-reveal to protect — and on a touchscreen there is no hover, which made
   // them unusable exactly when they had just been unlocked.
   const controls: [string, string][] = [
-    ['BudgetTable.svelte', '.group-drag-handle'],
-    ['BudgetTable.svelte', '.group-add'],
+    ['BudgetTable.svelte', '.category-drag-handle'],
+    ['BudgetTable.svelte', '.category-add'],
     ['BudgetEntryRow.svelte', '.drag-handle'],
   ]
 
@@ -100,30 +100,30 @@ describe('edit-mode controls do not hide behind hover', () => {
 describe('the controls are in the DOM the moment edit mode is on', () => {
   function vault(): VaultData {
     return {
-      version: 4,
+      version: 5,
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',
       }],
       budget: {
-        categoryGroups: [
+        categories: [
           { id: 'g1', name: 'Housing', type: 'expense', sortOrder: 10 },
           { id: 'g2', name: 'Living', type: 'expense', sortOrder: 20 },
         ],
-        categories: [],
+        entries: [],
         plan: [],
         archives: [],
       },
     }
   }
 
-  function row(id: string, name: string, groupId: string, groupName: string): PlanEntryView {
+  function row(id: string, name: string, categoryId: string, categoryName: string): PlanEntryView {
     return {
-      categoryId: id,
-      categoryName: name,
-      categoryType: 'expense',
-      categoryGroupId: groupId,
-      categoryGroupName: groupName,
+      entryId: id,
+      entryName: name,
+      entryType: 'expense',
+      categoryId: categoryId,
+      categoryName: categoryName,
       plannedAmount: '100.00',
     }
   }
@@ -134,28 +134,28 @@ describe('the controls are in the DOM the moment edit mode is on', () => {
         vault: vault(),
         entries: [row('e1', 'Rent', 'g1', 'Housing'), row('e2', 'Food', 'g2', 'Living')],
         onsave: vi.fn(),
-        oncategorycreated: vi.fn(),
-        oncategorydeleted: vi.fn(),
-        ongroupchanged: vi.fn(),
+        onentrycreated: vi.fn(),
+        onentrydeleted: vi.fn(),
+        oncategorychanged: vi.fn(),
       },
     })
   }
 
   // No hover is simulated anywhere in this test — that is the point of it.
-  test('group handles and per-group add buttons render for every group', () => {
+  test('category handles and per-category add buttons render for every category', () => {
     toggleEditing('budget')
     const { container } = renderTable()
 
-    expect(container.querySelectorAll('.group-drag-handle').length).toBe(2)
-    expect(screen.getByLabelText('Add a category to Housing')).toBeTruthy()
-    expect(screen.getByLabelText('Add a category to Living')).toBeTruthy()
+    expect(container.querySelectorAll('.category-drag-handle').length).toBe(2)
+    expect(screen.getByLabelText('Add an entry to Housing')).toBeTruthy()
+    expect(screen.getByLabelText('Add an entry to Living')).toBeTruthy()
   })
 
   test('outside edit mode neither is rendered at all', () => {
     const { container } = renderTable()
 
-    expect(container.querySelectorAll('.group-drag-handle').length).toBe(0)
-    expect(screen.queryByLabelText('Add a category to Housing')).toBeNull()
+    expect(container.querySelectorAll('.category-drag-handle').length).toBe(0)
+    expect(screen.queryByLabelText('Add an entry to Housing')).toBeNull()
   })
 
   test('the row handle needs no hover either', () => {

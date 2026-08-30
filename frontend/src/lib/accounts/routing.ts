@@ -1,20 +1,20 @@
-import type { VaultCategory, VaultData } from '../crypto/vault'
+import type { VaultEntry, VaultData } from '../crypto/vault'
 
-// A category's routing is a pair of endpoints: where the money comes from and
+// An entry's routing is a pair of endpoints: where the money comes from and
 // where it goes. `null` on either side means an external counterparty — outside
 // every account the user tracks. Because a vault always holds at least one
 // account, (null, null) cannot occur.
 export type FlowKind = 'income' | 'spending' | 'setaside'
 
-// Classify a routed category by the shape of its endpoints:
+// Classify a routed entry by the shape of its endpoints:
 //   (null, A) income    — money arrives from outside
 //   (A, null) spending  — money leaves your accounts for good
 //   (A, B) / (A, A) setaside — money moves but stays yours
-export function flowKindOf(category: VaultCategory): FlowKind {
-  const { sourceAccountId, sinkAccountId } = category
+export function flowKindOf(entry: VaultEntry): FlowKind {
+  const { sourceAccountId, sinkAccountId } = entry
   if (sourceAccountId === null && sinkAccountId === null) {
     throw new Error(
-      `category ${category.id} has no endpoints: at least one of source or sink must be an account`,
+      `entry ${entry.id} has no endpoints: at least one of source or sink must be an account`,
     )
   }
   if (sourceAccountId === null) return 'income'
@@ -36,7 +36,7 @@ export function isLegalRouting(
   return type === 'expense'
 }
 
-// The routing a category is born with. Both rows are legal, so a category is
+// The routing an entry is born with. Both rows are legal, so an entry is
 // never created unrouted or contradictory. These are defaults, not the only
 // available shapes — an expense may be re-routed into a set-aside later.
 export function defaultRouting(
@@ -49,7 +49,7 @@ export function defaultRouting(
   return { sourceAccountId: primaryAccountId, sinkAccountId: null }
 }
 
-// The account new categories default to. The vault invariant guarantees at
+// The account new entries default to. The vault invariant guarantees at
 // least one account exists; an empty array is a broken vault, not a valid state.
 export function primaryAccountId(vault: VaultData): string {
   const first = vault.accounts[0]
@@ -61,10 +61,10 @@ export function primaryAccountId(vault: VaultData): string {
 
 // A reserve accumulates somewhere, so it is only meaningful on a set-aside:
 // `reserve` implies `type === 'expense'` and `sink !== null`.
-export function isLegalCategoryRouting(category: VaultCategory): boolean {
-  if (!isLegalRouting(category.type, category.sourceAccountId, category.sinkAccountId)) {
+export function isLegalEntryRouting(entry: VaultEntry): boolean {
+  if (!isLegalRouting(entry.type, entry.sourceAccountId, entry.sinkAccountId)) {
     return false
   }
-  if (category.reserve === undefined) return true
-  return category.type === 'expense' && category.sinkAccountId !== null
+  if (entry.reserve === undefined) return true
+  return entry.type === 'expense' && entry.sinkAccountId !== null
 }

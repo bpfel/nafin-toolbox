@@ -6,17 +6,17 @@ vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
   markDirty: vi.fn(),
 }))
 
-import AddCategoryModal from './AddCategoryModal.svelte'
+import AddEntryModal from './AddEntryModal.svelte'
 
 afterEach(cleanup)
 
 function openOn(plannedAmount: string, onsave = vi.fn()) {
-  render(AddCategoryModal, {
+  render(AddEntryModal, {
     props: {
       type: 'expense' as const,
-      groups: [{ name: 'Housing', id: 'g1' }],
-      editCategory: { id: 'c1', name: 'Rent', groupName: 'Housing', plannedAmount },
-      vault: { categories: [], categoryGroups: [] } as unknown as VaultData,
+      categories: [{ name: 'Housing', id: 'g1' }],
+      editEntry: { id: 'c1', name: 'Rent', categoryName: 'Housing', plannedAmount },
+      vault: { entries: [], categories: [] } as unknown as VaultData,
       oncreated: vi.fn(),
       onclose: vi.fn(),
       onsave,
@@ -25,8 +25,8 @@ function openOn(plannedAmount: string, onsave = vi.fn()) {
   return { onsave, monthly: screen.getByLabelText('Planned/mo') as HTMLInputElement }
 }
 
-describe('AddCategoryModal — the only way to change an amount', () => {
-  // The dialog seeds the field with a de-CH formatted value, which groups
+describe('AddEntryModal — the only way to change an amount', () => {
+  // The dialog seeds the field with a de-CH formatted value, which categories
   // thousands with U+2019. It has to be able to read that back: editing a digit
   // rather than retyping the whole figure leaves the separator in place, and a
   // parser that chokes on it drops the edit with no error shown.

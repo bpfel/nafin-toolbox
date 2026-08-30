@@ -89,7 +89,7 @@
     <div class="panel-body">
       <p class="blurb">
         An archive is a named copy of the plan as it stands now. It keeps the names
-        and amounts it was taken with, so later edits to your categories leave it
+        and amounts it was taken with, so later edits to your entries leave it
         alone.
       </p>
 
