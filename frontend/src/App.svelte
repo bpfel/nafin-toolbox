@@ -19,6 +19,7 @@
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
   import SettingsMenu from './lib/nav/SettingsMenu.svelte'
+  import { t } from './lib/i18n/index.svelte'
 
   const authState = getAuthState()
   const vaultState = getVaultState()
@@ -220,7 +221,7 @@
 
 {#if authState.loading}
   <main>
-    <p class="loading">Loading...</p>
+    <p class="loading">{t('state.loading')}</p>
   </main>
 {:else if isVerifyPage}
   <VerifyEmailPage
@@ -238,8 +239,8 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Two-Factor Authentication Required</h1>
-        <p class="hint">Your administrator requires all users to enable two-factor authentication before continuing.</p>
+        <h1>{t('twofa.requiredTitle')}</h1>
+        <p class="hint">{t('twofa.requiredHint')}</p>
         <TwoFactorSetup onDone={() => { show2FAEnforcement = false; window.location.reload() }} />
       </div>
     </div>
@@ -253,18 +254,16 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>This page is out of date</h1>
+        <h1>{t('vault.outOfDateTitle')}</h1>
         <p class="hint">
-          Your data was saved by a newer version of the app than the one this page is
-          running, so this page cannot read it. Reloading picks up the current version.
+          {t('vault.outOfDateHint')}
         </p>
         <p class="hint">
-          Nothing has been lost, and nothing will be written while this page cannot read
-          your data.
+          {t('vault.outOfDateSafe')}
         </p>
 
-        <button class="btn-primary" onclick={() => location.reload()}>Reload</button>
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="btn-primary" onclick={() => location.reload()}>{t('action.reload')}</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
@@ -272,11 +271,11 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Set Up Encryption</h1>
-        <p class="hint">Your data will be encrypted end-to-end. Only you can read it — the server never sees your data in plain text.</p>
+        <h1>{t('vault.setupTitle')}</h1>
+        <p class="hint">{t('vault.setupHint')}</p>
 
         <button class="btn-primary" onclick={handleVaultSetup} disabled={settingUpVault}>
-          {settingUpVault ? 'Setting up encryption...' : 'Set up encryption'}
+          {settingUpVault ? t('vault.setupBusy') : t('vault.setupAction')}
         </button>
 
         {#if error}
@@ -289,12 +288,12 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Vault Decryption Failed</h1>
-        <p class="hint">Your encrypted vault could not be decrypted with your current password. This can happen if your password was reset by an admin. Use your recovery key to restore access.</p>
+        <h1>{t('vault.decryptFailedTitle')}</h1>
+        <p class="hint">{t('vault.decryptFailedHint')}</p>
 
         <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleRecovery() }}>
           <label>
-            Recovery Key
+            {t('vault.recoveryKeyLabel')}
             <input
               type="text"
               bind:value={recoveryKey}
@@ -310,11 +309,11 @@
           {/if}
 
           <button class="btn-primary" type="submit" disabled={recovering || !recoveryKey.trim()}>
-            {recovering ? 'Recovering...' : 'Recover vault'}
+            {recovering ? t('vault.recoverBusy') : t('vault.recoverAction')}
           </button>
         </form>
 
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
@@ -322,12 +321,12 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Unlock Vault</h1>
-        <p class="hint">Enter your password to decrypt your data.</p>
+        <h1>{t('vault.unlockTitle')}</h1>
+        <p class="hint">{t('vault.unlockHint')}</p>
 
         <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleUnlock() }}>
           <label>
-            Password
+            {t('field.password')}
             <input
               type="password"
               bind:value={unlockPassword}
@@ -342,11 +341,11 @@
           {/if}
 
           <button class="btn-primary" type="submit" disabled={unlocking || !unlockPassword}>
-            {unlocking ? 'Unlocking...' : 'Unlock'}
+            {unlocking ? t('vault.unlockBusy') : t('vault.unlockAction')}
           </button>
         </form>
 
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
@@ -354,19 +353,19 @@
 
   <main>
     <div class="top-bar">
-      <h1>Finance Tracker</h1>
+      <h1>{t('app.title')}</h1>
       <div class="user-info">
         <span class="role-tag">{authState.currentUser.role}</span>
         <span class="user-email">{authState.currentUser.email}</span>
         {#if !isAdmin}
           {#if vaultState.saving}
-            <span class="save-indicator">Saving...</span>
+            <span class="save-indicator">{t('state.saving')}</span>
           {:else if vaultState.dirty}
-            <span class="save-indicator unsaved">Unsaved</span>
+            <span class="save-indicator unsaved">{t('state.unsaved')}</span>
           {/if}
         {/if}
         {#if authState.currentUser.role === 'admin'}
-          <button class="btn-secondary" onclick={() => navigateTo('users')}>Users</button>
+          <button class="btn-secondary" onclick={() => navigateTo('users')}>{t('menu.users')}</button>
         {/if}
       </div>
       <!-- One menu at every width. The hamburger it replaces held the same items
@@ -387,8 +386,8 @@
       <p class="error">{error}</p>
     {:else if modules.length === 0}
       <div class="empty-state">
-        <p>No modules enabled yet.</p>
-        <button onclick={() => (showConfig = true)}>Configure modules</button>
+        <p>{t('modules.none')}</p>
+        <button onclick={() => (showConfig = true)}>{t('modules.configure')}</button>
       </div>
     {:else}
       {#each modules as mod}
@@ -448,7 +447,7 @@
           <div class="module-body" id="module-body-{mod.id}" hidden={!isExpanded(mod.id)}>
             {#if isAdmin}
               <div class="module-card admin-notice">
-                <p>Sign in with a regular account to use encrypted modules.</p>
+                <p>{t('app.adminNoVault')}</p>
               </div>
             {:else if mod.id === 'budget'}
               <BudgetModule />
@@ -457,7 +456,7 @@
             {:else}
               <div class="module-card">
                 <span class="module-id">{mod.id}</span>
-                <p>Coming soon.</p>
+                <p>{t('modules.comingSoon')}</p>
               </div>
             {/if}
           </div>
@@ -467,9 +466,9 @@
 
     {#if showConfig}
       <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-        <div class="modal" role="dialog" aria-label="Configure modules" use:focusTrap>
-          <h3>Modules</h3>
-          <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
+        <div class="modal" role="dialog" aria-label={t('modules.configure')} use:focusTrap>
+          <h3>{t('menu.modules')}</h3>
+          <p class="modal-hint">{t('modules.configureHint')}</p>
           <div class="module-list">
             {#each availableModules as mod}
               <div class="module-row" class:enabled={isEnabled(mod.id)}>
@@ -482,7 +481,7 @@
                   class:active={isEnabled(mod.id)}
                   disabled={toggling === mod.id}
                   onclick={() => toggleModule(mod.id)}
-                  aria-label="{isEnabled(mod.id) ? 'Disable' : 'Enable'} {mod.name}"
+                  aria-label="{isEnabled(mod.id) ? t('modules.disable') : t('modules.enable')} {mod.name}"
                 >
                   <span class="toggle-track">
                     <span class="toggle-thumb"></span>
@@ -491,7 +490,7 @@
               </div>
             {/each}
           </div>
-          <button class="close-btn" onclick={() => (showConfig = false)}>Done</button>
+          <button class="close-btn" onclick={() => (showConfig = false)}>{t('action.done')}</button>
         </div>
       </div>
     {/if}

@@ -47,9 +47,83 @@ export const en = {
   'entries.count.one': '{count} entry',
   'entries.count.other': '{count} entries',
 
+  // --- App shell ---
+  'app.title': 'Finance Tracker',
+  'app.adminNoVault': 'Sign in with a regular account to use encrypted modules.',
+
+  // --- Modules ---
+  'modules.none': 'No modules enabled yet.',
+  'modules.configure': 'Configure modules',
+  'modules.configureHint': 'Enable or disable modules. Data is kept when disabling.',
+  'modules.comingSoon': 'Coming soon.',
+  'modules.enable': 'Enable',
+  'modules.disable': 'Disable',
+
+  // --- Vault gates ---
+  'vault.setupTitle': 'Set Up Encryption',
+  'vault.setupHint': 'Your data will be encrypted end-to-end. Only you can read it — the server never sees your data in plain text.',
+  'vault.setupAction': 'Set up encryption',
+  'vault.setupBusy': 'Setting up encryption...',
+  'vault.decryptFailedTitle': 'Vault Decryption Failed',
+  'vault.decryptFailedHint': 'Your encrypted vault could not be decrypted with your current password. This can happen if your password was reset by an admin. Use your recovery key to restore access.',
+  'vault.recoveryKeyLabel': 'Recovery Key',
+  'vault.recoverAction': 'Recover vault',
+  'vault.recoverBusy': 'Recovering...',
+  'vault.unlockTitle': 'Unlock Vault',
+  'vault.unlockHint': 'Enter your password to decrypt your data.',
+  'vault.unlockAction': 'Unlock',
+  'vault.unlockBusy': 'Unlocking...',
+  'vault.outOfDateTitle': 'This page is out of date',
+  'vault.outOfDateHint': 'Your data was saved by a newer version of the app than the one this page is running, so this page cannot read it. Reloading picks up the current version.',
+  'vault.outOfDateSafe': 'Nothing has been lost, and nothing will be written while this page cannot read your data.',
+
+  // --- Two-factor enforcement ---
+  'twofa.requiredTitle': 'Two-Factor Authentication Required',
+  'twofa.requiredHint': 'Your administrator requires all users to enable two-factor authentication before continuing.',
+
+  // --- Common fields and actions ---
+  'field.password': 'Password',
+  'action.done': 'Done',
+
+  // --- Sign in ---
+  'auth.signIn': 'Sign In',
+  'auth.createFirstAccount': 'Create First Account',
+  'auth.createAccount': 'Create Account',
+  'auth.noUsersYet': 'No users exist yet. Create the admin account to get started.',
+  'auth.pleaseWait': 'Please wait...',
+  'auth.forgotHint': "Forgot your password? Contact your administrator to reset it. You'll need your recovery key to restore your encrypted data.",
+  'auth.backToLogin': 'Back to login',
+
+  // --- Two-factor challenge ---
+  'twofa.title': 'Two-Factor Authentication',
+  'twofa.enterCode': 'Enter the 6-digit code from your authenticator app.',
+  'twofa.enterRecoveryCode': 'Enter one of your recovery codes.',
+  'twofa.useRecoveryCode': 'Use a recovery code instead',
+  'twofa.useAuthenticator': 'Use authenticator code instead',
+  'twofa.recoveryCodePlaceholder': 'e.g. a1b2c3d4',
+  'twofa.verify': 'Verify',
+  'twofa.verifying': 'Verifying...',
+
+  // --- Account setup from an invitation ---
+  'verify.invalidTitle': 'Invalid Link',
+  'verify.invalidHint': 'This verification link is invalid. Please check your email for the correct link.',
+  'verify.usedTitle': 'Link Already Used',
+  'verify.usedHint': 'This account has already been set up. Sign in with the password you chose.',
+  'verify.goToSignIn': 'Go to sign in',
+  'verify.doneTitle': 'Account Verified',
+  'verify.doneHint': 'Your account has been set up. Redirecting...',
+  'verify.setupTitle': 'Set Up Your Account',
+  'verify.setupHint': 'Choose a password to complete your account setup.',
+  'verify.setPassword': 'Set Password & Sign In',
+  'verify.settingUp': 'Setting up...',
+
+  // --- Changing a password ---
+  'password.changeTitle': 'Change Password',
+  'password.changing': 'Changing...',
+
   // --- Common states ---
-  'state.loading': 'Loading…',
-  'state.saving': 'Saving…',
+  'state.loading': 'Loading...',
+  'state.saving': 'Saving...',
   'state.unsaved': 'Unsaved',
 } as const
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { changePassword, logout } from './authStore.svelte'
 
   let { message = '', onDone, showLogout = false }: { message?: string; onDone?: () => void; showLogout?: boolean } = $props()
@@ -32,7 +33,7 @@
 
 <div class="change-pw-container">
   <div class="change-pw-card">
-    <h2>Change Password</h2>
+    <h2>{t('password.changeTitle')}</h2>
     {#if message}
       <p class="hint">{message}</p>
     {/if}
@@ -78,12 +79,12 @@
       {/if}
 
       <button type="submit" disabled={submitting}>
-        {submitting ? 'Changing...' : 'Change Password'}
+        {submitting ? t('password.changing') : t('password.changeTitle')}
       </button>
     </form>
 
     {#if showLogout}
-      <button class="btn-logout" onclick={logout}>Log out</button>
+      <button class="btn-logout" onclick={logout}>{t('menu.logout')}</button>
     {/if}
   </div>
 </div>
