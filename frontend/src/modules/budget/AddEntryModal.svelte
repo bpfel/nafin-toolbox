@@ -55,12 +55,12 @@
     requestAnimationFrame(() => input.select())
   }
 
-  function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
-    valueFocusedField = null
-    if (!editEntry || !onsave) return
+  /** Writes the field's amount. False when there was nothing usable to write. */
+  function commitValue(field: 'planned_mo' | 'planned_yr'): boolean {
+    if (!editEntry || !onsave) return false
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
     const val = parseAmount(raw)
-    if (isNaN(val) || !isFinite(val)) return
+    if (isNaN(val) || !isFinite(val)) return false
 
     if (field === 'planned_mo') {
       plannedMoValue = fmt(val)
@@ -72,6 +72,24 @@
       plannedMoValue = fmt(monthly)
       onsave(editEntry.id, monthly.toFixed(4))
     }
+    return true
+  }
+
+  function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
+    valueFocusedField = null
+    commitValue(field)
+  }
+
+  // Enter means done, the same as it does in the name field above. Without this
+  // the amount only landed once focus moved, so the dialog sat there looking as
+  // though nothing had happened.
+  function handleValueKeydown(field: 'planned_mo' | 'planned_yr', e: KeyboardEvent) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    // Nonsense in the field leaves the dialog open to be corrected rather than
+    // closing over an amount that was never written.
+    if (!commitValue(field)) return
+    save()
   }
 
   function handleValueInput(field: 'planned_mo' | 'planned_yr') {
@@ -180,6 +198,7 @@
               onfocus={(e) => handleValueFocus('planned_mo', e)}
               onblur={() => handleValueBlur('planned_mo')}
               oninput={() => handleValueInput('planned_mo')}
+              onkeydown={(e) => handleValueKeydown('planned_mo', e)}
             />
           </label>
           <label class="value-field">
@@ -192,6 +211,7 @@
               onfocus={(e) => handleValueFocus('planned_yr', e)}
               onblur={() => handleValueBlur('planned_yr')}
               oninput={() => handleValueInput('planned_yr')}
+              onkeydown={(e) => handleValueKeydown('planned_yr', e)}
             />
           </label>
         </div>
