@@ -2,6 +2,10 @@ import { describe, test, expect, beforeEach } from 'vitest'
 import {
   listGroups,
   createGroup,
+  updateGroup,
+  mergeGroup,
+  findGroupConflict,
+  categoriesInGroup,
   getOrCreateGroup,
   listCategories,
   createCategory,
@@ -1274,5 +1278,155 @@ describe('resetBudget', () => {
     resetBudget(vault)
 
     expect(vault.accounts).toEqual(accountsBefore)
+  })
+})
+
+describe('updateGroup', () => {
+  function vaultWithGroups() {
+    const vault = createEmptyVault()
+    createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    createCategory(vault, { name: 'Utilities', type: 'expense', groupName: 'Housing' })
+    createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const housing = listGroups(vault).find(g => g.name === 'Housing')!
+    const employment = listGroups(vault).find(g => g.name === 'Employment')!
+    return { vault, housing, employment }
+  }
+
+  test('renames without disturbing its categories', () => {
+    const { vault, housing } = vaultWithGroups()
+
+    updateGroup(vault, housing.id, { name: 'Home' })
+
+    expect(housing.name).toBe('Home')
+    expect(categoriesInGroup(vault, housing.id).map(c => c.name)).toEqual(['Rent', 'Utilities'])
+  })
+
+  test('trims, and refuses a name that is only whitespace', () => {
+    const { vault, housing } = vaultWithGroups()
+
+    updateGroup(vault, housing.id, { name: '  Home  ' })
+    expect(housing.name).toBe('Home')
+
+    expect(() => updateGroup(vault, housing.id, { name: '   ' })).toThrow(/needs a name/)
+    expect(housing.name).toBe('Home')
+  })
+
+  // name+type is already a group's identity: getOrCreateGroup matches on the
+  // pair, so a rename must not manufacture a duplicate creation would refuse.
+  test('refuses a name already taken on the same side', () => {
+    const { vault, housing } = vaultWithGroups()
+    createCategory(vault, { name: 'Food', type: 'expense', groupName: 'Living' })
+
+    expect(() => updateGroup(vault, housing.id, { name: 'Living' })).toThrow(/already exists/)
+    expect(housing.name).toBe('Housing')
+  })
+
+  test('the same name on the other side is not a collision', () => {
+    const { vault, housing, employment } = vaultWithGroups()
+
+    // An expense "Employment" and an income "Employment" are different groups.
+    expect(findGroupConflict(vault, housing.id, 'Employment', 'expense')).toBeNull()
+    updateGroup(vault, housing.id, { name: 'Employment' })
+
+    expect(housing.name).toBe('Employment')
+    expect(employment.name).toBe('Employment')
+  })
+
+  test('changing the type carries the categories across', () => {
+    const { vault, housing } = vaultWithGroups()
+
+    updateGroup(vault, housing.id, { type: 'income' })
+
+    expect(housing.type).toBe('income')
+    // getPlanSummary reads each category's own type, so leaving them behind
+    // would count this group on the wrong side of the budget.
+    expect(categoriesInGroup(vault, housing.id).every(c => c.type === 'income')).toBe(true)
+  })
+
+  test('categories arrive on the other side legally routed', () => {
+    const { vault, housing } = vaultWithGroups()
+
+    updateGroup(vault, housing.id, { type: 'income' })
+
+    for (const cat of categoriesInGroup(vault, housing.id)) {
+      expect(isLegalCategoryRouting(cat)).toBe(true)
+    }
+  })
+
+  test('a reserve does not survive the move to income', () => {
+    const { vault, housing } = vaultWithGroups()
+    const rent = categoriesInGroup(vault, housing.id)[0]
+    rent.reserve = { kind: 'obligation', targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-01' }
+
+    updateGroup(vault, housing.id, { type: 'income' })
+
+    // Setting money aside towards a target is something only an expense does.
+    expect(rent.reserve).toBeUndefined()
+  })
+
+  test('renaming and switching type at once still checks the new side', () => {
+    const { vault, housing } = vaultWithGroups()
+
+    expect(() => updateGroup(vault, housing.id, { name: 'Employment', type: 'income' })).toThrow(
+      /already exists/,
+    )
+    expect(housing.type).toBe('expense')
+    expect(categoriesInGroup(vault, housing.id).every(c => c.type === 'expense')).toBe(true)
+  })
+
+  test('an unknown group is a no-op', () => {
+    const { vault } = vaultWithGroups()
+    expect(() => updateGroup(vault, 'no-such-group', { name: 'Whatever' })).not.toThrow()
+  })
+})
+
+describe('mergeGroup', () => {
+  function vaultWithTwo() {
+    const vault = createEmptyVault()
+    createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    createCategory(vault, { name: 'Food', type: 'expense', groupName: 'Living' })
+    const housing = listGroups(vault).find(g => g.name === 'Housing')!
+    const living = listGroups(vault).find(g => g.name === 'Living')!
+    return { vault, housing, living }
+  }
+
+  test('moves the categories across and drops the emptied group', () => {
+    const { vault, housing, living } = vaultWithTwo()
+
+    mergeGroup(vault, housing.id, living.id)
+
+    expect(categoriesInGroup(vault, living.id).map(c => c.name).sort()).toEqual(['Food', 'Rent'])
+    expect(listGroups(vault).map(g => g.name)).toEqual(['Living'])
+  })
+
+  test('the plan is untouched — nothing is deleted, only re-filed', () => {
+    const { vault, housing, living } = vaultWithTwo()
+    const rent = categoriesInGroup(vault, housing.id)[0]
+    setPlanned(vault, rent.id, '1350.00')
+
+    mergeGroup(vault, housing.id, living.id)
+
+    expect(plannedFor(vault, rent.id)).toBe('1350.00')
+  })
+
+  test('crossing sides changes the categories type with it', () => {
+    const { vault, housing } = vaultWithTwo()
+    createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const employment = listGroups(vault).find(g => g.name === 'Employment')!
+
+    mergeGroup(vault, housing.id, employment.id)
+
+    const moved = categoriesInGroup(vault, employment.id).find(c => c.name === 'Rent')!
+    expect(moved.type).toBe('income')
+    expect(isLegalCategoryRouting(moved)).toBe(true)
+  })
+
+  test('merging a group into itself is a no-op', () => {
+    const { vault, housing } = vaultWithTwo()
+
+    mergeGroup(vault, housing.id, housing.id)
+
+    expect(listGroups(vault)).toHaveLength(2)
+    expect(categoriesInGroup(vault, housing.id)).toHaveLength(1)
   })
 })

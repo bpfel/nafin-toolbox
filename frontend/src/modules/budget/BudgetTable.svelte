@@ -8,6 +8,7 @@
   import AddCategoryRow from './AddCategoryRow.svelte'
   import AddCategoryModal from './AddCategoryModal.svelte'
   import DeleteCategoryModal from './DeleteCategoryModal.svelte'
+  import EditGroupModal from './EditGroupModal.svelte'
 
   interface EntryGroup {
     groupName: string
@@ -22,9 +23,10 @@
     onsave: (categoryId: string, amount: string) => void
     oncategorycreated: () => void
     oncategorydeleted: () => void
+    ongroupchanged: () => void
   }
 
-  let { entries, vault, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
+  let { entries, vault, onsave, oncategorycreated, oncategorydeleted, ongroupchanged }: Props = $props()
 
   // Structural affordances — dragging, adding, deleting — appear only in edit
   // mode. Reading the plan and typing amounts stay available always.
@@ -32,6 +34,18 @@
 
   let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; presetGroupName?: string; editCategory?: { id: string; name: string; groupName: string; plannedAmount: string } } | null>(null)
   let deleteModalContext = $state<{ categoryId: string; categoryName: string } | null>(null)
+  let editGroupId = $state<string | null>(null)
+
+  let editGroup = $derived(
+    editGroupId ? vault.budget.categoryGroups.find(g => g.id === editGroupId) ?? null : null,
+  )
+
+  // The header row toggles collapse on click, so the name has to stop the event
+  // reaching it — same reason the "+" and the drag handle do.
+  function openGroupEditor(event: MouseEvent, groupId: string) {
+    event.stopPropagation()
+    editGroupId = groupId
+  }
 
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
   let collapsedGroups = $state(new Set<string>())
@@ -202,9 +216,9 @@
         <th class="right col-amount col-planned-yr">Planned/yr</th>
       </tr>
     </thead>
-    {#each incomeGroups as group (group.groupName)}
+    {#each incomeGroups as group (group.groupId)}
       <tbody use:sortable data-group-id={group.groupId}>
-        {#if incomeGroups.length > 1}
+        {#if incomeGroups.length > 1 || editing}
           <tr class="group-header" class:editing class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
             <td>
               {#if editing}
@@ -224,7 +238,15 @@
                   {/if}
                 </svg>
               </span>
-              <span class="group-name">{group.groupName || 'Other'}</span>
+              {#if editing}
+                <button
+                  class="group-name group-name-btn"
+                  aria-label="Edit group {group.groupName || 'Other'}"
+                  onclick={(e) => openGroupEditor(e, group.groupId)}
+                >{group.groupName || 'Other'}</button>
+              {:else}
+                <span class="group-name">{group.groupName || 'Other'}</span>
+              {/if}
               {#if editing}
                 <button
                   class="group-add"
@@ -260,9 +282,9 @@
         <th class="right col-amount col-planned-yr">Planned/yr</th>
       </tr>
     </thead>
-    {#each expenseGroups as group (group.groupName)}
+    {#each expenseGroups as group (group.groupId)}
       <tbody use:sortable data-group-id={group.groupId}>
-        {#if expenseGroups.length > 1}
+        {#if expenseGroups.length > 1 || editing}
           <tr class="group-header" class:editing class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
             <td>
               {#if editing}
@@ -282,7 +304,15 @@
                   {/if}
                 </svg>
               </span>
-              <span class="group-name">{group.groupName || 'Other'}</span>
+              {#if editing}
+                <button
+                  class="group-name group-name-btn"
+                  aria-label="Edit group {group.groupName || 'Other'}"
+                  onclick={(e) => openGroupEditor(e, group.groupId)}
+                >{group.groupName || 'Other'}</button>
+              {:else}
+                <span class="group-name">{group.groupName || 'Other'}</span>
+              {/if}
               {#if editing}
                 <button
                   class="group-add"
@@ -330,6 +360,15 @@
     categoryName={deleteModalContext.categoryName}
     ondeleted={() => handleCategoryDeleted(deleteModalContext!.categoryId)}
     onclose={() => deleteModalContext = null}
+  />
+{/if}
+
+{#if editGroup}
+  <EditGroupModal
+    group={editGroup}
+    {vault}
+    onsaved={ongroupchanged}
+    onclose={() => editGroupId = null}
   />
 {/if}
 
@@ -433,6 +472,21 @@
   /* table-layout is fixed, so the name column cannot borrow slack from the
      amount columns. Without this a name like "Abgaben und Versicherungen"
      wraps and doubles the row height. Entry names already behave this way. */
+  /* Marked like the category name, because it opens the same kind of dialog. */
+  .group-name-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  .group-name-btn:hover {
+    text-decoration: underline;
+    text-decoration-color: #aaa;
+    text-underline-offset: 2px;
+  }
   .group-name {
     white-space: nowrap;
     overflow: hidden;

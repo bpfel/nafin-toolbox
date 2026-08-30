@@ -137,6 +137,7 @@ describe('the controls are in the DOM the moment edit mode is on', () => {
         onsave: vi.fn(),
         oncategorycreated: vi.fn(),
         oncategorydeleted: vi.fn(),
+        ongroupchanged: vi.fn(),
       },
     })
   }

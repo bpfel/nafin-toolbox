@@ -169,6 +169,7 @@ describe('single-group budgets hide the group name', () => {
         onsave: vi.fn(),
         oncategorycreated: vi.fn(),
         oncategorydeleted: vi.fn(),
+        ongroupchanged: vi.fn(),
       },
     })
 
@@ -196,6 +197,7 @@ describe('single-group budgets hide the group name', () => {
         onsave: vi.fn(),
         oncategorycreated: vi.fn(),
         oncategorydeleted: vi.fn(),
+        ongroupchanged: vi.fn(),
       },
     })
 

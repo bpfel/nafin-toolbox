@@ -43,6 +43,93 @@ export function getOrCreateGroup(
   return createGroup(vault, name, type)
 }
 
+/** Every category filed under a group, archived ones included. */
+export function categoriesInGroup(vault: VaultData, groupId: string): VaultCategory[] {
+  return vault.budget.categories.filter(c => c.groupId === groupId)
+}
+
+/**
+ * The group a rename or type change would collide with, if any.
+ *
+ * Name and type together are already a group's identity everywhere else:
+ * getOrCreateGroup matches on the pair, so no normal path can produce two
+ * same-named expense groups. A rename must not manufacture the duplicate that
+ * creation refuses to make, so the caller is expected to offer a merge instead.
+ */
+export function findGroupConflict(
+  vault: VaultData,
+  groupId: string,
+  name: string,
+  type: 'income' | 'expense',
+): VaultCategoryGroup | null {
+  const trimmed = name.trim()
+  return (
+    vault.budget.categoryGroups.find(
+      g => g.id !== groupId && g.type === type && g.name === trimmed,
+    ) ?? null
+  )
+}
+
+/**
+ * Renames a group, moves it to the other side of the budget, or both.
+ *
+ * A type change carries every category in the group across with it. It has to:
+ * getPlanSummary reads each category's own type, so an income group holding
+ * expense categories would be counted on the wrong side. updateCategory does the
+ * carrying, which means routing is re-derived and reserves are dropped by
+ * exactly the same code that handles one category changing type on its own.
+ *
+ * Throws on an empty name or a collision, for the caller to show against the
+ * field the user typed in — the same contract renameArchive has.
+ */
+export function updateGroup(
+  vault: VaultData,
+  groupId: string,
+  update: { name?: string; type?: 'income' | 'expense' },
+): void {
+  const group = vault.budget.categoryGroups.find(g => g.id === groupId)
+  if (!group) return
+
+  const name = (update.name ?? group.name).trim()
+  if (name === '') {
+    throw new Error('a group needs a name')
+  }
+
+  const type = update.type ?? group.type
+  if (findGroupConflict(vault, groupId, name, type)) {
+    throw new Error(`a ${type} group called "${name}" already exists`)
+  }
+
+  if (type !== group.type) {
+    for (const cat of categoriesInGroup(vault, groupId)) {
+      updateCategory(vault, cat.id, { type })
+    }
+    group.type = type
+  }
+  group.name = name
+}
+
+/**
+ * Empties one group into another and removes it.
+ *
+ * Offered when a rename collides, because re-filing every category by hand is
+ * the workflow this whole feature exists to replace. Categories crossing between
+ * an income and an expense group change type on the way, through updateCategory,
+ * so they arrive routed correctly rather than contradicting their new group.
+ */
+export function mergeGroup(vault: VaultData, fromId: string, intoId: string): void {
+  if (fromId === intoId) return
+  const from = vault.budget.categoryGroups.find(g => g.id === fromId)
+  const into = vault.budget.categoryGroups.find(g => g.id === intoId)
+  if (!from || !into) return
+
+  for (const cat of categoriesInGroup(vault, fromId)) {
+    if (cat.type !== into.type) updateCategory(vault, cat.id, { type: into.type })
+    cat.groupId = into.id
+  }
+  vault.budget.categoryGroups = vault.budget.categoryGroups.filter(g => g.id !== fromId)
+}
+
 // --- Categories ---
 
 export function listCategories(vault: VaultData, includeArchived = false): VaultCategory[] {

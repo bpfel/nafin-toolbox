@@ -84,6 +84,7 @@
       onsave={handleSave}
       oncategorycreated={handleCategoryChange}
       oncategorydeleted={handleCategoryChange}
+      ongroupchanged={handleCategoryChange}
     />
     <ArchivePanel vault={vaultState.vault} />
 
