@@ -13,6 +13,7 @@
   import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
   import { isExpanded, toggleExpanded } from './lib/util/collapse.svelte'
   import { focusTrap } from './lib/util/focusTrap'
+  import { copyText } from './lib/util/clipboard'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
 
@@ -175,6 +176,26 @@
     clearRecoveryKey()
   }
 
+  let recoveryKeyCopied = $state(false)
+  let recoveryKeyCopyFailed = $state(false)
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+  async function handleCopyRecoveryKey() {
+    const key = authState.recoveryKeyToShow
+    if (!key) return
+
+    const copied = await copyText(key)
+    recoveryKeyCopied = copied
+    recoveryKeyCopyFailed = !copied
+
+    // The failure notice stays put — this key is shown exactly once, so a user
+    // who missed the copy needs to keep reading why.
+    clearTimeout(copiedTimer)
+    if (copied) {
+      copiedTimer = setTimeout(() => { recoveryKeyCopied = false }, 2500)
+    }
+  }
+
   async function handleUnlock() {
     if (!unlockPassword) return
     unlocking = true
@@ -243,6 +264,18 @@
         <div class="recovery-key-box">
           <code class="recovery-key">{authState.recoveryKeyToShow}</code>
         </div>
+        <div class="recovery-key-actions">
+          <button class="btn-secondary" onclick={handleCopyRecoveryKey}>
+            {recoveryKeyCopied ? 'Copied' : 'Copy key'}
+          </button>
+        </div>
+        <p class="copy-status" class:failed={recoveryKeyCopyFailed} aria-live="polite">
+          {#if recoveryKeyCopyFailed}
+            Could not reach the clipboard. Select the key above and copy it manually.
+          {:else if recoveryKeyCopied}
+            Recovery key copied to the clipboard.
+          {/if}
+        </p>
         <button class="btn-primary" onclick={handleRecoveryKeyDismiss}>I've saved my recovery key</button>
       </div>
     </div>
@@ -642,6 +675,23 @@
     padding: 1.25rem;
     margin: 1rem 0;
     text-align: center;
+  }
+  .recovery-key-actions {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+  .copy-status {
+    font-size: 0.85rem;
+    color: #2d6a4f;
+    text-align: center;
+    /* Reserved whether or not there is a message, so the button below does not
+       jump when one appears. */
+    min-height: 1.2rem;
+    margin: 0 0 0.5rem;
+  }
+  .copy-status.failed {
+    color: #c0392b;
   }
   .recovery-key {
     font-size: 0.85rem;
