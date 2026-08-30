@@ -509,8 +509,11 @@ describe('updateCategory', () => {
 
     const updated = updateCategory(vault, category.id, { groupName: 'New Group' })
 
-    expect(vault.budget.categoryGroups).toHaveLength(2)
-    expect(updated?.groupId).toBe(vault.budget.categoryGroups[1].id)
+    // 'Old Group' held only this category, so moving it out leaves nothing
+    // behind to keep.
+    expect(vault.budget.categoryGroups).toHaveLength(1)
+    expect(vault.budget.categoryGroups[0].name).toBe('New Group')
+    expect(updated?.groupId).toBe(vault.budget.categoryGroups[0].id)
   })
 
   test('updates groupName by reusing existing group', () => {
@@ -521,8 +524,9 @@ describe('updateCategory', () => {
 
     const updated = updateCategory(vault, category.id, { groupName: 'Group 2' })
 
+    // Reused rather than duplicated — and Group 1, now empty, is swept.
     expect(updated?.groupId).toBe(group2.id)
-    expect(vault.budget.categoryGroups).toHaveLength(2)
+    expect(vault.budget.categoryGroups.map(g => g.name)).toEqual(['Group 2'])
   })
 
   test('returns null for non-existent category', () => {
@@ -1428,5 +1432,66 @@ describe('mergeGroup', () => {
 
     expect(listGroups(vault)).toHaveLength(2)
     expect(categoriesInGroup(vault, housing.id)).toHaveLength(1)
+  })
+})
+
+describe('empty groups do not linger', () => {
+  function twoGroups() {
+    const vault = createEmptyVault()
+    const rent = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    const food = createCategory(vault, { name: 'Food', type: 'expense', groupName: 'Living' })
+    return { vault, rent, food }
+  }
+
+  test('deleting the last category takes its group with it', () => {
+    const { vault, rent } = twoGroups()
+
+    deleteCategory(vault, rent.id)
+
+    expect(listGroups(vault).map(g => g.name)).toEqual(['Living'])
+  })
+
+  test('a group with categories left is untouched', () => {
+    const { vault, rent } = twoGroups()
+    createCategory(vault, { name: 'Utilities', type: 'expense', groupName: 'Housing' })
+
+    deleteCategory(vault, rent.id)
+
+    expect(listGroups(vault).map(g => g.name).sort()).toEqual(['Housing', 'Living'])
+  })
+
+  // The bug this exists to prevent: an invisible group is still a name, and the
+  // rename dialog would refuse "Housing" while showing the user no such group.
+  test('an emptied group stops blocking the name', () => {
+    const { vault, rent, food } = twoGroups()
+
+    deleteCategory(vault, rent.id)
+
+    const living = listGroups(vault).find(g => g.name === 'Living')!
+    expect(findGroupConflict(vault, living.id, 'Housing', 'expense')).toBeNull()
+    expect(() => updateGroup(vault, living.id, { name: 'Housing' })).not.toThrow()
+    expect(listGroups(vault).map(g => g.name)).toEqual(['Housing'])
+    expect(categoriesInGroup(vault, living.id).map(c => c.id)).toEqual([food.id])
+  })
+
+  test('an archived category still holds its group open', () => {
+    const { vault, rent } = twoGroups()
+    updateCategory(vault, rent.id, { archived: true })
+    const spare = createCategory(vault, { name: 'Utilities', type: 'expense', groupName: 'Housing' })
+
+    deleteCategory(vault, spare.id)
+
+    // Rent is archived, not gone; unarchiving it should find Housing waiting.
+    expect(listGroups(vault).map(g => g.name).sort()).toEqual(['Housing', 'Living'])
+  })
+
+  test('seeded defaults survive seeding', () => {
+    const vault = createEmptyVault()
+    seedDefaults(vault)
+
+    expect(listGroups(vault).length).toBeGreaterThan(1)
+    for (const g of listGroups(vault)) {
+      expect(categoriesInGroup(vault, g.id).length).toBeGreaterThan(0)
+    }
   })
 })

@@ -43,6 +43,32 @@ export function getOrCreateGroup(
   return createGroup(vault, name, type)
 }
 
+/**
+ * Drops any group no category points at any more.
+ *
+ * Groups are created in two places: getOrCreateGroup, which is only reachable by
+ * creating a category, and seedDefaults, which fills every group it makes in the
+ * same pass. Neither leaves an empty one behind on purpose, so a group with no
+ * categories is residue from the last one leaving. The table already builds its
+ * headers from categories and stops drawing it, so this only makes the stored
+ * vault agree with what the user is looking at.
+ *
+ * It is not merely tidiness. findGroupConflict searches every stored group, so a
+ * lingering empty one collides with a rename while being invisible on screen:
+ * "an expense group called Housing already exists", about a group the user
+ * cannot find anywhere to do anything about.
+ *
+ * Archived categories still count as occupants — they can come back, and their
+ * group should be waiting for them.
+ *
+ * If a future feature ever lets someone create a group before filling it, this
+ * has to become targeted at the group just emptied instead of a sweep.
+ */
+function pruneEmptyGroups(vault: VaultData): void {
+  const occupied = new Set(vault.budget.categories.map(c => c.groupId))
+  vault.budget.categoryGroups = vault.budget.categoryGroups.filter(g => occupied.has(g.id))
+}
+
 /** Every category filed under a group, archived ones included. */
 export function categoriesInGroup(vault: VaultData, groupId: string): VaultCategory[] {
   return vault.budget.categories.filter(c => c.groupId === groupId)
@@ -194,6 +220,8 @@ export function updateCategory(
   if (update.groupName !== undefined) {
     const group = getOrCreateGroup(vault, update.groupName, cat.type)
     cat.groupId = group.id
+    // Moving the last category out empties the group it came from.
+    pruneEmptyGroups(vault)
   }
 
   return cat
@@ -206,6 +234,7 @@ export function deleteCategory(vault: VaultData, categoryId: string): void {
   // left alone: they hold names, not references, and a record of a past plan
   // must not lose lines because a category was deleted afterwards.
   vault.budget.plan = vault.budget.plan.filter(e => e.categoryId !== categoryId)
+  pruneEmptyGroups(vault)
 }
 
 export function reorderCategories(vault: VaultData, categoryIds: string[]): void {
