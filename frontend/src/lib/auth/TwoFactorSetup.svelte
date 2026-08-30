@@ -1,6 +1,7 @@
 <script lang="ts">
   import { setup2FA, confirm2FA } from './authStore.svelte'
   import TOTPInput from './TOTPInput.svelte'
+  import { createCopier } from '../util/copier.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
 
@@ -43,8 +44,10 @@
     }
   }
 
+  const copier = createCopier()
+
   function copyRecoveryCodes() {
-    navigator.clipboard.writeText(recoveryCodes.join('\n'))
+    copier.copy(recoveryCodes.join('\n'))
   }
 
   function downloadRecoveryCodes() {
@@ -110,9 +113,20 @@
     </div>
 
     <div class="code-actions">
-      <button class="btn-secondary" onclick={copyRecoveryCodes}>Copy All</button>
+      <button class="btn-secondary" onclick={copyRecoveryCodes}>
+        {copier.copied ? 'Copied' : 'Copy All'}
+      </button>
       <button class="btn-secondary" onclick={downloadRecoveryCodes}>Download</button>
     </div>
+
+    <p class="copy-status" class:failed={copier.failed} aria-live="polite">
+      {#if copier.failed}
+        Could not reach the clipboard. Select the codes above and copy them by
+        hand, or use Download.
+      {:else if copier.copied}
+        Recovery codes copied to the clipboard.
+      {/if}
+    </p>
 
     <button onclick={() => onDone?.()}>
       I've Saved My Codes
@@ -213,7 +227,19 @@
   .code-actions {
     display: flex;
     gap: 0.5rem;
-    margin-bottom: 1rem;
+  }
+
+  .copy-status {
+    font-size: 0.85rem;
+    color: #2d6a4f;
+    /* Reserved whether or not there is a message, so the button below it does
+       not jump when one appears. */
+    min-height: 1.2rem;
+    margin: 0.4rem 0 1rem;
+  }
+
+  .copy-status.failed {
+    color: #c0392b;
   }
 
   .btn-secondary {

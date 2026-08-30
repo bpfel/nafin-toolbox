@@ -13,7 +13,7 @@
   import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
   import { isExpanded, toggleExpanded } from './lib/util/collapse.svelte'
   import { focusTrap } from './lib/util/focusTrap'
-  import { copyText } from './lib/util/clipboard'
+  import { createCopier } from './lib/util/copier.svelte'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
 
@@ -176,25 +176,7 @@
     clearRecoveryKey()
   }
 
-  let recoveryKeyCopied = $state(false)
-  let recoveryKeyCopyFailed = $state(false)
-  let copiedTimer: ReturnType<typeof setTimeout> | undefined
-
-  async function handleCopyRecoveryKey() {
-    const key = authState.recoveryKeyToShow
-    if (!key) return
-
-    const copied = await copyText(key)
-    recoveryKeyCopied = copied
-    recoveryKeyCopyFailed = !copied
-
-    // The failure notice stays put — this key is shown exactly once, so a user
-    // who missed the copy needs to keep reading why.
-    clearTimeout(copiedTimer)
-    if (copied) {
-      copiedTimer = setTimeout(() => { recoveryKeyCopied = false }, 2500)
-    }
-  }
+  const recoveryKeyCopier = createCopier()
 
   async function handleUnlock() {
     if (!unlockPassword) return
@@ -265,14 +247,17 @@
           <code class="recovery-key">{authState.recoveryKeyToShow}</code>
         </div>
         <div class="recovery-key-actions">
-          <button class="btn-secondary" onclick={handleCopyRecoveryKey}>
-            {recoveryKeyCopied ? 'Copied' : 'Copy key'}
+          <button
+            class="btn-secondary"
+            onclick={() => recoveryKeyCopier.copy(authState.recoveryKeyToShow ?? '')}
+          >
+            {recoveryKeyCopier.copied ? 'Copied' : 'Copy key'}
           </button>
         </div>
-        <p class="copy-status" class:failed={recoveryKeyCopyFailed} aria-live="polite">
-          {#if recoveryKeyCopyFailed}
+        <p class="copy-status" class:failed={recoveryKeyCopier.failed} aria-live="polite">
+          {#if recoveryKeyCopier.failed}
             Could not reach the clipboard. Select the key above and copy it manually.
-          {:else if recoveryKeyCopied}
+          {:else if recoveryKeyCopier.copied}
             Recovery key copied to the clipboard.
           {/if}
         </p>
