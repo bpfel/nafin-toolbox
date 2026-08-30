@@ -151,6 +151,108 @@ export const en = {
 
   'action.close': 'Close',
 
+  // --- Security settings ---
+  'security.title': 'Security Settings',
+  'security.twofaTitle': 'Two-Factor Authentication',
+  'security.currentPasswordPlaceholder': 'Current password',
+  'security.disablePrompt': 'Enter your password to disable 2FA:',
+  'security.confirmDisable': 'Confirm Disable',
+  'security.disabling': 'Disabling...',
+  'security.disable2fa': 'Disable 2FA',
+  'security.enable2fa': 'Enable 2FA',
+  'security.regeneratePrompt': 'Enter your password to regenerate recovery codes:',
+  'security.regenerate': 'Regenerate Codes',
+  'security.regenerating': 'Generating...',
+  'security.regenerateCodes': 'Regenerate Recovery Codes',
+  'security.newCodesWarning': 'Save these new recovery codes. Old codes are now invalid.',
+  'security.passwordTitle': 'Password',
+  'security.deleteAccountTitle': 'Delete Account',
+  'security.deleteAccountHint': 'Permanently delete your account and all associated data. This cannot be undone.',
+  'security.deletePrompt': 'Enter your password to confirm account deletion:',
+  'security.deleteMyAccount': 'Delete My Account',
+  'security.deleting': 'Deleting...',
+
+  // --- Setting up two-factor ---
+  'twofa.setupTitle': 'Enable Two-Factor Authentication',
+  'twofa.setupHint': 'Add an extra layer of security to your account using a TOTP authenticator app.',
+  'twofa.setupAction': 'Set Up 2FA',
+  'twofa.settingUp': 'Setting up...',
+  'twofa.scanTitle': 'Scan QR Code',
+  'twofa.scanHint': 'Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)',
+  'twofa.manualEntry': "Can't scan? Enter manually",
+  'twofa.verifyPrompt': 'Enter the 6-digit code from your app to verify:',
+  'twofa.verifyAndEnable': 'Verify & Enable',
+  'twofa.codesTitle': 'Save Recovery Codes',
+  'twofa.codesWarning': 'Save these recovery codes in a safe place. Each code can only be used once. If you lose your authenticator, these codes are the only way to access your account.',
+  'twofa.copyAll': 'Copy All',
+
+  // --- Recovery key ---
+  'recoveryKey.title': 'Save Your Recovery Key',
+  'recoveryKey.copy': 'Copy key',
+  'recoveryKey.confirmTitle': 'Check you really have it',
+  'recoveryKey.label': 'Recovery key',
+  'recoveryKey.backToKey': 'Back to the key',
+  'recoveryKey.confirm': 'Confirm',
+
+  // --- Banners ---
+  'update.available': 'A new version of the app is available.',
+  'update.dismiss': 'Dismiss update notice',
+  'unsaved.title': 'Your changes are not being saved.',
+
+  'action.copied': 'Copied',
+  'action.download': 'Download',
+
+  // --- Budget ---
+  'budget.income': 'Income',
+  'budget.expenses': 'Expenses',
+  'budget.savings': 'Savings',
+  'budget.plannedMo': 'Planned/mo',
+  'budget.plannedYr': 'Planned/yr',
+  'budget.incomeYr': 'Income /yr',
+  'budget.expensesYr': 'Expenses /yr',
+  'budget.unallocatedMo': 'Unallocated /mo',
+  'budget.unallocatedYr': 'Unallocated /yr',
+  'budget.month': 'Month',
+  'budget.year': 'Year',
+  'budget.viewToggle': 'Showing {mode} amounts — switch to {other}',
+  'budget.monthly': 'monthly',
+  'budget.yearly': 'yearly',
+  'budget.dragToReorder': 'Drag to reorder',
+  'budget.editPlannedMo': 'Edit planned per month for {entry}',
+  'budget.editPlannedYr': 'Edit planned per year for {entry}',
+  'budget.editCategoryOf': 'Edit category {category}',
+  'budget.addEntryTo': 'Add an entry to {category}',
+  'budget.uncategorised': 'Other',
+  'budget.reset': 'Reset budget',
+  'budget.setupTitle': 'Set up your budget',
+  'budget.setupHint': 'Start with default Swiss budget entries based on BFS household survey data (HABE 2023, single person). You can customize everything later.',
+
+  // --- Entry dialog ---
+  'entry.editTitle': 'Edit entry',
+  'entry.addTitle': 'Add entry',
+  'entry.category': 'Category',
+  'entry.newCategoryPlaceholder': 'New category name',
+  'entry.namePlaceholder': 'e.g. Gym membership',
+  'entry.values': 'Values',
+  'entry.deleteTitle': 'Delete entry',
+
+  // --- Category dialog ---
+  'category.editTitle': 'Edit category',
+  'category.type': 'Type',
+
+  // --- Archives ---
+  'archive.newNameLabel': 'Name for the new archive',
+  'archive.newNamePlaceholder': 'e.g. Before the raise',
+  'archive.create': 'Archive current plan',
+  'archive.none': 'No archives yet.',
+  'archive.empty': 'This archive has no lines.',
+  'archive.entryColumn': 'Entry',
+  'archive.deleteOne': 'Delete archive {name}',
+  'archive.deleteTitle': 'Delete archive',
+  'archive.unrecoverable': 'This snapshot cannot be recovered.',
+
+  'field.name': 'Name',
+
   // --- Common states ---
   'state.loading': 'Loading...',
   'state.saving': 'Saving...',

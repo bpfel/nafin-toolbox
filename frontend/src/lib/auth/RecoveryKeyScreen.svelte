@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { createCopier } from '../util/copier.svelte'
 
   interface Props {
@@ -47,7 +48,7 @@
   <div class="screen">
     <div class="card">
       {#if step === 'save'}
-        <h1>Save Your Recovery Key</h1>
+        <h1>{t('recoveryKey.title')}</h1>
 
         <div class="stakes">
           <p>
@@ -67,9 +68,9 @@
 
         <div class="actions">
           <button class="btn secondary" onclick={() => copier.copy(recoveryKey)}>
-            {copier.copied ? 'Copied' : 'Copy key'}
+            {copier.copied ? t('action.copied') : t('recoveryKey.copy')}
           </button>
-          <button class="btn secondary" onclick={download}>Download</button>
+          <button class="btn secondary" onclick={download}>{t('action.download')}</button>
         </div>
 
         <p class="status" class:failed={copier.failed} aria-live="polite">
@@ -85,7 +86,7 @@
           I've saved my recovery key
         </button>
       {:else}
-        <h1>Check you really have it</h1>
+        <h1>{t('recoveryKey.confirmTitle')}</h1>
 
         <p class="lead">
           Paste the key back, so you find out now rather than the day you need it.
@@ -93,7 +94,7 @@
         </p>
 
         <label class="field">
-          <span class="label">Recovery key</span>
+          <span class="label">{t('recoveryKey.label')}</span>
           <input
             type="text"
             bind:value={typed}
@@ -115,8 +116,8 @@
         </p>
 
         <div class="actions">
-          <button class="btn secondary" onclick={() => (step = 'save')}>Back to the key</button>
-          <button class="btn primary" onclick={onconfirmed} disabled={!matches}>Confirm</button>
+          <button class="btn secondary" onclick={() => (step = 'save')}>{t('recoveryKey.backToKey')}</button>
+          <button class="btn primary" onclick={onconfirmed} disabled={!matches}>{t('recoveryKey.confirm')}</button>
         </div>
       {/if}
     </div>

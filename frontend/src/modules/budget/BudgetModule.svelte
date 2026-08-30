@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import BudgetSummary from './BudgetSummary.svelte'
@@ -66,13 +67,13 @@
 
 <div class="budget-module">
   {#if !vaultState.vault}
-    <p class="loading">Loading...</p>
+    <p class="loading">{t('state.loading')}</p>
   {:else if needsSetup}
     <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
   {:else if summary}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">
-        <button class="btn-reset" onclick={() => confirmingReset = true}>Reset budget</button>
+        <button class="btn-reset" onclick={() => confirmingReset = true}>{t('budget.reset')}</button>
       </div>
     {/if}
     {#if summary.entries.length > 0}

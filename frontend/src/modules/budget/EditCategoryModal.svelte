@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultCategory, VaultData } from '../../lib/crypto/vault'
   import * as engine from '../../lib/budget/budgetEngine'
@@ -64,19 +65,19 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Edit category" use:focusTrap>
-    <h3>Edit category</h3>
+  <div class="modal" role="dialog" aria-label={t('category.editTitle')} use:focusTrap>
+    <h3>{t('category.editTitle')}</h3>
 
     <label class="field">
-      <span class="label">Name</span>
+      <span class="label">{t('field.name')}</span>
       <input type="text" bind:value={name} onkeydown={(e) => e.key === 'Enter' && !conflict && save()} />
     </label>
 
     <label class="field">
-      <span class="label">Type</span>
+      <span class="label">{t('category.type')}</span>
       <select bind:value={type}>
-        <option value="income">Income</option>
-        <option value="expense">Expense</option>
+        <option value="income">{t('budget.income')}</option>
+        <option value="expense">{t('budget.expenses')}</option>
       </select>
     </label>
 

@@ -133,6 +133,108 @@ export const de: Messages = {
 
   'action.close': 'Schliessen',
 
+  // --- Security settings ---
+  'security.title': 'Sicherheitseinstellungen',
+  'security.twofaTitle': 'Zwei-Faktor-Authentifizierung',
+  'security.currentPasswordPlaceholder': 'Aktuelles Passwort',
+  'security.disablePrompt': 'Geben Sie Ihr Passwort ein, um 2FA zu deaktivieren:',
+  'security.confirmDisable': 'Deaktivieren bestätigen',
+  'security.disabling': 'Wird deaktiviert...',
+  'security.disable2fa': '2FA deaktivieren',
+  'security.enable2fa': '2FA aktivieren',
+  'security.regeneratePrompt': 'Geben Sie Ihr Passwort ein, um neue Wiederherstellungscodes zu erzeugen:',
+  'security.regenerate': 'Codes neu erzeugen',
+  'security.regenerating': 'Wird erzeugt...',
+  'security.regenerateCodes': 'Wiederherstellungscodes neu erzeugen',
+  'security.newCodesWarning': 'Bewahren Sie diese neuen Wiederherstellungscodes auf. Die alten Codes sind jetzt ungültig.',
+  'security.passwordTitle': 'Passwort',
+  'security.deleteAccountTitle': 'Konto löschen',
+  'security.deleteAccountHint': 'Löscht Ihr Konto und alle zugehörigen Daten dauerhaft. Dies kann nicht rückgängig gemacht werden.',
+  'security.deletePrompt': 'Geben Sie Ihr Passwort ein, um die Kontolöschung zu bestätigen:',
+  'security.deleteMyAccount': 'Mein Konto löschen',
+  'security.deleting': 'Wird gelöscht...',
+
+  // --- Setting up two-factor ---
+  'twofa.setupTitle': 'Zwei-Faktor-Authentifizierung aktivieren',
+  'twofa.setupHint': 'Schützen Sie Ihr Konto zusätzlich mit einer TOTP-Authenticator-App.',
+  'twofa.setupAction': '2FA einrichten',
+  'twofa.settingUp': 'Wird eingerichtet...',
+  'twofa.scanTitle': 'QR-Code scannen',
+  'twofa.scanHint': 'Scannen Sie diesen QR-Code mit Ihrer Authenticator-App (Google Authenticator, Authy usw.)',
+  'twofa.manualEntry': 'Scannen nicht möglich? Manuell eingeben',
+  'twofa.verifyPrompt': 'Geben Sie zur Bestätigung den 6-stelligen Code aus Ihrer App ein:',
+  'twofa.verifyAndEnable': 'Bestätigen & aktivieren',
+  'twofa.codesTitle': 'Wiederherstellungscodes sichern',
+  'twofa.codesWarning': 'Bewahren Sie diese Wiederherstellungscodes an einem sicheren Ort auf. Jeder Code ist nur einmal verwendbar. Wenn Sie Ihren Authenticator verlieren, sind diese Codes der einzige Zugang zu Ihrem Konto.',
+  'twofa.copyAll': 'Alle kopieren',
+
+  // --- Recovery key ---
+  'recoveryKey.title': 'Wiederherstellungsschlüssel sichern',
+  'recoveryKey.copy': 'Schlüssel kopieren',
+  'recoveryKey.confirmTitle': 'Prüfen Sie, ob Sie ihn wirklich haben',
+  'recoveryKey.label': 'Wiederherstellungsschlüssel',
+  'recoveryKey.backToKey': 'Zurück zum Schlüssel',
+  'recoveryKey.confirm': 'Bestätigen',
+
+  // --- Banners ---
+  'update.available': 'Eine neue Version der App ist verfügbar.',
+  'update.dismiss': 'Hinweis ausblenden',
+  'unsaved.title': 'Ihre Änderungen werden nicht gespeichert.',
+
+  'action.copied': 'Kopiert',
+  'action.download': 'Herunterladen',
+
+  // --- Budget ---
+  'budget.income': 'Einnahmen',
+  'budget.expenses': 'Ausgaben',
+  'budget.savings': 'Ersparnisse',
+  'budget.plannedMo': 'Geplant/Mt.',
+  'budget.plannedYr': 'Geplant/J.',
+  'budget.incomeYr': 'Einnahmen /J.',
+  'budget.expensesYr': 'Ausgaben /J.',
+  'budget.unallocatedMo': 'Nicht zugewiesen /Mt.',
+  'budget.unallocatedYr': 'Nicht zugewiesen /J.',
+  'budget.month': 'Monat',
+  'budget.year': 'Jahr',
+  'budget.viewToggle': 'Zeigt {mode} Beträge — wechseln zu {other}',
+  'budget.monthly': 'monatliche',
+  'budget.yearly': 'jährliche',
+  'budget.dragToReorder': 'Zum Umsortieren ziehen',
+  'budget.editPlannedMo': 'Monatsbetrag für {entry} bearbeiten',
+  'budget.editPlannedYr': 'Jahresbetrag für {entry} bearbeiten',
+  'budget.editCategoryOf': 'Kategorie {category} bearbeiten',
+  'budget.addEntryTo': 'Eintrag zu {category} hinzufügen',
+  'budget.uncategorised': 'Übrige',
+  'budget.reset': 'Budget zurücksetzen',
+  'budget.setupTitle': 'Budget einrichten',
+  'budget.setupHint': 'Beginnen Sie mit Schweizer Standardeinträgen auf Basis der BFS-Haushaltsbudgeterhebung (HABE 2023, Einpersonenhaushalt). Sie können später alles anpassen.',
+
+  // --- Entry dialog ---
+  'entry.editTitle': 'Eintrag bearbeiten',
+  'entry.addTitle': 'Eintrag hinzufügen',
+  'entry.category': 'Kategorie',
+  'entry.newCategoryPlaceholder': 'Name der neuen Kategorie',
+  'entry.namePlaceholder': 'z. B. Fitnessabo',
+  'entry.values': 'Beträge',
+  'entry.deleteTitle': 'Eintrag löschen',
+
+  // --- Category dialog ---
+  'category.editTitle': 'Kategorie bearbeiten',
+  'category.type': 'Typ',
+
+  // --- Archives ---
+  'archive.newNameLabel': 'Name für das neue Archiv',
+  'archive.newNamePlaceholder': 'z. B. Vor der Lohnerhöhung',
+  'archive.create': 'Aktuellen Plan archivieren',
+  'archive.none': 'Noch keine Archive.',
+  'archive.empty': 'Dieses Archiv hat keine Zeilen.',
+  'archive.entryColumn': 'Eintrag',
+  'archive.deleteOne': 'Archiv {name} löschen',
+  'archive.deleteTitle': 'Archiv löschen',
+  'archive.unrecoverable': 'Diese Momentaufnahme kann nicht wiederhergestellt werden.',
+
+  'field.name': 'Name',
+
   // --- Common states ---
   'state.loading': 'Wird geladen...',
   'state.saving': 'Wird gespeichert...',

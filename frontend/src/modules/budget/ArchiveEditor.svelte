@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultArchive, VaultArchiveLine } from '../../lib/crypto/vault'
 
@@ -85,7 +86,7 @@
 
 <div class="editor">
   <label class="rename-field">
-    <span class="rename-label">Name</span>
+    <span class="rename-label">{t('field.name')}</span>
     <input
       type="text"
       class="rename-input"
@@ -99,13 +100,13 @@
   {/if}
 
   {#if archive.lines.length === 0}
-    <p class="empty">This archive has no lines.</p>
+    <p class="empty">{t('archive.empty')}</p>
   {:else}
     <table>
       <thead>
         <tr>
-          <th class="col-name">Entry</th>
-          <th class="right col-amount">Planned/mo</th>
+          <th class="col-name">{t('archive.entryColumn')}</th>
+          <th class="right col-amount">{t('budget.plannedMo')}</th>
         </tr>
       </thead>
       {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + category.rows[0].line.type)}
@@ -123,15 +124,15 @@
       {/each}
       <tfoot>
         <tr>
-          <td>Income</td>
+          <td>{t('budget.income')}</td>
           <td class="right total income-total">{fmt(incomeTotal)}</td>
         </tr>
         <tr>
-          <td>Expenses</td>
+          <td>{t('budget.expenses')}</td>
           <td class="right total expense-total">{fmt(expenseTotal)}</td>
         </tr>
         <tr>
-          <td>Savings</td>
+          <td>{t('budget.savings')}</td>
           <td class="right total" class:income-total={balance >= 0} class:expense-total={balance < 0}>
             {fmt(balance)}
           </td>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { setup2FA, confirm2FA } from './authStore.svelte'
   import TOTPInput from './TOTPInput.svelte'
   import { createCopier } from '../util/copier.svelte'
@@ -63,32 +64,32 @@
 
 <div class="setup-2fa">
   {#if step === 'start'}
-    <h2>Enable Two-Factor Authentication</h2>
-    <p class="info">Add an extra layer of security to your account using a TOTP authenticator app.</p>
+    <h2>{t('twofa.setupTitle')}</h2>
+    <p class="info">{t('twofa.setupHint')}</p>
 
     {#if error}
       <p class="error">{error}</p>
     {/if}
 
     <button onclick={handleSetup} disabled={loading}>
-      {loading ? 'Setting up...' : 'Set Up 2FA'}
+      {loading ? t('twofa.settingUp') : t('twofa.setupAction')}
     </button>
 
   {:else if step === 'scan'}
-    <h2>Scan QR Code</h2>
-    <p class="info">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+    <h2>{t('twofa.scanTitle')}</h2>
+    <p class="info">{t('twofa.scanHint')}</p>
 
     <div class="qr-container">
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(otpauthURL)}" alt="QR Code" width="200" height="200" />
     </div>
 
     <details class="manual-entry">
-      <summary>Can't scan? Enter manually</summary>
+      <summary>{t('twofa.manualEntry')}</summary>
       <code class="secret-code">{secret}</code>
     </details>
 
     <div class="verify-step">
-      <p class="info">Enter the 6-digit code from your app to verify:</p>
+      <p class="info">{t('twofa.verifyPrompt')}</p>
       <div class="code-input-row">
         <TOTPInput bind:value={code} disabled={loading} onSubmit={handleConfirm} />
       </div>
@@ -98,13 +99,13 @@
       {/if}
 
       <button onclick={handleConfirm} disabled={loading || code.length < 6}>
-        {loading ? 'Verifying...' : 'Verify & Enable'}
+        {loading ? t('twofa.verifying') : t('twofa.verifyAndEnable')}
       </button>
     </div>
 
   {:else if step === 'codes'}
-    <h2>Save Recovery Codes</h2>
-    <p class="info warning">Save these recovery codes in a safe place. Each code can only be used once. If you lose your authenticator, these codes are the only way to access your account.</p>
+    <h2>{t('twofa.codesTitle')}</h2>
+    <p class="info warning">{t('twofa.codesWarning')}</p>
 
     <div class="codes-grid">
       {#each recoveryCodes as code}
@@ -114,9 +115,9 @@
 
     <div class="code-actions">
       <button class="btn-secondary" onclick={copyRecoveryCodes}>
-        {copier.copied ? 'Copied' : 'Copy All'}
+        {copier.copied ? t('action.copied') : t('twofa.copyAll')}
       </button>
-      <button class="btn-secondary" onclick={downloadRecoveryCodes}>Download</button>
+      <button class="btn-secondary" onclick={downloadRecoveryCodes}>{t('action.download')}</button>
     </div>
 
     <p class="copy-status" class:failed={copier.failed} aria-live="polite">

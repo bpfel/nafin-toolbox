@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { markDirty } from '../../lib/crypto/vaultStore.svelte'
@@ -95,15 +96,15 @@
 
       <div class="archive-form">
         <label class="name-field">
-          <span class="visually-hidden">Name for the new archive</span>
+          <span class="visually-hidden">{t('archive.newNameLabel')}</span>
           <input
             type="text"
-            placeholder="e.g. Before the raise"
+            placeholder={t('archive.newNamePlaceholder')}
             bind:value={newName}
             onkeydown={handleNameKeydown}
           />
         </label>
-        <button class="primary" onclick={archiveCurrentPlan}>Archive current plan</button>
+        <button class="primary" onclick={archiveCurrentPlan}>{t('archive.create')}</button>
       </div>
 
       {#if archiveError}
@@ -111,7 +112,7 @@
       {/if}
 
       {#if archives.length === 0}
-        <p class="empty">No archives yet.</p>
+        <p class="empty">{t('archive.none')}</p>
       {:else}
         <ul class="archive-list">
           {#each archives as archive (archive.id)}
@@ -135,7 +136,7 @@
                 </span>
                 <button
                   class="delete-btn"
-                  aria-label="Delete archive {archive.name}"
+                  aria-label={t('archive.deleteOne', { name: archive.name })}
                   onclick={() =>
                     (deleteTarget = {
                       id: archive.id,
