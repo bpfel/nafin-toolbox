@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+
+	"github.com/bpfel/nafin-toolbox/internal/apierror"
 	"os"
 	"strings"
 	"time"
@@ -167,7 +169,7 @@ func originCheck(allowed []string) func(http.Handler) http.Handler {
 				return
 			}
 			if _, ok := set[origin]; !ok {
-				http.Error(w, `{"error":"origin not allowed"}`, http.StatusForbidden)
+				apierror.Write(w, apierror.Server, http.StatusForbidden, "origin not allowed")
 				return
 			}
 			next.ServeHTTP(w, r)

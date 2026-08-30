@@ -1,3 +1,4 @@
+import { withCode } from '../api/client'
 import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault } from '../crypto/vaultStore.svelte'
 
 export interface User {
@@ -120,7 +121,7 @@ export async function login(email: string, password: string): Promise<string | {
   }
 
   const data = await res.json().catch(() => ({ error: 'Login failed' }))
-  return data.error || 'Login failed'
+  return withCode(data) || 'Login failed'
 }
 
 export async function verify2FA(mfaToken: string, code: string): Promise<string | null> {
@@ -157,7 +158,7 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
   }
 
   const data = await res.json().catch(() => ({ error: 'Verification failed' }))
-  return data.error || 'Verification failed'
+  return withCode(data) || 'Verification failed'
 }
 
 /**
@@ -255,7 +256,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
   }
 
   const data = await res.json().catch(() => ({ error: 'Password change failed' }))
-  return data.error || 'Password change failed'
+  return withCode(data) || 'Password change failed'
 }
 
 /**
@@ -295,7 +296,7 @@ export async function inviteUser(email: string, role: 'admin' | 'user' = 'user',
   }
 
   const data = await res.json().catch(() => ({ error: 'Invite failed' }))
-  return { error: data.error || 'Invite failed' }
+  return { error: withCode(data) || 'Invite failed' }
 }
 
 export async function listUsers(): Promise<User[]> {
@@ -333,7 +334,7 @@ export async function setup(email: string, password: string): Promise<string | n
   }
 
   const data = await res.json().catch(() => ({ error: 'Setup failed' }))
-  return data.error || 'Setup failed'
+  return withCode(data) || 'Setup failed'
 }
 
 export async function verifyEmail(token: string, password: string): Promise<string | null> {
@@ -360,7 +361,7 @@ export async function verifyEmail(token: string, password: string): Promise<stri
   }
 
   const data = await res.json().catch(() => ({ error: 'Verification failed' }))
-  return data.error || 'Verification failed'
+  return withCode(data) || 'Verification failed'
 }
 
 export async function setup2FA(): Promise<{ secret: string; url: string } | { error: string }> {
@@ -374,7 +375,7 @@ export async function setup2FA(): Promise<{ secret: string; url: string } | { er
   }
 
   const data = await res.json().catch(() => ({ error: '2FA setup failed' }))
-  return { error: data.error || '2FA setup failed' }
+  return { error: withCode(data) || '2FA setup failed' }
 }
 
 export async function confirm2FA(code: string): Promise<{ recovery_codes: string[] } | { error: string }> {
@@ -390,7 +391,7 @@ export async function confirm2FA(code: string): Promise<{ recovery_codes: string
   }
 
   const data = await res.json().catch(() => ({ error: 'Confirmation failed' }))
-  return { error: data.error || 'Confirmation failed' }
+  return { error: withCode(data) || 'Confirmation failed' }
 }
 
 export async function disable2FA(password: string): Promise<string | null> {
@@ -404,7 +405,7 @@ export async function disable2FA(password: string): Promise<string | null> {
   if (res.ok) return null
 
   const data = await res.json().catch(() => ({ error: 'Failed to disable 2FA' }))
-  return data.error || 'Failed to disable 2FA'
+  return withCode(data) || 'Failed to disable 2FA'
 }
 
 export async function regenerateRecoveryCodes(password: string): Promise<{ recovery_codes: string[] } | { error: string }> {
@@ -420,7 +421,7 @@ export async function regenerateRecoveryCodes(password: string): Promise<{ recov
   }
 
   const data = await res.json().catch(() => ({ error: 'Failed to regenerate codes' }))
-  return { error: data.error || 'Failed to regenerate codes' }
+  return { error: withCode(data) || 'Failed to regenerate codes' }
 }
 
 export async function deleteAccount(password: string): Promise<string | null> {
@@ -438,7 +439,7 @@ export async function deleteAccount(password: string): Promise<string | null> {
   }
 
   const data = await res.json().catch(() => ({ error: 'Failed to delete account' }))
-  return data.error || 'Failed to delete account'
+  return withCode(data) || 'Failed to delete account'
 }
 
 export async function deleteUser(id: number): Promise<string | null> {
@@ -450,7 +451,7 @@ export async function deleteUser(id: number): Promise<string | null> {
   if (res.ok) return null
 
   const data = await res.json().catch(() => ({ error: 'Failed to delete user' }))
-  return data.error || 'Failed to delete user'
+  return withCode(data) || 'Failed to delete user'
 }
 
 export async function adminResetPassword(id: number): Promise<{ temp_password: string } | { error: string }> {
@@ -461,7 +462,7 @@ export async function adminResetPassword(id: number): Promise<{ temp_password: s
 
   const data = await res.json().catch(() => ({ error: 'Failed to reset password' }))
   if (res.ok) return { temp_password: data.temp_password }
-  return { error: data.error || 'Failed to reset password' }
+  return { error: withCode(data) || 'Failed to reset password' }
 }
 
 export async function resendVerification(id: number): Promise<string | null> {
@@ -473,7 +474,7 @@ export async function resendVerification(id: number): Promise<string | null> {
   if (res.ok) return null
 
   const data = await res.json().catch(() => ({ error: 'Failed to resend' }))
-  return data.error || 'Failed to resend'
+  return withCode(data) || 'Failed to resend'
 }
 
 export interface AuditLogEntry {
@@ -527,5 +528,5 @@ export async function setRequire2FA(require: boolean): Promise<string | null> {
   if (res.ok) return null
 
   const data = await res.json().catch(() => ({ error: 'Failed to update setting' }))
-  return data.error || 'Failed to update setting'
+  return withCode(data) || 'Failed to update setting'
 }

@@ -6,6 +6,19 @@ export interface ModuleInfo {
   enabled_at: string
 }
 
+/**
+ * An error message with its code appended, when the server sent one.
+ *
+ * The messages stay in English, so a user running the interface in another
+ * language cannot describe a failure back to whoever runs the server. The code
+ * is the part they can read out. Shown in brackets rather than instead of the
+ * message, because whoever *can* read English should not have to decode it.
+ */
+export function withCode(body: { error?: string; code?: string }): string {
+  const message = body.error ?? ''
+  return body.code ? `${message} (${body.code})` : message
+}
+
 let onUnauthorized: (() => void) | null = null
 
 export function setOnUnauthorized(callback: () => void) {
@@ -26,7 +39,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     let msg = `API error: ${res.status} ${res.statusText}`
     try {
       const body = await res.json()
-      if (body.error) msg = body.error
+      if (body.error) msg = withCode(body)
     } catch { /* ignore parse errors */ }
     throw new Error(msg)
   }

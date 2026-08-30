@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/bpfel/nafin-toolbox/internal/apierror"
 	"os"
 	"strconv"
 	"strings"
@@ -34,37 +36,37 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !deps.LoginLimiter.Check(r) {
 			w.Header().Set("Retry-After", "900")
-			http.Error(w, `{"error":"too many login attempts"}`, http.StatusTooManyRequests)
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
 			return
 		}
 
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Email == "" || req.Password == "" {
-			http.Error(w, `{"error":"email and password required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "email and password required")
 			return
 		}
 
 		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
 			deps.LoginLimiter.RecordFailure(r)
 			uid := userIDPtr(user)
 			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
-			http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
 
 		// Reject unverified email users
 		if !user.EmailVerified {
-			http.Error(w, `{"error":"email not verified"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "email not verified")
 			return
 		}
 
@@ -72,7 +74,7 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 		if user.TOTPEnabled {
 			mfaToken, err := deps.Store.CreateMFAChallenge(r.Context(), user.ID)
 			if err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -85,13 +87,13 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 
 		// No 2FA — create session directly
 		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		sess, err := deps.Store.CreateSession(r.Context(), user.ID)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -131,7 +133,7 @@ func HandleLogout(deps *HandlerDeps) http.HandlerFunc {
 func HandleMe(w http.ResponseWriter, r *http.Request) {
 	user := UserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -145,23 +147,23 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
-			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
 			return
 		}
 
 		var req InviteRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Email == "" {
-			http.Error(w, `{"error":"email required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "email required")
 			return
 		}
 
 		if err := ValidateEmail(req.Email); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
 			return
 		}
 
@@ -177,22 +179,22 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 		// Validate password early in fallback mode (before DB lookup)
 		if !smtpAvailable {
 			if req.Password == "" {
-				http.Error(w, `{"error":"password required (email not configured)"}`, http.StatusBadRequest)
+				apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required (email not configured)")
 				return
 			}
 			if err := ValidatePassword(req.Password); err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+				apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
 				return
 			}
 		}
 
 		existing, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if existing != nil {
-			http.Error(w, `{"error":"user already exists"}`, http.StatusConflict)
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "user already exists")
 			return
 		}
 
@@ -200,14 +202,14 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 			// Email-based invite: create user with empty password, unverified
 			user, err := deps.Store.CreateUserFull(r.Context(), req.Email, "", role, false, false)
 			if err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 
 			// Create verification token
 			rawToken, err := deps.Store.CreateVerificationToken(r.Context(), user.ID, "email_verify")
 			if err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 
@@ -215,13 +217,13 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 			htmlBody, textBody, err := email.RenderInviteEmail(deps.AppURL, rawToken)
 			if err != nil {
 				log.Printf("rendering invite email: %v", err)
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 
 			if err := deps.EmailSender.Send(r.Context(), req.Email, "You've been invited to Finance Tracker", htmlBody, textBody); err != nil {
 				log.Printf("sending invite email: %v", err)
-				http.Error(w, `{"error":"failed to send invite email"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "failed to send invite email")
 				return
 			}
 
@@ -238,13 +240,13 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 			// Fallback: admin sets password (already validated above)
 			hash, err := HashPassword(req.Password)
 			if err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 
 			user, err := deps.Store.CreateUser(r.Context(), req.Email, hash, role, true)
 			if err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 
@@ -266,13 +268,13 @@ func HandleListUsers(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
-			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
 			return
 		}
 
 		users, err := deps.Store.ListUsers(r.Context())
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if users == nil {
@@ -289,49 +291,49 @@ func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
 		var req ChangePasswordRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.CurrentPassword == "" || req.NewPassword == "" {
-			http.Error(w, `{"error":"current and new password required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "current and new password required")
 			return
 		}
 
 		if !CheckPassword(user.PasswordHash, req.CurrentPassword) {
-			http.Error(w, `{"error":"current password is incorrect"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "current password is incorrect")
 			return
 		}
 
 		if err := ValidatePassword(req.NewPassword); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
 			return
 		}
 
 		newHash, err := HashPassword(req.NewPassword)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.UpdatePassword(r.Context(), user.ID, newHash); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.ClearMustChangePassword(r.Context(), user.ID); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -346,49 +348,49 @@ func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !deps.SetupLimiter.Allow(r) {
 			w.Header().Set("Retry-After", "900")
-			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
 
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Email == "" || req.Password == "" {
-			http.Error(w, `{"error":"email and password required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "email and password required")
 			return
 		}
 
 		if err := ValidateEmail(req.Email); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
 			return
 		}
 		if err := ValidatePassword(req.Password); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
 			return
 		}
 
 		hash, err := HashPassword(req.Password)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		user, err := deps.Store.CreateFirstUser(r.Context(), req.Email, hash)
 		if err == ErrSetupAlreadyDone {
-			http.Error(w, `{"error":"setup already completed"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "setup already completed")
 			return
 		}
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		sess, err := deps.Store.CreateSession(r.Context(), user.ID)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -406,7 +408,7 @@ func HandleNeedsSetup(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		count, err := deps.Store.UserCount(r.Context())
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -419,50 +421,50 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !deps.VerifyEmailLimiter.Check(r) {
 			w.Header().Set("Retry-After", "900")
-			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
 
 		var req VerifyEmailRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Token == "" || req.Password == "" {
-			http.Error(w, `{"error":"token and password required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "token and password required")
 			return
 		}
 
 		if err := ValidatePassword(req.Password); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
 			return
 		}
 
 		userID, err := deps.Store.ValidateVerificationToken(r.Context(), req.Token, "email_verify")
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if userID == 0 {
 			deps.VerifyEmailLimiter.RecordFailure(r)
-			http.Error(w, `{"error":"invalid or expired token"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid or expired token")
 			return
 		}
 
 		hash, err := HashPassword(req.Password)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.UpdatePassword(r.Context(), userID, hash); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.SetEmailVerified(r.Context(), userID); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -472,13 +474,13 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 		// Auto-login
 		sess, err := deps.Store.CreateSession(r.Context(), userID)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		user, err := deps.Store.GetUserByID(r.Context(), userID)
 		if err != nil || user == nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -494,35 +496,35 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !deps.Verify2FALimiter.Check(r) {
 			w.Header().Set("Retry-After", "900")
-			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
 
 		var req Verify2FARequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.MFAToken == "" || req.Code == "" {
-			http.Error(w, `{"error":"mfa_token and code required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "mfa_token and code required")
 			return
 		}
 
 		userID, err := deps.Store.ValidateMFAChallenge(r.Context(), req.MFAToken)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if userID == 0 {
-			http.Error(w, `{"error":"invalid or expired MFA token"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid or expired MFA token")
 			return
 		}
 
 		// Try TOTP code first
 		valid, err := validateTOTPCode(r.Context(), deps, userID, req.Code)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -530,7 +532,7 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 			// Try recovery code
 			valid, err = tryRecoveryCode(r.Context(), deps, userID, req.Code)
 			if err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 		}
@@ -538,25 +540,25 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 		if !valid {
 			deps.Verify2FALimiter.RecordFailure(r)
 			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, nil)
-			http.Error(w, `{"error":"invalid code"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid code")
 			return
 		}
 
 		// Create session
 		if err := deps.Store.DeleteUserSessions(r.Context(), userID); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		sess, err := deps.Store.CreateSession(r.Context(), userID)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		user, err := deps.Store.GetUserByID(r.Context(), userID)
 		if err != nil || user == nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -572,17 +574,17 @@ func HandleSetup2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
 		if deps.EncryptionKey == nil {
-			http.Error(w, `{"error":"2FA not available (encryption key not configured)"}`, http.StatusServiceUnavailable)
+			apierror.Write(w, apierror.Auth, http.StatusServiceUnavailable, "2FA not available (encryption key not configured)")
 			return
 		}
 
 		if user.TOTPEnabled {
-			http.Error(w, `{"error":"2FA is already enabled"}`, http.StatusConflict)
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is already enabled")
 			return
 		}
 
@@ -591,19 +593,19 @@ func HandleSetup2FA(deps *HandlerDeps) http.HandlerFunc {
 			AccountName: user.Email,
 		})
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		// Encrypt and store the secret
 		encrypted, err := Encrypt([]byte(key.Secret()), deps.EncryptionKey)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.SaveTOTPSecret(r.Context(), user.ID, encrypted); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -620,52 +622,52 @@ func HandleConfirm2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
 		if user.TOTPEnabled {
-			http.Error(w, `{"error":"2FA is already enabled"}`, http.StatusConflict)
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is already enabled")
 			return
 		}
 
 		var req Confirm2FARequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Code == "" {
-			http.Error(w, `{"error":"code required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "code required")
 			return
 		}
 
 		// Validate code against stored secret
 		valid, err := validateTOTPCode(r.Context(), deps, user.ID, req.Code)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if !valid {
-			http.Error(w, `{"error":"invalid code"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid code")
 			return
 		}
 
 		// Enable 2FA
 		if err := deps.Store.SetTOTPEnabled(r.Context(), user.ID, true); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		// Generate recovery codes
 		codes, hashes, err := generateRecoveryCodes(10)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.SaveRecoveryCodes(r.Context(), user.ID, hashes); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -680,28 +682,28 @@ func HandleDisable2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
 		var req Disable2FARequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Password == "" {
-			http.Error(w, `{"error":"password required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
 			return
 		}
 
 		if !CheckPassword(user.PasswordHash, req.Password) {
-			http.Error(w, `{"error":"incorrect password"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
 			return
 		}
 
 		if err := deps.Store.SetTOTPEnabled(r.Context(), user.ID, false); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -719,39 +721,39 @@ func HandleRegenerateRecoveryCodes(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
 		if !user.TOTPEnabled {
-			http.Error(w, `{"error":"2FA is not enabled"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "2FA is not enabled")
 			return
 		}
 
 		var req RegenerateRecoveryCodesRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Password == "" {
-			http.Error(w, `{"error":"password required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
 			return
 		}
 
 		if !CheckPassword(user.PasswordHash, req.Password) {
-			http.Error(w, `{"error":"incorrect password"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
 			return
 		}
 
 		codes, hashes, err := generateRecoveryCodes(10)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.SaveRecoveryCodes(r.Context(), user.ID, hashes); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -765,30 +767,30 @@ func HandleDeleteAccount(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
 		var req DeleteAccountRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Password == "" {
-			http.Error(w, `{"error":"password required"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
 			return
 		}
 
 		if !CheckPassword(user.PasswordHash, req.Password) {
-			http.Error(w, `{"error":"incorrect password"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
 			return
 		}
 
 		deps.Store.LogAudit(r.Context(), &user.ID, AuditUserDeleted, r, map[string]any{"self": true})
 
 		if err := deps.Store.DeleteUser(r.Context(), user.ID); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -808,19 +810,19 @@ func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
-			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
 			return
 		}
 
 		idStr := chi.URLParam(r, "id")
 		targetID, err := strconv.Atoi(idStr)
 		if err != nil {
-			http.Error(w, `{"error":"invalid user ID"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid user ID")
 			return
 		}
 
 		if targetID == caller.ID {
-			http.Error(w, `{"error":"cannot delete yourself via admin endpoint"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "cannot delete yourself via admin endpoint")
 			return
 		}
 
@@ -829,7 +831,7 @@ func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 		})
 
 		if err := deps.Store.DeleteUser(r.Context(), targetID); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -844,44 +846,44 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
-			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
 			return
 		}
 
 		idStr := chi.URLParam(r, "id")
 		targetID, err := strconv.Atoi(idStr)
 		if err != nil {
-			http.Error(w, `{"error":"invalid user ID"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid user ID")
 			return
 		}
 
 		if targetID == caller.ID {
-			http.Error(w, `{"error":"cannot reset your own password via admin endpoint"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "cannot reset your own password via admin endpoint")
 			return
 		}
 
 		target, err := deps.Store.GetUserByID(r.Context(), targetID)
 		if err != nil || target == nil {
-			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+			apierror.Write(w, apierror.Auth, http.StatusNotFound, "user not found")
 			return
 		}
 
 		// Generate random 16-char temporary password
 		tempBytes := make([]byte, 12)
 		if _, err := rand.Read(tempBytes); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		tempPassword := hex.EncodeToString(tempBytes)[:16]
 
 		hash, err := HashPassword(tempPassword)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.Store.UpdatePassword(r.Context(), targetID, hash); err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
@@ -907,25 +909,25 @@ func HandleResendVerification(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
-			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
 			return
 		}
 
 		idStr := chi.URLParam(r, "id")
 		targetID, err := strconv.Atoi(idStr)
 		if err != nil {
-			http.Error(w, `{"error":"invalid user ID"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid user ID")
 			return
 		}
 
 		user, err := deps.Store.GetUserByID(r.Context(), targetID)
 		if err != nil || user == nil {
-			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+			apierror.Write(w, apierror.Auth, http.StatusNotFound, "user not found")
 			return
 		}
 
 		if user.EmailVerified {
-			http.Error(w, `{"error":"user already verified"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "user already verified")
 			return
 		}
 
@@ -933,19 +935,19 @@ func HandleResendVerification(deps *HandlerDeps) http.HandlerFunc {
 		deps.Store.DeleteVerificationTokens(r.Context(), user.ID, "email_verify")
 		rawToken, err := deps.Store.CreateVerificationToken(r.Context(), user.ID, "email_verify")
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		htmlBody, textBody, err := email.RenderInviteEmail(deps.AppURL, rawToken)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		if err := deps.EmailSender.Send(r.Context(), user.Email, "You've been invited to Finance Tracker", htmlBody, textBody); err != nil {
 			log.Printf("resending invite email: %v", err)
-			http.Error(w, `{"error":"failed to send email"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "failed to send email")
 			return
 		}
 
@@ -959,24 +961,24 @@ func HandleAdminRequire2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
-			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
 			return
 		}
 
 		var req Require2FARequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		if req.Require {
 			if err := deps.Store.SetSetting(r.Context(), "require_2fa", "true"); err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 		} else {
 			if err := deps.Store.DeleteSetting(r.Context(), "require_2fa"); err != nil {
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
 			}
 		}
@@ -1003,7 +1005,7 @@ func HandleListAuditLogs(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
 		if !caller.IsAdmin() {
-			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
+			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
 			return
 		}
 
@@ -1021,7 +1023,7 @@ func HandleListAuditLogs(deps *HandlerDeps) http.HandlerFunc {
 		entries, total, err := deps.Store.ListAuditLogs(r.Context(), limit, offset, eventFilter, userIDFilter)
 		if err != nil {
 			log.Printf("audit log query error: %v", err)
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if entries == nil {
