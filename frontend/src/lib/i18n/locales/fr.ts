@@ -7,9 +7,6 @@ import type { Messages } from './en'
  * "pilier 3a" is the official name of the retirement scheme, and the QR-bill
  * field names are quoted from SIX's Style Guide QR-bill, which requires them
  * verbatim and warns that variations can stop a payment going through.
- *
- * Typography follows French convention: a narrow no-break space before the
- * high punctuation marks ? and :, which is why those strings look spaced.
  */
 export const fr: Messages = {
   // --- Settings menu ---
@@ -90,7 +87,7 @@ export const fr: Messages = {
   'auth.createAccount': 'Créer le compte',
   'auth.noUsersYet': 'Aucun utilisateur n’existe encore. Créez le compte administrateur pour commencer.',
   'auth.pleaseWait': 'Veuillez patienter...',
-  'auth.forgotHint': 'Mot de passe oublié ? Contactez votre administrateur pour le réinitialiser. Vous aurez besoin de votre clé de récupération pour rétablir vos données chiffrées.',
+  'auth.forgotHint': 'Mot de passe oublié? Contactez votre administrateur pour le réinitialiser. Vous aurez besoin de votre clé de récupération pour rétablir vos données chiffrées.',
   'auth.backToLogin': 'Retour à la connexion',
 
   // --- Two-factor challenge ---
@@ -147,12 +144,12 @@ export const fr: Messages = {
   'security.title': 'Paramètres de sécurité',
   'security.twofaTitle': 'Authentification à deux facteurs',
   'security.currentPasswordPlaceholder': 'Mot de passe actuel',
-  'security.disablePrompt': 'Saisissez votre mot de passe pour désactiver la 2FA :',
+  'security.disablePrompt': 'Saisissez votre mot de passe pour désactiver la 2FA:',
   'security.confirmDisable': 'Confirmer la désactivation',
   'security.disabling': 'Désactivation...',
   'security.disable2fa': 'Désactiver la 2FA',
   'security.enable2fa': 'Activer la 2FA',
-  'security.regeneratePrompt': 'Saisissez votre mot de passe pour régénérer les codes de récupération :',
+  'security.regeneratePrompt': 'Saisissez votre mot de passe pour régénérer les codes de récupération:',
   'security.regenerate': 'Régénérer les codes',
   'security.regenerating': 'Génération...',
   'security.regenerateCodes': 'Régénérer les codes de récupération',
@@ -160,7 +157,7 @@ export const fr: Messages = {
   'security.passwordTitle': 'Mot de passe',
   'security.deleteAccountTitle': 'Supprimer le compte',
   'security.deleteAccountHint': 'Supprime définitivement votre compte et toutes les données associées. Cette action est irréversible.',
-  'security.deletePrompt': 'Saisissez votre mot de passe pour confirmer la suppression du compte :',
+  'security.deletePrompt': 'Saisissez votre mot de passe pour confirmer la suppression du compte:',
   'security.deleteMyAccount': 'Supprimer mon compte',
   'security.deleting': 'Suppression...',
 
@@ -171,8 +168,8 @@ export const fr: Messages = {
   'twofa.settingUp': 'Configuration...',
   'twofa.scanTitle': 'Scanner le code QR',
   'twofa.scanHint': 'Scannez ce code QR avec votre application d’authentification (Google Authenticator, Authy, etc.)',
-  'twofa.manualEntry': 'Impossible de scanner ? Saisir manuellement',
-  'twofa.verifyPrompt': 'Saisissez le code à 6 chiffres de votre application pour vérifier :',
+  'twofa.manualEntry': 'Impossible de scanner? Saisir manuellement',
+  'twofa.verifyPrompt': 'Saisissez le code à 6 chiffres de votre application pour vérifier:',
   'twofa.verifyAndEnable': 'Vérifier et activer',
   'twofa.codesTitle': 'Conserver les codes de récupération',
   'twofa.codesWarning': 'Conservez ces codes de récupération en lieu sûr. Chaque code ne peut servir qu’une fois. Si vous perdez votre application d’authentification, ces codes sont le seul moyen d’accéder à votre compte.',
@@ -232,7 +229,7 @@ export const fr: Messages = {
   'entry.namePlaceholder': 'p. ex. abonnement de fitness',
   'entry.values': 'Montants',
   'entry.deleteTitle': 'Supprimer l’entrée',
-  'entry.deleteExplain': 'Retirer {name} de votre budget ? Son montant prévu disparaît avec elle. Une archive qui l’a déjà enregistrée en conserve la copie.',
+  'entry.deleteExplain': 'Retirer {name} de votre budget? Son montant prévu disparaît avec elle. Une archive qui l’a déjà enregistrée en conserve la copie.',
 
   // --- Category dialog ---
   'category.editTitle': 'Modifier la catégorie',
@@ -241,8 +238,8 @@ export const fr: Messages = {
   'category.typeExpense': 'dépenses',
   'category.movingSides.one': 'Déplacer cette catégorie vers les {type} emporte son {count} entrée. Son affectation de compte revient à la valeur par défaut.',
   'category.movingSides.other': 'Déplacer cette catégorie vers les {type} emporte ses {count} entrées. Leur affectation de compte revient à la valeur par défaut.',
-  'category.reservesLost.one': '{count} réserve est supprimée : mettre de l’argent de côté en vue d’un objectif est propre aux dépenses.',
-  'category.reservesLost.other': '{count} réserves sont supprimées : mettre de l’argent de côté en vue d’un objectif est propre aux dépenses.',
+  'category.reservesLost.one': '{count} réserve est supprimée: mettre de l’argent de côté en vue d’un objectif est propre aux dépenses.',
+  'category.reservesLost.other': '{count} réserves sont supprimées: mettre de l’argent de côté en vue d’un objectif est propre aux dépenses.',
   'category.conflictIncome': 'Une catégorie de revenus nommée {name} existe déjà. Deux catégories ne peuvent pas porter le même nom du même côté du budget.',
   'category.conflictExpense': 'Une catégorie de dépenses nommée {name} existe déjà. Deux catégories ne peuvent pas porter le même nom du même côté du budget.',
   'category.mergeExplain.one': 'La fusion déplace la {count} entrée de cette catégorie vers celle-ci et supprime {name}.',
@@ -259,8 +256,8 @@ export const fr: Messages = {
   'archive.deleteOne': 'Supprimer l’archive {name}',
   'archive.deleteTitle': 'Supprimer l’archive',
   'archive.unrecoverable': 'Cet instantané ne peut pas être récupéré.',
-  'archive.deleteExplain.one': 'Supprimer {name} et sa {count} ligne ?',
-  'archive.deleteExplain.other': 'Supprimer {name} et ses {count} lignes ?',
+  'archive.deleteExplain.one': 'Supprimer {name} et sa {count} ligne?',
+  'archive.deleteExplain.other': 'Supprimer {name} et ses {count} lignes?',
 
   // --- Resetting ---
   'reset.title': 'Réinitialiser le budget',
@@ -268,7 +265,7 @@ export const fr: Messages = {
   'reset.explain.other': 'Cela supprime les {count} entrées, leurs catégories et tous les montants prévus. Vous repartez d’un budget vide.',
   'reset.archivesKept.one': 'Votre {count} archive est un enregistrement de ce qui avait été budgété et elle est conservée.',
   'reset.archivesKept.other': 'Vos {count} archives sont des enregistrements de ce qui avait été budgété et elles sont conservées.',
-  'reset.noArchives': 'Rien n’est archivé : aucun enregistrement de ce plan ne subsistera. Annulez et archivez-le d’abord si vous souhaitez en conserver un.',
+  'reset.noArchives': 'Rien n’est archivé: aucun enregistrement de ce plan ne subsistera. Annulez et archivez-le d’abord si vous souhaitez en conserver un.',
 
   // --- Accounts ---
   'accounts.title': 'Comptes',
@@ -321,7 +318,7 @@ export const fr: Messages = {
   'alloc.setAside': 'Mis de côté',
   'alloc.editRouting': 'Modifier l’affectation',
   'alloc.bought': 'Acheté…',
-  'alloc.whatMeans': 'Que signifie {what} ?',
+  'alloc.whatMeans': 'Que signifie {what}?',
   'alloc.nothingBlocked': 'Rien n’est bloqué — ajustez un montant prévu ou corrigez le solde.',
 
   // --- Routing ---
