@@ -127,6 +127,16 @@
     checkAuth()
   })
 
+  // A verification link opened again by someone already signed in is just a link
+  // to the app. Drop the spent token from the URL and carry on, rather than
+  // showing a set-up form the session has plainly outgrown.
+  $effect(() => {
+    if (isVerifyPage && authState.currentUser) {
+      window.history.replaceState({}, '', '/')
+      isVerifyPage = false
+    }
+  })
+
   // Watch for deploys that leave this tab running chunks the server no longer has.
   $effect(() => startBuildVersionWatch())
 
@@ -214,12 +224,15 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if isVerifyPage}
-  <VerifyEmailPage onVerified={() => { isVerifyPage = false }} />
-{:else if authState.loading}
+{#if authState.loading}
   <main>
     <p class="loading">Loading...</p>
   </main>
+{:else if isVerifyPage}
+  <VerifyEmailPage
+    onVerified={() => { isVerifyPage = false }}
+    onLeave={() => { isVerifyPage = false }}
+  />
 {:else if !authState.currentUser}
   <LoginPage onSuccess={handleLoginSuccess} />
 {:else if authState.currentUser.must_change_password}

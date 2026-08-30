@@ -3,9 +3,11 @@
 
   interface Props {
     onVerified?: () => void
+    /** Leave the page without having verified — the link was already used. */
+    onLeave?: () => void
   }
 
-  let { onVerified }: Props = $props()
+  let { onVerified, onLeave }: Props = $props()
 
   let token = $state('')
   let password = $state('')
@@ -13,6 +15,7 @@
   let error = $state<string | null>(null)
   let submitting = $state(false)
   let success = $state(false)
+  let spent = $state(false)
 
   // Extract token from URL on mount
   $effect(() => {
@@ -20,6 +23,11 @@
     const t = params.get('token')
     if (t) token = t
   })
+
+  function leave() {
+    window.history.replaceState({}, '', '/')
+    onLeave?.()
+  }
 
   async function handleSubmit(e: Event) {
     e.preventDefault()
@@ -36,6 +44,10 @@
 
     if (result) {
       error = result
+      // The one failure the user can act on. A link that has already been used
+      // is not a form to try again — the account exists, so the way on is to
+      // sign in to it.
+      spent = /token/i.test(result)
     } else {
       success = true
       // Return to main app flow (shows recovery key screen if vault was set up)
@@ -52,6 +64,10 @@
     {#if !token}
       <h1>Invalid Link</h1>
       <p class="error-msg">This verification link is invalid. Please check your email for the correct link.</p>
+    {:else if spent}
+      <h1>Link Already Used</h1>
+      <p class="hint">This account has already been set up. Sign in with the password you chose.</p>
+      <button class="leave" onclick={leave}>Go to sign in</button>
     {:else if success}
       <h1>Account Verified</h1>
       <p class="success-msg">Your account has been set up. Redirecting...</p>
@@ -170,6 +186,11 @@
     padding: 0.5rem 0.75rem;
     background: #fdecea;
     border-radius: 6px;
+  }
+
+  /* The submit button is laid out by the form; this one stands alone. */
+  .leave {
+    margin-top: 1rem;
   }
 
   button:disabled {
