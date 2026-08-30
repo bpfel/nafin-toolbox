@@ -1,5 +1,7 @@
 import { en, type MessageKey, type Messages } from './locales/en'
 import { de } from './locales/de'
+import { fr } from './locales/fr'
+import { it } from './locales/it'
 import { rm } from './locales/rm'
 
 /**
@@ -21,7 +23,7 @@ export type Locale = (typeof LOCALES)[number]
  * locale typed `Messages` cannot compile with a slug missing, one typed
  * `Partial<Messages>` is allowed gaps and gets English in their place.
  */
-const CATALOGUES: Partial<Record<Locale, Partial<Messages>>> = { en, de, rm }
+const CATALOGUES: Partial<Record<Locale, Partial<Messages>>> = { en, de, fr, it, rm }
 
 /** Locales with a catalogue today. The picker offers these; the rest are pending. */
 export const AVAILABLE_LOCALES = LOCALES.filter(l => CATALOGUES[l] !== undefined)

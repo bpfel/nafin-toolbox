@@ -112,9 +112,10 @@ describe('the language list', () => {
 
     const current = screen.getByRole('menuitemradio', { name: /English/ })
     expect(current.getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('menuitemradio', { name: /Deutsch/ })).toBeTruthy()
-    // Declared but unshipped, so it must not be offerable.
-    expect(screen.queryByRole('menuitemradio', { name: /Français/ })).toBeNull()
+    // All four national languages plus English, listed in endonyms.
+    for (const name of [/Deutsch/, /Français/, /Italiano/, /Rumantsch/, /English/]) {
+      expect(screen.getByRole('menuitemradio', { name })).toBeTruthy()
+    }
   })
 
   test('says which languages are still being translated', async () => {

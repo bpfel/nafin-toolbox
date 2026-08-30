@@ -33,10 +33,11 @@ describe('the locale list', () => {
   test('offers only locales that actually have a catalogue', async () => {
     const { AVAILABLE_LOCALES, LOCALES } = await load()
 
-    expect(AVAILABLE_LOCALES).toEqual(['de', 'rm', 'en'])
-    // The rest are declared but not shippable yet, which is why the picker
-    // must read AVAILABLE_LOCALES rather than LOCALES.
-    expect(LOCALES.length).toBeGreaterThan(AVAILABLE_LOCALES.length)
+    expect(AVAILABLE_LOCALES).toEqual(['de', 'fr', 'it', 'rm', 'en'])
+    // All five ship today. The picker still reads AVAILABLE_LOCALES rather than
+    // LOCALES, so a sixth added without a catalogue cannot be selected into a
+    // blank interface.
+    expect(AVAILABLE_LOCALES.length).toBe(LOCALES.length)
   })
 })
 
@@ -100,12 +101,11 @@ describe('choosing a locale', () => {
     expect(getLocale()).toBe('en')
   })
 
-  test('skips a declared locale that has no catalogue yet', async () => {
+  test('takes the first language the browser asks for that we ship', async () => {
     pretendBrowserWants('fr-CH', 'de')
     const { getLocale } = await load()
 
-    // fr is declared but unshipped, so the next thing the browser asked for wins.
-    expect(getLocale()).toBe('de')
+    expect(getLocale()).toBe('fr')
   })
 
   test('a stored choice beats the browser', async () => {
@@ -131,13 +131,12 @@ describe('choosing a locale', () => {
     expect(getLocale()).toBe('en')
   })
 
-  test('refuses a locale with no catalogue', async () => {
-    const { setLocale, getLocale } = await load()
+  test('every declared locale is now shippable', async () => {
+    const { LOCALES, AVAILABLE_LOCALES } = await load()
 
-    setLocale('fr')
-
-    // Declared, not yet shipped — switching would blank the interface.
-    expect(getLocale()).toBe('en')
+    // The guard stays meaningful: adding a locale to LOCALES without a
+    // catalogue must still leave it unselectable.
+    expect([...AVAILABLE_LOCALES].sort()).toEqual([...LOCALES].sort())
   })
 })
 
