@@ -1,5 +1,6 @@
 <script lang="ts">
   import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, type User, getAuthState } from './authStore.svelte'
+  import DeleteUserModal from './DeleteUserModal.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
 
@@ -13,6 +14,8 @@
   let submitting = $state(false)
   let resending = $state<number | null>(null)
   let deleting = $state<number | null>(null)
+  let pendingDelete = $state<User | null>(null)
+  let deleteError = $state<string | null>(null)
   let confirmingReset = $state<number | null>(null)
   let resettingPassword = $state<number | null>(null)
   let tempPassword = $state<{ userId: number; password: string } | null>(null)
@@ -68,13 +71,28 @@
     }
   }
 
-  async function handleDelete(userId: number) {
-    deleting = userId
-    const result = await deleteUser(userId)
+  function askDelete(user: User) {
+    deleteError = null
+    pendingDelete = user
+  }
+
+  async function handleDelete() {
+    const target = pendingDelete
+    if (!target) return
+
+    deleting = target.id
+    deleteError = null
+    const result = await deleteUser(target.id)
     deleting = null
+
     if (result) {
-      error = result
+      // Kept on screen next to the button that failed, rather than reported
+      // somewhere further down the page.
+      deleteError = result
     } else {
+      pendingDelete = null
+      error = null
+      success = `${target.email} deleted`
       await loadUsers()
     }
   }
@@ -154,7 +172,7 @@
                 {#if u.id !== authState.currentUser?.id}
                   <button
                     class="btn-small btn-danger-small"
-                    onclick={() => handleDelete(u.id)}
+                    onclick={() => askDelete(u)}
                     disabled={deleting === u.id}
                   >
                     {deleting === u.id ? 'Deleting...' : 'Delete'}
@@ -167,6 +185,16 @@
       </tbody>
     </table>
   </div>
+
+  {#if pendingDelete}
+    <DeleteUserModal
+      user={pendingDelete}
+      deleting={deleting === pendingDelete.id}
+      error={deleteError}
+      ondelete={handleDelete}
+      onclose={() => { pendingDelete = null; deleteError = null }}
+    />
+  {/if}
 
   {#if tempPassword}
     {@const user = users.find(u => u.id === tempPassword.userId)}
