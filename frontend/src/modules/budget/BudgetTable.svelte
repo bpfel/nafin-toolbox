@@ -118,6 +118,16 @@
     deleteModalContext = { categoryId, categoryName }
   }
 
+  // Delete from inside the edit dialog: close it and hand over to the same
+  // confirmation the row's trash button opens, so there is one place a category
+  // is actually deleted rather than two.
+  function deleteFromEditor() {
+    const editing = addModalContext?.editCategory
+    if (!editing) return
+    addModalContext = null
+    openDeleteModal(editing.id, editing.name)
+  }
+
   function handleCategoryCreated() {
     oncategorycreated()
   }
@@ -351,6 +361,7 @@
     oncreated={handleCategoryCreated}
     onclose={() => addModalContext = null}
     {onsave}
+    ondelete={deleteFromEditor}
   />
 {/if}
 

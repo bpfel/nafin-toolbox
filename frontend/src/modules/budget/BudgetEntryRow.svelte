@@ -26,43 +26,12 @@
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  let longPressTimer: ReturnType<typeof setTimeout> | null = null
-  let longPressTriggered = false
-
-  function handleTouchStart() {
-    // The trash button is hidden on narrow screens, so long-press is the touch
-    // equivalent of it — and gated the same way.
-    if (!editing) return
-    longPressTriggered = false
-    longPressTimer = setTimeout(() => {
-      longPressTriggered = true
-      ondelete(entry.categoryId, entry.categoryName)
-    }, 600)
-  }
-
-  function handleTouchEnd() {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      longPressTimer = null
-    }
-  }
-
-  function handleTouchMove() {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      longPressTimer = null
-    }
-  }
 </script>
 
 <tr
   class="entry-row"
   class:income={entry.categoryType === 'income'}
   data-category-id={entry.categoryId}
-  ontouchstart={handleTouchStart}
-  ontouchend={handleTouchEnd}
-  ontouchmove={handleTouchMove}
-  ontouchcancel={handleTouchEnd}
 >
   <td class="name-cell">
     <div class="name-cell-inner">
@@ -174,7 +143,10 @@
   }
   /* Rendered only in edit mode, so it is already hidden when it would be noise.
      Fading it in on row hover made it unreachable on a touchscreen — the one
-     input where edit mode is the only signal you have. */
+     input where edit mode is the only signal you have.
+
+     Below 768px there is no width for it and it drops out entirely; deleting
+     happens from the category dialog there, which the whole row opens. */
   .trash-btn {
     background: none;
     border: none;

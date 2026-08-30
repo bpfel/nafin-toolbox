@@ -15,9 +15,15 @@
     oncreated: () => void
     onclose: () => void
     onsave?: (categoryId: string, amount: string) => void
+    /**
+     * Hands off to the delete confirmation. Only meaningful when editing, and
+     * the reason the table row needs no delete control of its own on a narrow
+     * screen — where there is no width for one.
+     */
+    ondelete?: () => void
   }
 
-  let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave }: Props = $props()
+  let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
 
   let isEdit = $derived(editCategory != null)
   // Seeded once: the modal is created fresh each time it opens, so every read of
@@ -197,6 +203,10 @@
     {/if}
 
     <div class="actions">
+      {#if isEdit && ondelete}
+        <button class="btn delete" onclick={ondelete}>Delete</button>
+      {/if}
+      <span class="spacer"></span>
       <button class="btn cancel" onclick={onclose}>Cancel</button>
       <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedGroupName}>
         {isEdit ? 'Save' : 'Add'}
@@ -292,7 +302,21 @@
   .actions {
     display: flex;
     gap: 0.75rem;
-    justify-content: flex-end;
+    align-items: center;
+  }
+  /* Delete sits apart from Cancel/Save rather than beside them: it is not one
+     of the two ways to finish, and it should not be the button you hit while
+     reaching for Cancel. */
+  .spacer {
+    flex: 1;
+  }
+  .delete {
+    background: white;
+    border: 1px solid #c0392b;
+    color: #c0392b;
+  }
+  .delete:hover {
+    background: #fdecea;
   }
   .btn {
     padding: 0.5rem 1.25rem;
