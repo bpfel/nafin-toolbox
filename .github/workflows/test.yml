@@ -37,6 +37,32 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  # Type checking, kept out of "Frontend tests" for the same reason npm audit is:
+  # one job, one question. `npm test` answers "does it behave?", this answers
+  # "do the types still describe it?", and a failure in one should not hide the
+  # other.
+  #
+  # svelte-check exits non-zero on errors only. Warnings are printed but do not
+  # fail the build, because a Svelte minor release can introduce new ones without
+  # a line of our code changing — the same no-commit-turns-it-red problem the
+  # audit split was solving. Warnings are still worth reading in the log.
+  type-check:
+    name: Type check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Single source of truth, shared with frontend/Dockerfile.
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run check
+
   # Deliberately its own job rather than a step inside "Frontend tests".
   #
   # A dependency audit fails for reasons that have nothing to do with the code:
