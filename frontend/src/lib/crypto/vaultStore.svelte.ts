@@ -1,5 +1,5 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
-import { encryptVault, decryptVault, createEmptyVault, VaultVersionAheadError, type VaultData } from './vault'
+import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
 import { fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError } from '../api/client'
 
 let vault = $state<VaultData | null>(null)
@@ -18,6 +18,11 @@ let lastUpdatedAt = $state<string | null>(null)
 // in-memory vault is now known to be stale, and every further save would fail
 // the same way, so the UI must tell the user to reload rather than retry.
 let conflicted = $state(false)
+
+// Set when the in-memory vault does not match the version it declares. Sticky
+// for the same reason as `conflicted`: every further save would be the same bad
+// write, and writing it is worse than not saving at all.
+let shapeInvalid = $state(false)
 
 // Set when the stored vault was written by a newer build. Distinct from a
 // decryption failure: the key is fine and the data is fine, this build simply
@@ -56,6 +61,8 @@ export function getVaultState() {
     get conflicted() { return conflicted },
     /** True when the stored vault is newer than this build can read. */
     get versionAhead() { return versionAhead },
+    /** True when the vault in memory contradicts its own version, so saving is refused. */
+    get shapeInvalid() { return shapeInvalid },
     get saving() { return saving },
     get lastSaved() { return lastSaved },
     get unlocked() { return unlocked },
@@ -168,7 +175,17 @@ export async function saveVault(): Promise<void> {
   if (!vault || !mek) return
   // Once the server has told us we are stale, retrying can only fail again — and
   // the auto-save runs every couple of seconds, so retrying would hammer it.
-  if (conflicted) return
+  if (conflicted || shapeInvalid) return
+
+  // Checked before the write, not after the read: a vault that cannot describe
+  // itself must not be allowed over one that can. `dirty` stays set, so the UI
+  // keeps saying the edits are unsaved rather than implying they landed.
+  try {
+    assertVaultShape(vault)
+  } catch {
+    shapeInvalid = true
+    return
+  }
 
   saving = true
   try {

@@ -126,6 +126,53 @@ export interface VaultEntry {
   reserve?: ReserveDefinition
 }
 
+/** A vault whose contents do not match the version it declares. */
+export class VaultShapeError extends Error {
+  constructor(detail: string) {
+    super(`vault does not match v${VAULT_VERSION}: ${detail}`)
+    this.name = 'VaultShapeError'
+  }
+}
+
+/**
+ * Checks that a vault about to be written matches the version it claims.
+ *
+ * Reads are already defensive — migrateVault works from the keys rather than the
+ * number — but nothing stopped an inconsistent vault being *written*, and a bad
+ * write outlives the tab that made it. One did: a vault stamped v5 with a v4
+ * budget, which every later reader turned into an undefined `entries` and a page
+ * that froze mid-render.
+ *
+ * Cheap enough to run on every save: four array checks on data already in hand.
+ */
+export function assertVaultShape(vault: VaultData): void {
+  if (vault.version !== VAULT_VERSION) {
+    throw new VaultShapeError(`version says ${String(vault.version)}`)
+  }
+
+  const budget = (vault as unknown as { budget?: Record<string, unknown> }).budget
+  if (!budget || typeof budget !== 'object') {
+    throw new VaultShapeError('budget is missing')
+  }
+
+  // The tell of the bug this exists to catch: v4's key still present.
+  if ('categoryGroups' in budget) {
+    throw new VaultShapeError('budget still carries v4 categoryGroups')
+  }
+
+  for (const key of ['categories', 'entries', 'plan', 'archives'] as const) {
+    if (!Array.isArray(budget[key])) {
+      throw new VaultShapeError(
+        `budget.${key} is ${budget[key] === undefined ? 'missing' : 'not an array'}`,
+      )
+    }
+  }
+
+  if (!Array.isArray(vault.accounts)) {
+    throw new VaultShapeError('accounts is missing')
+  }
+}
+
 // --- Encrypt / decrypt ---
 
 export async function encryptVault(

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest'
-import { encryptVault, decryptVault, createEmptyVault, migrateVault, VaultVersionAheadError, type VaultData,
+import { encryptVault, decryptVault, createEmptyVault, migrateVault, assertVaultShape, VaultVersionAheadError, type VaultData,
   VAULT_VERSION,
 } from './vault'
 import { generateMEK } from './keys'
@@ -926,5 +926,51 @@ describe('encryptVault — large vaults', () => {
 
     expect(decrypted.budget.archives).toHaveLength(40)
     expect(decrypted.budget.archives[39].lines).toHaveLength(50)
+  })
+})
+
+describe('assertVaultShape', () => {
+  test('a vault straight from createEmptyVault passes', () => {
+    expect(() => assertVaultShape(createEmptyVault())).not.toThrow()
+  })
+
+  // The exact state that got written during the v5 rollout and froze the app on
+  // every later read. Catching it here means it is never stored again.
+  test('rejects a v5 vault still carrying a v4 budget', () => {
+    const bad = createEmptyVault() as unknown as { budget: Record<string, unknown> }
+    delete bad.budget.entries
+    bad.budget.categoryGroups = []
+
+    expect(() => assertVaultShape(bad as unknown as VaultData)).toThrow(/categoryGroups/)
+  })
+
+  test('rejects a missing collection', () => {
+    for (const key of ['categories', 'entries', 'plan', 'archives']) {
+      const bad = createEmptyVault() as unknown as { budget: Record<string, unknown> }
+      delete bad.budget[key]
+      expect(() => assertVaultShape(bad as unknown as VaultData)).toThrow(new RegExp(key))
+    }
+  })
+
+  test('rejects a collection that is not an array', () => {
+    const bad = createEmptyVault() as unknown as { budget: Record<string, unknown> }
+    bad.budget.entries = { nope: true }
+
+    expect(() => assertVaultShape(bad as unknown as VaultData)).toThrow(/not an array/)
+  })
+
+  test('rejects a version this build does not write', () => {
+    const bad = { ...createEmptyVault(), version: 4 } as unknown as VaultData
+
+    expect(() => assertVaultShape(bad)).toThrow(/version says 4/)
+  })
+
+  test('rejects a missing budget or accounts', () => {
+    const noBudget = { version: VAULT_VERSION, accounts: [] } as unknown as VaultData
+    expect(() => assertVaultShape(noBudget)).toThrow(/budget is missing/)
+
+    const noAccounts = createEmptyVault() as unknown as { accounts?: unknown }
+    delete noAccounts.accounts
+    expect(() => assertVaultShape(noAccounts as unknown as VaultData)).toThrow(/accounts is missing/)
   })
 })
