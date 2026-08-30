@@ -28,6 +28,23 @@ export function normalizeAmount(raw: string): string {
 }
 
 /**
+ * Parses a typed amount to a number, accepting exactly what normalizeAmount
+ * accepts. Callers that need arithmetic on the value use this; callers that need
+ * the stored string form use normalizeAmount.
+ *
+ * It lives here so the set of characters that count as noise is defined once.
+ * de-CH formats a thousands separator as U+2019, not the ASCII apostrophe, so a
+ * private copy of this that only stripped `'` could not re-read its own output
+ * for any amount over 999.
+ *
+ * An empty string parses to 0, matching Number(''), so clearing a field zeroes
+ * it rather than being rejected.
+ */
+export function parseAmount(raw: string): number {
+  return Number(raw.replace(/['’\s]/g, '').replace(',', '.'))
+}
+
+/**
  * Svelte action for an amount field.
  *
  * Two behaviours, both about not making the user delete things:

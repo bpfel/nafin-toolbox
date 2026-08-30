@@ -3,6 +3,7 @@
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { parseAmount } from '../../lib/util/money'
 
   interface Props {
     type: 'income' | 'expense'
@@ -42,11 +43,6 @@
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  function parseInput(raw: string): number {
-    const cleaned = raw.replace(/'/g, '').replace(/,/g, '.')
-    return Number(cleaned)
-  }
-
   function handleValueFocus(field: 'planned_mo' | 'planned_yr', event: FocusEvent) {
     valueFocusedField = field
     const input = event.target as HTMLInputElement
@@ -57,7 +53,7 @@
     valueFocusedField = null
     if (!editCategory || !onsave) return
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
-    const val = parseInput(raw)
+    const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return
 
     if (field === 'planned_mo') {
@@ -74,7 +70,7 @@
 
   function handleValueInput(field: 'planned_mo' | 'planned_yr') {
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
-    const val = parseInput(raw)
+    const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return
 
     if (field === 'planned_mo') {
