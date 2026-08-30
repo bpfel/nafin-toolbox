@@ -6,6 +6,8 @@ import type {
   VaultArchiveLine,
 } from '../crypto/vault'
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
+import { seedNamesFor, type SeedKey } from './seedNames'
+import type { Locale } from '../i18n/index.svelte'
 
 // --- Entry Categories ---
 
@@ -428,69 +430,77 @@ export function resetBudget(vault: VaultData): void {
 // --- Seed Defaults ---
 
 interface DefaultCategory {
-  name: string
+  key: SeedKey
   type: 'income' | 'expense'
   sortOrder: number
 }
 
 interface DefaultEntry {
-  name: string
+  key: SeedKey
   type: 'income' | 'expense'
   sortOrder: number
-  categoryName: string
+  categoryKey: SeedKey
   amount: string
 }
 
 function bfsDefaultCategories(): DefaultCategory[] {
   return [
-    { name: 'Employment', type: 'income', sortOrder: 1 },
-    { name: 'Housing', type: 'expense', sortOrder: 10 },
-    { name: 'Insurance & Taxes', type: 'expense', sortOrder: 20 },
-    { name: 'Living', type: 'expense', sortOrder: 30 },
-    { name: 'Lifestyle', type: 'expense', sortOrder: 40 },
-    { name: 'Savings', type: 'expense', sortOrder: 50 },
+    { key: 'cat.employment', type: 'income', sortOrder: 1 },
+    { key: 'cat.housing', type: 'expense', sortOrder: 10 },
+    { key: 'cat.insuranceTaxes', type: 'expense', sortOrder: 20 },
+    { key: 'cat.living', type: 'expense', sortOrder: 30 },
+    { key: 'cat.lifestyle', type: 'expense', sortOrder: 40 },
+    { key: 'cat.savings', type: 'expense', sortOrder: 50 },
   ]
 }
 
 function bfsDefaults(): DefaultEntry[] {
   return [
-    { name: 'Salary (net)', type: 'income', sortOrder: 10, categoryName: 'Employment', amount: '6000.00' },
-    { name: 'Rent', type: 'expense', sortOrder: 10, categoryName: 'Housing', amount: '1350.00' },
-    { name: 'Utilities', type: 'expense', sortOrder: 20, categoryName: 'Housing', amount: '150.00' },
-    { name: 'Health Insurance', type: 'expense', sortOrder: 10, categoryName: 'Insurance & Taxes', amount: '391.67' },
-    { name: 'Other Insurance', type: 'expense', sortOrder: 20, categoryName: 'Insurance & Taxes', amount: '166.67' },
-    { name: 'Taxes', type: 'expense', sortOrder: 30, categoryName: 'Insurance & Taxes', amount: '833.33' },
-    { name: 'Food & Groceries', type: 'expense', sortOrder: 10, categoryName: 'Living', amount: '500.00' },
-    { name: 'Transportation', type: 'expense', sortOrder: 20, categoryName: 'Living', amount: '400.00' },
-    { name: 'Telecommunications', type: 'expense', sortOrder: 30, categoryName: 'Living', amount: '80.00' },
-    { name: 'Clothing & Footwear', type: 'expense', sortOrder: 10, categoryName: 'Lifestyle', amount: '100.00' },
-    { name: 'Entertainment & Recreation', type: 'expense', sortOrder: 20, categoryName: 'Lifestyle', amount: '250.00' },
-    { name: 'Dining Out', type: 'expense', sortOrder: 30, categoryName: 'Lifestyle', amount: '250.00' },
-    { name: 'Savings', type: 'expense', sortOrder: 10, categoryName: 'Savings', amount: '500.00' },
+    { key: 'salaryNet', type: 'income', sortOrder: 10, categoryKey: 'cat.employment', amount: '6000.00' },
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1350.00' },
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '150.00' },
+    { key: 'healthInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insuranceTaxes', amount: '391.67' },
+    { key: 'otherInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insuranceTaxes', amount: '166.67' },
+    { key: 'taxes', type: 'expense', sortOrder: 30, categoryKey: 'cat.insuranceTaxes', amount: '833.33' },
+    { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '500.00' },
+    { key: 'transport', type: 'expense', sortOrder: 20, categoryKey: 'cat.living', amount: '400.00' },
+    { key: 'telecoms', type: 'expense', sortOrder: 30, categoryKey: 'cat.living', amount: '80.00' },
+    { key: 'clothing', type: 'expense', sortOrder: 10, categoryKey: 'cat.lifestyle', amount: '100.00' },
+    { key: 'entertainment', type: 'expense', sortOrder: 20, categoryKey: 'cat.lifestyle', amount: '250.00' },
+    { key: 'diningOut', type: 'expense', sortOrder: 30, categoryKey: 'cat.lifestyle', amount: '250.00' },
+    { key: 'savings', type: 'expense', sortOrder: 10, categoryKey: 'cat.savings', amount: '500.00' },
     // Pillar 3a is budgeted like any other set-aside: the money leaves the
     // spending plan but stays yours. 588.00 is the 2026 employee cap (7'056)
     // spread over twelve months — a starting point, not a rule.
-    { name: 'Pillar 3a', type: 'expense', sortOrder: 20, categoryName: 'Savings', amount: '588.00' },
+    { key: 'pillar3a', type: 'expense', sortOrder: 20, categoryKey: 'cat.savings', amount: '588.00' },
   ]
 }
 
-export function seedDefaults(vault: VaultData): void {
+/**
+ * Writes the starter budget, named in the given language.
+ *
+ * The names are written in once and are the user's from then on — editing one
+ * sticks, and switching language later leaves them alone. That is the whole
+ * reason they are data here rather than slugs resolved at render.
+ */
+export function seedDefaults(vault: VaultData, locale: Locale = 'en'): void {
   if (vault.budget.entries.length > 0) return
 
-  // Create categories
-  for (const dg of bfsDefaultCategories()) {
-    createCategory(vault, dg.name, dg.type, dg.sortOrder)
+  const name = seedNamesFor(locale)
+
+  for (const dc of bfsDefaultCategories()) {
+    createCategory(vault, name[dc.key], dc.type, dc.sortOrder)
   }
 
-  // Create entries, and give each one its suggested amount in the plan.
-  // There is no month to seed and no actual to record: the plan is the budget.
+  // Each entry gets its suggested amount in the plan. There is no month to seed
+  // and no actual to record: the plan is the budget.
   for (const d of bfsDefaults()) {
-    const cat = createEntry(vault, {
-      name: d.name,
+    const entry = createEntry(vault, {
+      name: name[d.key],
       type: d.type,
-      categoryName: d.categoryName,
+      categoryName: name[d.categoryKey],
       sortOrder: d.sortOrder,
     })
-    setPlanned(vault, cat.id, d.amount)
+    setPlanned(vault, entry.id, d.amount)
   }
 }

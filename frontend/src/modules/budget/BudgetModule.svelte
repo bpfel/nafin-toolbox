@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../lib/i18n/index.svelte'
+  import { t, getLocale } from '../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import BudgetSummary from './BudgetSummary.svelte'
@@ -43,7 +43,7 @@
 
   function handleSeeded() {
     if (!vaultState.vault) return
-    engine.seedDefaults(vaultState.vault)
+    engine.seedDefaults(vaultState.vault, getLocale())
     markDirty()
     version++
   }

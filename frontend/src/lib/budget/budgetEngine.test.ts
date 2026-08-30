@@ -1495,3 +1495,75 @@ describe('empty categories do not linger', () => {
     }
   })
 })
+
+describe('seedDefaults in another language', () => {
+  test('writes the starter budget in the language asked for', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'fr')
+
+    expect(listCategories(vault).map(c => c.name)).toContain('Logement')
+    expect(listEntries(vault).map(e => e.name)).toContain('Loyer')
+    expect(listEntries(vault).map(e => e.name)).toContain('Assurance maladie')
+  })
+
+  test('entries land under the category of the same language', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'it')
+
+    const housing = listCategories(vault).find(c => c.name === 'Abitazione')!
+    expect(entriesInCategory(vault, housing.id).map(e => e.name).sort())
+      .toEqual(['Affitto', 'Spese accessorie'])
+  })
+
+  test('the amounts are the same whatever the language', () => {
+    const en = createEmptyVault()
+    const de = createEmptyVault()
+
+    seedDefaults(en, 'en')
+    seedDefaults(de, 'de')
+
+    // Only the words differ. The Swiss figures behind them do not.
+    expect(de.budget.plan.map(p => p.plannedAmount))
+      .toEqual(en.budget.plan.map(p => p.plannedAmount))
+    expect(listEntries(de)).toHaveLength(listEntries(en).length)
+  })
+
+  test('official Swiss terms keep their names', () => {
+    for (const [locale, expected] of [['de', 'Säule 3a'], ['fr', 'Pilier 3a'], ['it', 'Pilastro 3a']] as const) {
+      const vault = createEmptyVault()
+      seedDefaults(vault, locale)
+      expect(listEntries(vault).map(e => e.name)).toContain(expected)
+    }
+  })
+
+  // Seeding in a language we cannot check would write guessed words into a
+  // budget as data, where they persist and get edited rather than corrected.
+  test('a language with no seed names falls back to English', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'rm')
+
+    expect(listCategories(vault).map(c => c.name)).toContain('Housing')
+  })
+
+  test('defaults to English when no language is given', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+
+    expect(listCategories(vault).map(c => c.name)).toContain('Housing')
+  })
+
+  // The names are the user's once written: nothing re-translates them later.
+  test('renaming a seeded entry survives, because it is data', () => {
+    const vault = createEmptyVault()
+    seedDefaults(vault, 'de')
+    const rent = listEntries(vault).find(e => e.name === 'Miete')!
+
+    updateEntry(vault, rent.id, { name: 'Miete WG' })
+
+    expect(listEntries(vault).find(e => e.id === rent.id)!.name).toBe('Miete WG')
+  })
+})
