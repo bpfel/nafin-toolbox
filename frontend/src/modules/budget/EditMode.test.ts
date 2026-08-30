@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { cleanup, render, screen, fireEvent } from '@testing-library/svelte'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { PlanEntryView } from '../../lib/budget/budgetEngine'
 import type { VaultData } from '../../lib/crypto/vault'
@@ -29,14 +29,17 @@ function entry(): PlanEntryView {
   }
 }
 
-function renderRow() {
-  return render(BudgetEntryRow, {
-    props: {
-      entry: entry(),
-      ondelete: vi.fn(),
-      onedit: vi.fn(),
-    },
-  })
+function renderRow(onedit = vi.fn()) {
+  return {
+    ...render(BudgetEntryRow, {
+      props: {
+        entry: entry(),
+        ondelete: vi.fn(),
+        onedit,
+      },
+    }),
+    onedit,
+  }
 }
 
 describe('edit mode — the budget is read-only by default', () => {
@@ -57,6 +60,25 @@ describe('edit mode — the budget is read-only by default', () => {
     expect(screen.getByLabelText(/drag to reorder/i)).toBeTruthy()
     expect(screen.getByLabelText(/delete rent/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Rent' })).toBeTruthy()
+  })
+
+  // Reaching for the number is the obvious way to change it, so in edit mode the
+  // amount opens the same dialog the category name does. In read-only it is text,
+  // with nothing to click.
+  test('the amount opens the dialog in edit mode', async () => {
+    toggleEditing('budget')
+    const { onedit } = renderRow()
+
+    await fireEvent.click(screen.getByRole('button', { name: /edit planned per month for rent/i }))
+
+    expect(onedit).toHaveBeenCalledWith('c1', 'Rent', 'expense', 'Housing', '1350.00')
+  })
+
+  test('the amount is inert when read-only', () => {
+    renderRow()
+
+    expect(screen.queryByRole('button', { name: /edit planned per month/i })).toBeNull()
+    expect(screen.getByText('1\u2019350.00')).toBeTruthy()
   })
 
   // Amounts are not editable from the table in either mode. The category dialog

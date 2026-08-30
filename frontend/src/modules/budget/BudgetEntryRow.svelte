@@ -18,6 +18,10 @@
 
   let planned = $derived(Number(entry.plannedAmount))
 
+  function openEditor() {
+    onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount)
+  }
+
   function fmt(val: number): string {
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
@@ -66,7 +70,7 @@
         <span class="drag-handle" aria-label="Drag to reorder">&#x2807;</span>
         <button
           class="name-text"
-          onclick={() => onedit(entry.categoryId, entry.categoryName, entry.categoryType, entry.categoryGroupName, entry.plannedAmount)}
+          onclick={openEditor}
         >
           {entry.categoryName}
         </button>
@@ -87,10 +91,22 @@
     </div>
   </td>
   <td class="amount-cell planned-mo-cell">
-    <span class="cell-value">{fmt(planned)}</span>
+    {#if editing}
+      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per month for {entry.categoryName}">
+        {fmt(planned)}
+      </button>
+    {:else}
+      <span class="cell-value">{fmt(planned)}</span>
+    {/if}
   </td>
   <td class="amount-cell yearly planned-yr-cell">
-    <span class="cell-value">{fmt(planned * 12)}</span>
+    {#if editing}
+      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per year for {entry.categoryName}">
+        {fmt(planned * 12)}
+      </button>
+    {:else}
+      <span class="cell-value">{fmt(planned * 12)}</span>
+    {/if}
   </td>
 </tr>
 
@@ -191,7 +207,31 @@
   }
   .cell-value {
     display: block;
+    width: 100%;
     padding: 0.25rem 0.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Reaching for the number you want to change is the obvious move, so in edit
+     mode it opens the same dialog the category name does. Marked the same way,
+     because it means the same thing. */
+  .cell-button {
+    background: none;
+    border: none;
+    font-size: inherit;
+    font-family: inherit;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  .cell-button:hover {
+    text-decoration: underline;
+    text-decoration-color: #aaa;
+    text-underline-offset: 2px;
+  }
+  .cell-button:focus-visible {
+    outline: 2px solid #2d6a4f;
+    outline-offset: -2px;
   }
 
   :global(.drag-ghost) {
