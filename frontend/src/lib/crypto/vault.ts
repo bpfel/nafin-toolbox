@@ -181,14 +181,27 @@ export async function decryptVault(
 export function migrateVault(parsed: unknown): VaultData {
   if (!parsed || typeof parsed !== 'object') return createEmptyVault()
 
-  const vault = parsed as { version?: unknown; budget?: { categories?: unknown } }
+  const vault = parsed as {
+    version?: unknown
+    budget?: { categories?: unknown; entries?: unknown; categoryGroups?: unknown }
+  }
 
-  if (vault.version === VAULT_VERSION) return vault as unknown as VaultData
+  // The number is a claim; the keys are the evidence. A vault stamped v5 whose
+  // budget still carries v4's `categoryGroups` was renumbered by something that
+  // did not reshape it, and taking its word leaves every reader of `entries`
+  // reading undefined — which is a frozen page, not an error anyone can act on.
+  // Migrating on the evidence recovers the contents instead.
+  const wearingV4Keys =
+    vault.budget != null &&
+    vault.budget.entries === undefined &&
+    vault.budget.categoryGroups !== undefined
+
+  if (vault.version === VAULT_VERSION && !wearingV4Keys) return vault as unknown as VaultData
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
   // for being three steps behind.
   if (vault.version === 2) return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault)))
   if (vault.version === 3) return migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape))
-  if (vault.version === 4) return migrateV4ToV5(vault as unknown as V4Shape)
+  if (vault.version === 4 || wearingV4Keys) return migrateV4ToV5(vault as unknown as V4Shape)
 
   return createEmptyVault()
 }

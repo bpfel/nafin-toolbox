@@ -841,6 +841,31 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrateVault(v5)).toEqual(v5)
   })
 
+  // Seen in the wild during the v5 rollout: a vault stamped 5 whose budget still
+  // had v4's keys. Trusting the number handed every reader an undefined
+  // `entries`, which froze the page with nothing said.
+  test('a vault stamped v5 but still shaped like v4 is migrated anyway', () => {
+    const mislabelled = { ...v4Vault(), version: 5 }
+
+    const migrated = migrateVault(mislabelled)
+
+    expect(migrated.budget.entries).toHaveLength(1)
+    expect(migrated.budget.entries[0].name).toBe('Rent')
+    expect(migrated.budget.categories[0].name).toBe('Housing')
+    expect(migrated.budget.plan).toEqual([{ entryId: 'c1', plannedAmount: '1350.00' }])
+  })
+
+  test('a genuine v5 vault is still passed through untouched', () => {
+    const v5 = createEmptyVault()
+    v5.budget.entries.push({
+      id: 'e1', name: 'Rent', type: 'expense', sortOrder: 10,
+      archived: false, categoryId: 'c1', sourceAccountId: null, sinkAccountId: null,
+    })
+
+    // No categoryGroups key, so there is nothing to mistake it for.
+    expect(migrateVault(v5)).toEqual(v5)
+  })
+
   test('an unknown version still scrubs', () => {
     expect(migrateVault({ version: 99, budget: { entries: [{}] } }).budget.entries).toHaveLength(0)
     expect(migrateVault(null).budget.entries).toHaveLength(0)
