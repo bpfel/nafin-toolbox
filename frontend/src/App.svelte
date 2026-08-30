@@ -253,6 +253,25 @@
     recoveryKey={authState.recoveryKeyToShow}
     onconfirmed={handleRecoveryKeyDismiss}
   />
+{:else if vaultState.versionAhead && !isAdmin}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>This page is out of date</h1>
+        <p class="hint">
+          Your data was saved by a newer version of the app than the one this page is
+          running, so this page cannot read it. Reloading picks up the current version.
+        </p>
+        <p class="hint">
+          Nothing has been lost, and nothing will be written while this page cannot read
+          your data.
+        </p>
+
+        <button class="btn-primary" onclick={() => location.reload()}>Reload</button>
+        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+      </div>
+    </div>
+  </main>
 {:else if authState.vaultNeedsSetup && !isAdmin}
   <main>
     <div class="enforcement-container">

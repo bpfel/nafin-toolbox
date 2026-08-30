@@ -1,5 +1,5 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
-import { encryptVault, decryptVault, createEmptyVault, type VaultData } from './vault'
+import { encryptVault, decryptVault, createEmptyVault, VaultVersionAheadError, type VaultData } from './vault'
 import { fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError } from '../api/client'
 
 let vault = $state<VaultData | null>(null)
@@ -18,6 +18,11 @@ let lastUpdatedAt = $state<string | null>(null)
 // in-memory vault is now known to be stale, and every further save would fail
 // the same way, so the UI must tell the user to reload rather than retry.
 let conflicted = $state(false)
+
+// Set when the stored vault was written by a newer build. Distinct from a
+// decryption failure: the key is fine and the data is fine, this build simply
+// cannot read the shape. Nothing may be saved while it is set.
+let versionAhead = $state(false)
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -49,6 +54,8 @@ export function getVaultState() {
     get dirty() { return dirty },
     /** True once the server refused a save because the vault changed elsewhere. */
     get conflicted() { return conflicted },
+    /** True when the stored vault is newer than this build can read. */
+    get versionAhead() { return versionAhead },
     get saving() { return saving },
     get lastSaved() { return lastSaved },
     get unlocked() { return unlocked },
@@ -75,7 +82,13 @@ export async function tryRestoreVault(): Promise<boolean> {
     mek = cachedMEK
     unlocked = true
     return true
-  } catch {
+  } catch (e) {
+    if (e instanceof VaultVersionAheadError) {
+      // The cached key is not the problem, so it stays: clearing it would make
+      // the user sign in again to reach the same wall.
+      versionAhead = true
+      return false
+    }
     clearCachedMEK()
     return false
   }
@@ -86,7 +99,7 @@ export async function tryRestoreVault(): Promise<boolean> {
  * Returns 'ok' on success, 'no-keys' if keys don't exist yet,
  * or 'decrypt-failed' if keys exist but unwrap/decrypt failed.
  */
-export async function initializeVault(password: string, email: string): Promise<'ok' | 'no-keys' | 'decrypt-failed'> {
+export async function initializeVault(password: string, email: string): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead'> {
   const keys = await fetchVaultKeys()
   if (!keys) return 'no-keys'
 
@@ -106,10 +119,14 @@ export async function initializeVault(password: string, email: string): Promise<
     await cacheMEK(mek)
     unlocked = true
     return 'ok'
-  } catch {
+  } catch (e) {
     mek = null
     vault = null
     unlocked = false
+    if (e instanceof VaultVersionAheadError) {
+      versionAhead = true
+      return 'version-ahead'
+    }
     return 'decrypt-failed'
   }
 }

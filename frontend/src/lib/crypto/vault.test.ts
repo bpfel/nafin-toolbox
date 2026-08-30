@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest'
-import { encryptVault, decryptVault, createEmptyVault, migrateVault, type VaultData,
+import { encryptVault, decryptVault, createEmptyVault, migrateVault, VaultVersionAheadError, type VaultData,
   VAULT_VERSION,
 } from './vault'
 import { generateMEK } from './keys'
@@ -108,19 +108,23 @@ describe('version scrub', () => {
     expect(decrypted.budget.archives).toEqual([])
   })
 
-  test('scrubs a blob with a missing or unknown version', async () => {
+  test('scrubs a blob with no version at all', async () => {
     const mek = await generateMEK()
-
     const versionless = await encryptVault({ budget: { categories: [], entries: [], plan: [], archives: [] } } as unknown as VaultData, mek)
-    const future = await encryptVault({ ...createEmptyVault(), version: 99 } as unknown as VaultData, mek)
 
     const fromVersionless = await decryptVault(versionless.ciphertext, versionless.nonce, mek)
-    const fromFuture = await decryptVault(future.ciphertext, future.nonce, mek)
 
     expect(fromVersionless.version).toBe(VAULT_VERSION)
     expect(fromVersionless.accounts.length).toBe(1)
-    expect(fromFuture.version).toBe(VAULT_VERSION)
-    expect(fromFuture.accounts.length).toBe(1)
+  })
+
+  // It used to scrub this too, which meant a tab left open across an upgrade
+  // showed an empty budget and would then save that over the real one.
+  test('refuses a blob from a newer build rather than scrubbing it', async () => {
+    const mek = await generateMEK()
+    const future = await encryptVault({ ...createEmptyVault(), version: 99 } as unknown as VaultData, mek)
+
+    await expect(decryptVault(future.ciphertext, future.nonce, mek)).rejects.toThrow(/newer version/)
   })
 
   test('a current-version blob is returned untouched', async () => {
@@ -866,10 +870,33 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrateVault(v5)).toEqual(v5)
   })
 
-  test('an unknown version still scrubs', () => {
-    expect(migrateVault({ version: 99, budget: { entries: [{}] } }).budget.entries).toHaveLength(0)
+  // Behind us means the data predates a rename we know how to undo. Ahead of us
+  // means the opposite: nothing is wrong with the data, this build just cannot
+  // read it. Substituting an empty vault would show the budget as gone and then
+  // save that over the real one the moment anything was touched.
+  test('a vault from a newer build is refused, not emptied', () => {
+    expect(() => migrateVault({ version: 6, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
+    expect(() => migrateVault({ version: 99, budget: { entries: [] } })).toThrow(/newer version/)
+  })
+
+  test('the refusal names both versions, so the log says what to do', () => {
+    try {
+      migrateVault({ version: 7, budget: { entries: [] } })
+      throw new Error('should have refused')
+    } catch (e) {
+      expect(e).toBeInstanceOf(VaultVersionAheadError)
+      expect((e as VaultVersionAheadError).found).toBe(7)
+      expect((e as Error).message).toContain('v7')
+      expect((e as Error).message).toContain('v5')
+    }
+  })
+
+  test('junk and pre-v2 vaults still scrub', () => {
     expect(migrateVault(null).budget.entries).toHaveLength(0)
     expect(migrateVault('nonsense').budget.entries).toHaveLength(0)
+    expect(migrateVault({ version: 1, budget: {} }).budget.entries).toHaveLength(0)
+    // No version at all — nothing to be ahead of.
+    expect(migrateVault({ budget: {} }).budget.entries).toHaveLength(0)
   })
 })
 

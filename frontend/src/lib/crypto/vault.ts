@@ -2,6 +2,20 @@ const NONCE_LENGTH = 12
 
 export const VAULT_VERSION = 5
 
+/**
+ * A stored vault written by a build newer than this one.
+ *
+ * Thrown rather than scrubbed. Substituting an empty vault would show the user
+ * their budget as blank and, the moment they touched anything, save that over
+ * the real one — losing data to a problem whose whole fix is "reload the page".
+ */
+export class VaultVersionAheadError extends Error {
+  constructor(readonly found: number) {
+    super(`vault was saved by a newer version (v${found}, this build reads v${VAULT_VERSION})`)
+    this.name = 'VaultVersionAheadError'
+  }
+}
+
 // --- Vault data types ---
 
 export interface VaultData {
@@ -202,6 +216,13 @@ export function migrateVault(parsed: unknown): VaultData {
   if (vault.version === 2) return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault)))
   if (vault.version === 3) return migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape))
   if (vault.version === 4 || wearingV4Keys) return migrateV4ToV5(vault as unknown as V4Shape)
+
+  // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
+  // the data. Refuse it so the app can say so, instead of handing back an empty
+  // vault that reads as "your budget is gone".
+  if (typeof vault.version === 'number' && vault.version > VAULT_VERSION) {
+    throw new VaultVersionAheadError(vault.version)
+  }
 
   return createEmptyVault()
 }
