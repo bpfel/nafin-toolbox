@@ -18,7 +18,7 @@
   let deleteError = $state<string | null>(null)
   let confirmingReset = $state<number | null>(null)
   let resettingPassword = $state<number | null>(null)
-  let tempPassword = $state<{ userId: number; password: string } | null>(null)
+  let tempPassword = $state<{ email: string; password: string } | null>(null)
 
   async function loadUsers() {
     users = await listUsers()
@@ -58,15 +58,17 @@
     }
   }
 
-  async function handleResetPassword(userId: number) {
-    resettingPassword = userId
-    const result = await adminResetPassword(userId)
+  async function handleResetPassword(user: User) {
+    resettingPassword = user.id
+    const result = await adminResetPassword(user.id)
     resettingPassword = null
     confirmingReset = null
     if ('error' in result) {
       error = result.error
     } else {
-      tempPassword = { userId, password: result.temp_password }
+      // The email is captured here rather than looked up while rendering: the box
+      // has to keep naming the right person across the reload on the next line.
+      tempPassword = { email: user.email, password: result.temp_password }
       await loadUsers()
     }
   }
@@ -148,7 +150,7 @@
                       <span class="confirm-label">Reset?</span>
                       <button
                         class="btn-small btn-danger-small"
-                        onclick={() => handleResetPassword(u.id)}
+                        onclick={() => handleResetPassword(u)}
                         disabled={resettingPassword === u.id}
                       >
                         {resettingPassword === u.id ? 'Resetting...' : 'Confirm'}
@@ -197,9 +199,8 @@
   {/if}
 
   {#if tempPassword}
-    {@const user = users.find(u => u.id === tempPassword.userId)}
     <div class="temp-password-box">
-      <p><strong>Temporary password for {user?.email ?? 'user'}:</strong></p>
+      <p><strong>Temporary password for {tempPassword.email}:</strong></p>
       <code class="temp-password">{tempPassword.password}</code>
       <p class="temp-password-hint">Share this with the user securely. They will be asked to set a new password on next login.</p>
       <button class="btn-small" onclick={() => tempPassword = null}>Dismiss</button>
