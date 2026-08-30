@@ -17,6 +17,7 @@
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
+  import VersionTag from './lib/util/VersionTag.svelte'
 
   const authState = getAuthState()
   const vaultState = getVaultState()
@@ -525,6 +526,7 @@
 {/if}
 
 <!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
+<VersionTag />
 <UpdateBanner />
 <UnsavedBanner />
 

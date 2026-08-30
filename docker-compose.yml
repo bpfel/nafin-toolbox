@@ -39,7 +39,11 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Release builds: APP_VERSION="$(git describe --tags)" docker compose build frontend
+        APP_VERSION: ${APP_VERSION:-}
     ports:
       - "3000:3000"
     depends_on:
