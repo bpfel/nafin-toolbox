@@ -84,6 +84,37 @@ describe('deleting a category from the dialog', () => {
     expect(oncategorydeleted).not.toHaveBeenCalled()
   })
 
+  // The budget stopped having periods when v4 replaced them with one plan plus
+  // archives. The dialog described the old model for long enough that it is
+  // worth pinning the new one.
+  test('the confirmation describes what actually happens', async () => {
+    const vault = makeVault()
+    toggleEditing('budget')
+    show(vault)
+
+    const editor = await openEditor('Rent')
+    await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Delete category' })
+
+    expect(confirm.textContent).toMatch(/archive/i)
+    expect(confirm.textContent).not.toMatch(/periods/i)
+  })
+
+  test('archives really do keep the category after it is deleted', async () => {
+    const vault = makeVault()
+    const archive = engine.archivePlan(vault, 'Before the cull')
+    toggleEditing('budget')
+    show(vault)
+
+    const editor = await openEditor('Rent')
+    await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Delete category' })
+    await fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }))
+
+    expect(engine.listCategories(vault).map(c => c.name)).toEqual(['Food'])
+    expect(archive.lines.map(l => l.categoryName)).toContain('Rent')
+  })
+
   test('confirming removes the category', async () => {
     const vault = makeVault()
     toggleEditing('budget')

@@ -29,7 +29,14 @@
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label="Delete category" use:focusTrap>
     <h3>Delete category</h3>
-    <p>Remove <strong>{categoryName}</strong> from your budget? This deletes it from all periods.</p>
+    <!-- v4 replaced monthly periods with one plan plus named archives, so there
+         is no longer a set of periods to be removed from. What actually happens:
+         the category and its planned amount go, and archives keep the copy they
+         recorded, because they hold names rather than references to it. -->
+    <p>
+      Remove <strong>{categoryName}</strong> from your budget? Its planned amount goes
+      with it. Any archive that already recorded it keeps its copy.
+    </p>
 
     <div class="actions">
       <button class="btn cancel" onclick={onclose}>Cancel</button>
