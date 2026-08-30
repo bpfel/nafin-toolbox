@@ -19,9 +19,10 @@
   let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave }: Props = $props()
 
   let isEdit = $derived(editCategory != null)
-  let name = $state(editCategory?.name ?? '')
-  // Seeded once: the modal is created fresh each time it opens, so these are
-  // deliberately initial values rather than reactive reads.
+  // Seeded once: the modal is created fresh each time it opens, so every read of
+  // `editCategory` below is deliberately an initial value rather than a reactive
+  // one. `untrack` says so out loud, to Svelte and to the next reader.
+  let name = $state(untrack(() => editCategory?.name ?? ''))
   let selectedGroup = $state(
     untrack(() => editCategory?.groupName ?? presetGroupName ?? groups[0]?.name ?? ''),
   )
@@ -29,8 +30,12 @@
   let useNewGroup = $state(false)
   let error = $state<string | null>(null)
 
-  let plannedMoValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')
-  let plannedYrValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')
+  let plannedMoValue = $state(
+    untrack(() => (editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')),
+  )
+  let plannedYrValue = $state(
+    untrack(() => (editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')),
+  )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
 
   function fmt(val: number): string {

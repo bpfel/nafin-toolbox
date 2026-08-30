@@ -19,7 +19,7 @@ import {
 
 // Mock global fetch
 const mockFetch = vi.fn()
-global.fetch = mockFetch
+globalThis.fetch = mockFetch
 
 describe('setOnUnauthorized', () => {
   test('sets the unauthorized callback', () => {
