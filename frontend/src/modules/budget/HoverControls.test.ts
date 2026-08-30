@@ -60,7 +60,6 @@ describe('edit-mode controls do not hide behind hover', () => {
     ['BudgetTable.svelte', '.group-drag-handle'],
     ['BudgetTable.svelte', '.group-add'],
     ['BudgetEntryRow.svelte', '.drag-handle'],
-    ['BudgetEntryRow.svelte', '.trash-btn'],
   ]
 
   for (const [file, cls] of controls) {
@@ -159,17 +158,15 @@ describe('the controls are in the DOM the moment edit mode is on', () => {
     expect(screen.queryByLabelText('Add a category to Housing')).toBeNull()
   })
 
-  test('the row handle and trash button need no hover either', () => {
+  test('the row handle needs no hover either', () => {
     toggleEditing('budget')
     const { container } = render(BudgetEntryRow, {
       props: {
         entry: row('e1', 'Rent', 'g1', 'Housing'),
-        ondelete: vi.fn(),
         onedit: vi.fn(),
       },
     })
 
     expect(container.querySelector('.drag-handle')).toBeTruthy()
-    expect(container.querySelector('.trash-btn')).toBeTruthy()
   })
 })

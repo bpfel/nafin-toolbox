@@ -5,11 +5,10 @@
   interface Props {
     entry: PlanEntryView
     viewMode?: 'monthly' | 'yearly'
-    ondelete: (categoryId: string, categoryName: string) => void
     onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string) => void
   }
 
-  let { entry, viewMode = 'monthly', ondelete, onedit }: Props = $props()
+  let { entry, viewMode = 'monthly', onedit }: Props = $props()
 
   // Amounts are read-only here. Changing one is an edit like renaming or
   // reordering is, so it goes through edit mode and the category dialog -- one
@@ -42,16 +41,6 @@
           onclick={openEditor}
         >
           {entry.categoryName}
-        </button>
-        <button
-          class="trash-btn"
-          onclick={() => ondelete(entry.categoryId, entry.categoryName)}
-          aria-label="Delete {entry.categoryName}"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
         </button>
       {:else}
         <!-- Read-only: a button that opens nothing would only invite a click. -->
@@ -141,32 +130,6 @@
   .name-static:hover {
     text-decoration: none;
   }
-  /* Rendered only in edit mode, so it is already hidden when it would be noise.
-     Fading it in on row hover made it unreachable on a touchscreen — the one
-     input where edit mode is the only signal you have.
-
-     Below 768px there is no width for it and it drops out entirely; deleting
-     happens from the category dialog there, which the whole row opens. */
-  .trash-btn {
-    background: none;
-    border: none;
-    color: #adb5bd;
-    cursor: pointer;
-    padding: 0.15rem;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    transition: color 0.15s;
-  }
-  .trash-btn:hover {
-    color: #c0392b;
-  }
-  .trash-btn:focus-visible {
-    outline: 2px solid #c0392b;
-    outline-offset: 2px;
-    border-radius: 4px;
-    color: #c0392b;
-  }
   .amount-cell {
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -211,11 +174,10 @@
     background: #e3f2fd !important;
   }
 
-  /* Wide touchscreens keep both controls (the narrow-screen rules below drop
-     them in favour of long-press), so they need finger-sized targets. */
+  /* A coarse pointer needs a finger-sized target for the one control the row
+     still carries. */
   @media (hover: none) and (pointer: coarse) {
-    .drag-handle,
-    .trash-btn {
+    .drag-handle {
       min-width: 32px;
       min-height: 32px;
       justify-content: center;
@@ -233,9 +195,6 @@
       padding: 0.2rem 0.25rem;
     }
     .drag-handle {
-      display: none;
-    }
-    .trash-btn {
       display: none;
     }
     .planned-yr-cell {

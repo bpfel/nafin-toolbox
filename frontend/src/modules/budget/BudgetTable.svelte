@@ -272,7 +272,7 @@
         {/if}
         {#if !isCollapsed('income', group.groupName)}
           {#each group.entries as entry (entry.categoryId)}
-            <BudgetEntryRow {entry} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
+            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
           {/each}
         {/if}
       </tbody>
@@ -338,7 +338,7 @@
         {/if}
         {#if !isCollapsed('expense', group.groupName)}
           {#each group.entries as entry (entry.categoryId)}
-            <BudgetEntryRow {entry} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
+            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
           {/each}
         {/if}
       </tbody>
@@ -480,9 +480,6 @@
     border-radius: 4px;
     color: #2d6a4f;
   }
-  /* table-layout is fixed, so the name column cannot borrow slack from the
-     amount columns. Without this a name like "Abgaben und Versicherungen"
-     wraps and doubles the row height. Entry names already behave this way. */
   /* Marked like the category name, because it opens the same kind of dialog. */
   .group-name-btn {
     background: none;
@@ -498,6 +495,9 @@
     text-decoration-color: #aaa;
     text-underline-offset: 2px;
   }
+  /* table-layout is fixed, so the name column cannot borrow slack from the
+     amount columns. Without this a name like "Abgaben und Versicherungen"
+     wraps and doubles the row height. Entry names already behave this way. */
   .group-name {
     white-space: nowrap;
     overflow: hidden;

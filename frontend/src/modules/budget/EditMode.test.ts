@@ -34,7 +34,6 @@ function renderRow(onedit = vi.fn()) {
     ...render(BudgetEntryRow, {
       props: {
         entry: entry(),
-        ondelete: vi.fn(),
         onedit,
       },
     }),
@@ -47,7 +46,6 @@ describe('edit mode — the budget is read-only by default', () => {
     renderRow()
 
     expect(screen.queryByLabelText(/drag to reorder/i)).toBeNull()
-    expect(screen.queryByLabelText(/delete rent/i)).toBeNull()
     // The name is plain text, not a button that would open nothing.
     expect(screen.queryByRole('button', { name: 'Rent' })).toBeNull()
     expect(screen.getByText('Rent')).toBeTruthy()
@@ -58,8 +56,9 @@ describe('edit mode — the budget is read-only by default', () => {
     renderRow()
 
     expect(screen.getByLabelText(/drag to reorder/i)).toBeTruthy()
-    expect(screen.getByLabelText(/delete rent/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Rent' })).toBeTruthy()
+    // Deleting lives in the dialog that button opens, at every screen size.
+    expect(screen.queryByLabelText(/delete rent/i)).toBeNull()
   })
 
   // Reaching for the number is the obvious way to change it, so in edit mode the
