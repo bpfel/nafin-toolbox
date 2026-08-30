@@ -52,10 +52,12 @@ function rulesTouching(css: string, cls: string): Rule[] {
   return rules(css).filter(r => r.selector.includes(cls))
 }
 
-describe('edit-mode controls do not hide behind hover', () => {
+describe('edit-mode controls are never hidden', () => {
   // The controls only exist inside edit mode, so nothing is left for a
   // hover-reveal to protect — and on a touchscreen there is no hover, which made
-  // them unusable exactly when they had just been unlocked.
+  // them unusable exactly when they had just been unlocked. `display: none` is
+  // checked for the same reason: a narrow-screen rule hid the row handle, which
+  // is why entries could not be reordered on a phone.
   const controls: [string, string][] = [
     ['BudgetTable.svelte', '.category-drag-handle'],
     ['BudgetTable.svelte', '.category-add'],
@@ -63,7 +65,7 @@ describe('edit-mode controls do not hide behind hover', () => {
   ]
 
   for (const [file, cls] of controls) {
-    test(`${cls} in ${file} is never faded out or hidden by a rule`, () => {
+    test(`${cls} in ${file} is never faded out or hidden by any rule`, () => {
       const css = styleBlock(file)
       const touching = rulesTouching(css, cls)
 
@@ -71,6 +73,7 @@ describe('edit-mode controls do not hide behind hover', () => {
       for (const rule of touching) {
         expect(rule.body).not.toMatch(/opacity\s*:/)
         expect(rule.body).not.toMatch(/visibility\s*:/)
+        expect(rule.body).not.toMatch(/display\s*:\s*none/)
       }
     })
 

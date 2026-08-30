@@ -175,7 +175,9 @@
   }
 
   /* A coarse pointer needs a finger-sized target for the one control the row
-     still carries. */
+     still carries. The handle is a single glyph, so unlike the yearly column it
+     costs almost nothing to keep at every width — and hiding it was the reason
+     entries could not be reordered on a phone at all. */
   @media (hover: none) and (pointer: coarse) {
     .drag-handle {
       min-width: 32px;
@@ -193,9 +195,6 @@
     }
     .amount-cell {
       padding: 0.2rem 0.25rem;
-    }
-    .drag-handle {
-      display: none;
     }
     .planned-yr-cell {
       display: none;
