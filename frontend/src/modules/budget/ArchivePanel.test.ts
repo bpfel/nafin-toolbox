@@ -14,6 +14,12 @@ import ArchivePanel from './ArchivePanel.svelte'
 
 afterEach(cleanup)
 
+// de-CH's thousands separator has been both U+2019 and an ASCII apostrophe
+// depending on the ICU build (77 emits one, 78 the other), so expected strings
+// are formatted the way the app formats them rather than spelled out.
+const chf = (n: number) =>
+  n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 /**
  * The amount recorded against one archived entry.
  *
@@ -97,8 +103,8 @@ describe('ArchivePanel — archiving the plan', () => {
     // intermittently under parallel load — which it did, once, in a full run.
     expect(await screen.findByRole('button', { name: 'Before the raise' })).toBeTruthy()
     expect(await screen.findByText('Salary')).toBeTruthy()
-    expect(archivedAmount('Salary')).toBe('6\u2019000.00')
-    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
+    expect(archivedAmount('Salary')).toBe(chf(6000))
+    expect(archivedAmount('Rent')).toBe(chf(1350))
 
     expect(vault.budget.archives).toHaveLength(1)
     expect(vault.budget.archives[0].lines).toEqual([
@@ -138,7 +144,7 @@ describe('ArchivePanel — archiving the plan', () => {
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
+    expect(archivedAmount('Rent')).toBe(chf(1350))
     expect(screen.queryByText('Flat rent')).toBeNull()
   })
 
@@ -157,7 +163,7 @@ describe('ArchivePanel — archiving the plan', () => {
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
+    expect(archivedAmount('Rent')).toBe(chf(1350))
   })
 })
 
@@ -208,7 +214,7 @@ describe('ArchivePanel — editing an archive', () => {
     await openPanel(user)
     await createArchive(user, 'Q1')
 
-    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
+    expect(archivedAmount('Rent')).toBe(chf(1350))
 
     // Scoped to the open archive: the panel also carries a field for naming a
     // new one, which is not part of any archive.

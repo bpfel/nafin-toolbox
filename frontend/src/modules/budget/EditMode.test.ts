@@ -18,6 +18,12 @@ afterEach(() => {
   clearEditing()
 })
 
+// de-CH's thousands separator has been both U+2019 and an ASCII apostrophe
+// depending on the ICU build (77 emits one, 78 the other), so expected strings
+// are formatted the way the app formats them rather than spelled out.
+const chf = (n: number) =>
+  n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 function entry(): PlanEntryView {
   return {
     entryId: 'c1',
@@ -77,7 +83,7 @@ describe('edit mode — the budget is read-only by default', () => {
     renderRow()
 
     expect(screen.queryByRole('button', { name: /edit planned per month/i })).toBeNull()
-    expect(screen.getByText('1\u2019350.00')).toBeTruthy()
+    expect(screen.getByText(chf(1350))).toBeTruthy()
   })
 
   // Amounts are not editable from the table in either mode. The entry dialog
@@ -86,13 +92,13 @@ describe('edit mode — the budget is read-only by default', () => {
   test('the table never offers an amount field', () => {
     const { unmount } = renderRow()
     expect(document.querySelectorAll('input').length).toBe(0)
-    expect(screen.getByText('1\u2019350.00')).toBeTruthy()
+    expect(screen.getByText(chf(1350))).toBeTruthy()
     unmount()
 
     toggleEditing('budget')
     renderRow()
     expect(document.querySelectorAll('input').length).toBe(0)
-    expect(screen.getByText('1\u2019350.00')).toBeTruthy()
+    expect(screen.getByText(chf(1350))).toBeTruthy()
   })
 })
 

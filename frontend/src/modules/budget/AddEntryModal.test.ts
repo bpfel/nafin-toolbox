@@ -11,6 +11,12 @@ import AddEntryModal from './AddEntryModal.svelte'
 
 afterEach(cleanup)
 
+// de-CH's thousands separator has been both U+2019 and an ASCII apostrophe
+// depending on the ICU build (77 emits one, 78 the other), so expected strings
+// are formatted the way the app formats them rather than spelled out.
+const chf = (n: number) =>
+  n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 // A real vault, because Enter runs the whole save path — which writes the name
 // and category through the engine, not just the amount.
 function openOn(plannedAmount: string, onsave = vi.fn(), onclose = vi.fn()) {
@@ -46,9 +52,9 @@ describe('AddEntryModal — the only way to change an amount', () => {
   test('saves an edit that keeps the thousands separator', async () => {
     const { onsave, entryId, monthly } = openOn('1350.00')
 
-    expect(monthly.value).toBe('1’350.00')
+    expect(monthly.value).toBe(chf(1350))
 
-    await fireEvent.input(monthly, { target: { value: '1’450.00' } })
+    await fireEvent.input(monthly, { target: { value: chf(1450) } })
     await fireEvent.blur(monthly)
 
     expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
@@ -67,10 +73,10 @@ describe('AddEntryModal — the only way to change an amount', () => {
     const { monthly } = openOn('1350.00')
     const yearly = screen.getByLabelText('Planned/yr') as HTMLInputElement
 
-    expect(yearly.value).toBe('16’200.00')
+    expect(yearly.value).toBe(chf(16200))
 
-    await fireEvent.input(monthly, { target: { value: '1’450.00' } })
-    expect(yearly.value).toBe('17’400.00')
+    await fireEvent.input(monthly, { target: { value: chf(1450) } })
+    expect(yearly.value).toBe(chf(17400))
   })
 
   test('nonsense is left alone rather than saved as a number', async () => {

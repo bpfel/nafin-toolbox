@@ -24,7 +24,9 @@ describe('parseAmount — reading back what we printed', () => {
   test('accepts the separator toLocaleString actually emits', () => {
     const shown = (1350).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-    expect(shown).toBe('1\u2019350.00')
+    // Not spelled out: which character this is has changed between ICU builds,
+    // and reading whichever one is emitted is the entire point of the test.
+    expect(shown).not.toBe('1350.00')
     expect(parseAmount(shown)).toBe(1350)
   })
 
