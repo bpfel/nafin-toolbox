@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/budget/budgetEngine'
   import type {
@@ -400,7 +401,7 @@
 
 <div class="allocation-screen">
   {#if !vaultState.vault}
-    <p class="empty">Loading…</p>
+    <p class="empty">{t('state.loading')}</p>
   {:else if entries.length === 0}
     <p class="empty">
       No budget entries yet. Add them in the Budget module and they will appear here, ready to
@@ -423,7 +424,7 @@
 
     {#if incomeCategories.length > 0}
       <section class="flow-section">
-        <h3>Money in</h3>
+        <h3>{t('alloc.moneyIn')}</h3>
         {#each incomeCategories as category (category.categoryName)}
           {@render categoryBlock('income', category, showsHeaders(incomeCategories))}
         {/each}
@@ -432,7 +433,7 @@
 
     {#if expenseCategories.length > 0}
       <section class="flow-section">
-        <h3>Money out and money set aside</h3>
+        <h3>{t('alloc.moneyOut')}</h3>
         {#each expenseCategories as category (category.categoryName)}
           {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
         {/each}

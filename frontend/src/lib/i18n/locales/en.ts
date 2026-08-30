@@ -269,6 +269,128 @@ export const en = {
   'archive.deleteExplain.one': 'Delete {name} and its {count} line?',
   'archive.deleteExplain.other': 'Delete {name} and its {count} lines?',
 
+  // --- Accounts ---
+  'accounts.title': 'Accounts',
+  'accounts.subtitle': 'Balances are projected from the last correction, not accumulated.',
+  'accounts.add': 'Add',
+  'accounts.all': 'All accounts',
+  'accounts.projected': 'Projected balance',
+  'accounts.required': 'Required',
+  'accounts.available': 'Available',
+  'accounts.balance': 'Balance',
+  'accounts.asAt': 'As at',
+  'accounts.correct': 'Correct balance',
+  'accounts.saveCorrection': 'Save correction',
+  'accounts.edit': 'Edit {account}',
+  'accounts.qrbillFor': 'QR bill for {account}',
+  'accounts.deleteOne': 'Delete {account}',
+  'accounts.dragToReorder': 'Drag to reorder {account}',
+  'accounts.viewsLabel': 'Accounts views',
+
+  // Account kinds. 'Pillar 3a' is the Swiss tax-advantaged retirement scheme
+  // and keeps its official name in every language.
+  'accountKind.transactional': 'Transactional',
+  'accountKind.reserves': 'Reserves',
+  'accountKind.savings': 'Savings',
+  'accountKind.cash': 'Cash',
+  'accountKind.retirement3a': 'Pillar 3a',
+  'accountKind.investment': 'Investment',
+
+  // --- Account dialog ---
+  'accountForm.addTitle': 'Add account',
+  'accountForm.editTitle': 'Edit account',
+  'accountForm.namePlaceholder': 'e.g. Reserves',
+  'accountForm.kind': 'Kind',
+  'accountForm.bank': 'Bank',
+  'accountForm.bankPlaceholder': 'e.g. Raiffeisen',
+  'accountForm.paymentDetails': 'Payment details (for QR bills)',
+  'accountForm.iban': 'IBAN',
+
+  // --- Deleting an account ---
+  'accountDelete.title': 'Delete account',
+  'accountDelete.moveTo': 'Move its entries to',
+
+  'menu.edit': 'Edit',
+
+  // --- Allocations ---
+  //
+  // "Set-aside", "obligation" and "amortization" are this app's own concepts
+  // rather than standardised terms, so the German below is a reading of what
+  // they mean here, not a dictionary equivalent. Worth a native check: these
+  // words sit on the screen where people decide where money goes.
+  'alloc.moneyIn': 'Money in',
+  'alloc.moneyOut': 'Money out and money set aside',
+  'alloc.unallocated': 'Unallocated',
+  'alloc.netWorthChange': 'Net worth change',
+  'alloc.account': 'Account',
+  'alloc.projected': 'Projected',
+  'alloc.required': 'Required',
+  'alloc.available': 'Available',
+  'alloc.savings': 'Savings',
+  'alloc.setAside': 'Set-aside',
+  'alloc.editRouting': 'Edit routing',
+  'alloc.bought': 'Bought it…',
+  'alloc.whatMeans': 'What does {what} mean?',
+  'alloc.nothingBlocked': 'Nothing is blocked — adjust a planned amount or correct the balance.',
+
+  // --- Routing ---
+  'routing.landsIn': 'Lands in',
+  'routing.incomeHint': 'Income always arrives from outside your accounts.',
+  'routing.paidFrom': 'Paid from',
+  'routing.destination': 'Destination',
+  'routing.leaves': 'Leaves my accounts',
+  'routing.setAsideInto': 'Set aside into',
+  'routing.setAsideAccount': 'Set-aside account',
+
+  // --- Reserves ---
+  'reserve.savingTowards': 'Saving towards',
+  'reserve.nothingInParticular': 'Nothing in particular',
+  'reserve.obligation': 'An obligation — a bill that will arrive',
+  'reserve.amortization': 'An amortization — something to replace',
+  'reserve.periodMonths': 'Period in months',
+  'reserve.dueNextMonth': 'Next month it is due',
+  'reserve.cycleStarted': 'Cycle started',
+
+  // --- Purchase ---
+  'purchase.dialogLabel': 'Record purchase',
+  'purchase.pricePaid': 'Price paid',
+  'purchase.month': 'Month of purchase',
+  'purchase.priceError': 'Enter the price as a number, e.g. 1249.00',
+  'purchase.infoOnly': 'Information only — the purchase is recorded either way.',
+  'purchase.scope': 'No money is moved and no other item changes. Only this reserve is updated.',
+  'purchase.confirm': 'Record purchase',
+
+  // --- Category dialog notices ---
+  //
+  // One whole sentence per case rather than an article stitched on in the
+  // markup. English needed "A"/"An" chosen by the following word; every other
+  // language needs something different again, and none of it belongs in code.
+  'category.typeIncome': 'income',
+  'category.typeExpense': 'expense',
+  'category.movingSides.one': 'Moving this category to {type} takes its {count} entry with it. Their account routing resets to the default.',
+  'category.movingSides.other': 'Moving this category to {type} takes its {count} entries with it. Their account routing resets to the default.',
+  'category.reservesLost.one': '{count} reserve is removed: setting money aside towards a target is something only an expense does.',
+  'category.reservesLost.other': '{count} reserves are removed: setting money aside towards a target is something only an expense does.',
+  'category.conflictIncome': 'An income category called {name} already exists. Two categories cannot share a name on the same side of the budget.',
+  'category.conflictExpense': 'An expense category called {name} already exists. Two categories cannot share a name on the same side of the budget.',
+  'category.mergeExplain.one': "Merging moves this category's {count} entry into it and removes {name}.",
+  'category.mergeExplain.other': "Merging moves this category's {count} entries into it and removes {name}.",
+  'category.mergeInto': 'Merge into {name}',
+
+  // --- Entry dialog titles ---
+  'entry.editTypeTitle': 'Edit {type} entry',
+  'entry.addTypeTitle': 'Add {type} entry',
+  'entry.add': 'Add',
+
+  // --- Recovery key stakes ---
+  'recoveryKey.noReset': 'There is no way to reset this.',
+  'recoveryKey.stakes': 'If you forget your password and no longer have this key, everything in your vault is gone — your budget, your accounts, all of it.',
+  'recoveryKey.noAdmin': 'No administrator can recover it for you. The server only ever holds your data encrypted, and never sees the key that opens it.',
+  'recoveryKey.copyFailed': 'Could not reach the clipboard. Select the key above and copy it manually, or use Download.',
+  'recoveryKey.copied': 'Recovery key copied to the clipboard.',
+
+  'address.holderName': 'Holder name',
+
   // --- Common states ---
   'state.loading': 'Loading...',
   'state.saving': 'Saving...',

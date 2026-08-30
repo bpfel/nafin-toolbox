@@ -52,13 +52,10 @@
 
         <div class="stakes">
           <p>
-            <strong>There is no way to reset this.</strong> If you forget your password
-            and no longer have this key, everything in your vault is gone — your budget,
-            your accounts, all of it.
+            <strong>{t('recoveryKey.noReset')}</strong> {t('recoveryKey.stakes')}
           </p>
           <p>
-            No administrator can recover it for you. The server only ever holds your data
-            encrypted, and never sees the key that opens it.
+            {t('recoveryKey.noAdmin')}
           </p>
         </div>
 
@@ -75,10 +72,9 @@
 
         <p class="status" class:failed={copier.failed} aria-live="polite">
           {#if copier.failed}
-            Could not reach the clipboard. Select the key above and copy it manually,
-            or use Download.
+            {t('recoveryKey.copyFailed')}
           {:else if copier.copied}
-            Recovery key copied to the clipboard.
+            {t('recoveryKey.copied')}
           {/if}
         </p>
 

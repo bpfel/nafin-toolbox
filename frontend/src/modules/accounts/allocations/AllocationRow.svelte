@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition, VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { flowKindOf } from '../../../lib/accounts/routing'
   import { accountShortLabel } from '../../../lib/accounts/labels'
@@ -111,7 +112,7 @@
       : kind === 'spending'
         ? 'Spending'
         : kind === 'setaside'
-          ? isPlainSavings ? 'Savings' : 'Set-aside'
+          ? isPlainSavings ? t('alloc.savings') : t('alloc.setAside')
           : 'Unrouted',
   )
 
@@ -207,7 +208,7 @@
         aria-expanded={expanded}
         onclick={() => (expanded = !expanded)}
       >
-        {expanded ? 'Done' : 'Edit routing'}
+        {expanded ? t('action.done') : t('alloc.editRouting')}
       </button>
     {/if}
   </div>
@@ -239,7 +240,7 @@
                 No monthly amount planned — budget something towards this to get a date
               {/if}
             </span>
-            <button class="purchase" onclick={onpurchase}>Bought it…</button>
+            <button class="purchase" onclick={onpurchase}>{t('alloc.bought')}</button>
           {/if}
         </div>
       {/if}

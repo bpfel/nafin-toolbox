@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../lib/i18n/index.svelte'
+  import { t, tn, tAround } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultCategory, VaultData } from '../../lib/crypto/vault'
   import * as engine from '../../lib/budget/budgetEngine'
@@ -34,6 +34,18 @@
   )
 
   let changed = $derived(trimmed !== category.name || movingSides)
+
+  // Whole sentences with a slot, split only for rendering — see tAround.
+  let conflictParts = $derived(
+    tAround(type === 'income' ? 'category.conflictIncome' : 'category.conflictExpense', 'name'),
+  )
+  let mergeParts = $derived(
+    tAround(
+      members.length === 1 ? 'category.mergeExplain.one' : 'category.mergeExplain.other',
+      'name',
+      { count: members.length },
+    ),
+  )
 
   function save() {
     error = null
@@ -84,13 +96,11 @@
     {#if movingSides}
       <div class="notice">
         <p>
-          Moving this category to {type} takes its {members.length}
-          {members.length === 1 ? 'entry' : 'entries'} with it. Their account
-          routing resets to the default.
+          {tn('category.movingSides', members.length, {
+            type: type === 'income' ? t('category.typeIncome') : t('category.typeExpense'),
+          })}
           {#if reservesLost > 0}
-            {reservesLost}
-            {reservesLost === 1 ? 'reserve is' : 'reserves are'} removed: setting money
-            aside towards a target is something only an expense does.
+            {tn('category.reservesLost', reservesLost)}
           {/if}
         </p>
       </div>
@@ -99,13 +109,10 @@
     {#if conflict}
       <div class="notice">
         <p>
-          A{type === 'income' ? 'n' : ''} {type} category called <strong>{conflict.name}</strong>
-          already exists. Two categories cannot share a name on the same side of the budget.
+          {conflictParts[0]}<strong>{conflict.name}</strong>{conflictParts[1]}
         </p>
         <p>
-          Merging moves this category's {members.length}
-          {members.length === 1 ? 'entry' : 'entries'} into it and removes
-          <strong>{category.name}</strong>.
+          {mergeParts[0]}<strong>{category.name}</strong>{mergeParts[1]}
         </p>
       </div>
     {/if}
@@ -115,11 +122,11 @@
     {/if}
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       {#if conflict}
-        <button class="btn merge" onclick={merge}>Merge into {conflict.name}</button>
+        <button class="btn merge" onclick={merge}>{t('category.mergeInto', { name: conflict.name })}</button>
       {:else}
-        <button class="btn save" onclick={save} disabled={!changed || trimmed === ''}>Save</button>
+        <button class="btn save" onclick={save} disabled={!changed || trimmed === ''}>{t('action.save')}</button>
       {/if}
     </div>
   </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import Sortable from 'sortablejs'
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/accounts/accountsEngine'
@@ -235,11 +236,11 @@
 <div class="account-management">
   <header class="head">
     <div>
-      <h2>Accounts</h2>
-      <p class="sub">Balances are projected from the last correction, not accumulated.</p>
+      <h2>{t('accounts.title')}</h2>
+      <p class="sub">{t('accounts.subtitle')}</p>
     </div>
     {#if editing}
-      <button class="btn add" onclick={openCreate}>Add</button>
+      <button class="btn add" onclick={openCreate}>{t('accounts.add')}</button>
     {/if}
   </header>
 
@@ -248,7 +249,7 @@
   {/if}
 
   {#if !vaultState.vault}
-    <p class="loading">Loading...</p>
+    <p class="loading">{t('state.loading')}</p>
   {:else}
     <!-- A row that scrolls sideways rather than a grid that grows downwards.
          Only this element scrolls; the page itself never moves sideways. -->
@@ -275,18 +276,18 @@
          cards means a drop can never land a card past the sum. -->
     {#if rows.length > 0}
       <div class="totals" data-testid="account-totals">
-        <span class="totals-label">All accounts</span>
+        <span class="totals-label">{t('accounts.all')}</span>
         <dl class="figures">
           <div class="figure">
-            <dt>Projected balance</dt>
+            <dt>{t('accounts.projected')}</dt>
             <dd class="amount" data-testid="total-projected">{fmt(totals.projected)}</dd>
           </div>
           <div class="figure">
-            <dt>Required</dt>
+            <dt>{t('accounts.required')}</dt>
             <dd class="amount muted" data-testid="total-required">{fmt(totals.required)}</dd>
           </div>
           <div class="figure">
-            <dt>Available</dt>
+            <dt>{t('accounts.available')}</dt>
             <dd
               class="amount"
               class:negative={totals.available < 0}

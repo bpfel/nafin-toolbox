@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { focusTrap } from '../../../lib/util/focusTrap'
@@ -55,8 +56,8 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Delete account" use:focusTrap>
-    <h3>Delete account</h3>
+  <div class="modal" role="dialog" aria-label={t('accountDelete.title')} use:focusTrap>
+    <h3>{t('accountDelete.title')}</h3>
 
     <p>
       Remove <strong>{account.name}</strong>?
@@ -69,7 +70,7 @@
     </p>
 
     <label class="field">
-      <span class="label">Move its entries to</span>
+      <span class="label">{t('accountDelete.moveTo')}</span>
       <select bind:value={reassignToId}>
         {#each otherAccounts as a}
           <option value={a.id}>{a.name}</option>
@@ -96,7 +97,7 @@
     {/if}
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn delete" onclick={confirm} disabled={!reassignToId}>
         Delete and reassign
       </button>

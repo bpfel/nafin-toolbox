@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { AccountKind, QRAddress, VaultAccount } from '../../../lib/crypto/vault'
   import { isQRIban, ibanStatus } from '../../../lib/qrbill/validate'
@@ -17,13 +18,13 @@
 
   let { account, onsave, onclose }: Props = $props()
 
-  const KINDS: { value: AccountKind; label: string }[] = [
-    { value: 'transactional', label: 'Transactional' },
-    { value: 'reserves', label: 'Reserves' },
-    { value: 'savings', label: 'Savings' },
-    { value: 'cash', label: 'Cash' },
-    { value: 'retirement_3a', label: 'Pillar 3a' },
-    { value: 'investment', label: 'Investment' },
+  const KINDS: { value: AccountKind; label: () => string }[] = [
+    { value: 'transactional', label: () => t('accountKind.transactional') },
+    { value: 'reserves', label: () => t('accountKind.reserves') },
+    { value: 'savings', label: () => t('accountKind.savings') },
+    { value: 'cash', label: () => t('accountKind.cash') },
+    { value: 'retirement_3a', label: () => t('accountKind.retirement3a') },
+    { value: 'investment', label: () => t('accountKind.investment') },
   ]
 
   let isEdit = $derived(account !== null)
@@ -105,31 +106,31 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit account' : 'Add account'} use:focusTrap>
-    <h3>{isEdit ? 'Edit account' : 'Add account'}</h3>
+  <div class="modal" role="dialog" aria-label={isEdit ? t('accountForm.editTitle') : t('accountForm.addTitle')} use:focusTrap>
+    <h3>{isEdit ? t('accountForm.editTitle') : t('accountForm.addTitle')}</h3>
 
     <label class="field">
-      <span class="label">Name</span>
+      <span class="label">{t('field.name')}</span>
       <input
         type="text"
         bind:value={name}
-        placeholder="e.g. Reserves"
+        placeholder={t('accountForm.namePlaceholder')}
         onkeydown={e => { if (e.key === 'Enter' && name.trim()) save() }}
       />
     </label>
 
     <label class="field">
-      <span class="label">Kind</span>
+      <span class="label">{t('accountForm.kind')}</span>
       <select bind:value={kind}>
         {#each KINDS as k}
-          <option value={k.value}>{k.label}</option>
+          <option value={k.value}>{k.label()}</option>
         {/each}
       </select>
     </label>
 
     <label class="field">
-      <span class="label">Bank</span>
-      <input type="text" bind:value={bankName} placeholder="e.g. Raiffeisen" />
+      <span class="label">{t('accountForm.bank')}</span>
+      <input type="text" bind:value={bankName} placeholder={t('accountForm.bankPlaceholder')} />
     </label>
 
     <div class="advanced">
@@ -138,7 +139,7 @@
         aria-expanded={showAdvanced}
         onclick={() => (showAdvanced = !showAdvanced)}
       >
-        {showAdvanced ? '−' : '+'} Payment details (for QR bills)
+        {showAdvanced ? '−' : '+'} {t('accountForm.paymentDetails')}
       </button>
 
       {#if showAdvanced}
@@ -148,7 +149,7 @@
           </p>
 
           <label class="field">
-            <span class="label">IBAN</span>
+            <span class="label">{t('accountForm.iban')}</span>
             <input
               type="text"
               value={iban}
@@ -175,32 +176,32 @@
           </p>
 
           <label class="field">
-            <span class="label">Holder name</span>
+            <span class="label">{t('address.holderName')}</span>
             <input type="text" autocomplete="name" enterkeyhint="next" bind:value={holderName} />
           </label>
 
           <div class="row">
             <label class="field grow">
-              <span class="label">Street</span>
+              <span class="label">{t('address.street')}</span>
               <input type="text" autocomplete="address-line1" enterkeyhint="next" bind:value={street} />
             </label>
             <label class="field narrow">
-              <span class="label">No.</span>
+              <span class="label">{t('address.number')}</span>
               <input type="text" inputmode="numeric" enterkeyhint="next" bind:value={buildingNumber} />
             </label>
           </div>
 
           <div class="row">
             <label class="field narrow">
-              <span class="label">Postal code</span>
+              <span class="label">{t('address.postalCode')}</span>
               <input type="text" inputmode="numeric" autocomplete="postal-code" enterkeyhint="next" bind:value={postalCode} />
             </label>
             <label class="field grow">
-              <span class="label">City</span>
+              <span class="label">{t('address.city')}</span>
               <input type="text" autocomplete="address-level2" enterkeyhint="next" bind:value={city} />
             </label>
             <label class="field narrow">
-              <span class="label">Country</span>
+              <span class="label">{t('address.country')}</span>
               <input type="text" autocomplete="country" autocapitalize="characters" maxlength="2" enterkeyhint="done" bind:value={country} />
             </label>
           </div>
@@ -209,7 +210,7 @@
     </div>
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn save" onclick={save} disabled={!name.trim()}>
         {isEdit ? 'Save' : 'Add'}
       </button>

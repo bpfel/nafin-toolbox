@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import AccountManagement from './management/AccountManagement.svelte'
   import AllocationScreen from './allocations/AllocationScreen.svelte'
 
@@ -18,7 +19,7 @@
 </script>
 
 <div class="accounts-module">
-  <nav class="view-tabs" aria-label="Accounts views">
+  <nav class="view-tabs" aria-label={t('accounts.viewsLabel')}>
     <button
       class="tab"
       class:active={view === 'accounts'}

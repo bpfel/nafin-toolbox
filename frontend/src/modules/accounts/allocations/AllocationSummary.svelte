@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   // The two totals, side by side. They differ by exactly the set-asides:
   //
   //   unallocated = income − all expenses    "what has no job yet?"
@@ -104,7 +105,7 @@
     class="info-toggle"
     aria-expanded={openInfo === id}
     aria-controls={id}
-    aria-label="What does {what} mean?"
+    aria-label={t('alloc.whatMeans', { what })}
     onclick={() => toggleInfo(id)}
   >
     <span aria-hidden="true">i</span>
@@ -115,7 +116,7 @@
   <div class="totals">
     <div class="total">
       <span class="total-head info-group">
-        <span class="total-label">Unallocated</span>
+        <span class="total-label">{t('alloc.unallocated')}</span>
         {@render infoToggle('info-unallocated', 'Unallocated')}
         {#if openInfo === 'info-unallocated'}
           <span class="info-popover" id="info-unallocated" role="note">
@@ -135,7 +136,7 @@
 
     <div class="total">
       <span class="total-head info-group">
-        <span class="total-label">Net worth change</span>
+        <span class="total-label">{t('alloc.netWorthChange')}</span>
         {@render infoToggle('info-net-change', 'Net worth change')}
         {#if openInfo === 'info-net-change'}
           <span class="info-popover" id="info-net-change" role="note">
@@ -158,10 +159,10 @@
     <table class="accounts">
       <thead>
         <tr>
-          <th>Account</th>
-          <th class="right">Projected</th>
-          <th class="right">Required</th>
-          <th class="right">Available</th>
+          <th>{t('alloc.account')}</th>
+          <th class="right">{t('alloc.projected')}</th>
+          <th class="right">{t('alloc.required')}</th>
+          <th class="right">{t('alloc.available')}</th>
         </tr>
       </thead>
       <tbody>
@@ -187,7 +188,7 @@
         ({account.soonestObligation.monthsAway === 0
           ? 'this month'
           : `${account.soonestObligation.monthsAway} ${account.soonestObligation.monthsAway === 1 ? 'month' : 'months'} to go`}){/if}.
-      <span class="advice">Nothing is blocked — adjust a planned amount or correct the balance.</span>
+      <span class="advice">{t('alloc.nothingBlocked')}</span>
     </p>
   {/each}
 </div>

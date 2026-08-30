@@ -248,6 +248,118 @@ export const de: Messages = {
   'archive.deleteExplain.one': '{name} und die {count} Zeile löschen?',
   'archive.deleteExplain.other': '{name} und seine {count} Zeilen löschen?',
 
+  // --- Accounts ---
+  'accounts.title': 'Konten',
+  'accounts.subtitle': 'Salden werden ab der letzten Korrektur hochgerechnet, nicht aufsummiert.',
+  'accounts.add': 'Hinzufügen',
+  'accounts.all': 'Alle Konten',
+  'accounts.projected': 'Hochgerechneter Saldo',
+  'accounts.required': 'Benötigt',
+  'accounts.available': 'Verfügbar',
+  'accounts.balance': 'Saldo',
+  'accounts.asAt': 'Stand',
+  'accounts.correct': 'Saldo korrigieren',
+  'accounts.saveCorrection': 'Korrektur speichern',
+  'accounts.edit': '{account} bearbeiten',
+  'accounts.qrbillFor': 'QR-Rechnung für {account}',
+  'accounts.deleteOne': '{account} löschen',
+  'accounts.dragToReorder': '{account} zum Umsortieren ziehen',
+  'accounts.viewsLabel': 'Kontoansichten',
+
+  // 'Säule 3a' is the official Swiss term; it is not translated further.
+  'accountKind.transactional': 'Zahlungsverkehr',
+  'accountKind.reserves': 'Reserven',
+  'accountKind.savings': 'Sparen',
+  'accountKind.cash': 'Bargeld',
+  'accountKind.retirement3a': 'Säule 3a',
+  'accountKind.investment': 'Anlagen',
+
+  // --- Account dialog ---
+  'accountForm.addTitle': 'Konto hinzufügen',
+  'accountForm.editTitle': 'Konto bearbeiten',
+  'accountForm.namePlaceholder': 'z. B. Reserven',
+  'accountForm.kind': 'Art',
+  'accountForm.bank': 'Bank',
+  'accountForm.bankPlaceholder': 'z. B. Raiffeisen',
+  'accountForm.paymentDetails': 'Zahlungsangaben (für QR-Rechnungen)',
+  'accountForm.iban': 'IBAN',
+
+  // --- Deleting an account ---
+  'accountDelete.title': 'Konto löschen',
+  'accountDelete.moveTo': 'Seine Einträge verschieben nach',
+
+  'menu.edit': 'Bearbeiten',
+
+  // --- Allocations ---
+  'alloc.moneyIn': 'Geld herein',
+  'alloc.moneyOut': 'Geld hinaus und Zurückgelegtes',
+  'alloc.unallocated': 'Nicht zugewiesen',
+  'alloc.netWorthChange': 'Veränderung des Vermögens',
+  'alloc.account': 'Konto',
+  'alloc.projected': 'Hochgerechnet',
+  'alloc.required': 'Benötigt',
+  'alloc.available': 'Verfügbar',
+  'alloc.savings': 'Ersparnisse',
+  'alloc.setAside': 'Zurückgelegt',
+  'alloc.editRouting': 'Zuordnung bearbeiten',
+  'alloc.bought': 'Gekauft…',
+  'alloc.whatMeans': 'Was bedeutet {what}?',
+  'alloc.nothingBlocked': 'Nichts ist blockiert — passen Sie einen geplanten Betrag an oder korrigieren Sie den Saldo.',
+
+  // --- Routing ---
+  'routing.landsIn': 'Geht ein auf',
+  'routing.incomeHint': 'Einnahmen kommen immer von ausserhalb Ihrer Konten.',
+  'routing.paidFrom': 'Bezahlt ab',
+  'routing.destination': 'Ziel',
+  'routing.leaves': 'Verlässt meine Konten',
+  'routing.setAsideInto': 'Zurücklegen auf',
+  'routing.setAsideAccount': 'Konto für Zurückgelegtes',
+
+  // --- Reserves ---
+  'reserve.savingTowards': 'Sparen für',
+  'reserve.nothingInParticular': 'Nichts Bestimmtes',
+  'reserve.obligation': 'Eine Verpflichtung — eine Rechnung, die kommen wird',
+  'reserve.amortization': 'Eine Amortisation — etwas zu ersetzen',
+  'reserve.periodMonths': 'Zeitraum in Monaten',
+  'reserve.dueNextMonth': 'Nächsten Monat fällig',
+  'reserve.cycleStarted': 'Zyklus begonnen',
+
+  // --- Purchase ---
+  'purchase.dialogLabel': 'Kauf erfassen',
+  'purchase.pricePaid': 'Bezahlter Preis',
+  'purchase.month': 'Monat des Kaufs',
+  'purchase.priceError': 'Geben Sie den Preis als Zahl ein, z. B. 1249.00',
+  'purchase.infoOnly': 'Nur zur Information — der Kauf wird so oder so erfasst.',
+  'purchase.scope': 'Es wird kein Geld bewegt und keine andere Position verändert. Nur diese Reserve wird aktualisiert.',
+  'purchase.confirm': 'Kauf erfassen',
+
+  // --- Category dialog notices ---
+  'category.typeIncome': 'Einnahmen',
+  'category.typeExpense': 'Ausgaben',
+  'category.movingSides.one': 'Wenn Sie diese Kategorie zu {type} verschieben, kommt ihr {count} Eintrag mit. Dessen Kontozuordnung wird auf den Standard zurückgesetzt.',
+  'category.movingSides.other': 'Wenn Sie diese Kategorie zu {type} verschieben, kommen ihre {count} Einträge mit. Deren Kontozuordnung wird auf den Standard zurückgesetzt.',
+  'category.reservesLost.one': '{count} Reserve wird entfernt: Geld auf ein Ziel hin zurückzulegen ist etwas, das nur eine Ausgabe tut.',
+  'category.reservesLost.other': '{count} Reserven werden entfernt: Geld auf ein Ziel hin zurückzulegen ist etwas, das nur eine Ausgabe tut.',
+  'category.conflictIncome': 'Eine Einnahmenkategorie namens {name} existiert bereits. Zwei Kategorien können auf derselben Seite des Budgets nicht denselben Namen tragen.',
+  'category.conflictExpense': 'Eine Ausgabenkategorie namens {name} existiert bereits. Zwei Kategorien können auf derselben Seite des Budgets nicht denselben Namen tragen.',
+  'category.mergeExplain.one': 'Beim Zusammenführen wandert der {count} Eintrag dieser Kategorie dorthin und {name} wird entfernt.',
+  'category.mergeExplain.other': 'Beim Zusammenführen wandern die {count} Einträge dieser Kategorie dorthin und {name} wird entfernt.',
+  'category.mergeInto': 'Zusammenführen mit {name}',
+
+  // --- Entry dialog titles ---
+  'entry.editTypeTitle': '{type}-Eintrag bearbeiten',
+  'entry.addTypeTitle': '{type}-Eintrag hinzufügen',
+  'entry.add': 'Hinzufügen',
+
+  // --- Recovery key stakes ---
+  'recoveryKey.noReset': 'Dies lässt sich nicht zurücksetzen.',
+  'recoveryKey.stakes': 'Wenn Sie Ihr Passwort vergessen und diesen Schlüssel nicht mehr haben, ist alles in Ihrem Tresor verloren — Ihr Budget, Ihre Konten, alles.',
+  'recoveryKey.noAdmin': 'Kein Administrator kann ihn für Sie wiederherstellen. Der Server hält Ihre Daten immer nur verschlüsselt und sieht den Schlüssel nie, der sie öffnet.',
+  'recoveryKey.copyFailed': 'Die Zwischenablage war nicht erreichbar. Markieren Sie den Schlüssel oben und kopieren Sie ihn von Hand, oder nutzen Sie Herunterladen.',
+  'recoveryKey.copied': 'Wiederherstellungsschlüssel in die Zwischenablage kopiert.',
+
+  'address.holderName': 'Name des Inhabers',
+
   // --- Common states ---
   'state.loading': 'Wird geladen...',
   'state.saving': 'Wird gespeichert...',
