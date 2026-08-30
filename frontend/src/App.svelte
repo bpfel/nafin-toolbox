@@ -6,6 +6,7 @@
   import InvitePanel from './lib/auth/InvitePanel.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
   import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
+  import RecoveryKeyScreen from './lib/auth/RecoveryKeyScreen.svelte'
   import SecuritySettings from './lib/auth/SecuritySettings.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
@@ -13,7 +14,6 @@
   import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
   import { isExpanded, toggleExpanded } from './lib/util/collapse.svelte'
   import { focusTrap } from './lib/util/focusTrap'
-  import { createCopier } from './lib/util/copier.svelte'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
 
@@ -186,8 +186,6 @@
     clearRecoveryKey()
   }
 
-  const recoveryKeyCopier = createCopier()
-
   async function handleUnlock() {
     if (!unlockPassword) return
     unlocking = true
@@ -251,33 +249,10 @@
     </div>
   </main>
 {:else if authState.recoveryKeyToShow && !isAdmin}
-  <main>
-    <div class="enforcement-container">
-      <div class="enforcement-card">
-        <h1>Save Your Recovery Key</h1>
-        <p class="hint">This key is the only way to recover your encrypted data if you forget your password. Save it in a secure location. It will not be shown again.</p>
-        <div class="recovery-key-box">
-          <code class="recovery-key">{authState.recoveryKeyToShow}</code>
-        </div>
-        <div class="recovery-key-actions">
-          <button
-            class="btn-secondary"
-            onclick={() => recoveryKeyCopier.copy(authState.recoveryKeyToShow ?? '')}
-          >
-            {recoveryKeyCopier.copied ? 'Copied' : 'Copy key'}
-          </button>
-        </div>
-        <p class="copy-status" class:failed={recoveryKeyCopier.failed} aria-live="polite">
-          {#if recoveryKeyCopier.failed}
-            Could not reach the clipboard. Select the key above and copy it manually.
-          {:else if recoveryKeyCopier.copied}
-            Recovery key copied to the clipboard.
-          {/if}
-        </p>
-        <button class="btn-primary" onclick={handleRecoveryKeyDismiss}>I've saved my recovery key</button>
-      </div>
-    </div>
-  </main>
+  <RecoveryKeyScreen
+    recoveryKey={authState.recoveryKeyToShow}
+    onconfirmed={handleRecoveryKeyDismiss}
+  />
 {:else if authState.vaultNeedsSetup && !isAdmin}
   <main>
     <div class="enforcement-container">
@@ -666,39 +641,6 @@
     color: #155724;
   }
 
-  .recovery-key-box {
-    background: #f8f9fa;
-    border: 2px dashed #dee2e6;
-    border-radius: 8px;
-    padding: 1.25rem;
-    margin: 1rem 0;
-    text-align: center;
-  }
-  .recovery-key-actions {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 0.5rem;
-  }
-  .copy-status {
-    font-size: 0.85rem;
-    color: #2d6a4f;
-    text-align: center;
-    /* Reserved whether or not there is a message, so the button below does not
-       jump when one appears. */
-    min-height: 1.2rem;
-    margin: 0 0 0.5rem;
-  }
-  .copy-status.failed {
-    color: #c0392b;
-  }
-  .recovery-key {
-    font-size: 0.85rem;
-    font-family: monospace;
-    word-break: break-all;
-    line-height: 1.8;
-    color: #333;
-    user-select: all;
-  }
 
   .error {
     color: #c0392b;
