@@ -108,6 +108,31 @@ export const de: Messages = {
   'password.changeTitle': 'Passwort ändern',
   'password.changing': 'Wird geändert...',
 
+  // --- QR bill ---
+  // Field names quoted from SIX's Style Guide QR-bill, not translated.
+  'qrbill.title': 'QR-Rechnung für {account}',
+  'qrbill.dialogLabel': 'QR-Rechnung erstellen',
+  'qrbill.amountPlaceholder': 'Leer lassen für einen offenen Betrag',
+  'qrbill.referenceType': 'Referenztyp',
+  'qrbill.reference': 'Referenz',
+  'qrbill.referenceQRR': 'QR-Referenz (QRR)',
+  'qrbill.referenceSCOR': 'Creditor Reference (SCOR)',
+  'qrbill.referenceNON': 'Keine Referenz',
+  'qrbill.additionalInfo': 'Zusätzliche Informationen',
+  'qrbill.additionalInfoPlaceholder': 'z. B. Reserven-Einzahlung, März',
+  'qrbill.scanHint': 'Scannen Sie dies mit der Kamera Ihres Telefons von diesem Bildschirm ab.',
+  'qrbill.share': 'Als Bild teilen',
+
+  // --- Address fields ---
+  'address.name': 'Name',
+  'address.street': 'Strasse',
+  'address.number': 'Nr.',
+  'address.postalCode': 'PLZ',
+  'address.city': 'Ort',
+  'address.country': 'Land',
+
+  'action.close': 'Schliessen',
+
   // --- Common states ---
   'state.loading': 'Wird geladen...',
   'state.saving': 'Wird gespeichert...',

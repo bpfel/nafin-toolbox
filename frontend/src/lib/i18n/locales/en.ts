@@ -121,6 +121,36 @@ export const en = {
   'password.changeTitle': 'Change Password',
   'password.changing': 'Changing...',
 
+  // --- QR bill ---
+  //
+  // The field names below are the mandatory headings from SIX's "Style Guide
+  // QR-bill" (p.30-31), which prints them in German, French, Italian, English
+  // and Romansh. The guide is explicit that variations "could result in the
+  // payment not being made" — so these are quoted, never rephrased, and the
+  // remaining locales must be taken from the same table rather than translated.
+  'qrbill.title': 'QR bill for {account}',
+  'qrbill.dialogLabel': 'Generate QR bill',
+  'qrbill.amountPlaceholder': 'Leave empty for an open amount',
+  'qrbill.referenceType': 'Reference type',
+  'qrbill.reference': 'Reference',
+  'qrbill.referenceQRR': 'QR reference (QRR)',
+  'qrbill.referenceSCOR': 'Creditor reference (SCOR)',
+  'qrbill.referenceNON': 'No reference',
+  'qrbill.additionalInfo': 'Additional information',
+  'qrbill.additionalInfoPlaceholder': 'e.g. Reserves funding, March',
+  'qrbill.scanHint': "Scan this with your phone's camera from this screen.",
+  'qrbill.share': 'Share as an image',
+
+  // --- Address fields ---
+  'address.name': 'Name',
+  'address.street': 'Street',
+  'address.number': 'No.',
+  'address.postalCode': 'Postal code',
+  'address.city': 'City',
+  'address.country': 'Country',
+
+  'action.close': 'Close',
+
   // --- Common states ---
   'state.loading': 'Loading...',
   'state.saving': 'Saving...',
