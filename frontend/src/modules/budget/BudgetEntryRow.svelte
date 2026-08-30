@@ -1,36 +1,26 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import { isEditing } from '../../lib/util/editMode.svelte'
-
-  type Field = 'planned_mo' | 'planned_yr'
 
   interface Props {
     entry: PlanEntryView
     viewMode?: 'monthly' | 'yearly'
-    onsave: (categoryId: string, amount: string) => void
     ondelete: (categoryId: string, categoryName: string) => void
     onedit: (categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string) => void
   }
 
-  let { entry, viewMode = 'monthly', onsave, ondelete, onedit }: Props = $props()
+  let { entry, viewMode = 'monthly', ondelete, onedit }: Props = $props()
 
-  // Reordering, renaming and deleting are structural; typing amounts is not. Only
-  // the former wait for edit mode, so the everyday act of budgeting stays direct.
+  // Amounts are read-only here. Changing one is an edit like renaming or
+  // reordering is, so it goes through edit mode and the category dialog -- one
+  // way in, rather than a dialog field and a table cell that set the same value.
   let editing = $derived(isEditing('budget'))
 
-  const MAX_MONTHLY = 9_999_999_999.99
+  let planned = $derived(Number(entry.plannedAmount))
 
-  let plannedMoValue = $state('')
-  let plannedYrValue = $state('')
-
-  let plannedMoOriginal = ''
-  let plannedYrOriginal = ''
-
-  let plannedMoError = $state(false)
-  let plannedYrError = $state(false)
-
-  let focusedField = $state<Field | null>(null)
+  function fmt(val: number): string {
+    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
 
   let longPressTimer: ReturnType<typeof setTimeout> | null = null
   let longPressTriggered = false
@@ -58,116 +48,6 @@
       clearTimeout(longPressTimer)
       longPressTimer = null
     }
-  }
-
-  $effect(() => {
-    const planned = Number(entry.plannedAmount)
-    const focused = untrack(() => focusedField)
-
-    if (focused !== 'planned_mo') {
-      plannedMoValue = fmt(planned)
-    }
-    if (focused !== 'planned_yr') {
-      plannedYrValue = fmt(planned * 12)
-    }
-  })
-
-  function fmt(val: number): string {
-    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-
-  function handleFocus(field: Field, event: FocusEvent) {
-    focusedField = field
-    const input = event.target as HTMLInputElement
-    if (field === 'planned_mo') plannedMoOriginal = plannedMoValue
-    else plannedYrOriginal = plannedYrValue
-    requestAnimationFrame(() => input.select())
-  }
-
-  function handleBlur(field: Field) {
-    focusedField = null
-    const current = getValue(field)
-    const original = getOriginal(field)
-    if (current !== original) {
-      saveField(field)
-    }
-    setError(field, false)
-  }
-
-  function handleKeydown(field: Field, event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      if (saveField(field)) {
-        const input = event.target as HTMLInputElement
-        navigateVertical(input, field, event.shiftKey ? -1 : 1)
-      }
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      revertField(field)
-      ;(event.target as HTMLInputElement).blur()
-    }
-  }
-
-  function navigateVertical(input: HTMLInputElement, field: Field, direction: 1 | -1) {
-    const table = input.closest('table')
-    if (!table) return
-    const allInputs = Array.from(table.querySelectorAll<HTMLInputElement>(`input[data-field="${field}"]`))
-    const currentIdx = allInputs.indexOf(input)
-    const nextIdx = currentIdx + direction
-    if (nextIdx >= 0 && nextIdx < allInputs.length) {
-      allInputs[nextIdx].focus()
-    } else {
-      input.blur()
-    }
-  }
-
-  function getValue(field: Field): string {
-    return field === 'planned_mo' ? plannedMoValue : plannedYrValue
-  }
-
-  function getOriginal(field: Field): string {
-    return field === 'planned_mo' ? plannedMoOriginal : plannedYrOriginal
-  }
-
-  function setError(field: Field, val: boolean) {
-    if (field === 'planned_mo') plannedMoError = val
-    else plannedYrError = val
-  }
-
-  function revertField(field: Field) {
-    if (field === 'planned_mo') { plannedMoValue = plannedMoOriginal; plannedMoError = false }
-    else { plannedYrValue = plannedYrOriginal; plannedYrError = false }
-  }
-
-  function parseInput(raw: string): number {
-    const cleaned = raw.replace(/'/g, '').replace(/,/g, '.')
-    return Number(cleaned)
-  }
-
-  function saveField(field: Field): boolean {
-    const raw = getValue(field)
-    const val = parseInput(raw)
-
-    if (isNaN(val) || !isFinite(val)) {
-      setError(field, true)
-      return false
-    }
-
-    const monthly = field === 'planned_yr' ? val / 12 : val
-    if (Math.abs(monthly) > MAX_MONTHLY) {
-      setError(field, true)
-      return false
-    }
-
-    setError(field, false)
-
-    if (field === 'planned_mo') {
-      onsave(entry.categoryId, val.toFixed(2))
-    } else {
-      onsave(entry.categoryId, (val / 12).toFixed(4))
-    }
-
-    return true
   }
 </script>
 
@@ -207,32 +87,10 @@
     </div>
   </td>
   <td class="amount-cell planned-mo-cell">
-    <input
-      type="text"
-      inputmode="decimal"
-      class="cell-input"
-      class:cell-error={plannedMoError}
-      data-field="planned_mo"
-      aria-label="Planned per month for {entry.categoryName}"
-      bind:value={plannedMoValue}
-      onfocus={(e) => handleFocus('planned_mo', e)}
-      onblur={() => handleBlur('planned_mo')}
-      onkeydown={(e) => handleKeydown('planned_mo', e)}
-    />
+    <span class="cell-value">{fmt(planned)}</span>
   </td>
   <td class="amount-cell yearly planned-yr-cell">
-    <input
-      type="text"
-      inputmode="decimal"
-      class="cell-input"
-      class:cell-error={plannedYrError}
-      data-field="planned_yr"
-      aria-label="Planned per year for {entry.categoryName}"
-      bind:value={plannedYrValue}
-      onfocus={(e) => handleFocus('planned_yr', e)}
-      onblur={() => handleBlur('planned_yr')}
-      onkeydown={(e) => handleKeydown('planned_yr', e)}
-    />
+    <span class="cell-value">{fmt(planned * 12)}</span>
   </td>
 </tr>
 
@@ -328,36 +186,12 @@
     white-space: nowrap;
     padding: 0.25rem 0.35rem;
   }
-  .amount-cell.yearly .cell-input {
+  .amount-cell.yearly .cell-value {
     color: #888;
   }
-  .cell-input {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
+  .cell-value {
+    display: block;
     padding: 0.25rem 0.5rem;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    text-align: right;
-    font-size: inherit;
-    font-family: inherit;
-    font-variant-numeric: tabular-nums;
-    background: transparent;
-    color: inherit;
-    outline: none;
-    transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
-  }
-  .cell-input:hover {
-    border-color: #ddd;
-  }
-  .cell-input:focus {
-    border-color: #2d6a4f;
-    background: white;
-    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.15);
-  }
-  .cell-input.cell-error {
-    border-color: #c0392b;
-    background: #fdecea;
   }
 
   :global(.drag-ghost) {
@@ -380,8 +214,7 @@
     .entry-row td {
       padding: 0.4rem 0.5rem;
     }
-    .cell-input {
-      font-size: 16px;
+    .cell-value {
       padding: 0.2rem 0.35rem;
     }
     .amount-cell {

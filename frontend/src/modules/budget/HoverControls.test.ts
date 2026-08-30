@@ -163,7 +163,6 @@ describe('the controls are in the DOM the moment edit mode is on', () => {
     const { container } = render(BudgetEntryRow, {
       props: {
         entry: row('e1', 'Rent', 'g1', 'Housing'),
-        onsave: vi.fn(),
         ondelete: vi.fn(),
         onedit: vi.fn(),
       },

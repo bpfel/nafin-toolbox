@@ -33,7 +33,6 @@ function renderRow() {
   return render(BudgetEntryRow, {
     props: {
       entry: entry(),
-      onsave: vi.fn(),
       ondelete: vi.fn(),
       onedit: vi.fn(),
     },
@@ -60,16 +59,19 @@ describe('edit mode — the budget is read-only by default', () => {
     expect(screen.getByRole('button', { name: 'Rent' })).toBeTruthy()
   })
 
-  // The point of the split: entering figures is the everyday act and must never
-  // be behind a mode. Gating it would make the budget tiresome to actually use.
-  test('amount inputs are available in BOTH modes', () => {
+  // Amounts are not editable from the table in either mode. The category dialog
+  // is the only place a planned amount is set, so there is no second field
+  // writing the same value.
+  test('the table never offers an amount field', () => {
     const { unmount } = renderRow()
-    expect(document.querySelectorAll('input[data-field]').length).toBeGreaterThan(0)
+    expect(document.querySelectorAll('input').length).toBe(0)
+    expect(screen.getByText('1\u2019350.00')).toBeTruthy()
     unmount()
 
     toggleEditing('budget')
     renderRow()
-    expect(document.querySelectorAll('input[data-field]').length).toBeGreaterThan(0)
+    expect(document.querySelectorAll('input').length).toBe(0)
+    expect(screen.getByText('1\u2019350.00')).toBeTruthy()
   })
 })
 

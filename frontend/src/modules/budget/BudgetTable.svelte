@@ -240,7 +240,7 @@
         {/if}
         {#if !isCollapsed('income', group.groupName)}
           {#each group.entries as entry (entry.categoryId)}
-            <BudgetEntryRow {entry} {onsave} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
+            <BudgetEntryRow {entry} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
           {/each}
         {/if}
       </tbody>
@@ -298,7 +298,7 @@
         {/if}
         {#if !isCollapsed('expense', group.groupName)}
           {#each group.entries as entry (entry.categoryId)}
-            <BudgetEntryRow {entry} {onsave} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
+            <BudgetEntryRow {entry} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
           {/each}
         {/if}
       </tbody>
