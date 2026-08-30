@@ -55,12 +55,6 @@
     version++
   }
 
-  function updateLine(id: string, lineIndex: number, amount: string) {
-    engine.updateArchiveLine(vault, id, lineIndex, amount)
-    markDirty()
-    version++
-  }
-
   function confirmDelete() {
     if (!deleteTarget) return
     engine.deleteArchive(vault, deleteTarget.id)
@@ -160,7 +154,6 @@
                 <ArchiveEditor
                   {archive}
                   onrename={(name) => renameArchive(archive.id, name)}
-                  onamountchange={(lineIndex, amount) => updateLine(archive.id, lineIndex, amount)}
                 />
               {/if}
             </li>

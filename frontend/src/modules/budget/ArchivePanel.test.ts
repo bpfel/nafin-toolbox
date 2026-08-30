@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { cleanup, render, screen, within } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { VaultData } from '../../lib/crypto/vault'
@@ -13,6 +13,17 @@ vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
 import ArchivePanel from './ArchivePanel.svelte'
 
 afterEach(cleanup)
+
+/**
+ * The amount recorded against one archived category.
+ *
+ * Read out of its own row rather than by text: the same figure also appears in
+ * the totals, so a bare getByText would be ambiguous.
+ */
+function archivedAmount(categoryName: string): string {
+  const row = screen.getByText(categoryName).closest('tr')
+  return row?.querySelector('.line-amount')?.textContent?.trim() ?? ''
+}
 
 function makeVault(): VaultData {
   return {
@@ -85,14 +96,9 @@ describe('ArchivePanel — archiving the plan', () => {
     // flushes in a microtask. A synchronous query races that flush and fails
     // intermittently under parallel load — which it did, once, in a full run.
     expect(await screen.findByRole('button', { name: 'Before the raise' })).toBeTruthy()
-    const salary = await screen.findByLabelText(
-      'Planned per month for Salary in Before the raise',
-    ) as HTMLInputElement
-    const rent = await screen.findByLabelText(
-      'Planned per month for Rent in Before the raise',
-    ) as HTMLInputElement
-    expect(salary.value).toBe('6000.00')
-    expect(rent.value).toBe('1350.00')
+    expect(await screen.findByText('Salary')).toBeTruthy()
+    expect(archivedAmount('Salary')).toBe('6\u2019000.00')
+    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
 
     expect(vault.budget.archives).toHaveLength(1)
     expect(vault.budget.archives[0].lines).toEqual([
@@ -132,9 +138,8 @@ describe('ArchivePanel — archiving the plan', () => {
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    const rent = screen.getByLabelText('Planned per month for Rent in Q1') as HTMLInputElement
-    expect(rent.value).toBe('1350.00')
-    expect(screen.queryByLabelText(/Flat rent/)).toBeNull()
+    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
+    expect(screen.queryByText('Flat rent')).toBeNull()
   })
 
   test('deleting a category afterwards does not remove its archived line', async () => {
@@ -152,7 +157,7 @@ describe('ArchivePanel — archiving the plan', () => {
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    expect(screen.getByLabelText('Planned per month for Rent in Q1')).toBeTruthy()
+    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
   })
 })
 
@@ -193,7 +198,9 @@ describe('ArchivePanel — editing an archive', () => {
     expect(vault.budget.archives[0].name).toBe('Q1')
   })
 
-  test('edits an archived amount without changing the plan', async () => {
+  // An archive is a record of what was budgeted. Correcting it would be
+  // rewriting history, so the figures are text and the name is the only field.
+  test('an archived amount is a record, not a field', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
     render(ArchivePanel, { props: { vault } })
@@ -201,14 +208,13 @@ describe('ArchivePanel — editing an archive', () => {
     await openPanel(user)
     await createArchive(user, 'Q1')
 
-    const rent = screen.getByLabelText('Planned per month for Rent in Q1')
-    await user.clear(rent)
-    await user.type(rent, '1400')
-    await user.tab()
+    expect(archivedAmount('Rent')).toBe('1\u2019350.00')
 
-    expect(vault.budget.archives[0].lines[1].plannedAmount).toBe('1400.00')
-    // The plan is a separate record: correcting a snapshot must not rebudget today.
-    expect(engine.plannedFor(vault, 'rent')).toBe('1350.00')
+    // Scoped to the open archive: the panel also carries a field for naming a
+    // new one, which is not part of any archive.
+    const editor = within(document.querySelector('.editor') as HTMLElement)
+    expect(editor.getAllByRole('textbox')).toHaveLength(1)
+    expect(editor.getByLabelText('Name')).toBeTruthy()
   })
 })
 

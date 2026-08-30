@@ -290,27 +290,6 @@ export function renameArchive(vault: VaultData, id: string, name: string): void 
   if (archive) archive.name = trimmed
 }
 
-/**
- * Corrects one line of an archive in place.
- *
- * Editing an archive never touches the plan: the two are separate records, and
- * fixing a typo in last year's snapshot must not change what is budgeted today.
- * Lines are addressed by index because they have no ids — that is the price of
- * denormalisation, and it is paid here rather than by pointing at categories.
- */
-export function updateArchiveLine(
-  vault: VaultData,
-  archiveId: string,
-  lineIndex: number,
-  plannedAmount: string,
-): void {
-  const archive = vault.budget.archives.find(a => a.id === archiveId)
-  if (!archive) return
-  const line = archive.lines[lineIndex]
-  if (!line) return
-  line.plannedAmount = plannedAmount
-}
-
 export function deleteArchive(vault: VaultData, id: string): void {
   vault.budget.archives = vault.budget.archives.filter(a => a.id !== id)
 }

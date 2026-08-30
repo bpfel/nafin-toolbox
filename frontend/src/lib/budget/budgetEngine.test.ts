@@ -14,7 +14,6 @@ import {
   listArchives,
   archivePlan,
   renameArchive,
-  updateArchiveLine,
   deleteArchive,
   seedDefaults,
 } from './budgetEngine'
@@ -1009,58 +1008,6 @@ describe('renameArchive', () => {
 
     expect(() => renameArchive(vault, 'no-such-archive', 'Whatever')).not.toThrow()
     expect(archive.name).toBe('Only one')
-  })
-})
-
-describe('updateArchiveLine', () => {
-  function vaultWithArchive() {
-    const vault = createEmptyVault()
-    const salary = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
-    const rent = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
-    setPlanned(vault, salary.id, '6000.00')
-    setPlanned(vault, rent.id, '1350.00')
-    const archive = archivePlan(vault, 'Snapshot')
-    return { vault, archive, salary, rent }
-  }
-
-  test('edits the line in place', () => {
-    const { vault, archive } = vaultWithArchive()
-
-    updateArchiveLine(vault, archive.id, 1, '1400.00')
-
-    expect(archive.lines[1].plannedAmount).toBe('1400.00')
-    expect(archive.lines[1].categoryName).toBe('Rent')
-    expect(archive.lines[0].plannedAmount).toBe('6000.00')
-  })
-
-  test('never touches the live plan', () => {
-    const { vault, archive, salary, rent } = vaultWithArchive()
-    const planBefore = structuredClone(vault.budget.plan)
-
-    updateArchiveLine(vault, archive.id, 0, '1.00')
-    updateArchiveLine(vault, archive.id, 1, '2.00')
-
-    expect(vault.budget.plan).toEqual(planBefore)
-    expect(plannedFor(vault, salary.id)).toBe('6000.00')
-    expect(plannedFor(vault, rent.id)).toBe('1350.00')
-  })
-
-  test('leaves other archives alone', () => {
-    const { vault, archive } = vaultWithArchive()
-    const other = archivePlan(vault, 'Other')
-
-    updateArchiveLine(vault, archive.id, 0, '1.00')
-
-    expect(other.lines[0].plannedAmount).toBe('6000.00')
-  })
-
-  test('an unknown archive or an out-of-range line is a no-op', () => {
-    const { vault, archive } = vaultWithArchive()
-
-    expect(() => updateArchiveLine(vault, 'no-such-archive', 0, '1.00')).not.toThrow()
-    expect(() => updateArchiveLine(vault, archive.id, 99, '1.00')).not.toThrow()
-    expect(() => updateArchiveLine(vault, archive.id, -1, '1.00')).not.toThrow()
-    expect(archive.lines.map(l => l.plannedAmount)).toEqual(['6000.00', '1350.00'])
   })
 })
 
