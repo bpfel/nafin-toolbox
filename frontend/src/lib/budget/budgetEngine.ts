@@ -294,6 +294,21 @@ export function deleteArchive(vault: VaultData, id: string): void {
   vault.budget.archives = vault.budget.archives.filter(a => a.id !== id)
 }
 
+/**
+ * Empties the budget: every category, every group, and the plan itself.
+ *
+ * Archives are deliberately left standing. They are records of what was
+ * budgeted, denormalised down to names rather than references (see archivePlan),
+ * so nothing in them breaks when the categories they describe cease to exist —
+ * the same bargain deleteCategory already makes. A reset is for starting the
+ * plan over, not for erasing what the plan used to say.
+ */
+export function resetBudget(vault: VaultData): void {
+  vault.budget.categories = []
+  vault.budget.categoryGroups = []
+  vault.budget.plan = []
+}
+
 // --- Seed Defaults ---
 
 interface DefaultGroup {

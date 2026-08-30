@@ -14,6 +14,7 @@ import {
   listArchives,
   archivePlan,
   renameArchive,
+  resetBudget,
   deleteArchive,
   seedDefaults,
 } from './budgetEngine'
@@ -1220,5 +1221,58 @@ describe('createCategory routing defaults', () => {
     const category = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
 
     expect(category.sourceAccountId).toBe(vault.accounts[0].id)
+  })
+})
+
+describe('resetBudget', () => {
+  function vaultWithPlan() {
+    const vault = createEmptyVault()
+    const salary = createCategory(vault, { name: 'Salary', type: 'income', groupName: 'Employment' })
+    const rent = createCategory(vault, { name: 'Rent', type: 'expense', groupName: 'Housing' })
+    setPlanned(vault, salary.id, '6000.00')
+    setPlanned(vault, rent.id, '1350.00')
+    return { vault, salary, rent }
+  }
+
+  test('empties categories, groups and the plan', () => {
+    const { vault } = vaultWithPlan()
+
+    resetBudget(vault)
+
+    expect(vault.budget.categories).toEqual([])
+    expect(vault.budget.categoryGroups).toEqual([])
+    expect(vault.budget.plan).toEqual([])
+  })
+
+  // Archives hold names, not references, so they read the same after the
+  // categories they describe are gone. Resetting the plan is not erasing history.
+  test('leaves archives standing', () => {
+    const { vault } = vaultWithPlan()
+    const archive = archivePlan(vault, 'Before the reset')
+
+    resetBudget(vault)
+
+    expect(vault.budget.archives).toHaveLength(1)
+    expect(vault.budget.archives[0].name).toBe('Before the reset')
+    expect(archive.lines).toEqual([
+      { categoryName: 'Salary', groupName: 'Employment', type: 'income', plannedAmount: '6000.00' },
+      { categoryName: 'Rent', groupName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
+    ])
+  })
+
+  test('an already empty budget is unchanged', () => {
+    const vault = createEmptyVault()
+
+    expect(() => resetBudget(vault)).not.toThrow()
+    expect(vault.budget.categories).toEqual([])
+  })
+
+  test('the accounts module is none of its business', () => {
+    const { vault } = vaultWithPlan()
+    const accountsBefore = structuredClone(vault.accounts)
+
+    resetBudget(vault)
+
+    expect(vault.accounts).toEqual(accountsBefore)
   })
 })

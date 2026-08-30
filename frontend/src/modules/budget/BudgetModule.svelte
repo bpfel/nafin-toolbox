@@ -5,6 +5,8 @@
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
   import ArchivePanel from './ArchivePanel.svelte'
+  import ResetBudgetModal from './ResetBudgetModal.svelte'
+  import { isEditing } from '../../lib/util/editMode.svelte'
 
   const vaultState = getVaultState()
 
@@ -48,6 +50,18 @@
   function handleStartBlank() {
     dismissedSetup = true
   }
+
+  let confirmingReset = $state(false)
+
+  function handleReset() {
+    if (!vaultState.vault) return
+    engine.resetBudget(vaultState.vault)
+    // An empty budget is exactly the state the setup screen exists for, so the
+    // offer of the defaults comes back rather than leaving a blank table.
+    dismissedSetup = false
+    markDirty()
+    version++
+  }
 </script>
 
 <div class="budget-module">
@@ -56,6 +70,11 @@
   {:else if needsSetup}
     <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
   {:else if summary}
+    {#if isEditing('budget') && summary.entries.length > 0}
+      <div class="module-actions">
+        <button class="btn-reset" onclick={() => confirmingReset = true}>Reset budget</button>
+      </div>
+    {/if}
     {#if summary.entries.length > 0}
       <BudgetSummary {summary} />
     {/if}
@@ -67,6 +86,15 @@
       oncategorydeleted={handleCategoryChange}
     />
     <ArchivePanel vault={vaultState.vault} />
+
+    {#if confirmingReset}
+      <ResetBudgetModal
+        categoryCount={vaultState.vault.budget.categories.length}
+        archiveCount={vaultState.vault.budget.archives.length}
+        onreset={handleReset}
+        onclose={() => confirmingReset = false}
+      />
+    {/if}
   {/if}
 </div>
 
@@ -75,6 +103,25 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+  }
+  .module-actions {
+    display: flex;
+    justify-content: flex-end;
+    /* The module already spaces its children generously; the bar belongs to the
+       table below it rather than floating alone. */
+    margin-bottom: -1rem;
+  }
+  .btn-reset {
+    background: white;
+    color: #c0392b;
+    border: 1px solid #c0392b;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .btn-reset:hover {
+    background: #fdecea;
   }
   .loading {
     color: #888;
