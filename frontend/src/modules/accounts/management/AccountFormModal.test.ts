@@ -19,7 +19,7 @@ async function revealPaymentDetails(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('AccountFormModal — IBAN entry', () => {
-  test('groups the IBAN into blocks of four as it is typed', async () => {
+  test('categories the IBAN into blocks of four as it is typed', async () => {
     const user = userEvent.setup()
     open()
     await revealPaymentDetails(user)
@@ -30,7 +30,7 @@ describe('AccountFormModal — IBAN entry', () => {
     expect(field.value).toBe('CH93 0076 2011 6238 5295 7')
   })
 
-  test('groups a pasted IBAN that already contains its own spacing', async () => {
+  test('categories a pasted IBAN that already contains its own spacing', async () => {
     const user = userEvent.setup()
     open()
     await revealPaymentDetails(user)

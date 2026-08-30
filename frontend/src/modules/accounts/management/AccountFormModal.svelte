@@ -57,8 +57,8 @@
 
   let ibanState = $derived(ibanStatus(iban))
 
-  // Regroup as the user types. The caret is kept at the end rather than preserved
-  // mid-string: reflowing groups makes an exact caret restore fiddly, and IBANs are
+  // Recategory as the user types. The caret is kept at the end rather than preserved
+  // mid-string: reflowing categories makes an exact caret restore fiddly, and IBANs are
   // overwhelmingly pasted or typed straight through rather than edited in the middle.
   function onIbanInput(event: Event) {
     const input = event.currentTarget as HTMLInputElement

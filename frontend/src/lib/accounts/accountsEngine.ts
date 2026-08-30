@@ -2,7 +2,7 @@ import type { VaultAccount, VaultData } from '../crypto/vault'
 
 // CRUD over the account list, with one rule the rest of the module leans on:
 // the vault always holds at least one account. Every other invariant here —
-// no unrouted category, no orphan reassignment target — follows from it.
+// no unrouted entry, no orphan reassignment target — follows from it.
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
@@ -31,7 +31,7 @@ export function renameAccount(vault: VaultData, id: string, name: string): void 
   account.name = name
 }
 
-// Deleting an account moves every category that referenced it onto
+// Deleting an account moves every entry that referenced it onto
 // `reassignToId`. Reassignment only ever substitutes one id for another; it
 // never turns an endpoint null or non-null, and legality is decided purely by
 // which endpoints are null. So a legal routing stays legal — including
@@ -48,13 +48,13 @@ export function deleteAccount(vault: VaultData, id: string, reassignToId: string
   }
 
   if (reassignToId === id) {
-    throw new Error(`cannot reassign the categories of account ${id} to the account being deleted`)
+    throw new Error(`cannot reassign the entries of account ${id} to the account being deleted`)
   }
   findAccount(vault, reassignToId, 'reassignment target')
 
-  for (const category of vault.budget.categories) {
-    if (category.sourceAccountId === id) category.sourceAccountId = reassignToId
-    if (category.sinkAccountId === id) category.sinkAccountId = reassignToId
+  for (const entry of vault.budget.entries) {
+    if (entry.sourceAccountId === id) entry.sourceAccountId = reassignToId
+    if (entry.sinkAccountId === id) entry.sinkAccountId = reassignToId
   }
 
   vault.accounts = vault.accounts.filter(a => a.id !== id)

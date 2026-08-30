@@ -2,16 +2,16 @@
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
-    categoryId: string
-    categoryName: string
-    ondeleted: () => void
+    entryCount: number
+    archiveCount: number
+    onreset: () => void
     onclose: () => void
   }
 
-  let { categoryId, categoryName, ondeleted, onclose }: Props = $props()
+  let { entryCount, archiveCount, onreset, onclose }: Props = $props()
 
   function confirm() {
-    ondeleted()
+    onreset()
     onclose()
   }
 
@@ -27,15 +27,31 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Delete category" use:focusTrap>
-    <h3>Delete category</h3>
-    <p>Remove <strong>{categoryName}</strong> from your budget? This deletes it from all periods.</p>
+  <div class="modal" role="dialog" aria-label="Reset budget" use:focusTrap>
+    <h3>Reset budget</h3>
+    <p>
+      This removes all {entryCount}
+      {entryCount === 1 ? 'entry' : 'entries'}, their categories and every
+      planned amount. You start again from an empty budget.
+    </p>
+
+    <!-- Whether anything survives this depends entirely on whether the user ever
+         archived, and they should not have to remember which. -->
+    {#if archiveCount > 0}
+      <p class="kept">
+        Your {archiveCount} {archiveCount === 1 ? 'archive is' : 'archives are'} records
+        of what was budgeted and {archiveCount === 1 ? 'is' : 'are'} kept.
+      </p>
+    {:else}
+      <p class="warning">
+        Nothing is archived, so no record of this plan will remain. Cancel and
+        archive it first if you want to keep one.
+      </p>
+    {/if}
 
     <div class="actions">
       <button class="btn cancel" onclick={onclose}>Cancel</button>
-      <button class="btn delete" onclick={confirm}>
-        Delete
-      </button>
+      <button class="btn delete" onclick={confirm}>Reset budget</button>
     </div>
   </div>
 </div>
@@ -56,7 +72,9 @@
     border-radius: 12px;
     padding: 1.5rem;
     width: 100%;
-    max-width: 400px;
+    max-width: 440px;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
   }
   h3 {
@@ -67,6 +85,22 @@
     margin: 0 0 1rem;
     color: #555;
     line-height: 1.4;
+  }
+  .kept {
+    font-size: 0.85rem;
+    color: #2d6a4f;
+    background: #f0fdf4;
+    border: 1px solid #cfe9d9;
+    border-radius: 6px;
+    padding: 0.75rem;
+  }
+  .warning {
+    font-size: 0.85rem;
+    color: #6b5518;
+    background: #fff8e6;
+    border: 1px solid #f0e0b0;
+    border-radius: 6px;
+    padding: 0.75rem;
   }
   .actions {
     display: flex;
@@ -84,7 +118,7 @@
     border: 1px solid #dee2e6;
     color: #333;
   }
-  .cancel:hover:not(:disabled) {
+  .cancel:hover {
     background: #e9ecef;
   }
   .delete {
@@ -92,7 +126,7 @@
     border: none;
     color: white;
   }
-  .delete:hover:not(:disabled) {
+  .delete:hover {
     background: #a93226;
   }
 

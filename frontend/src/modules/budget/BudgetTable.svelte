@@ -5,13 +5,14 @@
   import type { VaultData } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
-  import AddCategoryRow from './AddCategoryRow.svelte'
-  import AddCategoryModal from './AddCategoryModal.svelte'
-  import DeleteCategoryModal from './DeleteCategoryModal.svelte'
+  import AddEntryRow from './AddEntryRow.svelte'
+  import AddEntryModal from './AddEntryModal.svelte'
+  import DeleteEntryModal from './DeleteEntryModal.svelte'
+  import EditCategoryModal from './EditCategoryModal.svelte'
 
-  interface EntryGroup {
-    groupName: string
-    groupId: string
+  interface EntryCategory {
+    categoryName: string
+    categoryId: string
     entries: PlanEntryView[]
     plannedTotal: number
   }
@@ -19,46 +20,59 @@
   interface Props {
     entries: PlanEntryView[]
     vault: VaultData
-    onsave: (categoryId: string, amount: string) => void
-    oncategorycreated: () => void
-    oncategorydeleted: () => void
+    onsave: (entryId: string, amount: string) => void
+    onentrycreated: () => void
+    onentrydeleted: () => void
+    oncategorychanged: () => void
   }
 
-  let { entries, vault, onsave, oncategorycreated, oncategorydeleted }: Props = $props()
+  let { entries, vault, onsave, onentrycreated, onentrydeleted, oncategorychanged }: Props = $props()
 
   // Structural affordances — dragging, adding, deleting — appear only in edit
   // mode. Reading the plan and typing amounts stay available always.
   let editing = $derived(isEditing('budget'))
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; groups: { name: string; id: string }[]; presetGroupName?: string; editCategory?: { id: string; name: string; groupName: string; plannedAmount: string } } | null>(null)
-  let deleteModalContext = $state<{ categoryId: string; categoryName: string } | null>(null)
+  let addModalContext = $state<{ type: 'income' | 'expense'; categories: { name: string; id: string }[]; presetCategoryName?: string; editEntry?: { id: string; name: string; categoryName: string; plannedAmount: string } } | null>(null)
+  let deleteModalContext = $state<{ entryId: string; entryName: string } | null>(null)
+  let editCategoryId = $state<string | null>(null)
+
+  let editCategory = $derived(
+    editCategoryId ? vault.budget.categories.find(g => g.id === editCategoryId) ?? null : null,
+  )
+
+  // The header row toggles collapse on click, so the name has to stop the event
+  // reaching it — same reason the "+" and the drag handle do.
+  function openCategoryEditor(event: MouseEvent, categoryId: string) {
+    event.stopPropagation()
+    editCategoryId = categoryId
+  }
 
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
-  let collapsedGroups = $state(new Set<string>())
+  let collapsedCategories = $state(new Set<string>())
 
-  function toggleGroup(type: 'income' | 'expense', groupName: string) {
-    const key = `${type}:${groupName}`
-    const next = new Set(collapsedGroups)
+  function toggleCategory(type: 'income' | 'expense', categoryName: string) {
+    const key = `${type}:${categoryName}`
+    const next = new Set(collapsedCategories)
     if (next.has(key)) next.delete(key)
     else next.add(key)
-    collapsedGroups = next
+    collapsedCategories = next
   }
 
-  function isCollapsed(type: 'income' | 'expense', groupName: string): boolean {
-    return collapsedGroups.has(`${type}:${groupName}`)
+  function isCollapsed(type: 'income' | 'expense', categoryName: string): boolean {
+    return collapsedCategories.has(`${type}:${categoryName}`)
   }
 
-  let incomeEntries = $derived(entries.filter(e => e.categoryType === 'income'))
-  let expenseEntries = $derived(entries.filter(e => e.categoryType === 'expense'))
+  let incomeEntries = $derived(entries.filter(e => e.entryType === 'income'))
+  let expenseEntries = $derived(entries.filter(e => e.entryType === 'expense'))
 
-  function groupEntries(list: PlanEntryView[]): EntryGroup[] {
-    const map = new Map<string, EntryGroup>()
+  function categoryEntries(list: PlanEntryView[]): EntryCategory[] {
+    const map = new Map<string, EntryCategory>()
     for (const e of list) {
-      const key = e.categoryGroupName || ''
+      const key = e.categoryName || ''
       if (!map.has(key)) {
         map.set(key, {
-          groupName: key,
-          groupId: e.categoryGroupId,
+          categoryName: key,
+          categoryId: e.categoryId,
           entries: [],
           plannedTotal: 0,
         })
@@ -67,50 +81,60 @@
       g.entries.push(e)
       g.plannedTotal += Number(e.plannedAmount)
     }
-    // Order by the group's own sortOrder. This used to be inferred from wherever
-    // each group's first category landed in the category sort, which meant
-    // dragging a category could silently reshuffle whole groups.
-    return Array.from(map.values()).sort((a, b) => groupOrder(a.groupId) - groupOrder(b.groupId))
+    // Order by the category's own sortOrder. This used to be inferred from wherever
+    // each category's first entry landed in the entry sort, which meant
+    // dragging an entry could silently reshuffle whole categories.
+    return Array.from(map.values()).sort((a, b) => categoryOrder(a.categoryId) - categoryOrder(b.categoryId))
   }
 
-  function groupOrder(groupId: string): number {
-    return vault.budget.categoryGroups.find(g => g.id === groupId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
+  function categoryOrder(categoryId: string): number {
+    return vault.budget.categories.find(g => g.id === categoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
   }
 
-  let incomeGroups = $derived(groupEntries(incomeEntries))
-  let expenseGroups = $derived(groupEntries(expenseEntries))
+  let incomeCategories = $derived(categoryEntries(incomeEntries))
+  let expenseCategories = $derived(categoryEntries(expenseEntries))
 
-  function groupsForType(type: 'income' | 'expense'): { name: string; id: string }[] {
-    const groups = type === 'income' ? incomeGroups : expenseGroups
-    return groups.map(g => ({ name: g.groupName, id: g.groupId }))
+  function categoriesForType(type: 'income' | 'expense'): { name: string; id: string }[] {
+    const categories = type === 'income' ? incomeCategories : expenseCategories
+    return categories.map(g => ({ name: g.categoryName, id: g.categoryId }))
   }
 
-  function openAddModal(type: 'income' | 'expense', presetGroupName?: string) {
-    addModalContext = { type, groups: groupsForType(type), presetGroupName }
+  function openAddModal(type: 'income' | 'expense', presetCategoryName?: string) {
+    addModalContext = { type, categories: categoriesForType(type), presetCategoryName }
   }
 
-  // The group header toggles collapse on click, so the "+" has to stop the event
-  // reaching it — otherwise adding to a group also folds it away underneath you.
-  function addToGroup(event: MouseEvent, type: 'income' | 'expense', groupName: string) {
+  // The category header toggles collapse on click, so the "+" has to stop the event
+  // reaching it — otherwise adding to a category also folds it away underneath you.
+  function addToCategory(event: MouseEvent, type: 'income' | 'expense', categoryName: string) {
     event.stopPropagation()
-    openAddModal(type, groupName)
+    openAddModal(type, categoryName)
   }
 
-  function openEditModal(categoryId: string, categoryName: string, categoryType: 'income' | 'expense', groupName: string, plannedAmount: string) {
-    addModalContext = { type: categoryType, groups: groupsForType(categoryType), editCategory: { id: categoryId, name: categoryName, groupName, plannedAmount } }
+  function openEditModal(entryId: string, entryName: string, entryType: 'income' | 'expense', categoryName: string, plannedAmount: string) {
+    addModalContext = { type: entryType, categories: categoriesForType(entryType), editEntry: { id: entryId, name: entryName, categoryName, plannedAmount } }
   }
 
-  function openDeleteModal(categoryId: string, categoryName: string) {
-    deleteModalContext = { categoryId, categoryName }
+  function openDeleteModal(entryId: string, entryName: string) {
+    deleteModalContext = { entryId, entryName }
   }
 
-  function handleCategoryCreated() {
-    oncategorycreated()
+  // Delete from inside the edit dialog: close it and hand over to the same
+  // confirmation the row's trash button opens, so there is one place an entry
+  // is actually deleted rather than two.
+  function deleteFromEditor() {
+    const editing = addModalContext?.editEntry
+    if (!editing) return
+    addModalContext = null
+    openDeleteModal(editing.id, editing.name)
   }
 
-  function handleCategoryDeleted(categoryId: string) {
-    engine.deleteCategory(vault, categoryId)
-    oncategorydeleted()
+  function handleEntryCreated() {
+    onentrycreated()
+  }
+
+  function handleEntryDeleted(entryId: string) {
+    engine.deleteEntry(vault, entryId)
+    onentrydeleted()
   }
 
   // Hiding a handle removes the affordance but leaves the Sortable instance live,
@@ -142,36 +166,36 @@
       animation: 150,
       handle: '.drag-handle',
       draggable: '.entry-row',
-      filter: '.group-header, .add-row',
+      filter: '.category-header, .add-row',
       ghostClass: 'drag-ghost',
       onEnd() {
         const rows = node.querySelectorAll('.entry-row')
-        const ids = Array.from(rows).map(r => (r as HTMLElement).dataset.categoryId!).filter(Boolean)
+        const ids = Array.from(rows).map(r => (r as HTMLElement).dataset.entryId!).filter(Boolean)
         if (ids.length > 0) {
-          engine.reorderCategories(vault, ids)
-          oncategorycreated()
+          engine.reorderEntries(vault, ids)
+          onentrycreated()
         }
       },
     })
     return register(instance)
   }
 
-  // Groups are <tbody> elements, so the sortable lives on the <table> and drags
-  // whole tbodies. Separate from the per-group `sortable` above, which drags rows
-  // within one group.
-  function groupSortable(node: HTMLElement) {
+  // Categories are <tbody> elements, so the sortable lives on the <table> and drags
+  // whole tbodies. Separate from the per-category `sortable` above, which drags rows
+  // within one category.
+  function categorySortable(node: HTMLElement) {
     const instance = Sortable.create(node, {
       animation: 150,
-      handle: '.group-drag-handle',
+      handle: '.category-drag-handle',
       draggable: 'tbody',
       ghostClass: 'drag-ghost',
       onEnd() {
         const ids = Array.from(node.querySelectorAll('tbody'))
-          .map(b => (b as HTMLElement).dataset.groupId)
+          .map(b => (b as HTMLElement).dataset.categoryId)
           .filter((id): id is string => Boolean(id))
         if (ids.length > 0) {
-          engine.reorderGroups(vault, ids)
-          oncategorycreated()
+          engine.reorderCategories(vault, ids)
+          onentrycreated()
         }
       },
     })
@@ -194,7 +218,7 @@
     </button>
   </div>
 
-  <table use:groupSortable>
+  <table use:categorySortable>
     <thead>
       <tr>
         <th class="col-name">Income</th>
@@ -202,57 +226,65 @@
         <th class="right col-amount col-planned-yr">Planned/yr</th>
       </tr>
     </thead>
-    {#each incomeGroups as group (group.groupName)}
-      <tbody use:sortable data-group-id={group.groupId}>
-        {#if incomeGroups.length > 1}
-          <tr class="group-header" class:editing class:collapsed={isCollapsed('income', group.groupName)} onclick={() => toggleGroup('income', group.groupName)}>
+    {#each incomeCategories as category (category.categoryId)}
+      <tbody use:sortable data-category-id={category.categoryId}>
+        {#if incomeCategories.length > 1 || editing}
+          <tr class="category-header" class:editing class:collapsed={isCollapsed('income', category.categoryName)} onclick={() => toggleCategory('income', category.categoryName)}>
             <td>
               {#if editing}
                 <span
-                  class="group-drag-handle"
+                  class="category-drag-handle"
                   title="Drag to reorder"
                   role="presentation"
                   onclick={(e) => e.stopPropagation()}
                 >⠿</span>
               {/if}
-              <span class="group-chevron">
+              <span class="category-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  {#if isCollapsed('income', group.groupName)}
+                  {#if isCollapsed('income', category.categoryName)}
                     <path d="M4 2 L10 6 L4 10 Z" />
                   {:else}
                     <path d="M2 4 L6 10 L10 4 Z" />
                   {/if}
                 </svg>
               </span>
-              <span class="group-name">{group.groupName || 'Other'}</span>
               {#if editing}
                 <button
-                  class="group-add"
-                  title="Add a category to {group.groupName || 'Other'}"
-                  aria-label="Add a category to {group.groupName || 'Other'}"
-                  onclick={(e) => addToGroup(e, 'income', group.groupName)}
+                  class="category-name category-name-btn"
+                  aria-label="Edit category {category.categoryName || 'Other'}"
+                  onclick={(e) => openCategoryEditor(e, category.categoryId)}
+                >{category.categoryName || 'Other'}</button>
+              {:else}
+                <span class="category-name">{category.categoryName || 'Other'}</span>
+              {/if}
+              {#if editing}
+                <button
+                  class="category-add"
+                  title="Add an entry to {category.categoryName || 'Other'}"
+                  aria-label="Add an entry to {category.categoryName || 'Other'}"
+                  onclick={(e) => addToCategory(e, 'income', category.categoryName)}
                 >+</button>
               {/if}
             </td>
-            <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
-            <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
+            <td class="right subtotal col-planned-mo">{fmt(category.plannedTotal)}</td>
+            <td class="right subtotal yearly col-planned-yr">{fmt(category.plannedTotal * 12)}</td>
           </tr>
         {/if}
-        {#if !isCollapsed('income', group.groupName)}
-          {#each group.entries as entry (entry.categoryId)}
-            <BudgetEntryRow {entry} {onsave} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
+        {#if !isCollapsed('income', category.categoryName)}
+          {#each category.entries as entry (entry.entryId)}
+            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
           {/each}
         {/if}
       </tbody>
     {/each}
     <tfoot>
       {#if editing}
-        <AddCategoryRow onadd={() => openAddModal('income')} />
+        <AddEntryRow onadd={() => openAddModal('income')} />
       {/if}
     </tfoot>
   </table>
 
-  <table use:groupSortable>
+  <table use:categorySortable>
     <thead>
       <tr>
         <th class="col-name">Expenses</th>
@@ -260,76 +292,94 @@
         <th class="right col-amount col-planned-yr">Planned/yr</th>
       </tr>
     </thead>
-    {#each expenseGroups as group (group.groupName)}
-      <tbody use:sortable data-group-id={group.groupId}>
-        {#if expenseGroups.length > 1}
-          <tr class="group-header" class:editing class:collapsed={isCollapsed('expense', group.groupName)} onclick={() => toggleGroup('expense', group.groupName)}>
+    {#each expenseCategories as category (category.categoryId)}
+      <tbody use:sortable data-category-id={category.categoryId}>
+        {#if expenseCategories.length > 1 || editing}
+          <tr class="category-header" class:editing class:collapsed={isCollapsed('expense', category.categoryName)} onclick={() => toggleCategory('expense', category.categoryName)}>
             <td>
               {#if editing}
                 <span
-                  class="group-drag-handle"
+                  class="category-drag-handle"
                   title="Drag to reorder"
                   role="presentation"
                   onclick={(e) => e.stopPropagation()}
                 >⠿</span>
               {/if}
-              <span class="group-chevron">
+              <span class="category-chevron">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  {#if isCollapsed('expense', group.groupName)}
+                  {#if isCollapsed('expense', category.categoryName)}
                     <path d="M4 2 L10 6 L4 10 Z" />
                   {:else}
                     <path d="M2 4 L6 10 L10 4 Z" />
                   {/if}
                 </svg>
               </span>
-              <span class="group-name">{group.groupName || 'Other'}</span>
               {#if editing}
                 <button
-                  class="group-add"
-                  title="Add a category to {group.groupName || 'Other'}"
-                  aria-label="Add a category to {group.groupName || 'Other'}"
-                  onclick={(e) => addToGroup(e, 'expense', group.groupName)}
+                  class="category-name category-name-btn"
+                  aria-label="Edit category {category.categoryName || 'Other'}"
+                  onclick={(e) => openCategoryEditor(e, category.categoryId)}
+                >{category.categoryName || 'Other'}</button>
+              {:else}
+                <span class="category-name">{category.categoryName || 'Other'}</span>
+              {/if}
+              {#if editing}
+                <button
+                  class="category-add"
+                  title="Add an entry to {category.categoryName || 'Other'}"
+                  aria-label="Add an entry to {category.categoryName || 'Other'}"
+                  onclick={(e) => addToCategory(e, 'expense', category.categoryName)}
                 >+</button>
               {/if}
             </td>
-            <td class="right subtotal col-planned-mo">{fmt(group.plannedTotal)}</td>
-            <td class="right subtotal yearly col-planned-yr">{fmt(group.plannedTotal * 12)}</td>
+            <td class="right subtotal col-planned-mo">{fmt(category.plannedTotal)}</td>
+            <td class="right subtotal yearly col-planned-yr">{fmt(category.plannedTotal * 12)}</td>
           </tr>
         {/if}
-        {#if !isCollapsed('expense', group.groupName)}
-          {#each group.entries as entry (entry.categoryId)}
-            <BudgetEntryRow {entry} {onsave} {viewMode} ondelete={openDeleteModal} onedit={openEditModal} />
+        {#if !isCollapsed('expense', category.categoryName)}
+          {#each category.entries as entry (entry.entryId)}
+            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
           {/each}
         {/if}
       </tbody>
     {/each}
     <tfoot>
       {#if editing}
-        <AddCategoryRow onadd={() => openAddModal('expense')} />
+        <AddEntryRow onadd={() => openAddModal('expense')} />
       {/if}
     </tfoot>
   </table>
 </div>
 
 {#if addModalContext}
-  <AddCategoryModal
+  <AddEntryModal
     type={addModalContext.type}
-    groups={addModalContext.groups}
-    editCategory={addModalContext.editCategory}
-    presetGroupName={addModalContext.presetGroupName}
+    categories={addModalContext.categories}
+    editEntry={addModalContext.editEntry}
+    presetCategoryName={addModalContext.presetCategoryName}
     {vault}
-    oncreated={handleCategoryCreated}
+    oncreated={handleEntryCreated}
     onclose={() => addModalContext = null}
     {onsave}
+    ondelete={deleteFromEditor}
   />
 {/if}
 
 {#if deleteModalContext}
-  <DeleteCategoryModal
-    categoryId={deleteModalContext.categoryId}
-    categoryName={deleteModalContext.categoryName}
-    ondeleted={() => handleCategoryDeleted(deleteModalContext!.categoryId)}
+  <DeleteEntryModal
+    entryId={deleteModalContext.entryId}
+    entryName={deleteModalContext.entryName}
+    ondeleted={() => handleEntryDeleted(deleteModalContext!.entryId)}
     onclose={() => deleteModalContext = null}
+  />
+{/if}
+
+{#if editCategory}
+  <EditCategoryModal
+    category={editCategory}
+    {vault}
+    onsaved={oncategorychanged}
+    onclose={() => editCategoryId = null}
   />
 {/if}
 
@@ -367,11 +417,11 @@
   th.right {
     text-align: right;
   }
-  :global(.group-header) {
+  :global(.category-header) {
     cursor: pointer;
     user-select: none;
   }
-  :global(.group-header) td {
+  :global(.category-header) td {
     padding: 0.5rem 0.75rem;
     background: #f1f3f5;
     font-weight: 600;
@@ -379,14 +429,14 @@
     color: #495057;
     border-bottom: 1px solid #dee2e6;
   }
-  :global(.group-header.collapsed) td {
+  :global(.category-header.collapsed) td {
     border-bottom: 2px solid #ced4da;
   }
-  :global(.group-header) .subtotal {
+  :global(.category-header) .subtotal {
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
-  :global(.group-header) .yearly {
+  :global(.category-header) .yearly {
     color: #888;
   }
   /* These two exist only inside edit mode — outside it they are not rendered at
@@ -394,7 +444,7 @@
      cost: on a touchscreen there is no hover, so the controls edit mode just
      unlocked were invisible. Visible whenever they exist; hover only shifts
      the colour. */
-  .group-drag-handle {
+  .category-drag-handle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -404,13 +454,13 @@
     transition: color 0.12s;
     user-select: none;
   }
-  .group-drag-handle:hover {
+  .category-drag-handle:hover {
     color: #495057;
   }
-  .group-drag-handle:active {
+  .category-drag-handle:active {
     cursor: grabbing;
   }
-  .group-add {
+  .category-add {
     background: none;
     border: none;
     color: #868e96;
@@ -421,30 +471,45 @@
     margin-left: 0.2rem;
     transition: color 0.12s;
   }
-  .group-add:hover {
+  .category-add:hover {
     color: #2d6a4f;
   }
-  .group-add:focus-visible {
+  .category-add:focus-visible {
     outline: 2px solid #2d6a4f;
     outline-offset: 2px;
     border-radius: 4px;
     color: #2d6a4f;
   }
+  /* Marked like the entry name, because it opens the same kind of dialog. */
+  .category-name-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  .category-name-btn:hover {
+    text-decoration: underline;
+    text-decoration-color: #aaa;
+    text-underline-offset: 2px;
+  }
   /* table-layout is fixed, so the name column cannot borrow slack from the
      amount columns. Without this a name like "Abgaben und Versicherungen"
      wraps and doubles the row height. Entry names already behave this way. */
-  .group-name {
+  .category-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
   }
-  :global(.group-header) td:first-child {
+  :global(.category-header) td:first-child {
     display: flex;
     align-items: center;
     gap: 0.1rem;
   }
-  .group-chevron {
+  .category-chevron {
     display: inline-flex;
     align-items: center;
     margin-right: 0.35rem;
@@ -453,13 +518,13 @@
     vertical-align: middle;
     color: #868e96;
   }
-  /* The chevron is not an edit-mode control — it collapses the group in either
+  /* The chevron is not an edit-mode control — it collapses the category in either
      mode — so outside edit mode it keeps the hover-reveal and relies on the
      coarse-pointer rule below. Inside edit mode it sits between two now-permanent
      controls, and a gap that fills in on hover would only look like a glitch. */
-  :global(.group-header:hover) .group-chevron,
-  :global(.group-header.editing) .group-chevron,
-  :global(.group-header.collapsed) .group-chevron {
+  :global(.category-header:hover) .category-chevron,
+  :global(.category-header.editing) .category-chevron,
+  :global(.category-header.collapsed) .category-chevron {
     opacity: 1;
   }
 
@@ -485,14 +550,14 @@
   }
 
   @media (hover: none) and (pointer: coarse) {
-    .group-chevron {
+    .category-chevron {
       opacity: 1;
     }
     /* Both glyphs are about 14px across — visible, but a fingertip needs more
        than that. Widen the hit area, not the glyph. Keyed on the pointer rather
        than the viewport: a wide touchscreen has the same fingers. */
-    .group-drag-handle,
-    .group-add {
+    .category-drag-handle,
+    .category-add {
       min-width: 32px;
       min-height: 32px;
       margin: 0;
@@ -545,7 +610,7 @@
     :global(.view-yearly .col-planned-yr) {
       display: table-cell;
     }
-    :global(.group-header) td {
+    :global(.category-header) td {
       padding: 0.4rem 0.5rem;
     }
   }

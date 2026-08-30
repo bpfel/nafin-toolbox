@@ -15,7 +15,7 @@ function open(overrides: Record<string, unknown> = {}) {
   const onclose = vi.fn()
   render(PurchaseDialog, {
     props: {
-      categoryName: 'Laptop',
+      entryName: 'Laptop',
       reserve: RESERVE,
       accountName: 'Reserves',
       available: '500.00',

@@ -180,10 +180,10 @@ func TestRoutes_RegistersAllEndpoints(t *testing.T) {
 
 func TestEnableRequest_JSONDecoding(t *testing.T) {
 	tests := []struct {
-		name     string
-		json     string
-		wantID   string
-		wantErr  bool
+		name    string
+		json    string
+		wantID  string
+		wantErr bool
 	}{
 		{
 			name:    "valid budget",

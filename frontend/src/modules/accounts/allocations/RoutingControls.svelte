@@ -4,7 +4,7 @@
   import { accountLabel } from '../../../lib/accounts/labels'
 
   // Routing controls shaped so the four contradictory combinations cannot be
-  // expressed. The category's own `type` selects the shape of the control:
+  // expressed. The entry's own `type` selects the shape of the control:
   //
   //   income  — one question, "where does this land?". The source is always
   //             external, so no source picker is ever rendered.
@@ -21,7 +21,7 @@
   }
 
   interface Props {
-    // Distinguishes this control's radio group from every other row's.
+    // Distinguishes this control's radio category from every other row's.
     fieldId: string
     type: 'income' | 'expense'
     sourceAccountId: string | null

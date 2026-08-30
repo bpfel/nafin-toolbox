@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ReserveDefinition, VaultAccount, VaultCategory } from '../../../lib/crypto/vault'
+  import type { ReserveDefinition, VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { flowKindOf } from '../../../lib/accounts/routing'
   import { accountShortLabel } from '../../../lib/accounts/labels'
   import {
@@ -20,7 +20,7 @@
   }
 
   interface Props {
-    category: VaultCategory
+    entry: VaultEntry
     plannedAmount: string
     accounts: VaultAccount[]
     currentMonth: string
@@ -34,7 +34,7 @@
   }
 
   let {
-    category,
+    entry,
     plannedAmount,
     accounts,
     currentMonth,
@@ -87,23 +87,23 @@
     return account ? accountShortLabel(account) : 'a deleted account'
   }
 
-  // A category with no endpoints at all is a broken record rather than a flow.
+  // An entry with no endpoints at all is a broken record rather than a flow.
   // Show it as needing attention instead of letting the classifier throw.
   let kind = $derived.by(() => {
     try {
-      return flowKindOf(category)
+      return flowKindOf(entry)
     } catch {
       return null
     }
   })
 
-  let isSetAside = $derived(category.type === 'expense' && category.sinkAccountId !== null)
+  let isSetAside = $derived(entry.type === 'expense' && entry.sinkAccountId !== null)
 
   // A set-aside with no reserve behind it is plain savings — money kept for
   // nothing in particular. Worth naming differently from a targeted set-aside,
   // since the two behave differently: only the targeted one accrues a required
   // amount against its account.
-  let isPlainSavings = $derived(kind === 'setaside' && !category.reserve)
+  let isPlainSavings = $derived(kind === 'setaside' && !entry.reserve)
 
   let kindLabel = $derived(
     kind === 'income'
@@ -122,19 +122,19 @@
   let flowSummary = $derived.by(() => {
     switch (kind) {
       case 'income':
-        return `From outside → ${accountName(category.sinkAccountId)}`
+        return `From outside → ${accountName(entry.sinkAccountId)}`
       case 'spending':
-        return `${accountName(category.sourceAccountId)} → leaves your accounts`
+        return `${accountName(entry.sourceAccountId)} → leaves your accounts`
       case 'setaside':
-        return category.sourceAccountId === category.sinkAccountId
-          ? `Stays in ${accountName(category.sourceAccountId)}, set aside`
-          : `${accountName(category.sourceAccountId)} → ${accountName(category.sinkAccountId)}`
+        return entry.sourceAccountId === entry.sinkAccountId
+          ? `Stays in ${accountName(entry.sourceAccountId)}, set aside`
+          : `${accountName(entry.sourceAccountId)} → ${accountName(entry.sinkAccountId)}`
       default:
         return 'No routing — pick where this money comes from'
     }
   })
 
-  let reserve = $derived(category.reserve)
+  let reserve = $derived(entry.reserve)
 
   let requiredNow = $derived.by(() => {
     if (!reserve) return null
@@ -197,7 +197,7 @@
 <div class="allocation-row" class:unrouted={kind === null}>
   <div class="row-head">
     <div class="identity">
-      <span class="name">{category.name}</span>
+      <span class="name">{entry.name}</span>
       <span class="kind kind-{kindClass}">{kindLabel}</span>
     </div>
     <span class="planned">{money(plannedAmount)}</span>
@@ -247,10 +247,10 @@
       {#if showEditor}
         <div class="editor">
           <RoutingControls
-            fieldId={category.id}
-            type={category.type}
-            sourceAccountId={category.sourceAccountId}
-            sinkAccountId={category.sinkAccountId}
+            fieldId={entry.id}
+            type={entry.type}
+            sourceAccountId={entry.sourceAccountId}
+            sinkAccountId={entry.sinkAccountId}
             {accounts}
             onchange={onroutingchange}
           />

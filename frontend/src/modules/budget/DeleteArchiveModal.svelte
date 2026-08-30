@@ -33,7 +33,7 @@
       Delete <strong>{archiveName}</strong> and its {lineCount}
       {lineCount === 1 ? 'line' : 'lines'}?
     </p>
-    <!-- An archive is the only copy of the plan as it stood: the categories it
+    <!-- An archive is the only copy of the plan as it stood: the entries it
          names may since have been renamed or deleted, so nothing can rebuild it. -->
     <p class="warning">This snapshot cannot be recovered.</p>
 

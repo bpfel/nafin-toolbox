@@ -79,8 +79,8 @@
 - [ ] How the migration runner tracks which migrations have run
 
 **Quiz:**
-1. Why does `budget_entries` have a foreign key to both `budget_categories` AND `budget_periods`?
-2. What would happen if you delete a category that has entries, given `ON DELETE CASCADE`?
+1. Why does `budget_entries` have a foreign key to both `budget_entries` AND `budget_periods`?
+2. What would happen if you delete an entry that has entries, given `ON DELETE CASCADE`?
 3. Why use `NUMERIC(14,4)` instead of `FLOAT` for money?
 4. What does the `schema_migrations` table do and why is each migration run inside a transaction?
 
@@ -112,11 +112,11 @@
 ### Lesson 4: Go Web Patterns (Router, Middleware)
 **Goal:** Understand how requests flow through a Go web server
 **Code to study:**
-- `backend/internal/server/server.go` — router setup, middleware chain, route groups
+- `backend/internal/server/server.go` — router setup, middleware chain, route categories
 
 **Topics:**
 - [ ] Chi router — `r.Route()`, `r.Get()`, `r.Post()`, `r.Delete()`
-- [ ] Route groups and sub-routers
+- [ ] Route categories and sub-routers
 - [ ] Middleware: what it is, how it wraps handlers
 - [ ] CORS middleware — why it exists, what it configures
 - [ ] `chi.URLParam()` — extracting values from URL paths
@@ -127,7 +127,7 @@
 1. What is middleware and why would you use it instead of putting logic in every handler?
 2. Why does the CORS middleware allow `credentials: true`?
 3. Trace a request from the browser to handler: what middleware does it pass through?
-4. Why are budget routes nested under `/api/budget` as a group?
+4. Why are budget routes nested under `/api/budget` as a category?
 
 ---
 
@@ -171,7 +171,7 @@
 - [ ] Type safety: catching bugs at compile time
 
 **Quiz:**
-1. Why define a `Category` interface instead of using `any`?
+1. Why define a `Entry` interface instead of using `any`?
 2. What does `async` do to a function's return type?
 3. How does `apiFetch` centralize error handling for all API calls?
 4. What would happen if the backend changed a field name but the frontend wasn't updated?
@@ -262,7 +262,7 @@
 **Goal:** Build complex interactive UIs and manage application state with Svelte 5
 **Code to study:**
 - `frontend/src/modules/budget/BudgetEntryRow.svelte` — inline editing, state sync
-- `frontend/src/modules/budget/BudgetTable.svelte` — group management, modals
+- `frontend/src/modules/budget/BudgetTable.svelte` — category management, modals
 - `frontend/src/lib/crypto/vaultStore.svelte.ts` — reactive store with encryption
 - `frontend/src/lib/auth/authStore.svelte.ts` — auth state management
 

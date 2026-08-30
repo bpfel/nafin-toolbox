@@ -8,7 +8,7 @@
 
 <tr class="add-row">
   <td colspan="4" class="add-cell">
-    <button class="add-btn" onclick={onadd}>+ Add category</button>
+    <button class="add-btn" onclick={onadd}>+ Add entry</button>
   </td>
 </tr>
 

@@ -8,6 +8,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# Passed through by compose; empty for a plain local build, in which case vite
+# falls back to package.json.
+ARG APP_VERSION=""
+ENV APP_VERSION=$APP_VERSION
 RUN npm run build
 
 FROM nginx:alpine

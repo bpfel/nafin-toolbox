@@ -1,20 +1,36 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 4
+export const VAULT_VERSION = 5
+
+/**
+ * A stored vault written by a build newer than this one.
+ *
+ * Thrown rather than scrubbed. Substituting an empty vault would show the user
+ * their budget as blank and, the moment they touched anything, save that over
+ * the real one — losing data to a problem whose whole fix is "reload the page".
+ */
+export class VaultVersionAheadError extends Error {
+  constructor(readonly found: number) {
+    super(`vault was saved by a newer version (v${found}, this build reads v${VAULT_VERSION})`)
+    this.name = 'VaultVersionAheadError'
+  }
+}
 
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 4
+  version: 5
   budget: BudgetVaultData
   accounts: VaultAccount[]
 }
 
 export interface BudgetVaultData {
-  categoryGroups: VaultCategoryGroup[]
+  /** The headings a budget is organised under. Called groups before v5. */
   categories: VaultCategory[]
+  /** The lines themselves — Rent, Salary. Called categories before v5. */
+  entries: VaultEntry[]
   /**
-   * The current plan: one planned amount per category. There is exactly one.
+   * The current plan: one planned amount per entry. There is exactly one.
    *
    * v4 removed monthly periods. The budget is a standing plan rather than a
    * per-month ledger — which is what it always was in practice, since the
@@ -26,7 +42,7 @@ export interface BudgetVaultData {
 }
 
 export interface VaultPlanEntry {
-  categoryId: string
+  entryId: string
   plannedAmount: string
 }
 
@@ -34,9 +50,9 @@ export interface VaultPlanEntry {
  * A named snapshot of the plan.
  *
  * Deliberately DENORMALISED: it stores the names and amounts as they were,
- * rather than pointing at live categories. An archive that referenced
- * categories would be rewritten by a later rename and would lose lines to a
- * later delete — it would stop being a record of anything. The cost is that an
+ * rather than pointing at live entries. An archive that referenced entries
+ * would be rewritten by a later rename and would lose lines to a later delete —
+ * it would stop being a record of anything. The cost is that an
  * archive cannot be diffed against the plan by id, which is not something we
  * need.
  */
@@ -48,8 +64,8 @@ export interface VaultArchive {
 }
 
 export interface VaultArchiveLine {
+  entryName: string
   categoryName: string
-  groupName: string
   type: 'income' | 'expense'
   plannedAmount: string
 }
@@ -91,23 +107,70 @@ export interface ReserveDefinition {
   anchorMonth: string            // 'YYYY-MM'
 }
 
-export interface VaultCategoryGroup {
+export interface VaultCategory {
   id: string
   name: string
   type: 'income' | 'expense'
   sortOrder: number
 }
 
-export interface VaultCategory {
+export interface VaultEntry {
   id: string
   name: string
   type: 'income' | 'expense'
   sortOrder: number
   archived: boolean
-  groupId: string
+  categoryId: string
   sourceAccountId: string | null
   sinkAccountId: string | null
   reserve?: ReserveDefinition
+}
+
+/** A vault whose contents do not match the version it declares. */
+export class VaultShapeError extends Error {
+  constructor(detail: string) {
+    super(`vault does not match v${VAULT_VERSION}: ${detail}`)
+    this.name = 'VaultShapeError'
+  }
+}
+
+/**
+ * Checks that a vault about to be written matches the version it claims.
+ *
+ * Reads are already defensive — migrateVault works from the keys rather than the
+ * number — but nothing stopped an inconsistent vault being *written*, and a bad
+ * write outlives the tab that made it. One did: a vault stamped v5 with a v4
+ * budget, which every later reader turned into an undefined `entries` and a page
+ * that froze mid-render.
+ *
+ * Cheap enough to run on every save: four array checks on data already in hand.
+ */
+export function assertVaultShape(vault: VaultData): void {
+  if (vault.version !== VAULT_VERSION) {
+    throw new VaultShapeError(`version says ${String(vault.version)}`)
+  }
+
+  const budget = (vault as unknown as { budget?: Record<string, unknown> }).budget
+  if (!budget || typeof budget !== 'object') {
+    throw new VaultShapeError('budget is missing')
+  }
+
+  // The tell of the bug this exists to catch: v4's key still present.
+  if ('categoryGroups' in budget) {
+    throw new VaultShapeError('budget still carries v4 categoryGroups')
+  }
+
+  for (const key of ['categories', 'entries', 'plan', 'archives'] as const) {
+    if (!Array.isArray(budget[key])) {
+      throw new VaultShapeError(
+        `budget.${key} is ${budget[key] === undefined ? 'missing' : 'not an array'}`,
+      )
+    }
+  }
+
+  if (!Array.isArray(vault.accounts)) {
+    throw new VaultShapeError('accounts is missing')
+  }
 }
 
 // --- Encrypt / decrypt ---
@@ -179,13 +242,34 @@ export async function decryptVault(
 export function migrateVault(parsed: unknown): VaultData {
   if (!parsed || typeof parsed !== 'object') return createEmptyVault()
 
-  const vault = parsed as { version?: unknown; budget?: { categories?: unknown } }
+  const vault = parsed as {
+    version?: unknown
+    budget?: { categories?: unknown; entries?: unknown; categoryGroups?: unknown }
+  }
 
-  if (vault.version === VAULT_VERSION) return vault as unknown as VaultData
+  // The number is a claim; the keys are the evidence. A vault stamped v5 whose
+  // budget still carries v4's `categoryGroups` was renumbered by something that
+  // did not reshape it, and taking its word leaves every reader of `entries`
+  // reading undefined — which is a frozen page, not an error anyone can act on.
+  // Migrating on the evidence recovers the contents instead.
+  const wearingV4Keys =
+    vault.budget != null &&
+    vault.budget.entries === undefined &&
+    vault.budget.categoryGroups !== undefined
+
+  if (vault.version === VAULT_VERSION && !wearingV4Keys) return vault as unknown as VaultData
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
-  // for being two steps behind.
-  if (vault.version === 2) return migrateV3ToV4(migrateV2ToV3(vault) as unknown as V3Shape)
-  if (vault.version === 3) return migrateV3ToV4(vault as unknown as V3Shape)
+  // for being three steps behind.
+  if (vault.version === 2) return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault)))
+  if (vault.version === 3) return migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape))
+  if (vault.version === 4 || wearingV4Keys) return migrateV4ToV5(vault as unknown as V4Shape)
+
+  // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
+  // the data. Refuse it so the app can say so, instead of handing back an empty
+  // vault that reads as "your budget is gone".
+  if (typeof vault.version === 'number' && vault.version > VAULT_VERSION) {
+    throw new VaultVersionAheadError(vault.version)
+  }
 
   return createEmptyVault()
 }
@@ -202,6 +286,38 @@ interface V3Shape {
     categoryGroups?: { id: string; name: string }[]
     categories?: { id: string; name: string; type: 'income' | 'expense'; groupId: string }[]
     periods?: V3Period[]
+  }
+}
+
+/**
+ * v4 in its own vocabulary — groups and categories, before v5 renamed them to
+ * categories and entries. Only the migration speaks this.
+ */
+interface V4Group { id: string; name: string; type: 'income' | 'expense'; sortOrder: number }
+interface V4Category {
+  id: string
+  name: string
+  type: 'income' | 'expense'
+  sortOrder: number
+  archived: boolean
+  groupId: string
+}
+interface V4PlanEntry { categoryId: string; plannedAmount: string }
+interface V4ArchiveLine {
+  categoryName: string
+  groupName: string
+  type: 'income' | 'expense'
+  plannedAmount: string
+}
+interface V4Archive { id: string; name: string; createdAt: string; lines: V4ArchiveLine[] }
+
+interface V4Shape {
+  version: number
+  budget?: {
+    categoryGroups?: V4Group[]
+    categories?: V4Category[]
+    plan?: V4PlanEntry[]
+    archives?: V4Archive[]
   }
 }
 
@@ -222,7 +338,7 @@ const MIGRATION_MONTH_NAMES = [
  * Archives are denormalised here using the category and group names as they
  * stand now. Periods never stored names, so today's are the only ones available.
  */
-function migrateV3ToV4(vault: V3Shape): VaultData {
+function migrateV3ToV4(vault: V3Shape): V4Shape {
   const budget = vault.budget ?? {}
   const categories = budget.categories ?? []
   const groups = budget.categoryGroups ?? []
@@ -234,12 +350,12 @@ function migrateV3ToV4(vault: V3Shape): VaultData {
   const categoryById = new Map(categories.map(c => [c.id, c]))
 
   const latest = periods.pop()
-  const plan: VaultPlanEntry[] = (latest?.entries ?? []).map(e => ({
+  const plan: V4PlanEntry[] = (latest?.entries ?? []).map(e => ({
     categoryId: e.categoryId,
     plannedAmount: e.plannedAmount,
   }))
 
-  const archives: VaultArchive[] = periods.map(period => ({
+  const archives: V4Archive[] = periods.map(period => ({
     id: crypto.randomUUID(),
     name: `${MIGRATION_MONTH_NAMES[period.month - 1] ?? period.month} ${period.year}`,
     createdAt: `${period.year}-${String(period.month).padStart(2, '0')}-01`,
@@ -257,13 +373,54 @@ function migrateV3ToV4(vault: V3Shape): VaultData {
     }),
   }))
 
+  const migrated = vault as unknown as V4Shape
+  migrated.version = 4
+  migrated.budget = {
+    categoryGroups: (budget.categoryGroups ?? []) as unknown as V4Group[],
+    categories: (budget.categories ?? []) as unknown as V4Category[],
+    plan,
+    archives,
+  }
+  return migrated
+}
+
+/**
+ * v4 -> v5: the vocabulary changes, nothing else does.
+ *
+ * What v4 called a group is a category, and what it called a category is an
+ * entry. Only the words move — every id, amount and archive line survives, so
+ * this is a pure key rename rather than a reshaping.
+ *
+ * The names are worth the migration because the old pair was actively
+ * misleading: "category" named the line item in the budget and the heading in
+ * the accounts screen at the same time.
+ */
+function migrateV4ToV5(vault: V4Shape): VaultData {
+  const budget = vault.budget ?? {}
+
   const migrated = vault as unknown as VaultData
   migrated.version = VAULT_VERSION
   migrated.budget = {
-    categoryGroups: (budget.categoryGroups ?? []) as unknown as VaultCategoryGroup[],
-    categories: (budget.categories ?? []) as unknown as VaultCategory[],
-    plan,
-    archives,
+    categories: (budget.categoryGroups ?? []) as unknown as VaultCategory[],
+    entries: (budget.categories ?? []).map(({ groupId, ...rest }) => ({
+      ...rest,
+      categoryId: groupId,
+    })) as VaultEntry[],
+    plan: (budget.plan ?? []).map(e => ({
+      entryId: e.categoryId,
+      plannedAmount: e.plannedAmount,
+    })),
+    archives: (budget.archives ?? []).map(a => ({
+      id: a.id,
+      name: a.name,
+      createdAt: a.createdAt,
+      lines: (a.lines ?? []).map(line => ({
+        entryName: line.categoryName,
+        categoryName: line.groupName,
+        type: line.type,
+        plannedAmount: line.plannedAmount,
+      })),
+    })),
   }
   return migrated
 }
@@ -276,7 +433,7 @@ function migrateV3ToV4(vault: V3Shape): VaultData {
  * longer exists. Strip it explicitly; everything else carries over untouched, so
  * budgets, accounts, routing and reserves all survive.
  */
-function migrateV2ToV3(vault: { version?: unknown; budget?: { categories?: unknown } }): VaultData {
+function migrateV2ToV3(vault: { version?: unknown; budget?: { categories?: unknown } }): V3Shape {
   const categories = vault.budget?.categories
   if (Array.isArray(categories)) {
     for (const category of categories) {
@@ -285,16 +442,16 @@ function migrateV2ToV3(vault: { version?: unknown; budget?: { categories?: unkno
       }
     }
   }
-  vault.version = VAULT_VERSION
-  return vault as unknown as VaultData
+  vault.version = 3
+  return vault as unknown as V3Shape
 }
 
 export function createEmptyVault(): VaultData {
   return {
     version: VAULT_VERSION,
     budget: {
-      categoryGroups: [],
       categories: [],
+      entries: [],
       plan: [],
       archives: [],
     },

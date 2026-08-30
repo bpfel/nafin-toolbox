@@ -47,7 +47,7 @@ existing `002_drop_allocations_module.sql`.
 ### The wizard onboards the easy half
 
 `feature/onboarding` walks a new user through income, age, rent, food and a savings goal, then
-seeds budget categories. Every concept it explains is one a user already understands before
+seeds budget entries. Every concept it explains is one a user already understands before
 opening the app. The concepts that actually need explaining — reserves, the obligation and
 amortization split, and the fact that a budget line has a *source* and a *sink* — postdate it
 entirely.
@@ -192,7 +192,7 @@ Leads with what the app is *not*: it does not see your bank, it does not track t
 and the numbers are yours to maintain. Getting that wrong early is what makes everything else
 feel broken.
 
-Then categories, groups, the standing plan, and archives as named snapshots rather than a
+Then entries, categories, the standing plan, and archives as named snapshots rather than a
 monthly ledger.
 
 ### Chapter 2 — Accounts: give every franc a destination
@@ -253,7 +253,7 @@ module. It is progressive disclosure with the pacing handed to the user.
 Four constraints, without which this goes wrong:
 
 1. **The guided modal must commit through the same engine functions as the normal UI**
-   (`createCategory`, the reserve definition, `markDirty`). It is a wrapper that pre-fills and
+   (`createEntry`, the reserve definition, `markDirty`). It is a wrapper that pre-fills and
    explains — not a second path to creating a reserve. Two code paths that can create an
    obligation will drift, and the guided one will be the one nobody maintains.
 2. **Only conceptually hard achievements get one.** "Three or more accounts" needs no
@@ -263,7 +263,7 @@ Four constraints, without which this goes wrong:
 3. **Offered, never nagged.** Locked entries do not badge, interrupt, or count down. The list
    is somewhere a user goes; it does not come to them. A checklist that pesters reads as
    serving the app rather than the user.
-4. **Skipping mid-modal must leave no debris** — no half-created category, no reserve with a
+4. **Skipping mid-modal must leave no debris** — no half-created entry, no reserve with a
    zero target.
 
 The definition grows one optional field, and its presence is what marks an achievement as a
@@ -295,7 +295,7 @@ found the rest already exists on `develop`:
 | `calculateMonthlyTax`, `calculateHealthInsurance` | Removed — see above |
 | `calculateBudget` | Estimate-driven throughout; removed with them |
 | `calculateProjection` | ~20 lines; `monthsToGoal` duplicates the affordability math in `reserveMath.ts` |
-| `generateCategories` | Writes the pre-v4 model; rewrite |
+| `generateEntries` | Writes the pre-v4 model; rewrite |
 | `formatCHF` | Duplicates `lib/util/money.ts` and the existing `de-CH` formatting |
 
 The step chrome (`WizardProgress`, `WizardNav`, `WizardIllustration`) is built for a linear
@@ -312,7 +312,7 @@ the reserve UI can link to it before any of the rest exists.
 **Phase 2 — Vault v5 + evaluation engine.** Additive migration, achievement definitions, pure
 evaluator, silent backfill. No UI.
 
-**Phase 3 — Chapter 1 (Budget).** Article plus the rebuilt seeding path — categories with
+**Phase 3 — Chapter 1 (Budget).** Article plus the rebuilt seeding path — entries with
 sensible names and blank amounts, no estimates.
 
 **Phase 4 — Chapter 2 (Accounts).** The reserves and obligation/amortization teaching, with

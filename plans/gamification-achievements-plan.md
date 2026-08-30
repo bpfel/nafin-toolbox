@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS achievement_progress (
 
 ### 1.3 Wire into server.go
 
-Add `r.Route("/settings", settings.Routes(s.db))` in the `/api` route group.
+Add `r.Route("/settings", settings.Routes(s.db))` in the `/api` route category.
 
 **Verify**: `curl /api/settings` → `{"achievements_enabled":"true"}`
 
@@ -96,7 +96,7 @@ Hardcoded Go definitions (single source of truth). 5 chapters + ~17 achievements
 | Chapter | Achievements |
 |---------|-------------|
 | **Ch 1: Know What You Have** (accounts) | First Step (enable), On the Books (first account), The Full Picture (3+ accounts) |
-| **Ch 2: Know Where It Goes** (budget) | Budget Conscious (enable), Categorized (first category), Month One (full month) |
+| **Ch 2: Know Where It Goes** (budget) | Budget Conscious (enable), Categorized (first entry), Month One (full month) |
 | **Ch 3: Give Every Franc a Job** (allocations) | Money with a Mission (enable), First Assignment (first allocation) |
 | **Ch 4: Pay Your Future Self** (provision3a) | Future Thinker (enable), Retirement Saver (first contribution), Maxed Out (hit annual cap) |
 | **Ch 5: Make Money Work For You** (investments) | Market Entrant (enable), First Position (first investment), Diversified (3 types) |
@@ -123,7 +123,7 @@ Each achievement has an educational tooltip, e.g.:
 | ID | Name | Trigger | Tooltip |
 |----|------|---------|---------|
 | `budget_enable` | Budget Conscious | Enable module (event) | A budget is not a restriction — it is a plan for your money. Research shows budgeters save 20% more. |
-| `budget_first_category` | Categorized | Create first budget category (event) | The 50/30/20 rule suggests: 50% needs, 30% wants, 20% savings. Categories help you see where you stand. |
+| `budget_first_entry` | Categorized | Create first budget entry (event) | The 50/30/20 rule suggests: 50% needs, 30% wants, 20% savings. Entries help you see where you stand. |
 | `budget_first_month` | Month One | Complete a full month of tracking (event) | The first month of tracking is always surprising. Most people discover 10–15% of spending they did not expect. |
 
 ##### Chapter 3: Give Every Franc a Job (allocations)

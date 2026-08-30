@@ -6,23 +6,23 @@ import {
   correctBalance,
   reorderAccounts,
 } from './accountsEngine'
-import { isLegalCategoryRouting } from './routing'
-import { createEmptyVault, type VaultCategory, type VaultData, type ReserveDefinition } from '../crypto/vault'
+import { isLegalEntryRouting } from './routing'
+import { createEmptyVault, type VaultEntry, type VaultData, type ReserveDefinition } from '../crypto/vault'
 
-function addCategory(vault: VaultData, overrides: Partial<VaultCategory> = {}): VaultCategory {
-  const category: VaultCategory = {
-    id: `cat-${vault.budget.categories.length + 1}`,
+function addEntry(vault: VaultData, overrides: Partial<VaultEntry> = {}): VaultEntry {
+  const entry: VaultEntry = {
+    id: `cat-${vault.budget.entries.length + 1}`,
     name: 'Test',
     type: 'expense',
     sortOrder: 10,
     archived: false,
-    groupId: 'group-1',
+    categoryId: 'category-1',
     sourceAccountId: null,
     sinkAccountId: null,
     ...overrides,
   }
-  vault.budget.categories.push(category)
-  return category
+  vault.budget.entries.push(entry)
+  return entry
 }
 
 function snapshot(vault: VaultData): string {
@@ -271,17 +271,17 @@ describe('reorderAccounts', () => {
     expect(b.iban).toBe('CH9300762011623852957')
   })
 
-  test('leaves categories and their routing alone', () => {
+  test('leaves entries and their routing alone', () => {
     const vault = createEmptyVault()
     const [a, b] = fourAccounts(vault)
-    const spending = addCategory(vault, { sourceAccountId: a.id, sinkAccountId: null })
-    const income = addCategory(vault, { type: 'income', sourceAccountId: null, sinkAccountId: b.id })
+    const spending = addEntry(vault, { sourceAccountId: a.id, sinkAccountId: null })
+    const income = addEntry(vault, { type: 'income', sourceAccountId: null, sinkAccountId: b.id })
 
     reorderAccounts(vault, [b.id, a.id])
 
     expect(spending.sourceAccountId).toBe(a.id)
     expect(income.sinkAccountId).toBe(b.id)
-    expect(vault.budget.categories).toHaveLength(2)
+    expect(vault.budget.entries).toHaveLength(2)
   })
 })
 
@@ -289,7 +289,7 @@ describe('deleteAccount — the core invariant', () => {
   test('deleting the last remaining account throws and leaves the vault unchanged', () => {
     const vault = createEmptyVault()
     const only = vault.accounts[0]
-    addCategory(vault, { sourceAccountId: only.id, sinkAccountId: null })
+    addEntry(vault, { sourceAccountId: only.id, sinkAccountId: null })
     const before = snapshot(vault)
 
     expect(() => deleteAccount(vault, only.id, only.id)).toThrow(/last remaining account/)
@@ -311,11 +311,11 @@ describe('deleteAccount — the core invariant', () => {
 })
 
 describe('deleteAccount — reassignment', () => {
-  test('repoints a category sourcing from the deleted account', () => {
+  test('repoints an entry sourcing from the deleted account', () => {
     const vault = createEmptyVault()
     const main = vault.accounts[0]
     const doomed = createAccount(vault, { name: 'Doomed' })
-    const spending = addCategory(vault, { sourceAccountId: doomed.id, sinkAccountId: null })
+    const spending = addEntry(vault, { sourceAccountId: doomed.id, sinkAccountId: null })
 
     deleteAccount(vault, doomed.id, main.id)
 
@@ -323,11 +323,11 @@ describe('deleteAccount — reassignment', () => {
     expect(spending.sinkAccountId).toBeNull()
   })
 
-  test('repoints a category sinking into the deleted account', () => {
+  test('repoints an entry sinking into the deleted account', () => {
     const vault = createEmptyVault()
     const main = vault.accounts[0]
     const doomed = createAccount(vault, { name: 'Doomed' })
-    const income = addCategory(vault, {
+    const income = addEntry(vault, {
       type: 'income',
       sourceAccountId: null,
       sinkAccountId: doomed.id,
@@ -339,11 +339,11 @@ describe('deleteAccount — reassignment', () => {
     expect(income.sinkAccountId).toBe(main.id)
   })
 
-  test('repoints a category doing both — the (A, A) set-aside case', () => {
+  test('repoints an entry doing both — the (A, A) set-aside case', () => {
     const vault = createEmptyVault()
     const main = vault.accounts[0]
     const doomed = createAccount(vault, { name: 'Doomed' })
-    const setaside = addCategory(vault, {
+    const setaside = addEntry(vault, {
       sourceAccountId: doomed.id,
       sinkAccountId: doomed.id,
       reserve,
@@ -359,7 +359,7 @@ describe('deleteAccount — reassignment', () => {
     const vault = createEmptyVault()
     const main = vault.accounts[0]
     const doomed = createAccount(vault, { name: 'Doomed' })
-    const setaside = addCategory(vault, { sourceAccountId: main.id, sinkAccountId: doomed.id })
+    const setaside = addEntry(vault, { sourceAccountId: main.id, sinkAccountId: doomed.id })
 
     deleteAccount(vault, doomed.id, main.id)
 
@@ -367,12 +367,12 @@ describe('deleteAccount — reassignment', () => {
     expect(setaside.sinkAccountId).toBe(main.id)
   })
 
-  test('removes the account and leaves unrelated categories untouched', () => {
+  test('removes the account and leaves unrelated entries untouched', () => {
     const vault = createEmptyVault()
     const main = vault.accounts[0]
     const other = createAccount(vault, { name: 'Other' })
     const doomed = createAccount(vault, { name: 'Doomed' })
-    const unrelated = addCategory(vault, { sourceAccountId: other.id, sinkAccountId: null })
+    const unrelated = addEntry(vault, { sourceAccountId: other.id, sinkAccountId: null })
 
     deleteAccount(vault, doomed.id, main.id)
 
@@ -388,7 +388,7 @@ describe('deleteAccount — reassignment', () => {
     const main = vault.accounts[0]
     const doomed = createAccount(vault, { name: 'Doomed' })
 
-    const shapes: Partial<VaultCategory>[] = [
+    const shapes: Partial<VaultEntry>[] = [
       { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: null },
       { type: 'income', sourceAccountId: null, sinkAccountId: doomed.id },
       { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: doomed.id },
@@ -397,15 +397,15 @@ describe('deleteAccount — reassignment', () => {
       { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: main.id, reserve },
       { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: doomed.id, reserve },
     ]
-    const categories = shapes.map(shape => addCategory(vault, shape))
-    expect(categories.every(isLegalCategoryRouting)).toBe(true)
+    const entries = shapes.map(shape => addEntry(vault, shape))
+    expect(entries.every(isLegalEntryRouting)).toBe(true)
 
     deleteAccount(vault, doomed.id, main.id)
 
-    for (const category of categories) {
-      expect(isLegalCategoryRouting(category)).toBe(true)
-      expect(category.sourceAccountId).not.toBe(doomed.id)
-      expect(category.sinkAccountId).not.toBe(doomed.id)
+    for (const entry of entries) {
+      expect(isLegalEntryRouting(entry)).toBe(true)
+      expect(entry.sourceAccountId).not.toBe(doomed.id)
+      expect(entry.sinkAccountId).not.toBe(doomed.id)
     }
   })
 })
@@ -415,7 +415,7 @@ describe('deleteAccount — bad arguments', () => {
     const vault = createEmptyVault()
     const main = vault.accounts[0]
     const doomed = createAccount(vault, { name: 'Doomed' })
-    addCategory(vault, { sourceAccountId: doomed.id, sinkAccountId: null })
+    addEntry(vault, { sourceAccountId: doomed.id, sinkAccountId: null })
     const before = snapshot(vault)
 
     expect(() => deleteAccount(vault, doomed.id, 'no-such-account')).toThrow(/not found/)
@@ -426,7 +426,7 @@ describe('deleteAccount — bad arguments', () => {
   test('throws when reassignToId equals the deleted id and leaves the vault unchanged', () => {
     const vault = createEmptyVault()
     const doomed = createAccount(vault, { name: 'Doomed' })
-    addCategory(vault, { sourceAccountId: doomed.id, sinkAccountId: null })
+    addEntry(vault, { sourceAccountId: doomed.id, sinkAccountId: null })
     const before = snapshot(vault)
 
     expect(() => deleteAccount(vault, doomed.id, doomed.id)).toThrow(/account being deleted/)

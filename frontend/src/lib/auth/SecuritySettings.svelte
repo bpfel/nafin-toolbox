@@ -3,6 +3,7 @@
   import TwoFactorSetup from './TwoFactorSetup.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
   import AuditLogViewer from './AuditLogViewer.svelte'
+  import { createCopier } from '../util/copier.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
 
@@ -64,9 +65,11 @@
     }
   }
 
+  const copier = createCopier()
+
   function copyRecoveryCodes() {
     if (recoveryCodes) {
-      navigator.clipboard.writeText(recoveryCodes.join('\n'))
+      copier.copy(recoveryCodes.join('\n'))
     }
   }
 </script>
@@ -113,7 +116,17 @@
                   <code class="recovery-code">{code}</code>
                 {/each}
               </div>
-              <button class="btn-secondary" onclick={copyRecoveryCodes}>Copy All</button>
+              <button class="btn-secondary" onclick={copyRecoveryCodes}>
+                {copier.copied ? 'Copied' : 'Copy All'}
+              </button>
+              <p class="copy-status" class:failed={copier.failed} aria-live="polite">
+                {#if copier.failed}
+                  Could not reach the clipboard. Select the codes above and copy
+                  them by hand.
+                {:else if copier.copied}
+                  Recovery codes copied to the clipboard.
+                {/if}
+              </p>
               <button onclick={() => { showRegenCodes = false; recoveryCodes = null; password = '' }}>Done</button>
             {:else}
               <p>Enter your password to regenerate recovery codes:</p>
@@ -310,6 +323,19 @@
     background: #f5f5f5;
     border-radius: 4px;
     text-align: center;
+  }
+
+  .copy-status {
+    font-size: 0.85rem;
+    color: #2d6a4f;
+    /* Reserved whether or not there is a message, so Done does not jump when
+       one appears. */
+    min-height: 1.2rem;
+    margin: 0.4rem 0;
+  }
+
+  .copy-status.failed {
+    color: #c0392b;
   }
 
   button:disabled {

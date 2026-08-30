@@ -1,29 +1,29 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { VaultAccount, VaultCategory } from '../../../lib/crypto/vault'
+  import type { VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { focusTrap } from '../../../lib/util/focusTrap'
 
   interface Props {
     account: VaultAccount
     /** Every account except the one being deleted — the reassignment targets. */
     otherAccounts: VaultAccount[]
-    categories: VaultCategory[]
+    entries: VaultEntry[]
     ondelete: (reassignToId: string) => void
     onclose: () => void
   }
 
-  let { account, otherAccounts, categories, ondelete, onclose }: Props = $props()
+  let { account, otherAccounts, entries, ondelete, onclose }: Props = $props()
 
   // Seeded once; the list cannot change while the dialog is open.
   let reassignToId = $state(untrack(() => otherAccounts[0]?.id ?? ''))
 
   let affected = $derived(
-    categories.filter(
+    entries.filter(
       c => c.sourceAccountId === account.id || c.sinkAccountId === account.id,
     ),
   )
 
-  // Reassignment substitutes one id for another, so a category with one endpoint
+  // Reassignment substitutes one id for another, so an entry with one endpoint
   // on the doomed account and the other on the target ends up with both
   // endpoints on the target: money moving from an account into itself. Legal by
   // design, but it is a different statement than the one the user wrote, so it
@@ -61,15 +61,15 @@
     <p>
       Remove <strong>{account.name}</strong>?
       {#if affected.length === 0}
-        No categories are routed through it.
+        No entries are routed through it.
       {:else}
         {affected.length}
-        {affected.length === 1 ? 'category is' : 'categories are'} routed through it and must move somewhere else.
+        {affected.length === 1 ? 'entry is' : 'entries are'} routed through it and must move somewhere else.
       {/if}
     </p>
 
     <label class="field">
-      <span class="label">Move its categories to</span>
+      <span class="label">Move its entries to</span>
       <select bind:value={reassignToId}>
         {#each otherAccounts as a}
           <option value={a.id}>{a.name}</option>
@@ -81,7 +81,7 @@
       <div class="notice">
         <p>
           {collapsing.length}
-          {collapsing.length === 1 ? 'category currently moves' : 'categories currently move'}
+          {collapsing.length === 1 ? 'entry currently moves' : 'entries currently move'}
           money between <strong>{account.name}</strong> and <strong>{targetName}</strong>. After the
           move both ends are {targetName}, so
           {collapsing.length === 1 ? 'it becomes' : 'they become'}

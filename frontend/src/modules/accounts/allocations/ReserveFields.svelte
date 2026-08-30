@@ -9,12 +9,12 @@
   // No local mirror of the props: every field reads the definition it is
   // editing and emits a whole new definition on change. That keeps the vault
   // the single source of truth and avoids a stale-copy bug when the row's
-  // category changes underneath it.
+  // entry changes underneath it.
 
   interface Props {
     reserve: ReserveDefinition | undefined
     currentMonth: string
-    /** What the budget already plans monthly for this category. Used to propose a target. */
+    /** What the budget already plans monthly for this entry. Used to propose a target. */
     plannedAmount: string
     onchange: (reserve: ReserveDefinition | undefined) => void
   }
@@ -39,7 +39,7 @@
    * which is the number the user would otherwise work out by hand.
    *
    * Computed in integer cents so 391.67 x 12 gives 4700.04 rather than a float
-   * artefact. A category with nothing planned proposes nothing.
+   * artefact. An entry with nothing planned proposes nothing.
    */
   function proposedTarget(periodMonths: number): string {
     const monthlyCents = Math.round(Number(plannedAmount) * 100)

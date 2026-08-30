@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/svelte'
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tick } from 'svelte'
 import Sortable from 'sortablejs'
-import type { VaultAccount, VaultCategory, VaultData } from '../../../lib/crypto/vault'
+import type { VaultAccount, VaultEntry, VaultData } from '../../../lib/crypto/vault'
 
 // The vault is a plain object mutated in place by the engine, so the store is
 // stubbed with a live getter rather than a snapshot.
@@ -38,8 +38,8 @@ function account(id: string, name: string, currentAmount = '100.00'): VaultAccou
 
 function vault(...accounts: VaultAccount[]): VaultData {
   return {
-    version: 4,
-    budget: { categoryGroups: [], categories: [], plan: [], archives: [] },
+    version: 5,
+    budget: { categories: [], entries: [], plan: [], archives: [] },
     accounts,
   }
 }
@@ -47,14 +47,14 @@ function vault(...accounts: VaultAccount[]): VaultData {
 // An obligation whose anchor month IS the month under test is due now, so the
 // whole target is already required — the simplest way to put a known figure in
 // `requiredForAccount` without reaching into the reserve maths.
-function dueReserve(id: string, sinkAccountId: string, targetAmount: string): VaultCategory {
+function dueReserve(id: string, sinkAccountId: string, targetAmount: string): VaultEntry {
   return {
     id,
     name: `${id} reserve`,
     type: 'expense',
     sortOrder: 0,
     archived: false,
-    groupId: 'g1',
+    categoryId: 'g1',
     sourceAccountId: null,
     sinkAccountId,
     reserve: { kind: 'obligation', targetAmount, periodMonths: 12, anchorMonth: '2026-08' },
@@ -238,7 +238,7 @@ describe('AccountManagement totals row', () => {
     const reserves = account('b', 'Reserves', '300.25')
     const v = vault(main, reserves)
     // Reserves: required 1200.00 against 300.25 projected, i.e. -899.75 available.
-    v.budget.categories.push(dueReserve('c1', 'b', '1200.00'))
+    v.budget.entries.push(dueReserve('c1', 'b', '1200.00'))
     store.vault = v
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
@@ -269,7 +269,7 @@ describe('AccountManagement totals row', () => {
   test('a total available below zero is shown as a shortfall', () => {
     const main = account('a', 'Main', '100.00')
     const v = vault(main)
-    v.budget.categories.push(dueReserve('c1', 'a', '500.00'))
+    v.budget.entries.push(dueReserve('c1', 'a', '500.00'))
     store.vault = v
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })

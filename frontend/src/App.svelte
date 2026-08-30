@@ -6,6 +6,7 @@
   import InvitePanel from './lib/auth/InvitePanel.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
   import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
+  import RecoveryKeyScreen from './lib/auth/RecoveryKeyScreen.svelte'
   import SecuritySettings from './lib/auth/SecuritySettings.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import BudgetModule from './modules/budget/BudgetModule.svelte'
@@ -15,6 +16,8 @@
   import { focusTrap } from './lib/util/focusTrap'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
+  import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
+  import VersionTag from './lib/util/VersionTag.svelte'
 
   const authState = getAuthState()
   const vaultState = getVaultState()
@@ -52,7 +55,7 @@
   const isAdmin = $derived(authState.currentUser?.role === 'admin')
 
   const availableModules = [
-    { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
+    { id: 'budget', name: 'Budget', description: 'Track income and expenses by entry' },
     // Allocations ships inside Accounts as a second view rather than as its own
     // module: it is meaningless without accounts, and the flat module list has no
     // way to express that dependency. The `allocations` registry id stays unused.
@@ -124,6 +127,16 @@
 
   $effect(() => {
     checkAuth()
+  })
+
+  // A verification link opened again by someone already signed in is just a link
+  // to the app. Drop the spent token from the URL and carry on, rather than
+  // showing a set-up form the session has plainly outgrown.
+  $effect(() => {
+    if (isVerifyPage && authState.currentUser) {
+      window.history.replaceState({}, '', '/')
+      isVerifyPage = false
+    }
   })
 
   // Watch for deploys that leave this tab running chunks the server no longer has.
@@ -211,12 +224,15 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if isVerifyPage}
-  <VerifyEmailPage onVerified={() => { isVerifyPage = false }} />
-{:else if authState.loading}
+{#if authState.loading}
   <main>
     <p class="loading">Loading...</p>
   </main>
+{:else if isVerifyPage}
+  <VerifyEmailPage
+    onVerified={() => { isVerifyPage = false }}
+    onLeave={() => { isVerifyPage = false }}
+  />
 {:else if !authState.currentUser}
   <LoginPage onSuccess={handleLoginSuccess} />
 {:else if authState.currentUser.must_change_password}
@@ -235,15 +251,26 @@
     </div>
   </main>
 {:else if authState.recoveryKeyToShow && !isAdmin}
+  <RecoveryKeyScreen
+    recoveryKey={authState.recoveryKeyToShow}
+    onconfirmed={handleRecoveryKeyDismiss}
+  />
+{:else if vaultState.versionAhead && !isAdmin}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Save Your Recovery Key</h1>
-        <p class="hint">This key is the only way to recover your encrypted data if you forget your password. Save it in a secure location. It will not be shown again.</p>
-        <div class="recovery-key-box">
-          <code class="recovery-key">{authState.recoveryKeyToShow}</code>
-        </div>
-        <button class="btn-primary" onclick={handleRecoveryKeyDismiss}>I've saved my recovery key</button>
+        <h1>This page is out of date</h1>
+        <p class="hint">
+          Your data was saved by a newer version of the app than the one this page is
+          running, so this page cannot read it. Reloading picks up the current version.
+        </p>
+        <p class="hint">
+          Nothing has been lost, and nothing will be written while this page cannot read
+          your data.
+        </p>
+
+        <button class="btn-primary" onclick={() => location.reload()}>Reload</button>
+        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
       </div>
     </div>
   </main>
@@ -439,7 +466,7 @@
           <!--
             Hidden, not removed. `{#if}` here would destroy every module's
             component state on each fold: a half-typed amount in a budget row,
-            the accounts/allocations tab the user was on, which category groups
+            the accounts/allocations tab the user was on, which entry categories
             they had open, an in-flight modal. None of that is in the vault, so
             none of it would come back. `hidden` takes the body out of the
             accessibility tree and the tab order exactly as removal would, while
@@ -499,7 +526,9 @@
 {/if}
 
 <!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
+<VersionTag />
 <UpdateBanner />
+<UnsavedBanner />
 
 <style>
   .loading {
@@ -635,22 +664,6 @@
     color: #155724;
   }
 
-  .recovery-key-box {
-    background: #f8f9fa;
-    border: 2px dashed #dee2e6;
-    border-radius: 8px;
-    padding: 1.25rem;
-    margin: 1rem 0;
-    text-align: center;
-  }
-  .recovery-key {
-    font-size: 0.85rem;
-    font-family: monospace;
-    word-break: break-all;
-    line-height: 1.8;
-    color: #333;
-    user-select: all;
-  }
 
   .error {
     color: #c0392b;

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import type { VaultArchive, VaultArchiveLine } from '../../lib/crypto/vault'
-  import { moneyInput, normalizeAmount } from '../../lib/util/money'
 
   interface Props {
     archive: VaultArchive
@@ -10,13 +9,9 @@
      * message is caught here so it lands next to the field the user typed in.
      */
     onrename: (name: string) => void
-    onamountchange: (lineIndex: number, amount: string) => void
   }
 
-  let { archive, onrename, onamountchange }: Props = $props()
-
-  // Archive lines are mutated in place by the engine, which runes cannot observe.
-  let version = $state(0)
+  let { archive, onrename }: Props = $props()
 
   // Seeded once: the editor is mounted fresh per archive, and the draft must not
   // be yanked out from under a half-typed rename.
@@ -25,40 +20,37 @@
 
   interface LineRow {
     line: VaultArchiveLine
-    /** Index into `archive.lines` — how `updateArchiveLine` addresses a line. */
+    /** Position in `archive.lines`, used only to key the rendered rows. */
     index: number
   }
 
-  interface LineGroup {
-    groupName: string
+  interface LineCategory {
+    categoryName: string
     rows: LineRow[]
   }
 
-  // `_version` is unused inside, and deliberately so: passing it in is what makes
-  // the surrounding $derived depend on it, which is the only way an in-place edit
-  // to a line reaches the DOM.
-  function groupsFor(type: 'income' | 'expense', _version: number): LineGroup[] {
-    const map = new Map<string, LineGroup>()
+  function categoriesFor(type: 'income' | 'expense'): LineCategory[] {
+    const map = new Map<string, LineCategory>()
     archive.lines.forEach((line, index) => {
       if (line.type !== type) return
-      const key = line.groupName || ''
-      if (!map.has(key)) map.set(key, { groupName: key, rows: [] })
+      const key = line.categoryName || ''
+      if (!map.has(key)) map.set(key, { categoryName: key, rows: [] })
       map.get(key)!.rows.push({ line, index })
     })
     return Array.from(map.values())
   }
 
-  let incomeGroups = $derived(groupsFor('income', version))
-  let expenseGroups = $derived(groupsFor('expense', version))
+  let incomeCategories = $derived(categoriesFor('income'))
+  let expenseCategories = $derived(categoriesFor('expense'))
 
-  function totalFor(type: 'income' | 'expense', _version: number): number {
+  function totalFor(type: 'income' | 'expense'): number {
     return archive.lines
       .filter(l => l.type === type)
       .reduce((sum, l) => sum + Number(l.plannedAmount), 0)
   }
 
-  let incomeTotal = $derived(totalFor('income', version))
-  let expenseTotal = $derived(totalFor('expense', version))
+  let incomeTotal = $derived(totalFor('income'))
+  let expenseTotal = $derived(totalFor('expense'))
   let balance = $derived(incomeTotal - expenseTotal)
 
   function commitName() {
@@ -69,7 +61,6 @@
     try {
       onrename(nameDraft)
       nameError = null
-      version++
     } catch (e) {
       nameError = e instanceof Error ? e.message : 'could not rename this archive'
     }
@@ -85,16 +76,6 @@
       nameError = null
       ;(e.target as HTMLInputElement).blur()
     }
-  }
-
-  function commitAmount(index: number, raw: string) {
-    const normalised = normalizeAmount(raw)
-    // A field the user emptied, or filled with something that is not a number,
-    // leaves the recorded amount alone rather than overwriting history with NaN.
-    if (normalised === '' || !Number.isFinite(Number(normalised))) return
-    if (normalised === archive.lines[index]?.plannedAmount) return
-    onamountchange(index, normalised)
-    version++
   }
 
   function fmt(val: number): string {
@@ -123,29 +104,19 @@
     <table>
       <thead>
         <tr>
-          <th class="col-name">Category</th>
+          <th class="col-name">Entry</th>
           <th class="right col-amount">Planned/mo</th>
         </tr>
       </thead>
-      {#each [...incomeGroups, ...expenseGroups] as group (group.groupName + ':' + group.rows[0].line.type)}
+      {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + category.rows[0].line.type)}
         <tbody>
-          <tr class="line-group">
-            <td colspan="2">{group.groupName || 'Other'}</td>
+          <tr class="line-category">
+            <td colspan="2">{category.categoryName || 'Other'}</td>
           </tr>
-          {#each group.rows as row (row.index)}
+          {#each category.rows as row (row.index)}
             <tr class="line-row" class:income={row.line.type === 'income'}>
-              <td class="line-name">{row.line.categoryName}</td>
-              <td class="line-amount">
-                <input
-                  type="text"
-                  inputmode="decimal"
-                  class="amount-input"
-                  aria-label="Planned per month for {row.line.categoryName} in {archive.name}"
-                  value={row.line.plannedAmount}
-                  use:moneyInput
-                  onchange={(e) => commitAmount(row.index, (e.currentTarget as HTMLInputElement).value)}
-                />
-              </td>
+              <td class="line-name">{row.line.entryName}</td>
+              <td class="line-amount">{fmt(Number(row.line.plannedAmount))}</td>
             </tr>
           {/each}
         </tbody>
@@ -237,7 +208,7 @@
   th.right {
     text-align: right;
   }
-  .line-group td {
+  .line-category td {
     padding: 0.35rem 0.5rem;
     background: #f1f3f5;
     font-weight: 600;
@@ -258,28 +229,7 @@
   }
   .line-amount {
     text-align: right;
-  }
-  .amount-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.2rem 0.4rem;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    text-align: right;
-    font-size: inherit;
-    font-family: inherit;
     font-variant-numeric: tabular-nums;
-    background: transparent;
-    color: inherit;
-    outline: none;
-  }
-  .amount-input:hover {
-    border-color: #ddd;
-  }
-  .amount-input:focus {
-    border-color: #2d6a4f;
-    background: white;
-    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.15);
   }
   tfoot td {
     padding: 0.35rem 0.5rem;
@@ -296,10 +246,4 @@
   }
   .income-total { color: #2d6a4f; }
   .expense-total { color: #c0392b; }
-
-  @media (max-width: 480px) {
-    .amount-input {
-      font-size: 16px;
-    }
-  }
 </style>

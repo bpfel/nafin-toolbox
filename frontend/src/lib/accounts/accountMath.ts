@@ -1,4 +1,4 @@
-import type { VaultAccount, VaultCategory, VaultData } from '../crypto/vault'
+import type { VaultAccount, VaultEntry, VaultData } from '../crypto/vault'
 import { flowKindOf } from './routing'
 import { fromCents, monthsBetween, requiredForItem, toCents } from './reserveMath'
 
@@ -21,7 +21,7 @@ function findAccount(vault: VaultData, accountId: string): VaultAccount {
 // obligations and amortizations are never tracked separately against a balance —
 // they sum into a single figure for whichever account they sink into.
 //
-// Archived categories are excluded: archiving a reserve is how the user says the
+// Archived entries are excluded: archiving a reserve is how the user says the
 // obligation is gone, and it must lower the account's required amount.
 export function requiredForAccount(
   vault: VaultData,
@@ -31,36 +31,36 @@ export function requiredForAccount(
   findAccount(vault, accountId)
 
   let cents = 0
-  for (const category of vault.budget.categories) {
-    if (category.archived) continue
-    if (!category.reserve) continue
-    if (category.sinkAccountId !== accountId) continue
-    cents += toCents(requiredForItem(category.reserve, currentMonth))
+  for (const entry of vault.budget.entries) {
+    if (entry.archived) continue
+    if (!entry.reserve) continue
+    if (entry.sinkAccountId !== accountId) continue
+    cents += toCents(requiredForItem(entry.reserve, currentMonth))
   }
   return fromCents(cents)
 }
 
 // --- Projection -------------------------------------------------------------
 
-// What one month of the plan does to one account's balance. A category that
+// What one month of the plan does to one account's balance. An entry that
 // both sources from and sinks into this account moves nothing, which falls out
 // of adding the sink side and subtracting the source side.
 function netAllocationCents(
-  categoriesById: Map<string, VaultCategory>,
-  entries: readonly { categoryId: string; plannedAmount: string }[],
+  entriesById: Map<string, VaultEntry>,
+  planLines: readonly { entryId: string; plannedAmount: string }[],
   accountId: string,
 ): number {
   let cents = 0
-  for (const entry of entries) {
-    const category = categoriesById.get(entry.categoryId)
-    // An entry whose category is gone belongs to no account.
-    if (!category) continue
+  for (const line of planLines) {
+    const entry = entriesById.get(line.entryId)
+    // A plan line whose entry is gone belongs to no account.
+    if (!entry) continue
     // Guard before classifying: an untouched account is unaffected either way,
-    // and a category with no endpoints at all is nobody's flow.
-    if (category.sourceAccountId !== accountId && category.sinkAccountId !== accountId) continue
+    // and an entry with no endpoints at all is nobody's flow.
+    if (entry.sourceAccountId !== accountId && entry.sinkAccountId !== accountId) continue
 
-    const planned = toCents(entry.plannedAmount)
-    switch (flowKindOf(category)) {
+    const planned = toCents(line.plannedAmount)
+    switch (flowKindOf(entry)) {
       // Money arrives from outside; the guard makes this account the sink.
       case 'income':
         cents += planned
@@ -71,8 +71,8 @@ function netAllocationCents(
         break
       // Money moves between accounts, possibly both of them this one.
       case 'setaside':
-        if (category.sinkAccountId === accountId) cents += planned
-        if (category.sourceAccountId === accountId) cents -= planned
+        if (entry.sinkAccountId === accountId) cents += planned
+        if (entry.sourceAccountId === accountId) cents -= planned
         break
     }
   }
@@ -102,9 +102,9 @@ export function projectedBalance(
   const account = findAccount(vault, accountId)
   const anchorMonth = account.lastCorrectedAt.slice(0, 7)
 
-  const categoriesById = new Map(vault.budget.categories.map(c => [c.id, c]))
+  const entriesById = new Map(vault.budget.entries.map(c => [c.id, c]))
   // The plan does not vary by month, so the flow is computed once and scaled.
-  const netMonthlyFlow = netAllocationCents(categoriesById, vault.budget.plan, accountId)
+  const netMonthlyFlow = netAllocationCents(entriesById, vault.budget.plan, accountId)
   const monthsElapsed = Math.max(0, monthsBetween(anchorMonth, currentMonth))
 
   return fromCents(toCents(account.currentAmount) + monthsElapsed * netMonthlyFlow)

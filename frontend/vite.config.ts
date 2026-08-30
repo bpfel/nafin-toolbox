@@ -1,5 +1,20 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+
+const pkg = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+) as { version: string }
+
+/**
+ * What the running app calls itself.
+ *
+ * A release build passes the tag in — `APP_VERSION="$(git describe --tags)"` —
+ * which also marks a build taken from between tags as exactly that. With nothing
+ * passed it falls back to package.json, so a local build still says something
+ * true rather than nothing.
+ */
+const appVersion = process.env.APP_VERSION?.trim() || `v${pkg.version}`
 
 // One id per build. It carries no meaning beyond "this is a different build than
 // the last one", so a timestamp is enough.
@@ -22,7 +37,7 @@ function emitVersionFile(): Plugin {
       this.emitFile({
         type: 'asset',
         fileName: 'version.json',
-        source: JSON.stringify({ buildId }) + '\n',
+        source: JSON.stringify({ version: appVersion, buildId }) + '\n',
       })
     },
   }
@@ -32,6 +47,7 @@ export default defineConfig({
   plugins: [svelte({ hot: !process.env.VITEST }), emitVersionFile()],
   define: {
     __BUILD_ID__: JSON.stringify(buildId),
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   server: {
     proxy: {

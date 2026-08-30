@@ -2,23 +2,23 @@ import { describe, test, expect } from 'vitest'
 import {
   flowKindOf,
   isLegalRouting,
-  isLegalCategoryRouting,
+  isLegalEntryRouting,
   defaultRouting,
   primaryAccountId,
 } from './routing'
-import { createEmptyVault, type VaultAccount, type VaultCategory, type ReserveDefinition } from '../crypto/vault'
+import { createEmptyVault, type VaultAccount, type VaultEntry, type ReserveDefinition } from '../crypto/vault'
 
 const A = 'account-a'
 const B = 'account-b'
 
-function category(overrides: Partial<VaultCategory> = {}): VaultCategory {
+function entry(overrides: Partial<VaultEntry> = {}): VaultEntry {
   return {
     id: 'cat-1',
     name: 'Test',
     type: 'expense',
     sortOrder: 10,
     archived: false,
-    groupId: 'group-1',
+    categoryId: 'category-1',
     sourceAccountId: A,
     sinkAccountId: null,
     ...overrides,
@@ -84,50 +84,50 @@ describe('isLegalRouting — the validity matrix', () => {
 
 describe('flowKindOf', () => {
   test('source non-null and sink null is spending', () => {
-    expect(flowKindOf(category({ sourceAccountId: A, sinkAccountId: null }))).toBe('spending')
+    expect(flowKindOf(entry({ sourceAccountId: A, sinkAccountId: null }))).toBe('spending')
   })
 
   test('source null and sink non-null is income', () => {
-    expect(flowKindOf(category({ type: 'income', sourceAccountId: null, sinkAccountId: A }))).toBe('income')
+    expect(flowKindOf(entry({ type: 'income', sourceAccountId: null, sinkAccountId: A }))).toBe('income')
   })
 
   test('both non-null and distinct is setaside', () => {
-    expect(flowKindOf(category({ sourceAccountId: A, sinkAccountId: B }))).toBe('setaside')
+    expect(flowKindOf(entry({ sourceAccountId: A, sinkAccountId: B }))).toBe('setaside')
   })
 
   test('(A, A) classifies as setaside', () => {
-    expect(flowKindOf(category({ sourceAccountId: A, sinkAccountId: A }))).toBe('setaside')
+    expect(flowKindOf(entry({ sourceAccountId: A, sinkAccountId: A }))).toBe('setaside')
   })
 
   test('throws when both endpoints are null', () => {
-    expect(() => flowKindOf(category({ sourceAccountId: null, sinkAccountId: null }))).toThrow()
+    expect(() => flowKindOf(entry({ sourceAccountId: null, sinkAccountId: null }))).toThrow()
   })
 })
 
-describe('isLegalCategoryRouting', () => {
+describe('isLegalEntryRouting', () => {
   test('accepts a legal routing without a reserve', () => {
-    expect(isLegalCategoryRouting(category({ sourceAccountId: A, sinkAccountId: null }))).toBe(true)
+    expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: null }))).toBe(true)
   })
 
   test('rejects an illegal routing without a reserve', () => {
-    expect(isLegalCategoryRouting(category({ type: 'income', sourceAccountId: A, sinkAccountId: B }))).toBe(false)
+    expect(isLegalEntryRouting(entry({ type: 'income', sourceAccountId: A, sinkAccountId: B }))).toBe(false)
   })
 
   test('accepts a reserve on an expense with a non-null sink', () => {
-    expect(isLegalCategoryRouting(category({ sourceAccountId: A, sinkAccountId: B, reserve }))).toBe(true)
+    expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: B, reserve }))).toBe(true)
   })
 
   test('accepts a reserve on an (A, A) set-aside', () => {
-    expect(isLegalCategoryRouting(category({ sourceAccountId: A, sinkAccountId: A, reserve }))).toBe(true)
+    expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: A, reserve }))).toBe(true)
   })
 
   test('rejects a reserve when the sink is null', () => {
-    expect(isLegalCategoryRouting(category({ sourceAccountId: A, sinkAccountId: null, reserve }))).toBe(false)
+    expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: null, reserve }))).toBe(false)
   })
 
-  test('rejects a reserve on an income category', () => {
+  test('rejects a reserve on an income entry', () => {
     // (null, A) is a legal income routing, but a reserve may never ride on income.
-    expect(isLegalCategoryRouting(category({ type: 'income', sourceAccountId: null, sinkAccountId: A, reserve }))).toBe(false)
+    expect(isLegalEntryRouting(entry({ type: 'income', sourceAccountId: null, sinkAccountId: A, reserve }))).toBe(false)
   })
 })
 
@@ -151,8 +151,8 @@ describe('defaultRouting', () => {
     const income = defaultRouting('income', A)
     const expense = defaultRouting('expense', A)
 
-    expect(flowKindOf(category({ type: 'income', ...income }))).toBe('income')
-    expect(flowKindOf(category({ type: 'expense', ...expense }))).toBe('spending')
+    expect(flowKindOf(entry({ type: 'income', ...income }))).toBe('income')
+    expect(flowKindOf(entry({ type: 'expense', ...expense }))).toBe('spending')
   })
 })
 

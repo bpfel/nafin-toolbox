@@ -14,7 +14,7 @@
   // information and never blocks: the money has already been spent.
 
   interface Props {
-    categoryName: string
+    entryName: string
     reserve: ReserveDefinition
     accountName: string
     // The sink account's available figure before the purchase.
@@ -24,7 +24,7 @@
     onclose: () => void
   }
 
-  let { categoryName, reserve, accountName, available, currentMonth, onconfirm, onclose }: Props =
+  let { entryName, reserve, accountName, available, currentMonth, onconfirm, onclose }: Props =
     $props()
 
   // Held as overrides so the fields still read from the props they default to,
@@ -94,7 +94,7 @@
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label="Record purchase" use:focusTrap>
-    <h3>Bought {categoryName}</h3>
+    <h3>Bought {entryName}</h3>
 
     <label class="field">
       <span class="label">Price paid</span>

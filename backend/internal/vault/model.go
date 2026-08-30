@@ -4,18 +4,23 @@ import "time"
 
 // Vault represents the encrypted vault stored per user.
 type Vault struct {
-	UserID     int       `json:"-"`
-	Ciphertext []byte    `json:"ciphertext"`
-	Nonce      []byte    `json:"nonce"`
-	Version    int       `json:"version"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	UserID     int    `json:"-"`
+	Ciphertext []byte `json:"ciphertext"`
+	Nonce      []byte `json:"nonce"`
+	// Version is reported by the client and never verified — the payload is
+	// encrypted and the real version lives inside it. Useful only for seeing how
+	// far a schema migration has rolled out; it says what the client claimed, not
+	// what the ciphertext holds.
+	Version   int       `json:"version"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // VaultPayload is what the client sends/receives (base64-encoded).
 type VaultPayload struct {
 	Ciphertext string `json:"ciphertext"`
 	Nonce      string `json:"nonce"`
-	Version    int    `json:"version"`
+	// Advisory, as on Vault: the server stores it without being able to check it.
+	Version int `json:"version"`
 
 	// ExpectedUpdatedAt is the updated_at the client last saw. When set, the
 	// write is refused with 409 if the stored vault has moved on since — which

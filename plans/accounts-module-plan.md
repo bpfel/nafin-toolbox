@@ -80,27 +80,27 @@ an open question, but the field needs to exist before we can find out.
 | `retirement_3a` | Pillar 3a | In-sourced; cap logic stays with Provision3a |
 | `investment` | Brokerage | For the future investments module |
 
-### Categories
+### Entries
 
-`VaultCategory` gains source/sink and an optional reserve definition:
+`VaultEntry` gains source/sink and an optional reserve definition:
 
 ```ts
-interface VaultCategory {
-  // ...existing fields (id, name, type, sortOrder, archived, groupId, fixed)
+interface VaultEntry {
+  // ...existing fields (id, name, type, sortOrder, archived, categoryId, fixed)
   sourceAccountId: string | null   // null = external counterparty
   sinkAccountId: string | null     // null = external counterparty
   reserve?: ReserveDefinition
 }
 ```
 
-Source and sink live on the **category**, not the entry: a flow's endpoints are stable month
+Source and sink live on the **entry**, not the entry: a flow's endpoints are stable month
 to month, and `fixed` already lives there. One-off overrides are not supported; if they turn
 out to be needed, the fields move to `VaultEntry` at the cost of repeating them every period.
 
 ### Income vs spending
 
-`VaultCategory.type: 'income' | 'expense'` **already exists** and drives the existing budget
-grouping and totals in `budgetEngine.ts`. It stays the source of truth.
+`VaultEntry.type: 'income' | 'expense'` **already exists** and drives the existing budget
+categorying and totals in `budgetEngine.ts`. It stays the source of truth.
 
 Source/sink introduces a second, derivable way to express the same thing, so the two can
 contradict. Rule: `type` is authoritative, source/sink is routing detail, and the pair is
@@ -120,7 +120,7 @@ multi-account behaviour from the same model with no special cases.
 ### At least one account always exists
 
 **Invariant: there is never zero accounts.** One is created implicitly — named "Main",
-carrying nothing but an id, a name and a zero balance — so every category can be routed from
+carrying nothing but an id, a name and a zero balance — so every entry can be routed from
 the moment it is created. The last account cannot be deleted.
 
 This is what removes the unassigned state entirely. It also keeps **Set-aside** available to
@@ -169,7 +169,7 @@ The four legal rows collapse to three kinds the user actually picks:
 
 Set-aside then optionally refines into a reserve:
 
-- **no target** — generic savings, what the seeded `Savings` category is today
+- **no target** — generic savings, what the seeded `Savings` entry is today
 - **Obligation** — a bill that will arrive; target, period, due month
 - **Amortization** — a replacement you will buy; target, period, anchor
 
@@ -195,7 +195,7 @@ netChange      = income − trueOutflow   // "did my net worth grow?"
 
 **Do not add `type: 'transfer'`.** Savings must stay visible as a budget line — that is the
 point of budgeting for reserves — and a third type would break the zero-based reading of
-`balance ≈ 0`, touch existing grouping and totals code, and duplicate what `sink !== null`
+`balance ≈ 0`, touch existing categorying and totals code, and duplicate what `sink !== null`
 already tells us. Keep `type` binary; derive the accounting view from routing.
 
 ## Reserves
@@ -440,11 +440,11 @@ Two views within the one module, built in parallel:
 
 ## UX workflow
 
-**Routing is never asked for in the budget.** `AddCategoryModal` stays exactly as it is
+**Routing is never asked for in the budget.** `AddEntryModal` stays exactly as it is
 today: income or expense, nothing about accounts. All routing is set on the allocation
 screen.
 
-### Categories are born routed, by default
+### Entries are born routed, by default
 
 Creation applies defaults rather than asking. With the always-one-account invariant there is
 always something to default to:
@@ -459,7 +459,7 @@ These are **defaults, not the available shapes**. An expense may equally be
 editing the routing on the allocation screen. Spending is merely the most common case and so
 the safest thing to assume when nothing has been said.
 
-Both defaults are legal combinations, so no category is ever born unrouted or contradictory.
+Both defaults are legal combinations, so no entry is ever born unrouted or contradictory.
 A user who never opens the allocation screen has a fully consistent model they never had to
 think about.
 
@@ -470,12 +470,12 @@ creation time — it is exactly what the allocation screen is for.
 ### Changing routing on the allocation screen
 
 Set-aside is an opt-in change made later, not a decision forced at creation. The controls are
-constrained by the category's existing type, so the four contradictions remain
+constrained by the entry's existing type, so the four contradictions remain
 unrepresentable — the constraint logic is unchanged, only its location moved:
 
-> **Income category** → one control: which account does this land in? (`sink`)
+> **Income entry** → one control: which account does this land in? (`sink`)
 >
-> **Expense category** → a source, then a two-way choice:
+> **Expense entry** → a source, then a two-way choice:
 > - ○ Leaves my accounts → **Spending**, `sink = null`
 > - ○ Set aside into… [account] → **Set-aside**, `sink = account`
 
@@ -495,17 +495,17 @@ today. Enabling the module is purely additive.
 
 ### No unassigned state
 
-Defaults plus the always-one-account invariant mean categories are routed from creation.
+Defaults plus the always-one-account invariant mean entries are routed from creation.
 There is no unassigned badge, no "not yet assigned" prompt, and no bulk-assignment flow.
 
 ### Keeping it consistent over time
 
-- **Changing a category's kind** invalidates its routing. Warn and re-derive rather than
+- **Changing an entry's kind** invalidates its routing. Warn and re-derive rather than
   silently leaving a contradiction behind.
-- **Deleting an account** requires reassigning its categories. Since one account always
-  remains, the delete dialog can always offer "move these 7 categories to [account]" — there
+- **Deleting an account** requires reassigning its entries. Since one account always
+  remains, the delete dialog can always offer "move these 7 entries to [account]" — there
   is no orphan case to handle. The last account cannot be deleted at all.
-- **Archiving a category with a reserve** stops its accumulation and lowers the account's
+- **Archiving an entry with a reserve** stops its accumulation and lowers the account's
   required amount. Make that consequence explicit in the confirmation.
 
 ### Making the model legible
@@ -522,7 +522,7 @@ Three surfaces do the explaining, so the concept never has to be described in pr
 
 - **Balance drift** — resolved by deriving the balance from an anchor pair rather than
   accumulating into a stored figure. See *The balance is derived, not accumulated*.
-- **`kind` does not drive behaviour.** It is metadata for grouping and labelling only. The
+- **`kind` does not drive behaviour.** It is metadata for categorying and labelling only. The
   two candidate behaviours are better keyed off the underlying facts: QR fields follow
   *has an IBAN*, not kind, and restricting which kinds may be reserve sinks would encode a
   guess. Revisit only if a real need appears.
@@ -535,7 +535,7 @@ Three surfaces do the explaining, so the concept never has to be described in pr
 **Income and expense. Nothing else.**
 
 The budget module is untouched by Accounts. Set-asides appear among the expenses and are
-totalled as expenses, indistinguishable from rent — exactly as the seeded `Savings` category
+totalled as expenses, indistinguishable from rent — exactly as the seeded `Savings` entry
 behaves today. No kind badge, no source or sink column, no account information of any form.
 
 `plannedBalance = income − expenses` remains the single total, and the zero-based reading of

@@ -3,43 +3,50 @@
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { parseAmount } from '../../lib/util/money'
 
   interface Props {
     type: 'income' | 'expense'
-    groups: { name: string; id: string }[]
-    editCategory?: { id: string; name: string; groupName: string; plannedAmount?: string } | null
-    /** Preselects the group when adding — set by the "+" on a group header. */
-    presetGroupName?: string
+    categories: { name: string; id: string }[]
+    editEntry?: { id: string; name: string; categoryName: string; plannedAmount?: string } | null
+    /** Preselects the category when adding — set by the "+" on a category header. */
+    presetCategoryName?: string
     vault: VaultData
     oncreated: () => void
     onclose: () => void
-    onsave?: (categoryId: string, amount: string) => void
+    onsave?: (entryId: string, amount: string) => void
+    /**
+     * Hands off to the delete confirmation. Only meaningful when editing, and
+     * the reason the table row needs no delete control of its own on a narrow
+     * screen — where there is no width for one.
+     */
+    ondelete?: () => void
   }
 
-  let { type, groups, editCategory = null, presetGroupName, vault, oncreated, onclose, onsave }: Props = $props()
+  let { type, categories, editEntry = null, presetCategoryName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
 
-  let isEdit = $derived(editCategory != null)
-  let name = $state(editCategory?.name ?? '')
-  // Seeded once: the modal is created fresh each time it opens, so these are
-  // deliberately initial values rather than reactive reads.
-  let selectedGroup = $state(
-    untrack(() => editCategory?.groupName ?? presetGroupName ?? groups[0]?.name ?? ''),
+  let isEdit = $derived(editEntry != null)
+  // Seeded once: the modal is created fresh each time it opens, so every read of
+  // `editEntry` below is deliberately an initial value rather than a reactive
+  // one. `untrack` says so out loud, to Svelte and to the next reader.
+  let name = $state(untrack(() => editEntry?.name ?? ''))
+  let selectedCategory = $state(
+    untrack(() => editEntry?.categoryName ?? presetCategoryName ?? categories[0]?.name ?? ''),
   )
-  let newGroupName = $state('')
-  let useNewGroup = $state(false)
+  let newCategoryName = $state('')
+  let useNewCategory = $state(false)
   let error = $state<string | null>(null)
 
-  let plannedMoValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount)) : '')
-  let plannedYrValue = $state(editCategory?.plannedAmount ? fmt(Number(editCategory.plannedAmount) * 12) : '')
+  let plannedMoValue = $state(
+    untrack(() => (editEntry?.plannedAmount ? fmt(Number(editEntry.plannedAmount)) : '')),
+  )
+  let plannedYrValue = $state(
+    untrack(() => (editEntry?.plannedAmount ? fmt(Number(editEntry.plannedAmount) * 12) : '')),
+  )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
 
   function fmt(val: number): string {
     return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-
-  function parseInput(raw: string): number {
-    const cleaned = raw.replace(/'/g, '').replace(/,/g, '.')
-    return Number(cleaned)
   }
 
   function handleValueFocus(field: 'planned_mo' | 'planned_yr', event: FocusEvent) {
@@ -48,28 +55,46 @@
     requestAnimationFrame(() => input.select())
   }
 
-  function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
-    valueFocusedField = null
-    if (!editCategory || !onsave) return
+  /** Writes the field's amount. False when there was nothing usable to write. */
+  function commitValue(field: 'planned_mo' | 'planned_yr'): boolean {
+    if (!editEntry || !onsave) return false
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
-    const val = parseInput(raw)
-    if (isNaN(val) || !isFinite(val)) return
+    const val = parseAmount(raw)
+    if (isNaN(val) || !isFinite(val)) return false
 
     if (field === 'planned_mo') {
       plannedMoValue = fmt(val)
       plannedYrValue = fmt(val * 12)
-      onsave(editCategory.id, val.toFixed(2))
+      onsave(editEntry.id, val.toFixed(2))
     } else {
       const monthly = val / 12
       plannedYrValue = fmt(val)
       plannedMoValue = fmt(monthly)
-      onsave(editCategory.id, monthly.toFixed(4))
+      onsave(editEntry.id, monthly.toFixed(4))
     }
+    return true
+  }
+
+  function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
+    valueFocusedField = null
+    commitValue(field)
+  }
+
+  // Enter means done, the same as it does in the name field above. Without this
+  // the amount only landed once focus moved, so the dialog sat there looking as
+  // though nothing had happened.
+  function handleValueKeydown(field: 'planned_mo' | 'planned_yr', e: KeyboardEvent) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    // Nonsense in the field leaves the dialog open to be corrected rather than
+    // closing over an amount that was never written.
+    if (!commitValue(field)) return
+    save()
   }
 
   function handleValueInput(field: 'planned_mo' | 'planned_yr') {
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
-    const val = parseInput(raw)
+    const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return
 
     if (field === 'planned_mo') {
@@ -79,31 +104,31 @@
     }
   }
 
-  let resolvedGroupName = $derived(useNewGroup ? newGroupName.trim() : selectedGroup)
+  let resolvedCategoryName = $derived(useNewCategory ? newCategoryName.trim() : selectedCategory)
 
   function save() {
     const trimmed = name.trim()
     if (!trimmed) return
-    if (!isEdit && !resolvedGroupName) return
+    if (!isEdit && !resolvedCategoryName) return
     error = null
 
     try {
-      if (isEdit && editCategory) {
-        engine.updateCategory(vault, editCategory.id, {
+      if (isEdit && editEntry) {
+        engine.updateEntry(vault, editEntry.id, {
           name: trimmed,
-          groupName: resolvedGroupName,
+          categoryName: resolvedCategoryName,
         })
       } else {
-        engine.createCategory(vault, {
+        engine.createEntry(vault, {
           name: trimmed,
           type,
-          groupName: resolvedGroupName,
+          categoryName: resolvedCategoryName,
         })
       }
       oncreated()
       onclose()
     } catch (e) {
-      error = e instanceof Error ? e.message : isEdit ? 'Failed to update category' : 'Failed to create category'
+      error = e instanceof Error ? e.message : isEdit ? 'Failed to update entry' : 'Failed to create entry'
     }
   }
 
@@ -119,30 +144,30 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit category' : 'Add category'} use:focusTrap>
-    <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} category</h3>
+  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit entry' : 'Add entry'} use:focusTrap>
+    <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} entry</h3>
 
     <label class="field">
-      <span class="label">Group</span>
-      {#if useNewGroup}
-        <div class="group-input-row">
+      <span class="label">Category</span>
+      {#if useNewCategory}
+        <div class="category-input-row">
           <input
             type="text"
-            bind:value={newGroupName}
-            placeholder="New group name"
+            bind:value={newCategoryName}
+            placeholder="New category name"
           />
-          <button class="link-btn" onclick={() => { useNewGroup = false; newGroupName = '' }}>
+          <button class="link-btn" onclick={() => { useNewCategory = false; newCategoryName = '' }}>
             existing
           </button>
         </div>
       {:else}
-        <div class="group-input-row">
-          <select bind:value={selectedGroup}>
-            {#each groups as g}
+        <div class="category-input-row">
+          <select bind:value={selectedCategory}>
+            {#each categories as g}
               <option value={g.name}>{g.name || 'Other'}</option>
             {/each}
           </select>
-          <button class="link-btn" onclick={() => (useNewGroup = true)}>
+          <button class="link-btn" onclick={() => (useNewCategory = true)}>
             + new
           </button>
         </div>
@@ -159,7 +184,7 @@
       />
     </label>
 
-    {#if isEdit && editCategory?.plannedAmount != null}
+    {#if isEdit && editEntry?.plannedAmount != null}
       <div class="values-section">
         <span class="label">Values</span>
         <div class="values-grid">
@@ -173,6 +198,7 @@
               onfocus={(e) => handleValueFocus('planned_mo', e)}
               onblur={() => handleValueBlur('planned_mo')}
               oninput={() => handleValueInput('planned_mo')}
+              onkeydown={(e) => handleValueKeydown('planned_mo', e)}
             />
           </label>
           <label class="value-field">
@@ -185,6 +211,7 @@
               onfocus={(e) => handleValueFocus('planned_yr', e)}
               onblur={() => handleValueBlur('planned_yr')}
               oninput={() => handleValueInput('planned_yr')}
+              onkeydown={(e) => handleValueKeydown('planned_yr', e)}
             />
           </label>
         </div>
@@ -196,8 +223,12 @@
     {/if}
 
     <div class="actions">
+      {#if isEdit && ondelete}
+        <button class="btn delete" onclick={ondelete}>Delete</button>
+      {/if}
+      <span class="spacer"></span>
       <button class="btn cancel" onclick={onclose}>Cancel</button>
-      <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedGroupName}>
+      <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedCategoryName}>
         {isEdit ? 'Save' : 'Add'}
       </button>
     </div>
@@ -227,13 +258,13 @@
     margin: 0 0 0.25rem;
     font-size: 1.1rem;
   }
-  .group-input-row {
+  .category-input-row {
     display: flex;
     gap: 0.5rem;
     align-items: center;
   }
-  .group-input-row select,
-  .group-input-row input[type="text"] {
+  .category-input-row select,
+  .category-input-row input[type="text"] {
     flex: 1;
     padding: 0.6rem 0.75rem;
     border: 1px solid #ccc;
@@ -241,8 +272,8 @@
     font-size: 1rem;
     outline: none;
   }
-  .group-input-row select:focus,
-  .group-input-row input[type="text"]:focus {
+  .category-input-row select:focus,
+  .category-input-row input[type="text"]:focus {
     border-color: #2d6a4f;
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }
@@ -291,7 +322,21 @@
   .actions {
     display: flex;
     gap: 0.75rem;
-    justify-content: flex-end;
+    align-items: center;
+  }
+  /* Delete sits apart from Cancel/Save rather than beside them: it is not one
+     of the two ways to finish, and it should not be the button you hit while
+     reaching for Cancel. */
+  .spacer {
+    flex: 1;
+  }
+  .delete {
+    background: white;
+    border: 1px solid #c0392b;
+    color: #c0392b;
+  }
+  .delete:hover {
+    background: #fdecea;
   }
   .btn {
     padding: 0.5rem 1.25rem;

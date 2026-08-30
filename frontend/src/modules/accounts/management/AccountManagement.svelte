@@ -72,7 +72,7 @@
     return { projected, required, available }
   })
 
-  // Display only: the sum is already exact, this just groups the thousands the
+  // Display only: the sum is already exact, this just categories the thousands the
   // way the cards do.
   function fmt(cents: number): string {
     return Number(fromCents(cents)).toLocaleString('de-CH', {
@@ -309,7 +309,7 @@
   <DeleteAccountModal
     account={deleteTarget}
     otherAccounts={vaultState.vault.accounts.filter(a => a.id !== deleteTarget?.id)}
-    categories={vaultState.vault.budget.categories}
+    entries={vaultState.vault.budget.entries}
     ondelete={confirmDelete}
     onclose={() => (deleteTarget = null)}
   />

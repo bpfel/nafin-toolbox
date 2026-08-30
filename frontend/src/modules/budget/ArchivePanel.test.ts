@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { cleanup, render, screen, within } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { VaultData } from '../../lib/crypto/vault'
@@ -14,9 +14,26 @@ import ArchivePanel from './ArchivePanel.svelte'
 
 afterEach(cleanup)
 
+// de-CH's thousands separator has been both U+2019 and an ASCII apostrophe
+// depending on the ICU build (77 emits one, 78 the other), so expected strings
+// are formatted the way the app formats them rather than spelled out.
+const chf = (n: number) =>
+  n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/**
+ * The amount recorded against one archived entry.
+ *
+ * Read out of its own row rather than by text: the same figure also appears in
+ * the totals, so a bare getByText would be ambiguous.
+ */
+function archivedAmount(entryName: string): string {
+  const row = screen.getByText(entryName).closest('tr')
+  return row?.querySelector('.line-amount')?.textContent?.trim() ?? ''
+}
+
 function makeVault(): VaultData {
   return {
-    version: 4,
+    version: 5,
     accounts: [
       {
         id: 'main',
@@ -28,18 +45,18 @@ function makeVault(): VaultData {
       },
     ],
     budget: {
-      categoryGroups: [
+      categories: [
         { id: 'g-income', name: 'Employment', type: 'income', sortOrder: 10 },
         { id: 'g-housing', name: 'Housing', type: 'expense', sortOrder: 20 },
       ],
-      categories: [
+      entries: [
         {
           id: 'salary',
           name: 'Salary',
           type: 'income',
           sortOrder: 10,
           archived: false,
-          groupId: 'g-income',
+          categoryId: 'g-income',
           sourceAccountId: null,
           sinkAccountId: 'main',
         },
@@ -49,14 +66,14 @@ function makeVault(): VaultData {
           type: 'expense',
           sortOrder: 20,
           archived: false,
-          groupId: 'g-housing',
+          categoryId: 'g-housing',
           sourceAccountId: 'main',
           sinkAccountId: null,
         },
       ],
       plan: [
-        { categoryId: 'salary', plannedAmount: '6000.00' },
-        { categoryId: 'rent', plannedAmount: '1350.00' },
+        { entryId: 'salary', plannedAmount: '6000.00' },
+        { entryId: 'rent', plannedAmount: '1350.00' },
       ],
       archives: [],
     },
@@ -85,19 +102,14 @@ describe('ArchivePanel — archiving the plan', () => {
     // flushes in a microtask. A synchronous query races that flush and fails
     // intermittently under parallel load — which it did, once, in a full run.
     expect(await screen.findByRole('button', { name: 'Before the raise' })).toBeTruthy()
-    const salary = await screen.findByLabelText(
-      'Planned per month for Salary in Before the raise',
-    ) as HTMLInputElement
-    const rent = await screen.findByLabelText(
-      'Planned per month for Rent in Before the raise',
-    ) as HTMLInputElement
-    expect(salary.value).toBe('6000.00')
-    expect(rent.value).toBe('1350.00')
+    expect(await screen.findByText('Salary')).toBeTruthy()
+    expect(archivedAmount('Salary')).toBe(chf(6000))
+    expect(archivedAmount('Rent')).toBe(chf(1350))
 
     expect(vault.budget.archives).toHaveLength(1)
     expect(vault.budget.archives[0].lines).toEqual([
-      { categoryName: 'Salary', groupName: 'Employment', type: 'income', plannedAmount: '6000.00' },
-      { categoryName: 'Rent', groupName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
+      { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
+      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
     ])
   })
 
@@ -113,7 +125,7 @@ describe('ArchivePanel — archiving the plan', () => {
     expect(vault.budget.archives).toHaveLength(0)
   })
 
-  test('renaming a category afterwards leaves the archive alone', async () => {
+  test('renaming an entry afterwards leaves the archive alone', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
     render(ArchivePanel, { props: { vault } })
@@ -122,8 +134,8 @@ describe('ArchivePanel — archiving the plan', () => {
     await createArchive(user, 'Q1')
     cleanup()
 
-    // The category is renamed and its planned amount changed after the snapshot.
-    engine.updateCategory(vault, 'rent', { name: 'Flat rent' })
+    // The entry is renamed and its planned amount changed after the snapshot.
+    engine.updateEntry(vault, 'rent', { name: 'Flat rent' })
     engine.setPlanned(vault, 'rent', '1500.00')
 
     // A freshly mounted panel renders the archive from its own denormalised
@@ -132,12 +144,11 @@ describe('ArchivePanel — archiving the plan', () => {
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    const rent = screen.getByLabelText('Planned per month for Rent in Q1') as HTMLInputElement
-    expect(rent.value).toBe('1350.00')
-    expect(screen.queryByLabelText(/Flat rent/)).toBeNull()
+    expect(archivedAmount('Rent')).toBe(chf(1350))
+    expect(screen.queryByText('Flat rent')).toBeNull()
   })
 
-  test('deleting a category afterwards does not remove its archived line', async () => {
+  test('deleting an entry afterwards does not remove its archived line', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
     render(ArchivePanel, { props: { vault } })
@@ -146,13 +157,13 @@ describe('ArchivePanel — archiving the plan', () => {
     await createArchive(user, 'Q1')
     cleanup()
 
-    engine.deleteCategory(vault, 'rent')
+    engine.deleteEntry(vault, 'rent')
 
     render(ArchivePanel, { props: { vault } })
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    expect(screen.getByLabelText('Planned per month for Rent in Q1')).toBeTruthy()
+    expect(archivedAmount('Rent')).toBe(chf(1350))
   })
 })
 
@@ -172,8 +183,8 @@ describe('ArchivePanel — editing an archive', () => {
 
     expect(vault.budget.archives[0].name).toBe('First quarter')
     expect(vault.budget.plan).toEqual([
-      { categoryId: 'salary', plannedAmount: '6000.00' },
-      { categoryId: 'rent', plannedAmount: '1350.00' },
+      { entryId: 'salary', plannedAmount: '6000.00' },
+      { entryId: 'rent', plannedAmount: '1350.00' },
     ])
   })
 
@@ -193,7 +204,9 @@ describe('ArchivePanel — editing an archive', () => {
     expect(vault.budget.archives[0].name).toBe('Q1')
   })
 
-  test('edits an archived amount without changing the plan', async () => {
+  // An archive is a record of what was budgeted. Correcting it would be
+  // rewriting history, so the figures are text and the name is the only field.
+  test('an archived amount is a record, not a field', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
     render(ArchivePanel, { props: { vault } })
@@ -201,14 +214,13 @@ describe('ArchivePanel — editing an archive', () => {
     await openPanel(user)
     await createArchive(user, 'Q1')
 
-    const rent = screen.getByLabelText('Planned per month for Rent in Q1')
-    await user.clear(rent)
-    await user.type(rent, '1400')
-    await user.tab()
+    expect(archivedAmount('Rent')).toBe(chf(1350))
 
-    expect(vault.budget.archives[0].lines[1].plannedAmount).toBe('1400.00')
-    // The plan is a separate record: correcting a snapshot must not rebudget today.
-    expect(engine.plannedFor(vault, 'rent')).toBe('1350.00')
+    // Scoped to the open archive: the panel also carries a field for naming a
+    // new one, which is not part of any archive.
+    const editor = within(document.querySelector('.editor') as HTMLElement)
+    expect(editor.getAllByRole('textbox')).toHaveLength(1)
+    expect(editor.getByLabelText('Name')).toBeTruthy()
   })
 })
 
