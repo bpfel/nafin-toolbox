@@ -492,6 +492,7 @@ export const en = {
   'error.saveCategory': 'could not save this category',
   'error.renameArchive': 'could not rename this archive',
   'error.archivePlan': 'could not archive the plan',
+  'password.mustChange': 'Please set a new password to continue.',
 } as const
 
 /**

@@ -1,13 +1,6 @@
 <script lang="ts">
   import { focusTrap } from '../util/focusTrap'
-  import {
-    AVAILABLE_LOCALES,
-    getLocale,
-    isProvisional,
-    setLocale,
-    t,
-    type Locale,
-  } from '../i18n/index.svelte'
+  import { t } from '../i18n/index.svelte'
 
   interface Props {
     role: string
@@ -19,23 +12,14 @@
   let { role, email, onnavigate, onlogout }: Props = $props()
 
   let open = $state(false)
-  let showLanguages = $state(false)
 
   function close() {
     open = false
-    showLanguages = false
   }
 
   function go(view: 'security' | 'modules') {
     close()
     onnavigate(view)
-  }
-
-  function choose(locale: Locale) {
-    setLocale(locale)
-    // Deliberately stays open. The whole interface changes underneath, which is
-    // the confirmation — and someone who picked the wrong language can still
-    // read the list, because it is written in endonyms.
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -74,39 +58,11 @@
         <span class="email">{email}</span>
       </div>
 
-      {#if showLanguages}
-        <button class="item" role="menuitem" onclick={() => (showLanguages = false)}>
-          ← {t('action.back')}
-        </button>
-        <ul class="languages">
-          {#each AVAILABLE_LOCALES as locale}
-            <li>
-              <button
-                class="item language"
-                role="menuitemradio"
-                aria-checked={getLocale() === locale}
-                onclick={() => choose(locale)}
-              >
-                <span class="tick" aria-hidden="true">{getLocale() === locale ? '✓' : ''}</span>
-                <span class="name">{t(`language.${locale}` as 'language.en')}</span>
-                {#if isProvisional(locale)}
-                  <span class="provisional">{t('language.provisional')}</span>
-                {/if}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <button class="item" role="menuitem" onclick={() => go('security')}>{t('menu.security')}</button>
-        <button class="item" role="menuitem" onclick={() => go('modules')}>{t('menu.modules')}</button>
-        <button class="item" role="menuitem" aria-haspopup="true" onclick={() => (showLanguages = true)}>
-          {t('menu.language')}
-          <span class="current" aria-hidden="true">{t(`language.${getLocale()}` as 'language.en')}</span>
-        </button>
-        <button class="item danger" role="menuitem" onclick={() => { close(); onlogout() }}>
-          {t('menu.logout')}
-        </button>
-      {/if}
+      <button class="item" role="menuitem" onclick={() => go('security')}>{t('menu.security')}</button>
+      <button class="item" role="menuitem" onclick={() => go('modules')}>{t('menu.modules')}</button>
+      <button class="item danger" role="menuitem" onclick={() => { close(); onlogout() }}>
+        {t('menu.logout')}
+      </button>
     </div>
   {/if}
 </div>
@@ -200,31 +156,6 @@
   }
   .item.danger { color: #c0392b; }
   .item.danger:hover { background: #fdecea; }
-
-  .current {
-    margin-left: auto;
-    font-size: 0.8rem;
-    color: #888;
-  }
-
-  .languages {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .tick {
-    width: 1rem;
-    flex: none;
-    color: #2d6a4f;
-  }
-  .name { flex: 1; }
-  .provisional {
-    font-size: 0.7rem;
-    color: #b26a00;
-    background: #fdf3e0;
-    border-radius: 4px;
-    padding: 0.05rem 0.35rem;
-  }
 
   @media (max-width: 768px) {
     .panel {

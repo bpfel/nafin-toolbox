@@ -458,4 +458,5 @@ export const de: Messages = {
   'error.saveCategory': 'diese Kategorie konnte nicht gespeichert werden',
   'error.renameArchive': 'dieses Archiv konnte nicht umbenannt werden',
   'error.archivePlan': 'der Plan konnte nicht archiviert werden',
+  'password.mustChange': 'Bitte legen Sie ein neues Passwort fest, um fortzufahren.',
 }

@@ -19,6 +19,7 @@
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
   import SettingsMenu from './lib/nav/SettingsMenu.svelte'
+  import LanguagePicker from './lib/nav/LanguagePicker.svelte'
   import { t } from './lib/i18n/index.svelte'
 
   const authState = getAuthState()
@@ -215,7 +216,37 @@
       recovering = false
     }
   }
+  /**
+   * True on every screen that renders its own centred card instead of the app's
+   * top bar — loading, sign-up, login, and each enforcement gate.
+   *
+   * These are exactly the screens with nowhere to put the language picker in
+   * flow, so it floats there instead. The condition mirrors the branch chain
+   * below and has to move with it: a gate added there wants a term here too, or
+   * that screen silently loses the picker.
+   */
+  let chromeless = $derived(
+    authState.loading ||
+      isVerifyPage ||
+      !authState.currentUser ||
+      authState.currentUser.must_change_password ||
+      show2FAEnforcement ||
+      (!isAdmin &&
+        (authState.recoveryKeyToShow != null ||
+          vaultState.versionAhead ||
+          authState.vaultNeedsSetup ||
+          authState.vaultDecryptFailed ||
+          authState.vaultLocked ||
+          !vaultState.unlocked)),
+  )
 </script>
+
+{#if chromeless}
+  <div class="floating-language">
+    <LanguagePicker />
+  </div>
+{/if}
+
 
 <svelte:window onkeydown={handleKeydown} />
 
@@ -232,7 +263,7 @@
   <LoginPage onSuccess={handleLoginSuccess} />
 {:else if authState.currentUser.must_change_password}
   <ChangePasswordForm
-    message="Please set a new password to continue."
+    message={t('password.mustChange')}
     showLogout={true}
   />
 {:else if show2FAEnforcement}
@@ -370,12 +401,15 @@
       </div>
       <!-- One menu at every width. The hamburger it replaces held the same items
            and a copy of the role and email, which now live in the panel. -->
-      <SettingsMenu
-        role={authState.currentUser.role}
-        email={authState.currentUser.email}
-        onnavigate={navigateTo}
-        onlogout={handleLogout}
-      />
+      <div class="bar-controls">
+        <LanguagePicker />
+        <SettingsMenu
+          role={authState.currentUser.role}
+          email={authState.currentUser.email}
+          onnavigate={navigateTo}
+          onlogout={handleLogout}
+        />
+      </div>
     </div>
 
     {#if showSecurity}
@@ -507,6 +541,21 @@
     text-align: center;
     padding: 4rem;
     color: #666;
+  }
+
+  /* Anchored to the viewport, because these screens centre a card and have no
+     bar to sit in. */
+  .floating-language {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+  }
+
+  .bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   .top-bar {

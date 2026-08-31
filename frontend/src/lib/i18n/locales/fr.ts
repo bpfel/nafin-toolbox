@@ -446,4 +446,5 @@ export const fr: Messages = {
   'error.saveCategory': 'cette catégorie n’a pas pu être enregistrée',
   'error.renameArchive': 'cette archive n’a pas pu être renommée',
   'error.archivePlan': 'le plan n’a pas pu être archivé',
+  'password.mustChange': 'Veuillez définir un nouveau mot de passe pour continuer.',
 }

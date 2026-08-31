@@ -446,4 +446,5 @@ export const it: Messages = {
   'error.saveCategory': 'non è stato possibile salvare questa categoria',
   'error.renameArchive': 'non è stato possibile rinominare questa archiviazione',
   'error.archivePlan': 'non è stato possibile archiviare il piano',
+  'password.mustChange': 'Imposta una nuova password per continuare.',
 }

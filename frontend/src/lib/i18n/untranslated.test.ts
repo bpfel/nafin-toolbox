@@ -74,6 +74,10 @@ const MARKUP_SHAPES: [RegExp, string][] = [
   [/>([A-Za-z0-9][^<>{}\n]{3,})</g, 'text between tags'],
   [/^[ \t]*([A-Za-z0-9][^<>{}\n=]{3,})$/gm, 'text on its own line'],
   [/(?:aria-label|title|placeholder|alt)="([A-Za-z0-9][^"]{3,})"/g, 'attribute'],
+  // Any attribute holding a whole sentence — which is how a `message="..."`
+  // prop passed to a child component stayed English past the allowlist above.
+  // Terminal punctuation is the tell; class names and paths have none.
+  [/\w+="([A-Z][^"]*[.?!])"/g, 'sentence in an attribute'],
   [/\{[^{}]*?'([A-Za-z0-9][^']{3,})'[^{}]*?\}/g, 'string in an expression'],
 ]
 
