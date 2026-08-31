@@ -14,6 +14,14 @@ import { describe, test, expect } from 'vitest'
  * widen it here and the next component gets checked for free.
  */
 
+/**
+ * What this cannot see: values the server supplies. `{user.role}` rendered a
+ * raw "user" for months and no pattern here could ever have caught it, because
+ * there is no literal to find — the English lives in the API's enum. Any closed
+ * set of server values shown to a user needs a slug per value, and only a person
+ * noticing will tell you it is missing.
+ */
+
 /** Admin-only screens stay English by decision, not by oversight. */
 const ADMIN_ONLY = ['AuditLogViewer.svelte', 'InvitePanel.svelte', 'DeleteUserModal.svelte']
 

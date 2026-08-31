@@ -468,7 +468,7 @@ export const en = {
   // --- Found by the untranslated-strings scan ---
   'password.mismatchNew': 'New passwords do not match',
   'password.mismatch': 'Passwords do not match',
-  'recoveryKey.saved': 'I’ve saved my recovery key',
+  'recoveryKey.saved': 'Recovery key saved',
   'twofa.codesSaved': 'I’ve saved my codes',
   'twofa.qrAlt': 'QR code',
   'twofa.codesCopyFailedPlain': 'Could not reach the clipboard. Select the codes above and copy them by hand.',
@@ -518,6 +518,10 @@ export const en = {
   'qrbill.amount': 'Amount',
   'qrbill.amountLabel': 'Amount ({currency})',
   'qrbill.debtorOptional': 'Debtor (optional)',
+
+  // --- Roles. Server-supplied values, so no scan can see them. ---
+  'role.user': 'User',
+  'role.admin': 'Admin',
 } as const
 
 /**

@@ -15,7 +15,7 @@ function show() {
 
 async function reachConfirmStep() {
   const r = show()
-  await fireEvent.click(screen.getByRole('button', { name: /i['’]ve saved my recovery key/i }))
+  await fireEvent.click(screen.getByRole('button', { name: /recovery key saved/i }))
   return r
 }
 
@@ -93,7 +93,7 @@ describe('the safeguard', () => {
     expect(screen.getByText(KEY)).toBeTruthy()
 
     // Nobody is stranded: the key is still there to copy again.
-    await fireEvent.click(screen.getByRole('button', { name: /i['’]ve saved my recovery key/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /recovery key saved/i }))
     expect(confirmBtn()).toBeTruthy()
   })
 })

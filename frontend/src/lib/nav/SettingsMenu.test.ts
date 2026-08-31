@@ -55,7 +55,7 @@ describe('the gear', () => {
     show()
     const p = await open()
 
-    expect(within(p).getByText('user')).toBeTruthy()
+    expect(within(p).getByText('User')).toBeTruthy()
     expect(within(p).getByText('anna@example.ch')).toBeTruthy()
   })
 

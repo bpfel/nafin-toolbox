@@ -85,7 +85,7 @@ export const de: Messages = {
   'twofa.title': 'Zwei-Faktor-Authentifizierung',
   'twofa.enterCode': 'Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.',
   'twofa.enterRecoveryCode': 'Geben Sie einen Ihrer Wiederherstellungscodes ein.',
-  'twofa.useRecoveryCode': 'Stattdessen Wiederherstellungscode verwenden',
+  'twofa.useRecoveryCode': 'Wiederherstellungscode verwenden',
   'twofa.useAuthenticator': 'Stattdessen Authenticator-Code verwenden',
   'twofa.recoveryCodePlaceholder': 'z. B. a1b2c3d4',
   'twofa.verify': 'Bestätigen',
@@ -434,7 +434,7 @@ export const de: Messages = {
   // --- Found by the untranslated-strings scan ---
   'password.mismatchNew': 'Die neuen Passwörter stimmen nicht überein',
   'password.mismatch': 'Die Passwörter stimmen nicht überein',
-  'recoveryKey.saved': 'Ich habe meinen Wiederherstellungsschlüssel gesichert',
+  'recoveryKey.saved': 'Schlüssel gesichert',
   'twofa.codesSaved': 'Ich habe meine Codes gesichert',
   'twofa.qrAlt': 'QR-Code',
   'twofa.codesCopyFailedPlain': 'Die Zwischenablage war nicht erreichbar. Markieren Sie die Codes oben und kopieren Sie sie von Hand.',
@@ -483,5 +483,9 @@ export const de: Messages = {
   'accountForm.checksumValid': 'Prüfsumme gültig. Erkannt als {kind}.',
   'qrbill.amount': 'Betrag',
   'qrbill.amountLabel': 'Betrag ({currency})',
-  'qrbill.debtorOptional': 'Zahlungspflichtige Person (optional)',
+  'qrbill.debtorOptional': 'Zahlbar durch (optional)',
+
+  // --- Roles. Server-supplied values, so no scan can see them. ---
+  'role.user': 'Benutzer',
+  'role.admin': 'Admin',
 }

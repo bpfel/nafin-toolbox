@@ -250,7 +250,7 @@ export const it: Messages = {
   'snapshot.newNameLabel': 'Nome della nuova istantanea',
   'snapshot.newNamePlaceholder': 'p. es. prima dell’aumento',
   'snapshot.create': 'Scatta un’istantanea',
-  'snapshot.none': 'Nessuna istantanea per il momento.',
+  'snapshot.none': 'Nessuna istantanea.',
   'snapshot.empty': 'Questa istantanea non contiene righe.',
   'snapshot.entryColumn': 'Voce',
   'snapshot.deleteOne': 'Elimina l’istantanea {name}',
@@ -328,7 +328,7 @@ export const it: Messages = {
   'routing.destination': 'Destinazione',
   'routing.leaves': 'Esce dai miei conti',
   'routing.setAsideInto': 'Messo da parte su',
-  'routing.setAsideAccount': 'Conto per il denaro messo da parte',
+  'routing.setAsideAccount': 'Conto di accantonamento',
 
   // --- Reserves ---
   'reserve.savingTowards': 'Risparmio in vista di',
@@ -348,7 +348,7 @@ export const it: Messages = {
   'purchase.scope': 'Non viene spostato denaro e nessuna altra posizione cambia. Viene aggiornata solo questa riserva.',
   'purchase.confirm': 'Registra l’acquisto',
 
-  'budget.loadDefaults': 'Carica i valori svizzeri predefiniti',
+  'budget.loadDefaults': 'Modello svizzero',
   'budget.startBlank': 'Inizia da zero',
   'snapshot.panelTitle': 'Archivio',
   'snapshot.blurb': 'Un’istantanea è una copia con nome del piano così com’è ora. Conserva i nomi e gli importi con cui è stata scattata, quindi le modifiche successive alle tue voci non la toccano.',
@@ -422,7 +422,7 @@ export const it: Messages = {
   // --- Found by the untranslated-strings scan ---
   'password.mismatchNew': 'Le nuove password non coincidono',
   'password.mismatch': 'Le password non coincidono',
-  'recoveryKey.saved': 'Ho salvato la mia chiave di recupero',
+  'recoveryKey.saved': 'Chiave salvata',
   'twofa.codesSaved': 'Ho salvato i miei codici',
   'twofa.qrAlt': 'Codice QR',
   'twofa.codesCopyFailedPlain': 'Non è stato possibile raggiungere gli appunti. Seleziona i codici qui sopra e copiali a mano.',
@@ -471,5 +471,9 @@ export const it: Messages = {
   'accountForm.checksumValid': 'Somma di controllo valida. Rilevato come {kind}.',
   'qrbill.amount': 'Importo',
   'qrbill.amountLabel': 'Importo ({currency})',
-  'qrbill.debtorOptional': 'Debitore (facoltativo)',
+  'qrbill.debtorOptional': 'Pagabile da (facoltativo)',
+
+  // --- Roles. Server-supplied values, so no scan can see them. ---
+  'role.user': 'Utente',
+  'role.admin': 'Admin',
 }

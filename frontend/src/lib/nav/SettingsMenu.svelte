@@ -54,7 +54,7 @@
       <!-- Repeated from the bar because the bar hides them on a narrow screen,
            where this panel is the only place they appear. -->
       <div class="who">
-        <span class="role">{role}</span>
+        <span class="role">{t(`role.${role}` as 'role.user')}</span>
         <span class="email">{email}</span>
       </div>
 

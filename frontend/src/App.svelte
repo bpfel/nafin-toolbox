@@ -386,7 +386,7 @@
     <div class="top-bar">
       <h1>{t('app.title')}</h1>
       <div class="user-info">
-        <span class="role-tag">{authState.currentUser.role}</span>
+        <span class="role-tag">{t(`role.${authState.currentUser.role}` as 'role.user')}</span>
         <span class="user-email">{authState.currentUser.email}</span>
         {#if !isAdmin}
           {#if vaultState.saving}

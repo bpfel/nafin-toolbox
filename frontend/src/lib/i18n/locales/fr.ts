@@ -94,7 +94,7 @@ export const fr: Messages = {
   'twofa.title': 'Authentification à deux facteurs',
   'twofa.enterCode': 'Saisissez le code à 6 chiffres de votre application d’authentification.',
   'twofa.enterRecoveryCode': 'Saisissez l’un de vos codes de récupération.',
-  'twofa.useRecoveryCode': 'Utiliser plutôt un code de récupération',
+  'twofa.useRecoveryCode': 'Utiliser un code de récupération',
   'twofa.useAuthenticator': 'Utiliser plutôt le code de l’application',
   'twofa.recoveryCodePlaceholder': 'p. ex. a1b2c3d4',
   'twofa.verify': 'Vérifier',
@@ -110,7 +110,7 @@ export const fr: Messages = {
   'verify.doneHint': 'Votre compte a été configuré. Redirection...',
   'verify.setupTitle': 'Configurer votre compte',
   'verify.setupHint': 'Choisissez un mot de passe pour terminer la configuration de votre compte.',
-  'verify.setPassword': 'Définir le mot de passe et se connecter',
+  'verify.setPassword': 'Enregistrer et se connecter',
   'verify.settingUp': 'Configuration...',
 
   // --- Changing a password ---
@@ -250,7 +250,7 @@ export const fr: Messages = {
   'snapshot.newNameLabel': 'Nom du nouvel instantané',
   'snapshot.newNamePlaceholder': 'p. ex. avant l’augmentation',
   'snapshot.create': 'Prendre un instantané',
-  'snapshot.none': 'Aucun instantané pour le moment.',
+  'snapshot.none': 'Aucun instantané.',
   'snapshot.empty': 'Cet instantané ne contient aucune ligne.',
   'snapshot.entryColumn': 'Entrée',
   'snapshot.deleteOne': 'Supprimer l’instantané {name}',
@@ -328,7 +328,7 @@ export const fr: Messages = {
   'routing.destination': 'Destination',
   'routing.leaves': 'Quitte mes comptes',
   'routing.setAsideInto': 'Mis de côté sur',
-  'routing.setAsideAccount': 'Compte pour l’argent mis de côté',
+  'routing.setAsideAccount': 'Compte de provision',
 
   // --- Reserves ---
   'reserve.savingTowards': 'Épargne en vue de',
@@ -348,7 +348,7 @@ export const fr: Messages = {
   'purchase.scope': 'Aucun argent n’est déplacé et aucune autre position ne change. Seule cette réserve est mise à jour.',
   'purchase.confirm': 'Enregistrer l’achat',
 
-  'budget.loadDefaults': 'Charger les valeurs suisses par défaut',
+  'budget.loadDefaults': 'Modèle suisse',
   'budget.startBlank': 'Commencer à vide',
   'snapshot.panelTitle': 'Archives',
   'snapshot.blurb': 'Un instantané est une copie nommée du plan tel qu’il est maintenant. Il conserve les noms et les montants du moment où il a été pris, de sorte que vos modifications ultérieures ne le touchent pas.',
@@ -422,7 +422,7 @@ export const fr: Messages = {
   // --- Found by the untranslated-strings scan ---
   'password.mismatchNew': 'Les nouveaux mots de passe ne correspondent pas',
   'password.mismatch': 'Les mots de passe ne correspondent pas',
-  'recoveryKey.saved': 'J’ai sauvegardé ma clé de récupération',
+  'recoveryKey.saved': 'Clé sauvegardée',
   'twofa.codesSaved': 'J’ai sauvegardé mes codes',
   'twofa.qrAlt': 'Code QR',
   'twofa.codesCopyFailedPlain': 'Le presse-papiers n’a pas pu être atteint. Sélectionnez les codes ci-dessus et copiez-les à la main.',
@@ -471,5 +471,9 @@ export const fr: Messages = {
   'accountForm.checksumValid': 'Somme de contrôle valide. Détecté comme {kind}.',
   'qrbill.amount': 'Montant',
   'qrbill.amountLabel': 'Montant ({currency})',
-  'qrbill.debtorOptional': 'Débiteur (facultatif)',
+  'qrbill.debtorOptional': 'Payable par (facultatif)',
+
+  // --- Roles. Server-supplied values, so no scan can see them. ---
+  'role.user': 'Utilisateur',
+  'role.admin': 'Admin',
 }
