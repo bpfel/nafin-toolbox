@@ -5,7 +5,7 @@
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
-  import ArchivePanel from './ArchivePanel.svelte'
+  import SnapshotPanel from './SnapshotPanel.svelte'
   import ResetBudgetModal from './ResetBudgetModal.svelte'
   import { isEditing } from '../../lib/util/editMode.svelte'
 
@@ -87,12 +87,12 @@
       onentrydeleted={handleEntryChange}
       oncategorychanged={handleEntryChange}
     />
-    <ArchivePanel vault={vaultState.vault} />
+    <SnapshotPanel vault={vaultState.vault} />
 
     {#if confirmingReset}
       <ResetBudgetModal
         entryCount={vaultState.vault.budget.entries.length}
-        archiveCount={vaultState.vault.budget.archives.length}
+        snapshotCount={vaultState.vault.budget.snapshots.length}
         onreset={handleReset}
         onclose={() => confirmingReset = false}
       />

@@ -39,7 +39,7 @@ function entry(overrides: Partial<VaultEntry> & { id: string; name: string }): V
 
 function makeVault(): VaultData {
   return {
-    version: 5,
+    version: 6,
     accounts: [
       {
         id: 'main',
@@ -91,7 +91,7 @@ function makeVault(): VaultData {
         { entryId: 'rent', plannedAmount: '500.00' },
         { entryId: 'laptop', plannedAmount: '100.00' },
       ],
-      archives: [],
+      snapshots: [],
     },
   }
 }

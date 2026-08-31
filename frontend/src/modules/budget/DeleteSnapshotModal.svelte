@@ -3,17 +3,17 @@
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
-    archiveName: string
+    snapshotName: string
     lineCount: number
     ondeleted: () => void
     onclose: () => void
   }
 
-  let { archiveName, lineCount, ondeleted, onclose }: Props = $props()
+  let { snapshotName, lineCount, ondeleted, onclose }: Props = $props()
 
   let explain = $derived(
     tAround(
-      lineCount === 1 ? 'archive.deleteExplain.one' : 'archive.deleteExplain.other',
+      lineCount === 1 ? 'snapshot.deleteExplain.one' : 'snapshot.deleteExplain.other',
       'name',
       { count: lineCount },
     ),
@@ -36,14 +36,14 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('archive.deleteTitle')} use:focusTrap>
-    <h3>{t('archive.deleteTitle')}</h3>
+  <div class="modal" role="dialog" aria-label={t('snapshot.deleteTitle')} use:focusTrap>
+    <h3>{t('snapshot.deleteTitle')}</h3>
     <p>
-      {explain[0]}<strong>{archiveName}</strong>{explain[1]}
+      {explain[0]}<strong>{snapshotName}</strong>{explain[1]}
     </p>
-    <!-- An archive is the only copy of the plan as it stood: the entries it
+    <!-- An snapshot is the only copy of the plan as it stood: the entries it
          names may since have been renamed or deleted, so nothing can rebuild it. -->
-    <p class="warning">{t('archive.unrecoverable')}</p>
+    <p class="warning">{t('snapshot.unrecoverable')}</p>
 
     <div class="actions">
       <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>

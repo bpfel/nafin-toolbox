@@ -222,16 +222,16 @@ export const de: Messages = {
   'category.editTitle': 'Kategorie bearbeiten',
   'category.type': 'Typ',
 
-  // --- Archives ---
-  'archive.newNameLabel': 'Name für das neue Archiv',
-  'archive.newNamePlaceholder': 'z. B. Vor der Lohnerhöhung',
-  'archive.create': 'Aktuellen Plan archivieren',
-  'archive.none': 'Noch keine Archive.',
-  'archive.empty': 'Dieses Archiv hat keine Zeilen.',
-  'archive.entryColumn': 'Eintrag',
-  'archive.deleteOne': 'Archiv {name} löschen',
-  'archive.deleteTitle': 'Archiv löschen',
-  'archive.unrecoverable': 'Diese Momentaufnahme kann nicht wiederhergestellt werden.',
+  // --- Snapshots ---
+  'snapshot.newNameLabel': 'Name für die neue Momentaufnahme',
+  'snapshot.newNamePlaceholder': 'z. B. Vor der Lohnerhöhung',
+  'snapshot.create': 'Momentaufnahme erstellen',
+  'snapshot.none': 'Noch keine Momentaufnahmen.',
+  'snapshot.empty': 'Diese Momentaufnahme hat keine Zeilen.',
+  'snapshot.entryColumn': 'Eintrag',
+  'snapshot.deleteOne': 'Momentaufnahme {name} löschen',
+  'snapshot.deleteTitle': 'Momentaufnahme löschen',
+  'snapshot.unrecoverable': 'Diese Momentaufnahme kann nicht wiederhergestellt werden.',
 
   'field.name': 'Name',
 
@@ -239,14 +239,14 @@ export const de: Messages = {
   'reset.title': 'Budget zurücksetzen',
   'reset.explain.one': 'Damit werden der eine Eintrag, seine Kategorie und alle geplanten Beträge entfernt. Sie beginnen wieder mit einem leeren Budget.',
   'reset.explain.other': 'Damit werden alle {count} Einträge, ihre Kategorien und alle geplanten Beträge entfernt. Sie beginnen wieder mit einem leeren Budget.',
-  'reset.archivesKept.one': 'Ihr {count} Archiv ist eine Aufzeichnung des damals Budgetierten und bleibt erhalten.',
-  'reset.archivesKept.other': 'Ihre {count} Archive sind Aufzeichnungen des damals Budgetierten und bleiben erhalten.',
-  'reset.noArchives': 'Es ist nichts archiviert, daher bleibt keine Aufzeichnung dieses Plans zurück. Brechen Sie ab und archivieren Sie ihn zuerst, wenn Sie eine behalten möchten.',
+  'reset.snapshotsKept.one': 'Ihre {count} Momentaufnahme ist eine Aufzeichnung des damals Budgetierten und bleibt erhalten.',
+  'reset.snapshotsKept.other': 'Ihre {count} Momentaufnahmen sind Aufzeichnungen des damals Budgetierten und bleiben erhalten.',
+  'reset.noSnapshots': 'Es gibt keine Momentaufnahmen, es bleibt also keine Aufzeichnung dieses Plans. Brechen Sie ab und erstellen Sie zuerst eine, wenn Sie eine behalten möchten.',
 
-  'entry.deleteExplain': 'Soll {name} aus Ihrem Budget entfernt werden? Der geplante Betrag geht mit. Ein Archiv, das ihn bereits erfasst hat, behält seine Kopie.',
+  'entry.deleteExplain': 'Soll {name} aus Ihrem Budget entfernt werden? Der geplante Betrag geht mit. Eine Momentaufnahme, die ihn bereits erfasst hat, behält ihre Kopie.',
 
-  'archive.deleteExplain.one': '{name} und die {count} Zeile löschen?',
-  'archive.deleteExplain.other': '{name} und seine {count} Zeilen löschen?',
+  'snapshot.deleteExplain.one': '{name} und die {count} Zeile löschen?',
+  'snapshot.deleteExplain.other': '{name} und seine {count} Zeilen löschen?',
 
   // --- Accounts ---
   'accounts.title': 'Konten',
@@ -362,8 +362,8 @@ export const de: Messages = {
 
   'budget.loadDefaults': 'Schweizer Standardwerte laden',
   'budget.startBlank': 'Leer beginnen',
-  'archive.panelTitle': 'Archive',
-  'archive.blurb': 'Ein Archiv ist eine benannte Kopie des Plans, wie er jetzt steht. Es behält die Namen und Beträge, mit denen es erstellt wurde — spätere Änderungen an Ihren Einträgen lassen es unberührt.',
+  'snapshot.panelTitle': 'Archiv',
+  'snapshot.blurb': 'Eine Momentaufnahme ist eine benannte Kopie des Plans, wie er jetzt steht. Sie behält die Namen und Beträge, mit denen sie erstellt wurde — spätere Änderungen an Ihren Einträgen lassen sie unberührt.',
   'accounts.tabAccounts': 'Konten',
   'accounts.tabAllocations': 'Zuordnungen',
   'alloc.noEntries': 'Noch keine Budgeteinträge. Legen Sie sie im Budget-Modul an, dann erscheinen sie hier und können zugeordnet werden.',
@@ -416,8 +416,8 @@ export const de: Messages = {
   'twofa.enterCode.label': 'Code eingeben',
   'time.months.one': 'Monat',
   'time.months.other': 'Monate',
-  'archive.lines.one': 'Zeile',
-  'archive.lines.other': 'Zeilen',
+  'snapshot.lines.one': 'Zeile',
+  'snapshot.lines.other': 'Zeilen',
   'accountForm.qrIbanNote': 'eine QR-IBAN — Rechnungen verwenden eine QR-Referenz (QRR)',
   'accountForm.regularIbanNote': 'eine normale IBAN — Rechnungen verwenden keine Referenz oder SCOR',
   'qrbill.generate': 'Erzeugen',
@@ -456,8 +456,8 @@ export const de: Messages = {
   'qrbill.qrIbanRule': 'Eine QR-IBAN akzeptiert ausschliesslich eine QR-Referenz.',
   'qrbill.regularIbanRule': 'Eine normale IBAN akzeptiert keine Referenz oder eine Creditor Reference — niemals eine QR-Referenz.',
   'error.saveCategory': 'diese Kategorie konnte nicht gespeichert werden',
-  'error.renameArchive': 'dieses Archiv konnte nicht umbenannt werden',
-  'error.archivePlan': 'der Plan konnte nicht archiviert werden',
+  'error.renameSnapshot': 'diese Momentaufnahme konnte nicht umbenannt werden',
+  'error.takeSnapshot': 'es konnte keine Momentaufnahme erstellt werden',
   'password.mustChange': 'Bitte legen Sie ein neues Passwort fest, um fortzufahren.',
 
   // --- Sentences assembled around their values ---

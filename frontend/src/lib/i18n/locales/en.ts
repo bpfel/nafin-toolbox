@@ -240,16 +240,16 @@ export const en = {
   'category.editTitle': 'Edit category',
   'category.type': 'Type',
 
-  // --- Archives ---
-  'archive.newNameLabel': 'Name for the new archive',
-  'archive.newNamePlaceholder': 'e.g. Before the raise',
-  'archive.create': 'Archive current plan',
-  'archive.none': 'No archives yet.',
-  'archive.empty': 'This archive has no lines.',
-  'archive.entryColumn': 'Entry',
-  'archive.deleteOne': 'Delete archive {name}',
-  'archive.deleteTitle': 'Delete archive',
-  'archive.unrecoverable': 'This snapshot cannot be recovered.',
+  // --- Snapshots ---
+  'snapshot.newNameLabel': 'Name for the new snapshot',
+  'snapshot.newNamePlaceholder': 'e.g. Before the raise',
+  'snapshot.create': 'Take a snapshot',
+  'snapshot.none': 'No snapshots yet.',
+  'snapshot.empty': 'This snapshot has no lines.',
+  'snapshot.entryColumn': 'Entry',
+  'snapshot.deleteOne': 'Delete snapshot {name}',
+  'snapshot.deleteTitle': 'Delete snapshot',
+  'snapshot.unrecoverable': 'This snapshot cannot be recovered.',
 
   'field.name': 'Name',
 
@@ -260,14 +260,14 @@ export const en = {
   'reset.title': 'Reset budget',
   'reset.explain.one': 'This removes all {count} entry, its category and every planned amount. You start again from an empty budget.',
   'reset.explain.other': 'This removes all {count} entries, their categories and every planned amount. You start again from an empty budget.',
-  'reset.archivesKept.one': 'Your {count} archive is a record of what was budgeted and is kept.',
-  'reset.archivesKept.other': 'Your {count} archives are records of what was budgeted and are kept.',
-  'reset.noArchives': 'Nothing is archived, so no record of this plan will remain. Cancel and archive it first if you want to keep one.',
+  'reset.snapshotsKept.one': 'Your {count} snapshot is a record of what was budgeted and is kept.',
+  'reset.snapshotsKept.other': 'Your {count} snapshots are records of what was budgeted and are kept.',
+  'reset.noSnapshots': 'There are no snapshots, so no record of this plan will remain. Cancel and take one first if you want to keep it.',
 
-  'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Any archive that already recorded it keeps its copy.',
+  'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Any snapshot that already recorded it keeps its copy.',
 
-  'archive.deleteExplain.one': 'Delete {name} and its {count} line?',
-  'archive.deleteExplain.other': 'Delete {name} and its {count} lines?',
+  'snapshot.deleteExplain.one': 'Delete {name} and its {count} line?',
+  'snapshot.deleteExplain.other': 'Delete {name} and its {count} lines?',
 
   // --- Accounts ---
   'accounts.title': 'Accounts',
@@ -394,8 +394,8 @@ export const en = {
   // --- Missed in the first pass: text on its own line, and script literals ---
   'budget.loadDefaults': 'Load Swiss defaults',
   'budget.startBlank': 'Start blank',
-  'archive.panelTitle': 'Archives',
-  'archive.blurb': 'An archive is a named copy of the plan as it stands now. It keeps the names and amounts it was taken with, so later edits to your entries leave it alone.',
+  'snapshot.panelTitle': 'Archive',
+  'snapshot.blurb': 'A snapshot is a named copy of the plan as it stands now. It keeps the names and amounts it was taken with, so later edits to your entries leave it alone.',
   'accounts.tabAccounts': 'Accounts',
   'accounts.tabAllocations': 'Allocations',
   'alloc.noEntries': 'No budget entries yet. Add them in the Budget module and they will appear here, ready to route.',
@@ -450,8 +450,8 @@ export const en = {
   'twofa.enterCode.label': 'Enter code',
   'time.months.one': 'month',
   'time.months.other': 'months',
-  'archive.lines.one': 'line',
-  'archive.lines.other': 'lines',
+  'snapshot.lines.one': 'line',
+  'snapshot.lines.other': 'lines',
   'accountForm.qrIbanNote': 'a QR-IBAN — bills will use a QR reference (QRR)',
   'accountForm.regularIbanNote': 'a regular IBAN — bills will use no reference or SCOR',
   'qrbill.generate': 'Generate',
@@ -490,8 +490,8 @@ export const en = {
   'qrbill.qrIbanRule': 'A QR-IBAN accepts only a QR reference.',
   'qrbill.regularIbanRule': 'A regular IBAN accepts no reference or a creditor reference — never a QR reference.',
   'error.saveCategory': 'could not save this category',
-  'error.renameArchive': 'could not rename this archive',
-  'error.archivePlan': 'could not archive the plan',
+  'error.renameSnapshot': 'could not rename this snapshot',
+  'error.takeSnapshot': 'could not take a snapshot',
   'password.mustChange': 'Please set a new password to continue.',
 
   // --- Sentences assembled around their values ---

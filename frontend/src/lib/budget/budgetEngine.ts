@@ -2,8 +2,8 @@ import type {
   VaultData,
   VaultCategory,
   VaultEntry,
-  VaultArchive,
-  VaultArchiveLine,
+  VaultSnapshot,
+  VaultSnapshotLine,
 } from '../crypto/vault'
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
 import { seedNamesFor, type SeedKey } from './seedNames'
@@ -108,7 +108,7 @@ export function findCategoryConflict(
  * exactly the same code that handles one entry changing type on its own.
  *
  * Throws on an empty name or a collision, for the caller to show against the
- * field the user typed in — the same contract renameArchive has.
+ * field the user typed in — the same contract renameSnapshot has.
  */
 export function updateCategory(
   vault: VaultData,
@@ -232,7 +232,7 @@ export function updateEntry(
 export function deleteEntry(vault: VaultData, entryId: string): void {
   vault.budget.entries = vault.budget.entries.filter(c => c.id !== entryId)
   // The plan is keyed by entry, so a deleted entry's line would otherwise
-  // linger as an amount nothing can display or edit. Archives are deliberately
+  // linger as an amount nothing can display or edit. Snapshots are deliberately
   // left alone: they hold names, not references, and a record of a past plan
   // must not lose lines because an entry was deleted afterwards.
   vault.budget.plan = vault.budget.plan.filter(e => e.entryId !== entryId)
@@ -350,73 +350,73 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
   }
 }
 
-// --- Archives ---
+// --- Snapshots ---
 
-/** Archives, newest first. */
-export function listArchives(vault: VaultData): VaultArchive[] {
-  // Stable sort over an already newest-first array, so two archives created in
+/** Snapshots, newest first. */
+export function listSnapshots(vault: VaultData): VaultSnapshot[] {
+  // Stable sort over an already newest-first array, so two snapshots created in
   // the same millisecond keep the order they were made in.
-  return [...vault.budget.archives].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return [...vault.budget.snapshots].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
 /**
  * Snapshots the current plan under a name.
  *
  * The lines are DENORMALISED — entry and category names are copied in, not
- * referenced. An archive that pointed at live entries would be rewritten by
+ * referenced. An snapshot that pointed at live entries would be rewritten by
  * the next rename and would lose lines to the next delete, which would make it
  * a view of the present rather than a record of the past.
  *
  * The snapshot covers what the plan summary shows: every non-archived entry,
- * including those left at 0.00, so an archive reads the same as the plan it was
+ * including those left at 0.00, so an snapshot reads the same as the plan it was
  * taken from.
  */
-export function archivePlan(vault: VaultData, name: string): VaultArchive {
+export function takeSnapshot(vault: VaultData, name: string): VaultSnapshot {
   const trimmed = name.trim()
   if (trimmed === '') {
     // An unnamed snapshot cannot be told apart from any other, so it could never
     // be found again — better to refuse than to store something unusable.
-    throw new Error('an archive needs a name')
+    throw new Error('an snapshot needs a name')
   }
 
   const categoryNameById = new Map(vault.budget.categories.map(g => [g.id, g.name]))
 
-  const lines: VaultArchiveLine[] = listEntries(vault).map(cat => ({
+  const lines: VaultSnapshotLine[] = listEntries(vault).map(cat => ({
     entryName: cat.name,
     categoryName: categoryNameById.get(cat.categoryId) ?? '',
     type: cat.type,
     plannedAmount: plannedFor(vault, cat.id),
   }))
 
-  const archive: VaultArchive = {
+  const snapshot: VaultSnapshot = {
     id: crypto.randomUUID(),
     name: trimmed,
     createdAt: new Date().toISOString(),
     lines,
   }
-  vault.budget.archives.unshift(archive)
-  return archive
+  vault.budget.snapshots.unshift(snapshot)
+  return snapshot
 }
 
-/** Renames an archive. An empty name is rejected, as it is on creation. */
-export function renameArchive(vault: VaultData, id: string, name: string): void {
+/** Renames an snapshot. An empty name is rejected, as it is on creation. */
+export function renameSnapshot(vault: VaultData, id: string, name: string): void {
   const trimmed = name.trim()
   if (trimmed === '') {
-    throw new Error('an archive needs a name')
+    throw new Error('an snapshot needs a name')
   }
-  const archive = vault.budget.archives.find(a => a.id === id)
-  if (archive) archive.name = trimmed
+  const snapshot = vault.budget.snapshots.find(a => a.id === id)
+  if (snapshot) snapshot.name = trimmed
 }
 
-export function deleteArchive(vault: VaultData, id: string): void {
-  vault.budget.archives = vault.budget.archives.filter(a => a.id !== id)
+export function deleteSnapshot(vault: VaultData, id: string): void {
+  vault.budget.snapshots = vault.budget.snapshots.filter(a => a.id !== id)
 }
 
 /**
  * Empties the budget: every entry, every category, and the plan itself.
  *
- * Archives are deliberately left standing. They are records of what was
- * budgeted, denormalised down to names rather than references (see archivePlan),
+ * Snapshots are deliberately left standing. They are records of what was
+ * budgeted, denormalised down to names rather than references (see takeSnapshot),
  * so nothing in them breaks when the entries they describe cease to exist —
  * the same bargain deleteEntry already makes. A reset is for starting the
  * plan over, not for erasing what the plan used to say.

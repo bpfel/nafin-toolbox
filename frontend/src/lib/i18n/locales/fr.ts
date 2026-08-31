@@ -229,7 +229,7 @@ export const fr: Messages = {
   'entry.namePlaceholder': 'p. ex. abonnement de fitness',
   'entry.values': 'Montants',
   'entry.deleteTitle': 'Supprimer l’entrée',
-  'entry.deleteExplain': 'Retirer {name} de votre budget? Son montant prévu disparaît avec elle. Une archive qui l’a déjà enregistrée en conserve la copie.',
+  'entry.deleteExplain': 'Retirer {name} de votre budget? Son montant prévu disparaît avec elle. Un instantané qui l’a déjà enregistrée en conserve la copie.',
 
   // --- Category dialog ---
   'category.editTitle': 'Modifier la catégorie',
@@ -246,26 +246,26 @@ export const fr: Messages = {
   'category.mergeExplain.other': 'La fusion déplace les {count} entrées de cette catégorie vers celle-ci et supprime {name}.',
   'category.mergeInto': 'Fusionner avec {name}',
 
-  // --- Archives ---
-  'archive.newNameLabel': 'Nom de la nouvelle archive',
-  'archive.newNamePlaceholder': 'p. ex. avant l’augmentation',
-  'archive.create': 'Archiver le plan actuel',
-  'archive.none': 'Aucune archive pour le moment.',
-  'archive.empty': 'Cette archive ne contient aucune ligne.',
-  'archive.entryColumn': 'Entrée',
-  'archive.deleteOne': 'Supprimer l’archive {name}',
-  'archive.deleteTitle': 'Supprimer l’archive',
-  'archive.unrecoverable': 'Cet instantané ne peut pas être récupéré.',
-  'archive.deleteExplain.one': 'Supprimer {name} et sa {count} ligne?',
-  'archive.deleteExplain.other': 'Supprimer {name} et ses {count} lignes?',
+  // --- Snapshots ---
+  'snapshot.newNameLabel': 'Nom du nouvel instantané',
+  'snapshot.newNamePlaceholder': 'p. ex. avant l’augmentation',
+  'snapshot.create': 'Prendre un instantané',
+  'snapshot.none': 'Aucun instantané pour le moment.',
+  'snapshot.empty': 'Cet instantané ne contient aucune ligne.',
+  'snapshot.entryColumn': 'Entrée',
+  'snapshot.deleteOne': 'Supprimer l’instantané {name}',
+  'snapshot.deleteTitle': 'Supprimer l’instantané',
+  'snapshot.unrecoverable': 'Cet instantané ne peut pas être récupéré.',
+  'snapshot.deleteExplain.one': 'Supprimer {name} et sa {count} ligne?',
+  'snapshot.deleteExplain.other': 'Supprimer {name} et ses {count} lignes?',
 
   // --- Resetting ---
   'reset.title': 'Réinitialiser le budget',
   'reset.explain.one': 'Cela supprime l’unique entrée, sa catégorie et tous les montants prévus. Vous repartez d’un budget vide.',
   'reset.explain.other': 'Cela supprime les {count} entrées, leurs catégories et tous les montants prévus. Vous repartez d’un budget vide.',
-  'reset.archivesKept.one': 'Votre {count} archive est un enregistrement de ce qui avait été budgété et elle est conservée.',
-  'reset.archivesKept.other': 'Vos {count} archives sont des enregistrements de ce qui avait été budgété et elles sont conservées.',
-  'reset.noArchives': 'Rien n’est archivé: aucun enregistrement de ce plan ne subsistera. Annulez et archivez-le d’abord si vous souhaitez en conserver un.',
+  'reset.snapshotsKept.one': 'Votre {count} instantané est un enregistrement de ce qui avait été budgété et il est conservé.',
+  'reset.snapshotsKept.other': 'Vos {count} instantanés sont des enregistrements de ce qui avait été budgété et ils sont conservés.',
+  'reset.noSnapshots': 'Il n’y a aucun instantané, aucun enregistrement de ce plan ne subsistera donc. Annulez et prenez-en un d’abord si vous voulez en garder un.',
 
   // --- Accounts ---
   'accounts.title': 'Comptes',
@@ -350,8 +350,8 @@ export const fr: Messages = {
 
   'budget.loadDefaults': 'Charger les valeurs suisses par défaut',
   'budget.startBlank': 'Commencer à vide',
-  'archive.panelTitle': 'Archives',
-  'archive.blurb': 'Une archive est une copie nommée du plan tel qu’il est maintenant. Elle conserve les noms et les montants du moment où elle a été prise, de sorte que vos modifications ultérieures ne la touchent pas.',
+  'snapshot.panelTitle': 'Archives',
+  'snapshot.blurb': 'Un instantané est une copie nommée du plan tel qu’il est maintenant. Il conserve les noms et les montants du moment où il a été pris, de sorte que vos modifications ultérieures ne le touchent pas.',
   'accounts.tabAccounts': 'Comptes',
   'accounts.tabAllocations': 'Affectations',
   'alloc.noEntries': 'Aucune entrée de budget pour l’instant. Créez-les dans le module Budget et elles apparaîtront ici, prêtes à être affectées.',
@@ -404,8 +404,8 @@ export const fr: Messages = {
   'twofa.enterCode.label': 'Saisir le code',
   'time.months.one': 'mois',
   'time.months.other': 'mois',
-  'archive.lines.one': 'ligne',
-  'archive.lines.other': 'lignes',
+  'snapshot.lines.one': 'ligne',
+  'snapshot.lines.other': 'lignes',
   'accountForm.qrIbanNote': 'un QR-IBAN — les factures utiliseront une référence QR (QRR)',
   'accountForm.regularIbanNote': 'un IBAN ordinaire — les factures n’utiliseront aucune référence ou SCOR',
   'qrbill.generate': 'Générer',
@@ -444,8 +444,8 @@ export const fr: Messages = {
   'qrbill.qrIbanRule': 'Un QR-IBAN n’accepte qu’une référence QR.',
   'qrbill.regularIbanRule': 'Un IBAN ordinaire n’accepte aucune référence ou une référence créancier — jamais une référence QR.',
   'error.saveCategory': 'cette catégorie n’a pas pu être enregistrée',
-  'error.renameArchive': 'cette archive n’a pas pu être renommée',
-  'error.archivePlan': 'le plan n’a pas pu être archivé',
+  'error.renameSnapshot': 'cet instantané n’a pas pu être renommé',
+  'error.takeSnapshot': 'l’instantané n’a pas pu être pris',
   'password.mustChange': 'Veuillez définir un nouveau mot de passe pour continuer.',
 
   // --- Sentences assembled around their values ---

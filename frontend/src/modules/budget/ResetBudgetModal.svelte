@@ -4,12 +4,12 @@
 
   interface Props {
     entryCount: number
-    archiveCount: number
+    snapshotCount: number
     onreset: () => void
     onclose: () => void
   }
 
-  let { entryCount, archiveCount, onreset, onclose }: Props = $props()
+  let { entryCount, snapshotCount, onreset, onclose }: Props = $props()
 
   function confirm() {
     onreset()
@@ -36,13 +36,13 @@
 
     <!-- Whether anything survives this depends entirely on whether the user ever
          archived, and they should not have to remember which. -->
-    {#if archiveCount > 0}
+    {#if snapshotCount > 0}
       <p class="kept">
-        {tn('reset.archivesKept', archiveCount)}
+        {tn('reset.snapshotsKept', snapshotCount)}
       </p>
     {:else}
       <p class="warning">
-        {t('reset.noArchives')}
+        {t('reset.noSnapshots')}
       </p>
     {/if}
 

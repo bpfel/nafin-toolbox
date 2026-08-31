@@ -1,10 +1,10 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
-  import type { VaultArchive, VaultArchiveLine } from '../../lib/crypto/vault'
+  import type { VaultSnapshot, VaultSnapshotLine } from '../../lib/crypto/vault'
 
   interface Props {
-    archive: VaultArchive
+    snapshot: VaultSnapshot
     /**
      * Commits a new name. May throw — the engine refuses an empty name — and the
      * message is caught here so it lands next to the field the user typed in.
@@ -12,16 +12,16 @@
     onrename: (name: string) => void
   }
 
-  let { archive, onrename }: Props = $props()
+  let { snapshot, onrename }: Props = $props()
 
-  // Seeded once: the editor is mounted fresh per archive, and the draft must not
+  // Seeded once: the editor is mounted fresh per snapshot, and the draft must not
   // be yanked out from under a half-typed rename.
-  let nameDraft = $state(untrack(() => archive.name))
+  let nameDraft = $state(untrack(() => snapshot.name))
   let nameError = $state<string | null>(null)
 
   interface LineRow {
-    line: VaultArchiveLine
-    /** Position in `archive.lines`, used only to key the rendered rows. */
+    line: VaultSnapshotLine
+    /** Position in `snapshot.lines`, used only to key the rendered rows. */
     index: number
   }
 
@@ -32,7 +32,7 @@
 
   function categoriesFor(type: 'income' | 'expense'): LineCategory[] {
     const map = new Map<string, LineCategory>()
-    archive.lines.forEach((line, index) => {
+    snapshot.lines.forEach((line, index) => {
       if (line.type !== type) return
       const key = line.categoryName || ''
       if (!map.has(key)) map.set(key, { categoryName: key, rows: [] })
@@ -45,7 +45,7 @@
   let expenseCategories = $derived(categoriesFor('expense'))
 
   function totalFor(type: 'income' | 'expense'): number {
-    return archive.lines
+    return snapshot.lines
       .filter(l => l.type === type)
       .reduce((sum, l) => sum + Number(l.plannedAmount), 0)
   }
@@ -55,7 +55,7 @@
   let balance = $derived(incomeTotal - expenseTotal)
 
   function commitName() {
-    if (nameDraft.trim() === archive.name) {
+    if (nameDraft.trim() === snapshot.name) {
       nameError = null
       return
     }
@@ -63,7 +63,7 @@
       onrename(nameDraft)
       nameError = null
     } catch (e) {
-      nameError = e instanceof Error ? e.message : t('error.renameArchive')
+      nameError = e instanceof Error ? e.message : t('error.renameSnapshot')
     }
   }
 
@@ -73,7 +73,7 @@
       ;(e.target as HTMLInputElement).blur()
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      nameDraft = archive.name
+      nameDraft = snapshot.name
       nameError = null
       ;(e.target as HTMLInputElement).blur()
     }
@@ -99,13 +99,13 @@
     <p class="error" role="alert">{nameError}</p>
   {/if}
 
-  {#if archive.lines.length === 0}
-    <p class="empty">{t('archive.empty')}</p>
+  {#if snapshot.lines.length === 0}
+    <p class="empty">{t('snapshot.empty')}</p>
   {:else}
     <table>
       <thead>
         <tr>
-          <th class="col-name">{t('archive.entryColumn')}</th>
+          <th class="col-name">{t('snapshot.entryColumn')}</th>
           <th class="right col-amount">{t('budget.plannedMo')}</th>
         </tr>
       </thead>

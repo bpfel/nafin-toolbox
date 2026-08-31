@@ -53,8 +53,8 @@ function vaultWith(
   plan: VaultPlanEntry[] = [],
 ): VaultData {
   return {
-    version: 5,
-    budget: { categories: [], entries, plan, archives: [] },
+    version: 6,
+    budget: { categories: [], entries, plan, snapshots: [] },
     accounts,
   }
 }

@@ -229,7 +229,7 @@ export const it: Messages = {
   'entry.namePlaceholder': 'p. es. abbonamento in palestra',
   'entry.values': 'Importi',
   'entry.deleteTitle': 'Elimina la voce',
-  'entry.deleteExplain': 'Rimuovere {name} dal tuo budget? Il suo importo previsto sparisce con essa. Un archivio che l’ha già registrata ne conserva la copia.',
+  'entry.deleteExplain': 'Rimuovere {name} dal tuo budget? Il suo importo previsto sparisce con essa. Un’istantanea che l’ha già registrata ne conserva la copia.',
 
   // --- Category dialog ---
   'category.editTitle': 'Modifica la categoria',
@@ -246,26 +246,26 @@ export const it: Messages = {
   'category.mergeExplain.other': 'Unendole, le {count} voci di questa categoria passano in quella e {name} viene rimossa.',
   'category.mergeInto': 'Unisci a {name}',
 
-  // --- Archives ---
-  'archive.newNameLabel': 'Nome del nuovo archivio',
-  'archive.newNamePlaceholder': 'p. es. prima dell’aumento',
-  'archive.create': 'Archivia il piano attuale',
-  'archive.none': 'Nessun archivio per il momento.',
-  'archive.empty': 'Questo archivio non contiene righe.',
-  'archive.entryColumn': 'Voce',
-  'archive.deleteOne': 'Elimina l’archivio {name}',
-  'archive.deleteTitle': 'Elimina l’archivio',
-  'archive.unrecoverable': 'Questa istantanea non può essere recuperata.',
-  'archive.deleteExplain.one': 'Eliminare {name} e la sua {count} riga?',
-  'archive.deleteExplain.other': 'Eliminare {name} e le sue {count} righe?',
+  // --- Snapshots ---
+  'snapshot.newNameLabel': 'Nome della nuova istantanea',
+  'snapshot.newNamePlaceholder': 'p. es. prima dell’aumento',
+  'snapshot.create': 'Scatta un’istantanea',
+  'snapshot.none': 'Nessuna istantanea per il momento.',
+  'snapshot.empty': 'Questa istantanea non contiene righe.',
+  'snapshot.entryColumn': 'Voce',
+  'snapshot.deleteOne': 'Elimina l’istantanea {name}',
+  'snapshot.deleteTitle': 'Elimina l’istantanea',
+  'snapshot.unrecoverable': 'Questa istantanea non può essere recuperata.',
+  'snapshot.deleteExplain.one': 'Eliminare {name} e la sua {count} riga?',
+  'snapshot.deleteExplain.other': 'Eliminare {name} e le sue {count} righe?',
 
   // --- Resetting ---
   'reset.title': 'Reimposta il budget',
   'reset.explain.one': 'Questo rimuove l’unica voce, la sua categoria e ogni importo previsto. Riparti da un budget vuoto.',
   'reset.explain.other': 'Questo rimuove tutte le {count} voci, le loro categorie e ogni importo previsto. Riparti da un budget vuoto.',
-  'reset.archivesKept.one': 'Il tuo {count} archivio è una registrazione di quanto era stato preventivato e viene conservato.',
-  'reset.archivesKept.other': 'I tuoi {count} archivi sono registrazioni di quanto era stato preventivato e vengono conservati.',
-  'reset.noArchives': 'Non è archiviato nulla, quindi non resterà alcuna registrazione di questo piano. Annulla e archivialo prima, se vuoi conservarne una.',
+  'reset.snapshotsKept.one': 'La tua {count} istantanea è una registrazione di quanto era stato preventivato e viene conservata.',
+  'reset.snapshotsKept.other': 'Le tue {count} istantanee sono registrazioni di quanto era stato preventivato e vengono conservate.',
+  'reset.noSnapshots': 'Non ci sono istantanee, quindi non resterà alcuna registrazione di questo piano. Annulla e scattane una prima, se vuoi conservarla.',
 
   // --- Accounts ---
   'accounts.title': 'Conti',
@@ -350,8 +350,8 @@ export const it: Messages = {
 
   'budget.loadDefaults': 'Carica i valori svizzeri predefiniti',
   'budget.startBlank': 'Inizia da zero',
-  'archive.panelTitle': 'Archivi',
-  'archive.blurb': 'Un archivio è una copia con nome del piano così com’è ora. Conserva i nomi e gli importi con cui è stato creato, quindi le modifiche successive alle tue voci non lo toccano.',
+  'snapshot.panelTitle': 'Archivio',
+  'snapshot.blurb': 'Un’istantanea è una copia con nome del piano così com’è ora. Conserva i nomi e gli importi con cui è stata scattata, quindi le modifiche successive alle tue voci non la toccano.',
   'accounts.tabAccounts': 'Conti',
   'accounts.tabAllocations': 'Assegnazioni',
   'alloc.noEntries': 'Nessuna voce di budget per ora. Creale nel modulo Budget e appariranno qui, pronte per essere assegnate.',
@@ -404,8 +404,8 @@ export const it: Messages = {
   'twofa.enterCode.label': 'Inserisci il codice',
   'time.months.one': 'mese',
   'time.months.other': 'mesi',
-  'archive.lines.one': 'riga',
-  'archive.lines.other': 'righe',
+  'snapshot.lines.one': 'riga',
+  'snapshot.lines.other': 'righe',
   'accountForm.qrIbanNote': 'un QR-IBAN — le fatture useranno un riferimento QR (QRR)',
   'accountForm.regularIbanNote': 'un IBAN normale — le fatture non useranno riferimento oppure SCOR',
   'qrbill.generate': 'Genera',
@@ -444,8 +444,8 @@ export const it: Messages = {
   'qrbill.qrIbanRule': 'Un QR-IBAN accetta soltanto un riferimento QR.',
   'qrbill.regularIbanRule': 'Un IBAN ordinario non accetta alcun riferimento oppure un riferimento del creditore — mai un riferimento QR.',
   'error.saveCategory': 'non è stato possibile salvare questa categoria',
-  'error.renameArchive': 'non è stato possibile rinominare questa archiviazione',
-  'error.archivePlan': 'non è stato possibile archiviare il piano',
+  'error.renameSnapshot': 'non è stato possibile rinominare questa istantanea',
+  'error.takeSnapshot': 'non è stato possibile scattare un’istantanea',
   'password.mustChange': 'Imposta una nuova password per continuare.',
 
   // --- Sentences assembled around their values ---

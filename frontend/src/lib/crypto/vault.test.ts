@@ -33,7 +33,7 @@ function legacyV1Vault(): unknown {
 }
 
 describe('createEmptyVault', () => {
-  test('creates a valid empty v5 vault structure', () => {
+  test('creates a valid empty v6 vault structure', () => {
     const vault = createEmptyVault()
 
     expect(vault.version).toBe(VAULT_VERSION)
@@ -41,7 +41,7 @@ describe('createEmptyVault', () => {
       categories: [],
       entries: [],
       plan: [],
-      archives: [],
+      snapshots: [],
     })
     expect(vault.accounts.length).toBe(1)
   })
@@ -84,7 +84,7 @@ describe('createEmptyVault', () => {
 })
 
 describe('version scrub', () => {
-  test('decrypting a v1 blob yields a fresh v5 vault with one Main account', async () => {
+  test('decrypting a v1 blob yields a fresh v6 vault with one Main account', async () => {
     const mek = await generateMEK()
 
     const encrypted = await encryptVault(legacyV1Vault() as VaultData, mek)
@@ -105,12 +105,12 @@ describe('version scrub', () => {
     expect(decrypted.budget.categories).toEqual([])
     expect(decrypted.budget.entries).toEqual([])
     expect(decrypted.budget.plan).toEqual([])
-    expect(decrypted.budget.archives).toEqual([])
+    expect(decrypted.budget.snapshots).toEqual([])
   })
 
   test('scrubs a blob with no version at all', async () => {
     const mek = await generateMEK()
-    const versionless = await encryptVault({ budget: { categories: [], entries: [], plan: [], archives: [] } } as unknown as VaultData, mek)
+    const versionless = await encryptVault({ budget: { categories: [], entries: [], plan: [], snapshots: [] } } as unknown as VaultData, mek)
 
     const fromVersionless = await decryptVault(versionless.ciphertext, versionless.nonce, mek)
 
@@ -213,7 +213,7 @@ describe('encryptVault and decryptVault', () => {
   test('round-trip encryption and decryption preserves data', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -230,7 +230,7 @@ describe('encryptVault and decryptVault', () => {
           { entryId: 'c1', plannedAmount: '5000.00' },
           { entryId: 'c2', plannedAmount: '400.00' },
         ],
-        archives: [
+        snapshots: [
           {
             id: 'ar1',
             name: 'February',
@@ -353,14 +353,14 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.budget.categories).toEqual([])
     expect(decrypted.budget.entries).toEqual([])
     expect(decrypted.budget.plan).toEqual([])
-    expect(decrypted.budget.archives).toEqual([])
+    expect(decrypted.budget.snapshots).toEqual([])
     expect(decrypted.accounts).toEqual(vault.accounts)
   })
 
-  test('preserves complex vault with multiple archives', async () => {
+  test('preserves complex vault with multiple snapshots', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -372,7 +372,7 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c1', name: 'Salary', type: 'income', sortOrder: 0, archived: false, categoryId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
         plan: [{ entryId: 'c1', plannedAmount: '5400.00' }],
-        archives: [
+        snapshots: [
           {
             id: 'ar1',
             name: 'January',
@@ -387,7 +387,7 @@ describe('encryptVault and decryptVault', () => {
           },
           {
             id: 'ar3',
-            name: 'An archive of an empty plan',
+            name: 'An snapshot of an empty plan',
             createdAt: '2026-03-01T00:00:00.000Z',
             lines: [],
           },
@@ -398,17 +398,17 @@ describe('encryptVault and decryptVault', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.archives.length).toBe(3)
-    expect(decrypted.budget.archives[0].name).toBe('January')
-    expect(decrypted.budget.archives[0].createdAt).toBe('2026-01-01T00:00:00.000Z')
-    expect(decrypted.budget.archives[0].lines[0].plannedAmount).toBe('5000.00')
-    expect(decrypted.budget.archives[2].lines).toEqual([])
+    expect(decrypted.budget.snapshots.length).toBe(3)
+    expect(decrypted.budget.snapshots[0].name).toBe('January')
+    expect(decrypted.budget.snapshots[0].createdAt).toBe('2026-01-01T00:00:00.000Z')
+    expect(decrypted.budget.snapshots[0].lines[0].plannedAmount).toBe('5000.00')
+    expect(decrypted.budget.snapshots[2].lines).toEqual([])
   })
 
   test('preserves archived flag in entries', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -419,7 +419,7 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c2', name: 'Archived', type: 'expense', sortOrder: 1, archived: true, categoryId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
         ],
         plan: [],
-        archives: [],
+        snapshots: [],
       },
     }
 
@@ -433,7 +433,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '1234.05', lastCorrectedAt: '2026-08-15' },
       ],
@@ -443,7 +443,7 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c1', name: 'Groceries', type: 'expense', sortOrder: 0, archived: false, categoryId: 'g1', sourceAccountId: 'a1', sinkAccountId: null },
         ],
         plan: [{ entryId: 'c1', plannedAmount: '123.45' }],
-        archives: [
+        snapshots: [
           {
             id: 'ar1',
             name: 'Last year',
@@ -458,14 +458,14 @@ describe('encryptVault and decryptVault', () => {
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
     expect(decrypted.budget.plan[0].plannedAmount).toBe('123.45')
-    expect(decrypted.budget.archives[0].lines[0].plannedAmount).toBe('67.89')
+    expect(decrypted.budget.snapshots[0].lines[0].plannedAmount).toBe('67.89')
     expect(decrypted.accounts[0].currentAmount).toBe('1234.05')
   })
 
   test('preserves special characters in text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: 'a1', name: 'Zürich «Haupt»', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -475,7 +475,7 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c1', name: 'Salary (CHF)', type: 'income', sortOrder: 0, archived: false, categoryId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
         plan: [],
-        archives: [
+        snapshots: [
           {
             id: 'ar1',
             name: 'Line 1\nLine 2\tTabbed',
@@ -491,14 +491,14 @@ describe('encryptVault and decryptVault', () => {
 
     expect(decrypted.budget.categories[0].name).toBe('Émoji 🎉 & Special "chars"')
     expect(decrypted.budget.entries[0].name).toBe('Salary (CHF)')
-    expect(decrypted.budget.archives[0].name).toBe('Line 1\nLine 2\tTabbed')
+    expect(decrypted.budget.snapshots[0].name).toBe('Line 1\nLine 2\tTabbed')
     expect(decrypted.accounts[0].name).toBe('Zürich «Haupt»')
   })
 
   test('preserves sortOrder values', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -513,7 +513,7 @@ describe('encryptVault and decryptVault', () => {
           { id: 'c2', name: 'Cat2', type: 'income', sortOrder: 10, archived: false, categoryId: 'g1', sourceAccountId: null, sinkAccountId: 'a1' },
         ],
         plan: [],
-        archives: [],
+        snapshots: [],
       },
     }
 
@@ -532,7 +532,7 @@ describe('encryptVault and decryptVault', () => {
 
     // Create a large vault with many entries
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: Array.from({ length: 5 }, (_, i) => ({
         id: `a${i}`,
         name: `Account ${i}`,
@@ -562,15 +562,15 @@ describe('encryptVault and decryptVault', () => {
           entryId: `c${i}`,
           plannedAmount: `${1000 + i}.00`,
         })),
-        archives: Array.from({ length: 24 }, (_, archiveIndex) => ({
-          id: `ar${archiveIndex}`,
-          name: `Snapshot ${archiveIndex}`,
-          createdAt: `2026-01-01T00:00:00.${String(archiveIndex).padStart(3, '0')}Z`,
+        snapshots: Array.from({ length: 24 }, (_, snapshotIndex) => ({
+          id: `ar${snapshotIndex}`,
+          name: `Snapshot ${snapshotIndex}`,
+          createdAt: `2026-01-01T00:00:00.${String(snapshotIndex).padStart(3, '0')}Z`,
           lines: Array.from({ length: 30 }, (_, lineIndex) => ({
             entryName: `Entry ${lineIndex}`,
             categoryName: `Category ${lineIndex % 10}`,
             type: lineIndex % 2 === 0 ? ('income' as const) : ('expense' as const),
-            plannedAmount: `${1000 + lineIndex}.${archiveIndex}0`,
+            plannedAmount: `${1000 + lineIndex}.${snapshotIndex}0`,
           })),
         })),
       },
@@ -583,14 +583,14 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.budget.categories.length).toBe(10)
     expect(decrypted.budget.entries.length).toBe(100)
     expect(decrypted.budget.plan.length).toBe(100)
-    expect(decrypted.budget.archives.length).toBe(24)
-    expect(decrypted.budget.archives[0].lines.length).toBe(30)
+    expect(decrypted.budget.snapshots.length).toBe(24)
+    expect(decrypted.budget.snapshots[0].lines.length).toBe(30)
   })
 
   test('handles empty strings in all text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: '', name: '', kind: 'cash', currency: 'CHF', currentAmount: '', lastCorrectedAt: '' },
       ],
@@ -600,7 +600,7 @@ describe('encryptVault and decryptVault', () => {
           { id: '', name: '', type: 'income', sortOrder: 0, archived: false, categoryId: '', sourceAccountId: null, sinkAccountId: '' },
         ],
         plan: [{ entryId: '', plannedAmount: '' }],
-        archives: [
+        snapshots: [
           { id: '', name: '', createdAt: '', lines: [{ entryName: '', categoryName: '', type: 'income', plannedAmount: '' }] },
         ],
       },
@@ -612,7 +612,7 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.budget.categories[0].id).toBe('')
     expect(decrypted.budget.categories[0].name).toBe('')
     expect(decrypted.budget.entries[0].name).toBe('')
-    expect(decrypted.budget.archives[0].name).toBe('')
+    expect(decrypted.budget.snapshots[0].name).toBe('')
     expect(decrypted.budget.plan[0].plannedAmount).toBe('')
     expect(decrypted.accounts[0].name).toBe('')
   })
@@ -620,7 +620,7 @@ describe('encryptVault and decryptVault', () => {
   test('preserves exact JSON structure including whitespace in strings', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -628,7 +628,7 @@ describe('encryptVault and decryptVault', () => {
         categories: [],
         entries: [],
         plan: [],
-        archives: [
+        snapshots: [
           {
             id: 'ar1',
             name: '  leading and trailing spaces  ',
@@ -642,7 +642,7 @@ describe('encryptVault and decryptVault', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.archives[0].name).toBe('  leading and trailing spaces  ')
+    expect(decrypted.budget.snapshots[0].name).toBe('  leading and trailing spaces  ')
   })
 
   test('ciphertext length is proportional to plaintext size', async () => {
@@ -652,7 +652,7 @@ describe('encryptVault and decryptVault', () => {
     const encryptedSmall = await encryptVault(smallVault, mek)
 
     const largeVault: VaultData = {
-      version: 5,
+      version: 6,
       accounts: [],
       budget: {
         categories: Array.from({ length: 50 }, (_, i) => ({
@@ -663,7 +663,7 @@ describe('encryptVault and decryptVault', () => {
         })),
         entries: [],
         plan: [],
-        archives: [],
+        snapshots: [],
       },
     }
     const encryptedLarge = await encryptVault(largeVault, mek)
@@ -762,7 +762,7 @@ describe('migrateVault — legacy versions forward', () => {
   test('keeps everything else — this is a migration, not a scrub', () => {
     const migrated = migrateVault(v2Vault())
 
-    expect(migrated.version).toBe(5)
+    expect(migrated.version).toBe(6)
     expect(migrated.budget.entries).toHaveLength(2)
     expect(migrated.budget.entries[0].name).toBe('Rent')
     expect(migrated.budget.categories).toHaveLength(1)
@@ -770,11 +770,11 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrated.accounts[0].currentAmount).toBe('500.00')
   })
 
-  test('the only period becomes the plan, with no archive and no actual', () => {
+  test('the only period becomes the plan, with no snapshot and no actual', () => {
     const migrated = migrateVault(v2Vault())
 
     expect(migrated.budget.plan).toEqual([{ entryId: 'c1', plannedAmount: '1350.00' }])
-    expect(migrated.budget.archives).toEqual([])
+    expect(migrated.budget.snapshots).toEqual([])
   })
 
   test('preserves routing and reserve definitions', () => {
@@ -793,15 +793,15 @@ describe('migrateVault — legacy versions forward', () => {
 
     expect(migrated.budget.entries).toHaveLength(2)
     expect(migrated.budget.plan).toEqual([{ entryId: 'c1', plannedAmount: '1350.00' }])
-    expect(migrated.version).toBe(5)
+    expect(migrated.version).toBe(6)
   })
 
   // v4 -> v5 renamed the vocabulary and nothing else, so every id, amount and
-  // archive line has to come through unchanged under its new key.
+  // snapshot line has to come through unchanged under its new key.
   test('v4 groups become categories and v4 categories become entries', () => {
     const migrated = migrateVault(v4Vault())
 
-    expect(migrated.version).toBe(5)
+    expect(migrated.version).toBe(6)
     expect(migrated.budget.categories).toEqual([
       { id: 'g1', name: 'Housing', type: 'expense', sortOrder: 10 },
     ])
@@ -826,7 +826,7 @@ describe('migrateVault — legacy versions forward', () => {
   test('archived lines keep both names, under the new ones', () => {
     const migrated = migrateVault(v4Vault())
 
-    expect(migrated.budget.archives[0].lines).toEqual([
+    expect(migrated.budget.snapshots[0].lines).toEqual([
       { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1300.00' },
     ])
   })
@@ -838,7 +838,7 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrated.accounts[0].currentAmount).toBe('500.00')
   })
 
-  test('a v5 vault passes through untouched', () => {
+  test('a current vault passes through untouched', () => {
     const v5 = createEmptyVault()
     v5.budget.plan.push({ entryId: 'c1', plannedAmount: '42.00' })
 
@@ -859,7 +859,7 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrated.budget.plan).toEqual([{ entryId: 'c1', plannedAmount: '1350.00' }])
   })
 
-  test('a genuine v5 vault is still passed through untouched', () => {
+  test('a genuine current vault is still passed through untouched', () => {
     const v5 = createEmptyVault()
     v5.budget.entries.push({
       id: 'e1', name: 'Rent', type: 'expense', sortOrder: 10,
@@ -874,8 +874,71 @@ describe('migrateVault — legacy versions forward', () => {
   // means the opposite: nothing is wrong with the data, this build just cannot
   // read it. Substituting an empty vault would show the budget as gone and then
   // save that over the real one the moment anything was touched.
+  /** A v5 vault: the v6 shape exactly, but calling its snapshots archives. */
+  function v5Vault() {
+    return {
+      version: 5,
+      budget: {
+        categories: [{ id: 'c1', name: 'Housing', type: 'expense', sortOrder: 10 }],
+        entries: [
+          { id: 'e1', name: 'Rent', type: 'expense', sortOrder: 10, archived: false, categoryId: 'c1', sourceAccountId: 'a1', sinkAccountId: null },
+        ],
+        plan: [{ entryId: 'e1', plannedAmount: '1350.00' }],
+        archives: [
+          {
+            id: 'ar1',
+            name: 'Q1',
+            createdAt: '2026-01-01',
+            lines: [{ entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1300.00' }],
+          },
+        ],
+      },
+      accounts: [
+        { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '500.00', lastCorrectedAt: '2026-08-01' },
+      ],
+    }
+  }
+
+  test('v5 archives become v6 snapshots, contents untouched', () => {
+    const migrated = migrateVault(v5Vault())
+
+    expect(migrated.version).toBe(6)
+    expect(migrated.budget.snapshots).toHaveLength(1)
+    expect(migrated.budget.snapshots[0].name).toBe('Q1')
+    expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
+    // A key move, not a transformation: nothing else may shift.
+    expect(migrated.budget.entries).toEqual(v5Vault().budget.entries)
+    expect(migrated.budget.plan).toEqual(v5Vault().budget.plan)
+  })
+
+  test('the old key does not survive the move', () => {
+    const migrated = migrateVault(v5Vault())
+
+    // Leaving both names alive is how a vault ends up stamped with a version
+    // its shape does not match — the exact failure the v4 tell exists to catch.
+    expect('archives' in migrated.budget).toBe(false)
+  })
+
+  // The same bug as the v5 rollout, one version on.
+  test('a vault stamped v6 but still holding archives is migrated anyway', () => {
+    const mislabelled = { ...v5Vault(), version: 6 }
+
+    const migrated = migrateVault(mislabelled)
+
+    expect(migrated.budget.snapshots).toHaveLength(1)
+    expect(migrated.budget.snapshots[0].name).toBe('Q1')
+  })
+
+  test('a v4 vault is carried through both renames', () => {
+    const migrated = migrateVault(v4Vault())
+
+    expect(migrated.version).toBe(6)
+    expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
+    expect(migrated.budget.snapshots[0].lines[0].categoryName).toBe('Housing')
+  })
+
   test('a vault from a newer build is refused, not emptied', () => {
-    expect(() => migrateVault({ version: 6, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
+    expect(() => migrateVault({ version: 7, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
     expect(() => migrateVault({ version: 99, budget: { entries: [] } })).toThrow(/newer version/)
   })
 
@@ -887,7 +950,7 @@ describe('migrateVault — legacy versions forward', () => {
       expect(e).toBeInstanceOf(VaultVersionAheadError)
       expect((e as VaultVersionAheadError).found).toBe(7)
       expect((e as Error).message).toContain('v7')
-      expect((e as Error).message).toContain('v5')
+      expect((e as Error).message).toContain('v6')
     }
   })
 
@@ -902,15 +965,15 @@ describe('migrateVault — legacy versions forward', () => {
 
 describe('encryptVault — large vaults', () => {
   // Regression: the old `String.fromCharCode(...bytes)` spread overflowed the
-  // call stack past roughly 100KB, so a vault with many archives could not be
-  // saved at all. Archives make vaults that size unremarkable.
+  // call stack past roughly 100KB, so a vault with many snapshots could not be
+  // saved at all. Snapshots make vaults that size unremarkable.
   test('encrypts a vault far past the old stack limit', async () => {
     const mek = await generateMEK()
     const vault = createEmptyVault()
 
-    // ~2000 archive lines: a few years of monthly snapshots.
-    vault.budget.archives = Array.from({ length: 40 }, (_, a) => ({
-      id: `archive-${a}`,
+    // ~2000 snapshot lines: a few years of monthly snapshots.
+    vault.budget.snapshots = Array.from({ length: 40 }, (_, a) => ({
+      id: `snapshot-${a}`,
       name: `Snapshot ${a}`,
       createdAt: '2026-08-16',
       lines: Array.from({ length: 50 }, (_, l) => ({
@@ -924,8 +987,8 @@ describe('encryptVault — large vaults', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.archives).toHaveLength(40)
-    expect(decrypted.budget.archives[39].lines).toHaveLength(50)
+    expect(decrypted.budget.snapshots).toHaveLength(40)
+    expect(decrypted.budget.snapshots[39].lines).toHaveLength(50)
   })
 })
 
@@ -945,7 +1008,7 @@ describe('assertVaultShape', () => {
   })
 
   test('rejects a missing collection', () => {
-    for (const key of ['categories', 'entries', 'plan', 'archives']) {
+    for (const key of ['categories', 'entries', 'plan', 'snapshots']) {
       const bad = createEmptyVault() as unknown as { budget: Record<string, unknown> }
       delete bad.budget[key]
       expect(() => assertVaultShape(bad as unknown as VaultData)).toThrow(new RegExp(key))

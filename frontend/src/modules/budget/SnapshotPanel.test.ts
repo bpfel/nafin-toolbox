@@ -10,7 +10,7 @@ vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
   markDirty: vi.fn(),
 }))
 
-import ArchivePanel from './ArchivePanel.svelte'
+import SnapshotPanel from './SnapshotPanel.svelte'
 
 afterEach(cleanup)
 
@@ -21,19 +21,19 @@ const chf = (n: number) =>
   n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /**
- * The amount recorded against one archived entry.
+ * The amount recorded against one snapshot line.
  *
  * Read out of its own row rather than by text: the same figure also appears in
  * the totals, so a bare getByText would be ambiguous.
  */
-function archivedAmount(entryName: string): string {
+function snapshotAmount(entryName: string): string {
   const row = screen.getByText(entryName).closest('tr')
   return row?.querySelector('.line-amount')?.textContent?.trim() ?? ''
 }
 
 function makeVault(): VaultData {
   return {
-    version: 5,
+    version: 6,
     accounts: [
       {
         id: 'main',
@@ -75,200 +75,202 @@ function makeVault(): VaultData {
         { entryId: 'salary', plannedAmount: '6000.00' },
         { entryId: 'rent', plannedAmount: '1350.00' },
       ],
-      archives: [],
+      snapshots: [],
     },
   }
 }
 
 async function openPanel(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: /archives/i }))
+  // The section is the Archive; the things in it are snapshots. Opening it is
+  // by the section's name, which is the whole point of the v6 split.
+  await user.click(screen.getByRole('button', { name: /archive/i }))
 }
 
-async function createArchive(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await user.type(screen.getByLabelText(/name for the new archive/i), name)
-  await user.click(screen.getByRole('button', { name: /archive current plan/i }))
+async function createSnapshot(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.type(screen.getByLabelText(/name for the new snapshot/i), name)
+  await user.click(screen.getByRole('button', { name: /take a snapshot/i }))
 }
 
-describe('ArchivePanel — archiving the plan', () => {
+describe('SnapshotPanel — taking a snapshot', () => {
   test('captures the current plan under the typed name', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Before the raise')
+    await createSnapshot(user, 'Before the raise')
 
-    // findBy, not getBy: creating the archive re-renders the panel, and Svelte
+    // findBy, not getBy: creating the snapshot re-renders the panel, and Svelte
     // flushes in a microtask. A synchronous query races that flush and fails
     // intermittently under parallel load — which it did, once, in a full run.
     expect(await screen.findByRole('button', { name: 'Before the raise' })).toBeTruthy()
     expect(await screen.findByText('Salary')).toBeTruthy()
-    expect(archivedAmount('Salary')).toBe(chf(6000))
-    expect(archivedAmount('Rent')).toBe(chf(1350))
+    expect(snapshotAmount('Salary')).toBe(chf(6000))
+    expect(snapshotAmount('Rent')).toBe(chf(1350))
 
-    expect(vault.budget.archives).toHaveLength(1)
-    expect(vault.budget.archives[0].lines).toEqual([
+    expect(vault.budget.snapshots).toHaveLength(1)
+    expect(vault.budget.snapshots[0].lines).toEqual([
       { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
       { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
     ])
   })
 
-  test('refuses an unnamed archive and says so', async () => {
+  test('refuses an unnamed snapshot and says so', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await user.click(screen.getByRole('button', { name: /archive current plan/i }))
+    await user.click(screen.getByRole('button', { name: /take a snapshot/i }))
 
     expect(screen.getByRole('alert').textContent).toMatch(/needs a name/i)
-    expect(vault.budget.archives).toHaveLength(0)
+    expect(vault.budget.snapshots).toHaveLength(0)
   })
 
-  test('renaming an entry afterwards leaves the archive alone', async () => {
+  test('renaming an entry afterwards leaves the snapshot alone', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
     cleanup()
 
     // The entry is renamed and its planned amount changed after the snapshot.
     engine.updateEntry(vault, 'rent', { name: 'Flat rent' })
     engine.setPlanned(vault, 'rent', '1500.00')
 
-    // A freshly mounted panel renders the archive from its own denormalised
+    // A freshly mounted panel renders the snapshot from its own denormalised
     // lines, so it still reads as the plan that was captured.
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    expect(archivedAmount('Rent')).toBe(chf(1350))
+    expect(snapshotAmount('Rent')).toBe(chf(1350))
     expect(screen.queryByText('Flat rent')).toBeNull()
   })
 
-  test('deleting an entry afterwards does not remove its archived line', async () => {
+  test('deleting an entry afterwards does not remove its snapshot line', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
     cleanup()
 
     engine.deleteEntry(vault, 'rent')
 
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
     await openPanel(user)
     await user.click(screen.getByRole('button', { name: 'Q1' }))
 
-    expect(archivedAmount('Rent')).toBe(chf(1350))
+    expect(snapshotAmount('Rent')).toBe(chf(1350))
   })
 })
 
-describe('ArchivePanel — editing an archive', () => {
-  test('renames an archive without touching the plan', async () => {
+describe('SnapshotPanel — editing a snapshot', () => {
+  test('renames a snapshot without touching the plan', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
 
     const nameField = screen.getByLabelText('Name') as HTMLInputElement
     await user.clear(nameField)
     await user.type(nameField, 'First quarter')
     await user.tab()
 
-    expect(vault.budget.archives[0].name).toBe('First quarter')
+    expect(vault.budget.snapshots[0].name).toBe('First quarter')
     expect(vault.budget.plan).toEqual([
       { entryId: 'salary', plannedAmount: '6000.00' },
       { entryId: 'rent', plannedAmount: '1350.00' },
     ])
   })
 
-  test('rejects an empty archive name and keeps the old one', async () => {
+  test('rejects an empty snapshot name and keeps the old one', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
 
     const nameField = screen.getByLabelText('Name') as HTMLInputElement
     await user.clear(nameField)
     await user.tab()
 
     expect(screen.getByRole('alert').textContent).toMatch(/needs a name/i)
-    expect(vault.budget.archives[0].name).toBe('Q1')
+    expect(vault.budget.snapshots[0].name).toBe('Q1')
   })
 
-  // An archive is a record of what was budgeted. Correcting it would be
+  // An snapshot is a record of what was budgeted. Correcting it would be
   // rewriting history, so the figures are text and the name is the only field.
-  test('an archived amount is a record, not a field', async () => {
+  test('a snapshot amount is a record, not a field', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
 
-    expect(archivedAmount('Rent')).toBe(chf(1350))
+    expect(snapshotAmount('Rent')).toBe(chf(1350))
 
-    // Scoped to the open archive: the panel also carries a field for naming a
-    // new one, which is not part of any archive.
+    // Scoped to the open snapshot: the panel also carries a field for naming a
+    // new one, which is not part of any snapshot.
     const editor = within(document.querySelector('.editor') as HTMLElement)
     expect(editor.getAllByRole('textbox')).toHaveLength(1)
     expect(editor.getByLabelText('Name')).toBeTruthy()
   })
 })
 
-describe('ArchivePanel — deleting an archive', () => {
+describe('SnapshotPanel — deleting a snapshot', () => {
   test('asks for confirmation before deleting', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
 
-    await user.click(screen.getByRole('button', { name: 'Delete archive Q1' }))
+    await user.click(screen.getByRole('button', { name: 'Delete snapshot Q1' }))
 
     // The dialog is up and nothing has been deleted yet.
-    expect(screen.getByRole('dialog', { name: 'Delete archive' })).toBeTruthy()
-    expect(vault.budget.archives).toHaveLength(1)
+    expect(screen.getByRole('dialog', { name: 'Delete snapshot' })).toBeTruthy()
+    expect(vault.budget.snapshots).toHaveLength(1)
   })
 
-  test('cancelling the confirmation keeps the archive', async () => {
+  test('cancelling the confirmation keeps the snapshot', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
 
-    await user.click(screen.getByRole('button', { name: 'Delete archive Q1' }))
+    await user.click(screen.getByRole('button', { name: 'Delete snapshot Q1' }))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(vault.budget.archives).toHaveLength(1)
+    expect(vault.budget.snapshots).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Q1' })).toBeTruthy()
   })
 
-  test('confirming deletes the archive', async () => {
+  test('confirming deletes the snapshot', async () => {
     const user = userEvent.setup()
     const vault = makeVault()
-    render(ArchivePanel, { props: { vault } })
+    render(SnapshotPanel, { props: { vault } })
 
     await openPanel(user)
-    await createArchive(user, 'Q1')
+    await createSnapshot(user, 'Q1')
 
-    await user.click(screen.getByRole('button', { name: 'Delete archive Q1' }))
+    await user.click(screen.getByRole('button', { name: 'Delete snapshot Q1' }))
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
-    expect(vault.budget.archives).toHaveLength(0)
+    expect(vault.budget.snapshots).toHaveLength(0)
     expect(screen.queryByRole('button', { name: 'Q1' })).toBeNull()
-    expect(screen.getByText(/no archives yet/i)).toBeTruthy()
+    expect(screen.getByText(/no snapshots yet/i)).toBeTruthy()
   })
 })

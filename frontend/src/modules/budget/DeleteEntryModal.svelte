@@ -34,9 +34,9 @@
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label={t('entry.deleteTitle')} use:focusTrap>
     <h3>{t('entry.deleteTitle')}</h3>
-    <!-- v4 replaced monthly periods with one plan plus named archives, so there
+    <!-- v4 replaced monthly periods with one plan plus named snapshots, so there
          is no longer a set of periods to be removed from. What actually happens:
-         the entry and its planned amount go, and archives keep the copy they
+         the entry and its planned amount go, and snapshots keep the copy they
          recorded, because they hold names rather than references to it. -->
     <p>
       {explain[0]}<strong>{entryName}</strong>{explain[1]}

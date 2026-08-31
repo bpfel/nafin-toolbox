@@ -215,9 +215,9 @@ describe('splitting a sentence around a slot', () => {
   test('gives the text either side of the placeholder', async () => {
     const { tAround } = await load()
 
-    const [before, after] = tAround('archive.deleteOne', 'name')
+    const [before, after] = tAround('snapshot.deleteOne', 'name')
 
-    expect(before).toBe('Delete archive ')
+    expect(before).toBe('Delete snapshot ')
     expect(after).toBe('')
   })
 
