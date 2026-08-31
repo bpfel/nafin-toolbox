@@ -289,7 +289,7 @@
     // The controls cannot produce an illegal pair; this is the assertion that
     // keeps that true if they ever change.
     if (!isLegalRouting(entry.type, routing.sourceAccountId, routing.sinkAccountId)) {
-      error = `${entry.name} cannot be routed that way.`
+      error = t('alloc.cannotRoute', { entry: entry.name })
       return
     }
 
@@ -317,7 +317,7 @@
     if (!isLegalEntryRouting(entry)) {
       if (previous === undefined) delete entry.reserve
       else entry.reserve = previous
-      error = `${entry.name} must be set aside into an account before it can have a target.`
+      error = t('alloc.mustSetAside', { entry: entry.name })
       return
     }
 
@@ -376,7 +376,7 @@
             <path d="M2 4 L6 10 L10 4 Z" />
           </svg>
         </span>
-        <span class="category-name">{category.categoryName || 'Other'}</span>
+        <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
         <span class="category-subtotal">{money(category.plannedTotal)}</span>
       </button>
     {/if}

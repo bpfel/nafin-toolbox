@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../../lib/i18n/index.svelte'
+  import { t, tn } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition, VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { flowKindOf } from '../../../lib/accounts/routing'
   import { accountShortLabel } from '../../../lib/accounts/labels'
@@ -220,13 +220,19 @@
       {#if showStatus}
         <div class="reserve-status">
           <span class="required">
-            {money(requiredNow!)} of {money(reserve!.targetAmount)} should be set aside by now
+            {t('reserve.requiredNow', {
+              current: money(requiredNow!),
+              target: money(reserve!.targetAmount),
+            })}
           </span>
           {#if obligation}
             <span class="timing">
               {obligation.monthsAway === 0
-                ? 'Due this month'
-                : `Due ${monthLabel(obligation.due)} — ${obligation.monthsAway} ${obligation.monthsAway === 1 ? 'month' : 'months'} to go`}
+                ? t('reserve.dueThisMonth')
+                : t('reserve.dueIn', {
+                    month: monthLabel(obligation.due),
+                    away: tn('time.monthsToGo', obligation.monthsAway),
+                  })}
             </span>
           {/if}
           {#if amortization}
@@ -234,8 +240,10 @@
               {#if amortization.monthsAway === 0}
                 {t('alloc.affordableNow')}
               {:else if amortization.affordableFrom}
-                At {money(fromCents(amortization.rateCents))}/month, affordable from
-                {monthLabel(amortization.affordableFrom)}
+                {t('alloc.affordableFrom', {
+                  rate: money(fromCents(amortization.rateCents)),
+                  month: monthLabel(amortization.affordableFrom),
+                })}
               {:else}
                 {t('alloc.noMonthlyAmount')}
               {/if}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../../lib/i18n/index.svelte'
+  import { t, tn } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { AccountKind, QRAddress, VaultAccount } from '../../../lib/crypto/vault'
   import { isQRIban, ibanStatus } from '../../../lib/qrbill/validate'
@@ -165,11 +165,14 @@
             {#if ibanState === 'invalid'}
               {t('accountForm.ibanInvalid')}
             {:else if ibanState === 'incomplete'}
-              {21 - cleanedIban.length} more character{21 - cleanedIban.length === 1 ? '' : 's'} to go.
+              {tn('accountForm.charsToGo', 21 - cleanedIban.length)}
             {:else if ibanState === 'valid'}
-              Checksum valid. Detected as {ibanKind === 'qr-iban'
-                ? t('accountForm.qrIbanNote')
-                : t('accountForm.regularIbanNote')}.
+              {t('accountForm.checksumValid', {
+                kind:
+                  ibanKind === 'qr-iban'
+                    ? t('accountForm.qrIbanNote')
+                    : t('accountForm.regularIbanNote'),
+              })}
             {:else}
               {t('accountForm.holderHint')}
             {/if}
@@ -212,7 +215,7 @@
     <div class="actions">
       <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn save" onclick={save} disabled={!name.trim()}>
-        {isEdit ? 'Save' : 'Add'}
+        {isEdit ? t('action.save') : t('accounts.add')}
       </button>
     </div>
   </div>

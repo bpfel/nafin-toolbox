@@ -3,14 +3,15 @@ import { describe, test, expect } from 'vitest'
 /**
  * Finds English left behind in components.
  *
- * Written after four separate rounds of "this bit is still in English" — each
- * one a shape the previous scan had not thought of: text sitting on its own
- * line, strings inside object literals, both arms of a ternary in markup, and a
- * status message starting with a digit, which every pattern anchored to a
- * letter had quietly skipped.
+ * Rewritten after five rounds of "this bit is still in English", each one a
+ * shape the previous scan had not thought of: text wrapped across lines,
+ * strings in object literals, both arms of a ternary, a status message starting
+ * with a digit, a sentence passed as a component prop, a lone word inside an
+ * expression, and prose interleaved with `{expressions}` on one line.
  *
- * A scan only finds the shapes it knows about, so this one runs in CI rather
- * than in my head. When it catches something new, widen it here.
+ * The lesson each time was the same — a scan only finds the shapes it knows
+ * about — so it lives here rather than in my head. When it misses something,
+ * widen it here and the next component gets checked for free.
  */
 
 /** Admin-only screens stay English by decision, not by oversight. */
@@ -32,7 +33,7 @@ function scannable(): [string, string][] {
   )
 }
 
-/** The markup half of a component: everything outside `<script>` and `<style>`. */
+/** The markup half: everything outside `<script>` and `<style>`. */
 function markupOf(src: string): string {
   return src
     .replace(/<script[\s\S]*?<\/script>/g, '')
@@ -41,11 +42,63 @@ function markupOf(src: string): string {
 }
 
 function scriptOf(src: string): string {
-  const blocks = src.match(/<script[\s\S]*?<\/script>/g) ?? []
-  return blocks
+  return (src.match(/<script[\s\S]*?<\/script>/g) ?? [])
     .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
+}
+
+/**
+ * Markup with every `{expression}` blanked out, innermost first so nested
+ * braces clear too.
+ *
+ * Without this, a line reading `Income {money(a)} − expenses {money(b)}.` is
+ * invisible: it is prose, but no pattern that forbids braces will match it and
+ * no pattern that allows them can tell prose from code. Blanking the code first
+ * leaves plain text behind, which is easy to recognise.
+ */
+function withoutExpressions(markup: string): string {
+  let out = ''
+  let cursor = 0
+  for (const [start, end] of expressionSpans(markup)) {
+    out += markup.slice(cursor, start)
+    cursor = end
+  }
+  return out + markup.slice(cursor)
+}
+
+/**
+ * The bounds of every top-level `{...}` in the markup, matched by counting
+ * depth rather than by regex.
+ *
+ * A regex cannot do this: `{n === 1 ? 'month' : `${n} months`}` contains braces
+ * inside a template literal, so any `[^{}]*` pattern stops early and the rest of
+ * the expression — where the English usually is — never gets scanned.
+ */
+function expressionSpans(markup: string): [number, number][] {
+  const spans: [number, number][] = []
+  for (let i = 0; i < markup.length; i++) {
+    if (markup[i] !== '{') continue
+    let depth = 0
+    for (let j = i; j < markup.length; j++) {
+      if (markup[j] === '{') depth++
+      else if (markup[j] === '}' && --depth === 0) {
+        spans.push([i, j + 1])
+        i = j
+        break
+      }
+    }
+  }
+  return spans
+}
+
+/** Every `{expression}` in the markup, with key comparisons dropped. */
+function expressionsOf(markup: string): string {
+  return expressionSpans(markup)
+    .map(([start, end]) => markup.slice(start, end))
+    .join('\n')
+    // `e.key === 'Enter'` is a keyboard event, not a button that says Enter.
+    .replace(/\.key\s*[!=]==?\s*'[A-Za-z]+'/g, '')
 }
 
 /** Looks like prose but is not shown to anyone. */
@@ -61,6 +114,21 @@ const NOT_PROSE = [
   /^[a-z]\w*:\s*.+,$/,
 ]
 
+/**
+ * Blanks the `${...}` holes in a template literal, leaving only the words the
+ * translator would see. Without this a date format like `${y}-${m}` reads as
+ * prose, because the code inside the holes has spaces in it.
+ */
+function stripHoles(s: string): string {
+  let previous: string
+  let out = s
+  do {
+    previous = out
+    out = out.replace(/\$\{[^{}]*\}/g, '')
+  } while (out !== previous)
+  return out
+}
+
 function looksLikeProse(s: string): boolean {
   const text = s.trim()
   if (text.length < 4) return false
@@ -69,32 +137,49 @@ function looksLikeProse(s: string): boolean {
   return /\s/.test(text) || /[.?!]$/.test(text)
 }
 
-/** Where a literal can hide in markup. */
-const MARKUP_SHAPES: [RegExp, string][] = [
-  [/>([A-Za-z0-9][^<>{}\n]{3,})</g, 'text between tags'],
-  [/^[ \t]*([A-Za-z0-9][^<>{}\n=]{3,})$/gm, 'text on its own line'],
+/** Prose, once the code around it has been cleared away. */
+const TEXT_SHAPES: [RegExp, string][] = [
+  [/>([A-Za-z0-9][^<>\n]{3,})</g, 'text between tags'],
+  [/^[ \t]*([A-Za-z0-9][^<>\n=]{3,})$/gm, 'text on its own line'],
+]
+
+/** Prose that never reaches a text node. */
+const ATTRIBUTE_SHAPES: [RegExp, string][] = [
   [/(?:aria-label|title|placeholder|alt)="([A-Za-z0-9][^"]{3,})"/g, 'attribute'],
   // Any attribute holding a whole sentence — which is how a `message="..."`
   // prop passed to a child component stayed English past the allowlist above.
   // Terminal punctuation is the tell; class names and paths have none.
   [/\w+="([A-Z][^"]*[.?!])"/g, 'sentence in an attribute'],
-  [/\{[^{}]*?'([A-Za-z0-9][^']{3,})'[^{}]*?\}/g, 'string in an expression'],
 ]
 
-/**
- * A lone capitalised word as an element's entire content — a button label.
- *
- * Kept apart from the shapes above because it fails their prose test: a single
- * word with no space and no full stop is indistinguishable from an identifier
- * by shape alone, which is how a stray "Delete" survived every earlier scan.
- * Here the position does the work instead of the wording.
- */
-const LONE_LABEL = />\s*([A-Z][a-z]{2,14})\s*</g
+/** Prose that only exists as a string inside an expression. */
+const EXPRESSION_SHAPES: [RegExp, string][] = [
+  [/'([A-Za-z0-9][^']{3,})'/g, 'string in an expression'],
+  // Template literals, where a sentence gets assembled around its values.
+  // `${...}` holes leave no space of their own, so a one-word template still
+  // reads as an identifier and is correctly ignored.
+  [/`([A-Za-z0-9$][^`]{3,})`/g, 'template string'],
+]
 
 /** Where a literal can hide in the script: values that end up rendered. */
 const SCRIPT_SHAPES: [RegExp, string][] = [
   [/(?:description|label|message|title|placeholder|error)\s*:\s*'([A-Za-z0-9][^']{3,})'/g, 'object literal'],
   [/=\s*'([A-Za-z0-9][^']{3,})'/g, 'assigned string'],
+  [/=\s*`([A-Za-z0-9$][^`]{3,})`/g, 'assigned template string'],
+]
+
+/**
+ * Single capitalised words, which fail the prose test by definition: one word
+ * with no space and no full stop is indistinguishable from an identifier by
+ * wording alone. Position does the work instead — a word standing as an
+ * element's whole content, or quoted inside a markup expression, is a label.
+ * This is how a stray `Delete` button and an `{editing ? 'Done' : 'Edit'}`
+ * toggle both survived every earlier scan.
+ */
+const LONE_LABEL = /\b([A-Z][a-z]{1,14})\b/
+const LONE_SHAPES: [(m: string) => string, RegExp, string][] = [
+  [markupOf, />\s*([A-Z][a-z]{2,14})\s*</g, 'lone label'],
+  [m => expressionsOf(markupOf(m)), /'([A-Z][a-z]{1,14})'/g, 'lone word in an expression'],
 ]
 
 describe('no English left in the interface', () => {
@@ -102,21 +187,29 @@ describe('no English left in the interface', () => {
     const offenders: string[] = []
 
     for (const [file, src] of scannable()) {
-      const regions: [string, [RegExp, string][]][] = [
-        [markupOf(src), MARKUP_SHAPES],
+      const markup = markupOf(src)
+      const passes: [string, [RegExp, string][]][] = [
+        [withoutExpressions(markup), TEXT_SHAPES],
+        [markup, ATTRIBUTE_SHAPES],
+        [expressionsOf(markup), EXPRESSION_SHAPES],
         [scriptOf(src), SCRIPT_SHAPES],
       ]
-      for (const [region, shapes] of regions) {
+      for (const [region, shapes] of passes) {
         for (const [shape, kind] of shapes) {
           for (const match of region.matchAll(shape)) {
-            if (looksLikeProse(match[1])) {
-              offenders.push(`${file} [${kind}] ${match[1].trim().slice(0, 70)}`)
+            const text = stripHoles(match[1])
+            if (looksLikeProse(text)) {
+              offenders.push(`${file} [${kind}] ${text.trim().slice(0, 70)}`)
             }
           }
         }
       }
-      for (const match of markupOf(src).matchAll(LONE_LABEL)) {
-        offenders.push(`${file} [lone label] ${match[1]}`)
+      for (const [region, shape, kind] of LONE_SHAPES) {
+        for (const match of region(src).matchAll(shape)) {
+          if (LONE_LABEL.test(match[1])) {
+            offenders.push(`${file} [${kind}] ${match[1]}`)
+          }
+        }
       }
     }
 

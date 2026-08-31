@@ -136,8 +136,11 @@
   </dl>
 
   <p class="anchor" class:stale>
-    Corrected {formatDate(account.lastCorrectedAt)} to {fmt(account.currentAmount)}
-    {#if stale}<span class="stale-note">· projected forward since then</span>{/if}
+    {t('accounts.correctedOn', {
+      date: formatDate(account.lastCorrectedAt),
+      amount: fmt(account.currentAmount),
+    })}
+    {#if stale}<span class="stale-note">{t('accounts.projectedSince')}</span>{/if}
   </p>
 
   {#if correcting}
@@ -180,7 +183,7 @@
            exists to avoid, so correcting it must always be one click away. -->
       <button class="btn ghost" onclick={startCorrection}>{t('accounts.correct')}</button>
       {#if editing}
-        <button class="btn ghost" onclick={onedit} aria-label={t('accounts.edit', { account: account.name })}>{t('menu.edit')}</button>
+        <button class="btn ghost" onclick={onedit} aria-label={t('accounts.edit', { account: account.name })}>{t('action.edit')}</button>
       {/if}
       <!-- Generating a bill reads the account; it changes nothing. -->
       {#if qrCapable}

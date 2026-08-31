@@ -132,7 +132,10 @@
 
     {#if leavesShort}
       <p class="info">
-        This leaves {accountName} {money(leavesShort)} below its required amount.
+        {t('purchase.leavesShort', {
+          account: accountName,
+          amount: money(leavesShort),
+        })}
         <span class="advice">{t('purchase.infoOnly')}</span>
       </p>
     {/if}

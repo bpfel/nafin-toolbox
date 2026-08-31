@@ -181,7 +181,7 @@
     {/if}
 
     <label class="field">
-      <span class="label">Amount ({account.currency})</span>
+      <span class="label">{t('qrbill.amountLabel', { currency: account.currency })}</span>
       <input
         type="text"
         inputmode="decimal"
@@ -191,7 +191,7 @@
         placeholder={t('qrbill.amountPlaceholder')}
       />
     </label>
-    {#if errorFor('amount')}<p class="error">Amount {errorFor('amount')}</p>{/if}
+    {#if errorFor('amount')}<p class="error">{t('qrbill.amount')} {errorFor('amount')}</p>{/if}
 
     <label class="field">
       <span class="label">{t('qrbill.referenceType')}</span>
@@ -222,7 +222,7 @@
           placeholder={referenceType === 'QRR' ? '27 digits' : 'RF...'}
         />
       </label>
-      {#if errorFor('reference')}<p class="error">Reference {errorFor('reference')}</p>{/if}
+      {#if errorFor('reference')}<p class="error">{t('qrbill.reference')} {errorFor('reference')}</p>{/if}
     {/if}
 
     <label class="field">
@@ -230,7 +230,7 @@
       <input type="text" bind:value={additionalInfo} placeholder={t('qrbill.additionalInfoPlaceholder')} />
     </label>
     {#if errorFor('additionalInfo')}
-      <p class="error">Additional information {errorFor('additionalInfo')}</p>
+      <p class="error">{t('qrbill.additionalInfo')} {errorFor('additionalInfo')}</p>
     {/if}
 
     <div class="advanced">
@@ -239,7 +239,7 @@
         aria-expanded={showDebtor}
         onclick={() => (showDebtor = !showDebtor)}
       >
-        {showDebtor ? '−' : '+'} Debtor (optional)
+        {showDebtor ? '−' : '+'} {t('qrbill.debtorOptional')}
       </button>
 
       {#if showDebtor}

@@ -310,7 +310,7 @@ export const en = {
   'accountDelete.title': 'Delete account',
   'accountDelete.moveTo': 'Move its entries to',
 
-  'menu.edit': 'Edit',
+  'action.edit': 'Edit',
 
   // --- Allocations ---
   //
@@ -493,6 +493,31 @@ export const en = {
   'error.renameArchive': 'could not rename this archive',
   'error.archivePlan': 'could not archive the plan',
   'password.mustChange': 'Please set a new password to continue.',
+
+  // --- Sentences assembled around their values ---
+  'reserve.requiredNow': '{current} of {target} should be set aside by now',
+  'reserve.dueThisMonth': 'Due this month',
+  'reserve.dueIn': 'Due {month} — {away}',
+  'reserve.proposedFrom': 'Target proposed from the {amount} already budgeted each month. Overwrite it with the real figure if you know it.',
+  'time.monthsToGo.one': '{count} month to go',
+  'time.monthsToGo.other': '{count} months to go',
+  'alloc.affordableFrom': 'At {rate}/month, affordable from {month}',
+  'alloc.cannotRoute': '{entry} cannot be routed that way.',
+  'alloc.mustSetAside': '{entry} must be set aside into an account before it can have a target.',
+  'alloc.unallocatedInfo': 'Income {income} − expenses {expenses}.',
+  'alloc.netWorthInfo': 'Income {income} − money that actually leaves {outflow}. {setAside} is set aside and stays yours.',
+  'alloc.shortOf': '{account} is {amount} short of what is planned against it.',
+  'alloc.shortOfDue': '{account} is {amount} short of what is planned against it, and the next obligation falls due {month} ({away}).',
+  'alloc.thisMonth': 'this month',
+  'purchase.leavesShort': 'This leaves {account} {amount} below its required amount.',
+  'accounts.correctedOn': 'Corrected {date} to {amount}',
+  'accounts.projectedSince': '· projected forward since then',
+  'accountForm.charsToGo.one': '{count} more character to go.',
+  'accountForm.charsToGo.other': '{count} more characters to go.',
+  'accountForm.checksumValid': 'Checksum valid. Detected as {kind}.',
+  'qrbill.amount': 'Amount',
+  'qrbill.amountLabel': 'Amount ({currency})',
+  'qrbill.debtorOptional': 'Debtor (optional)',
 } as const
 
 /**

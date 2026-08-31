@@ -17,7 +17,7 @@ export const it: Messages = {
   'menu.logout': 'Esci',
   'menu.users': 'Utenti',
   'menu.close': 'Chiudi il menu',
-  'menu.edit': 'Modifica',
+  'action.edit': 'Modifica',
 
   // --- Language names (endonyms, never translated) ---
   'language.de': 'Deutsch',
@@ -447,4 +447,29 @@ export const it: Messages = {
   'error.renameArchive': 'non è stato possibile rinominare questa archiviazione',
   'error.archivePlan': 'non è stato possibile archiviare il piano',
   'password.mustChange': 'Imposta una nuova password per continuare.',
+
+  // --- Sentences assembled around their values ---
+  'reserve.requiredNow': '{current} su {target} dovrebbero essere accantonati a oggi',
+  'reserve.dueThisMonth': 'In scadenza questo mese',
+  'reserve.dueIn': 'In scadenza {month} — {away}',
+  'reserve.proposedFrom': 'Importo obiettivo proposto a partire dai {amount} già preventivati ogni mese. Sostituiscilo con la cifra reale se la conosci.',
+  'time.monthsToGo.one': 'ancora {count} mese',
+  'time.monthsToGo.other': 'ancora {count} mesi',
+  'alloc.affordableFrom': 'A {rate}/mese, sostenibile da {month}',
+  'alloc.cannotRoute': '{entry} non può essere instradata così.',
+  'alloc.mustSetAside': '{entry} deve essere accantonata su un conto prima di poter avere un obiettivo.',
+  'alloc.unallocatedInfo': 'Entrate {income} − uscite {expenses}.',
+  'alloc.netWorthInfo': 'Entrate {income} − denaro che esce davvero {outflow}. {setAside} viene accantonato e resta tuo.',
+  'alloc.shortOf': 'Su {account} mancano {amount} rispetto a quanto è pianificato.',
+  'alloc.shortOfDue': 'Su {account} mancano {amount} rispetto a quanto è pianificato, e la prossima scadenza cade {month} ({away}).',
+  'alloc.thisMonth': 'questo mese',
+  'purchase.leavesShort': 'Questo lascia {account} {amount} sotto l’importo richiesto.',
+  'accounts.correctedOn': 'Corretto il {date} a {amount}',
+  'accounts.projectedSince': '· proiettato da allora',
+  'accountForm.charsToGo.one': 'Ancora {count} carattere.',
+  'accountForm.charsToGo.other': 'Ancora {count} caratteri.',
+  'accountForm.checksumValid': 'Somma di controllo valida. Rilevato come {kind}.',
+  'qrbill.amount': 'Importo',
+  'qrbill.amountLabel': 'Importo ({currency})',
+  'qrbill.debtorOptional': 'Debitore (facoltativo)',
 }

@@ -112,7 +112,7 @@
       {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + category.rows[0].line.type)}
         <tbody>
           <tr class="line-category">
-            <td colspan="2">{category.categoryName || 'Other'}</td>
+            <td colspan="2">{category.categoryName || t('budget.uncategorised')}</td>
           </tr>
           {#each category.rows as row (row.index)}
             <tr class="line-row" class:income={row.line.type === 'income'}>

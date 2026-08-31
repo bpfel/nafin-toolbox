@@ -465,7 +465,7 @@
                 aria-pressed={isEditing(mod.id)}
                 onclick={() => toggleEditing(mod.id)}
               >
-                {isEditing(mod.id) ? 'Done' : 'Edit'}
+                {isEditing(mod.id) ? t('action.done') : t('action.edit')}
               </button>
             {/if}
           </div>

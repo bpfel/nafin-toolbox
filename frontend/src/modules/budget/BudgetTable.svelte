@@ -254,9 +254,9 @@
                   class="category-name category-name-btn"
                   aria-label={t('budget.editCategoryOf', { category: category.categoryName || t('budget.uncategorised') })}
                   onclick={(e) => openCategoryEditor(e, category.categoryId)}
-                >{category.categoryName || 'Other'}</button>
+                >{category.categoryName || t('budget.uncategorised')}</button>
               {:else}
-                <span class="category-name">{category.categoryName || 'Other'}</span>
+                <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
               {/if}
               {#if editing}
                 <button
@@ -320,9 +320,9 @@
                   class="category-name category-name-btn"
                   aria-label={t('budget.editCategoryOf', { category: category.categoryName || t('budget.uncategorised') })}
                   onclick={(e) => openCategoryEditor(e, category.categoryId)}
-                >{category.categoryName || 'Other'}</button>
+                >{category.categoryName || t('budget.uncategorised')}</button>
               {:else}
-                <span class="category-name">{category.categoryName || 'Other'}</span>
+                <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
               {/if}
               {#if editing}
                 <button

@@ -226,10 +226,12 @@
 
     {#if isProposed && Number(plannedAmount) > 0}
       <p class="hint">
-        Target proposed from the {Number(plannedAmount).toLocaleString('de-CH', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })} already budgeted each month. Overwrite it with the real figure if you know it.
+        {t('reserve.proposedFrom', {
+          amount: Number(plannedAmount).toLocaleString('de-CH', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+        })}
       </p>
     {/if}
     <p class="hint">{anchorHint}</p>

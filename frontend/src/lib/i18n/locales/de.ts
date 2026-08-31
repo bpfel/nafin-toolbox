@@ -288,7 +288,7 @@ export const de: Messages = {
   'accountDelete.title': 'Konto löschen',
   'accountDelete.moveTo': 'Seine Einträge verschieben nach',
 
-  'menu.edit': 'Bearbeiten',
+  'action.edit': 'Bearbeiten',
 
   // --- Allocations ---
   'alloc.moneyIn': 'Geld herein',
@@ -459,4 +459,29 @@ export const de: Messages = {
   'error.renameArchive': 'dieses Archiv konnte nicht umbenannt werden',
   'error.archivePlan': 'der Plan konnte nicht archiviert werden',
   'password.mustChange': 'Bitte legen Sie ein neues Passwort fest, um fortzufahren.',
+
+  // --- Sentences assembled around their values ---
+  'reserve.requiredNow': '{current} von {target} sollten bis jetzt zurückgestellt sein',
+  'reserve.dueThisMonth': 'Diesen Monat fällig',
+  'reserve.dueIn': 'Fällig {month} — {away}',
+  'reserve.proposedFrom': 'Zielbetrag vorgeschlagen aus den {amount}, die monatlich bereits budgetiert sind. Überschreiben Sie ihn mit dem tatsächlichen Wert, wenn Sie ihn kennen.',
+  'time.monthsToGo.one': 'noch {count} Monat',
+  'time.monthsToGo.other': 'noch {count} Monate',
+  'alloc.affordableFrom': 'Bei {rate}/Monat leistbar ab {month}',
+  'alloc.cannotRoute': '{entry} kann nicht so geführt werden.',
+  'alloc.mustSetAside': '{entry} muss auf ein Konto zurückgestellt werden, bevor es ein Ziel haben kann.',
+  'alloc.unallocatedInfo': 'Einnahmen {income} − Ausgaben {expenses}.',
+  'alloc.netWorthInfo': 'Einnahmen {income} − Geld, das tatsächlich abfliesst {outflow}. {setAside} wird zurückgestellt und bleibt Ihres.',
+  'alloc.shortOf': 'Auf {account} fehlen {amount} gegenüber dem, was dafür geplant ist.',
+  'alloc.shortOfDue': 'Auf {account} fehlen {amount} gegenüber dem, was dafür geplant ist, und die nächste Verpflichtung wird {month} fällig ({away}).',
+  'alloc.thisMonth': 'diesen Monat',
+  'purchase.leavesShort': 'Damit liegt {account} {amount} unter dem erforderlichen Betrag.',
+  'accounts.correctedOn': 'Korrigiert am {date} auf {amount}',
+  'accounts.projectedSince': '· seither fortgeschrieben',
+  'accountForm.charsToGo.one': 'Noch {count} Zeichen.',
+  'accountForm.charsToGo.other': 'Noch {count} Zeichen.',
+  'accountForm.checksumValid': 'Prüfsumme gültig. Erkannt als {kind}.',
+  'qrbill.amount': 'Betrag',
+  'qrbill.amountLabel': 'Betrag ({currency})',
+  'qrbill.debtorOptional': 'Zahlungspflichtige Person (optional)',
 }

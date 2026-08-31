@@ -165,7 +165,7 @@
         <div class="category-input-row">
           <select bind:value={selectedCategory}>
             {#each categories as g}
-              <option value={g.name}>{g.name || 'Other'}</option>
+              <option value={g.name}>{g.name || t('budget.uncategorised')}</option>
             {/each}
           </select>
           <button class="link-btn" onclick={() => (useNewCategory = true)}>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../../lib/i18n/index.svelte'
+  import { t, tn, tAround } from '../../../lib/i18n/index.svelte'
   // The two totals, side by side. They differ by exactly the set-asides:
   //
   //   unallocated = income − all expenses    "what has no job yet?"
@@ -95,6 +95,27 @@
   }
 
   let underFunded = $derived(accounts.filter(a => Number(a.available) < 0))
+
+  /**
+   * The under-funded warning, split around the account name so it stays bold.
+   *
+   * Two whole sentences rather than one with a clause tacked on: the obligation
+   * half has to be reorderable, and it cannot be if the markup glues it to the
+   * end of the first half in English word order.
+   */
+  function shortfall(account: AccountStatus): { before: string; after: string } {
+    const amount = moneyAbs(account.available)
+    const due = account.soonestObligation
+    const [before, after] = due
+      ? tAround('alloc.shortOfDue', 'account', {
+          amount,
+          month: monthLabel(due.month),
+          away:
+            due.monthsAway === 0 ? t('alloc.thisMonth') : tn('time.monthsToGo', due.monthsAway),
+        })
+      : tAround('alloc.shortOf', 'account', { amount })
+    return { before, after }
+  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} onclick={handleDocumentClick} />
@@ -117,10 +138,13 @@
     <div class="total">
       <span class="total-head info-group">
         <span class="total-label">{t('alloc.unallocated')}</span>
-        {@render infoToggle('info-unallocated', 'Unallocated')}
+        {@render infoToggle('info-unallocated', t('alloc.unallocated'))}
         {#if openInfo === 'info-unallocated'}
           <span class="info-popover" id="info-unallocated" role="note">
-            Income {money(plannedIncome)} − expenses {money(plannedExpenses)}.
+            {t('alloc.unallocatedInfo', {
+              income: money(plannedIncome),
+              expenses: money(plannedExpenses),
+            })}
             {t('alloc.zeroMeans')}
           </span>
         {/if}
@@ -137,11 +161,14 @@
     <div class="total">
       <span class="total-head info-group">
         <span class="total-label">{t('alloc.netWorthChange')}</span>
-        {@render infoToggle('info-net-change', 'Net worth change')}
+        {@render infoToggle('info-net-change', t('alloc.netWorthChange'))}
         {#if openInfo === 'info-net-change'}
           <span class="info-popover" id="info-net-change" role="note">
-            Income {money(plannedIncome)} − money that actually leaves {money(trueOutflow)}.
-            {money(setAside)} is set aside and stays yours.
+            {t('alloc.netWorthInfo', {
+              income: money(plannedIncome),
+              outflow: money(trueOutflow),
+              setAside: money(setAside),
+            })}
           </span>
         {/if}
       </span>
@@ -181,13 +208,9 @@
   {/if}
 
   {#each underFunded as account (account.id)}
+    {@const short = shortfall(account)}
     <p class="warning">
-      <strong>{account.name}</strong> is {moneyAbs(account.available)} short of what
-      is planned against it{#if account.soonestObligation}, and the next obligation falls due
-        {monthLabel(account.soonestObligation.month)}
-        ({account.soonestObligation.monthsAway === 0
-          ? 'this month'
-          : `${account.soonestObligation.monthsAway} ${account.soonestObligation.monthsAway === 1 ? 'month' : 'months'} to go`}){/if}.
+      {short.before}<strong>{account.name}</strong>{short.after}
       <span class="advice">{t('alloc.nothingBlocked')}</span>
     </p>
   {/each}

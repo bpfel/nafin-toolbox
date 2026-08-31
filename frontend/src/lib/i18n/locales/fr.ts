@@ -17,7 +17,7 @@ export const fr: Messages = {
   'menu.logout': 'Se déconnecter',
   'menu.users': 'Utilisateurs',
   'menu.close': 'Fermer le menu',
-  'menu.edit': 'Modifier',
+  'action.edit': 'Modifier',
 
   // --- Language names (endonyms, never translated) ---
   'language.de': 'Deutsch',
@@ -447,4 +447,29 @@ export const fr: Messages = {
   'error.renameArchive': 'cette archive n’a pas pu être renommée',
   'error.archivePlan': 'le plan n’a pas pu être archivé',
   'password.mustChange': 'Veuillez définir un nouveau mot de passe pour continuer.',
+
+  // --- Sentences assembled around their values ---
+  'reserve.requiredNow': '{current} sur {target} devraient être provisionnés à ce jour',
+  'reserve.dueThisMonth': 'Échéance ce mois-ci',
+  'reserve.dueIn': 'Échéance {month} — {away}',
+  'reserve.proposedFrom': 'Montant cible proposé à partir des {amount} déjà budgétés chaque mois. Remplacez-le par le chiffre réel si vous le connaissez.',
+  'time.monthsToGo.one': 'encore {count} mois',
+  'time.monthsToGo.other': 'encore {count} mois',
+  'alloc.affordableFrom': 'À {rate}/mois, abordable dès {month}',
+  'alloc.cannotRoute': '{entry} ne peut pas être acheminée ainsi.',
+  'alloc.mustSetAside': '{entry} doit être provisionnée sur un compte avant de pouvoir avoir un objectif.',
+  'alloc.unallocatedInfo': 'Revenus {income} − dépenses {expenses}.',
+  'alloc.netWorthInfo': 'Revenus {income} − argent qui sort réellement {outflow}. {setAside} est mis de côté et reste à vous.',
+  'alloc.shortOf': 'Il manque {amount} sur {account} par rapport à ce qui y est planifié.',
+  'alloc.shortOfDue': 'Il manque {amount} sur {account} par rapport à ce qui y est planifié, et la prochaine échéance tombe {month} ({away}).',
+  'alloc.thisMonth': 'ce mois-ci',
+  'purchase.leavesShort': 'Cela laisse {account} {amount} en dessous du montant requis.',
+  'accounts.correctedOn': 'Corrigé le {date} à {amount}',
+  'accounts.projectedSince': '· projeté depuis lors',
+  'accountForm.charsToGo.one': 'Encore {count} caractère.',
+  'accountForm.charsToGo.other': 'Encore {count} caractères.',
+  'accountForm.checksumValid': 'Somme de contrôle valide. Détecté comme {kind}.',
+  'qrbill.amount': 'Montant',
+  'qrbill.amountLabel': 'Montant ({currency})',
+  'qrbill.debtorOptional': 'Débiteur (facultatif)',
 }
