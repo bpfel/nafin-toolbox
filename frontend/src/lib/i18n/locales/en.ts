@@ -91,7 +91,7 @@ export const en = {
   'auth.createAccount': 'Create Account',
   'auth.noUsersYet': 'No users exist yet. Create the admin account to get started.',
   'auth.pleaseWait': 'Please wait...',
-  'auth.forgotHint': "Forgot your password? Contact your administrator to reset it. You'll need your recovery key to restore your encrypted data.",
+  'auth.forgotHint': "Forgot your password? Contact your administrator to reset it. You’ll need your recovery key to restore your encrypted data.",
   'auth.backToLogin': 'Back to login',
 
   // --- Two-factor challenge ---
@@ -123,7 +123,7 @@ export const en = {
 
   // --- QR bill ---
   //
-  // The field names below are the mandatory headings from SIX's "Style Guide
+  // The field names below are the mandatory headings from SIX’s "Style Guide
   // QR-bill" (p.30-31), which prints them in German, French, Italian, English
   // and Romansh. The guide is explicit that variations "could result in the
   // payment not being made" — so these are quoted, never rephrased, and the
@@ -138,7 +138,7 @@ export const en = {
   'qrbill.referenceNON': 'No reference',
   'qrbill.additionalInfo': 'Additional information',
   'qrbill.additionalInfoPlaceholder': 'e.g. Reserves funding, March',
-  'qrbill.scanHint': "Scan this with your phone's camera from this screen.",
+  'qrbill.scanHint': "Scan this with your phone’s camera from this screen.",
   'qrbill.share': 'Share as an image',
 
   // --- Address fields ---
@@ -179,7 +179,7 @@ export const en = {
   'twofa.settingUp': 'Setting up...',
   'twofa.scanTitle': 'Scan QR Code',
   'twofa.scanHint': 'Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)',
-  'twofa.manualEntry': "Can't scan? Enter manually",
+  'twofa.manualEntry': "Can’t scan? Enter manually",
   'twofa.verifyPrompt': 'Enter the 6-digit code from your app to verify:',
   'twofa.verifyAndEnable': 'Verify & Enable',
   'twofa.codesTitle': 'Save Recovery Codes',
@@ -314,7 +314,7 @@ export const en = {
 
   // --- Allocations ---
   //
-  // "Set-aside", "obligation" and "amortization" are this app's own concepts
+  // "Set-aside", "obligation" and "amortization" are this app’s own concepts
   // rather than standardised terms, so the German below is a reading of what
   // they mean here, not a dictionary equivalent. Worth a native check: these
   // words sit on the screen where people decide where money goes.
@@ -373,8 +373,8 @@ export const en = {
   'category.reservesLost.other': '{count} reserves are removed: setting money aside towards a target is something only an expense does.',
   'category.conflictIncome': 'An income category called {name} already exists. Two categories cannot share a name on the same side of the budget.',
   'category.conflictExpense': 'An expense category called {name} already exists. Two categories cannot share a name on the same side of the budget.',
-  'category.mergeExplain.one': "Merging moves this category's {count} entry into it and removes {name}.",
-  'category.mergeExplain.other': "Merging moves this category's {count} entries into it and removes {name}.",
+  'category.mergeExplain.one': "Merging moves this category’s {count} entry into it and removes {name}.",
+  'category.mergeExplain.other': "Merging moves this category’s {count} entries into it and removes {name}.",
   'category.mergeInto': 'Merge into {name}',
 
   // --- Entry dialog titles ---
@@ -391,10 +391,107 @@ export const en = {
 
   'address.holderName': 'Holder name',
 
+  // --- Missed in the first pass: text on its own line, and script literals ---
+  'budget.loadDefaults': 'Load Swiss defaults',
+  'budget.startBlank': 'Start blank',
+  'archive.panelTitle': 'Archives',
+  'archive.blurb': 'An archive is a named copy of the plan as it stands now. It keeps the names and amounts it was taken with, so later edits to your entries leave it alone.',
+  'accounts.tabAccounts': 'Accounts',
+  'accounts.tabAllocations': 'Allocations',
+  'alloc.noEntries': 'No budget entries yet. Add them in the Budget module and they will appear here, ready to route.',
+  'alloc.affordableNow': 'Affordable now',
+  'alloc.noMonthlyAmount': 'No monthly amount planned — budget something towards this to get a date',
+  'alloc.zeroMeans': 'Zero means every franc has a job.',
+  'reserve.targetAmount': 'Target amount',
+  'password.current': 'Current Password',
+  'password.new': 'New Password',
+  'password.confirmNew': 'Confirm New Password',
+  'field.confirmPassword': 'Confirm Password',
+  'field.email': 'Email',
+  'field.recoveryCode': 'Recovery Code',
+  'update.notNow': 'Not now',
+  'twofa.codesCopyFailed': 'Could not reach the clipboard. Select the codes above and copy them by hand, or use Download.',
+  'twofa.codesCopied': 'Recovery codes copied to the clipboard.',
+  'recoveryKey.pasteHint': 'Paste the key back, so you find out now rather than the day you need it. After this it is never shown again.',
+  'recoveryKey.matches': 'That matches. Keep it somewhere you will still have in a year.',
+  'recoveryKey.caseMismatch': 'Almost — the key is case-sensitive.',
+  'recoveryKey.noMatch': 'That does not match the key.',
+  'accounts.correctionHint': 'The balance and the date it is true as of are one entry — both are set together.',
+  'accountForm.ibanHint': 'Only needed to generate a Swiss QR bill for this account. Leave empty otherwise.',
+  'accountForm.ibanInvalid': 'Not a valid Swiss or Liechtenstein IBAN — check for a mistyped digit.',
+  'accountForm.holderHint': 'Only needed for QR bills.',
+  'accountDelete.noneRouted': 'No entries are routed through it.',
+  'accountDelete.confirm': 'Delete and reassign',
+  'qrbill.payHint': 'Pays into this account. The IBAN and address come from the account — only the amount and reference are set here.',
+  'qrbill.noAddress': 'This account has no complete holder address. Add it under the account’s payment details — a QR bill needs it.',
+  'qrbill.shareHint': 'Shares the picture to Files, Photos or a chat. Banking apps scan with the camera and will not read it from here.',
+
+  // --- Module descriptions ---
+  'module.budget.description': 'Track income and expenses by entry',
+  'module.accounts.description': 'Accounts, money flows between them, and reserves for future costs',
+  'module.provision3a.description': 'Swiss retirement savings (3a)',
+  'module.investments.description': 'Track stocks, ETFs, and other assets',
+
+  // --- Failures the app reports when it has nothing better ---
+  'error.loadModules': 'Failed to load modules',
+  'error.updateModule': 'Failed to update module',
+  'error.setupEncryption': 'Failed to set up encryption',
+  'error.unlockVault': 'Failed to unlock vault',
+  'error.recoveryFailed': 'Recovery failed',
+  'error.reorderAccounts': 'Failed to reorder the accounts',
+  'error.saveAccount': 'Failed to save the account',
+  'error.correctBalance': 'Failed to correct the balance',
+  'error.deleteAccount': 'Failed to delete the account',
+  'error.generateQr': 'Failed to generate the QR code',
+  'error.createEntry': 'Failed to create entry',
+
+  'security.twofaEnabled': '2FA is enabled',
+  'security.twofaNotEnabled': '2FA is not enabled',
+  'twofa.enterCode.label': 'Enter code',
+  'time.months.one': 'month',
+  'time.months.other': 'months',
+  'archive.lines.one': 'line',
+  'archive.lines.other': 'lines',
+  'accountForm.qrIbanNote': 'a QR-IBAN — bills will use a QR reference (QRR)',
+  'accountForm.regularIbanNote': 'a regular IBAN — bills will use no reference or SCOR',
+  'qrbill.generate': 'Generate',
+  'qrbill.regenerate': 'Regenerate',
+  'qrbill.shareTitle': 'QR bill',
+
+  'error.updateEntry': 'Failed to update entry',
+
   // --- Common states ---
   'state.loading': 'Loading...',
   'state.saving': 'Saving...',
   'state.unsaved': 'Unsaved',
+
+  // --- Found by the untranslated-strings scan ---
+  'password.mismatchNew': 'New passwords do not match',
+  'password.mismatch': 'Passwords do not match',
+  'recoveryKey.saved': 'I’ve saved my recovery key',
+  'twofa.codesSaved': 'I’ve saved my codes',
+  'twofa.qrAlt': 'QR code',
+  'twofa.codesCopyFailedPlain': 'Could not reach the clipboard. Select the codes above and copy them by hand.',
+  'alloc.setAsideTotal': 'Set-asides total {amount} this month. They count as budgeted expenses but stay in your accounts.',
+  'purchase.effect': 'The next cycle saves towards {price} over {months}, starting {start}. Nothing is required in that first month, and the amount climbs from there.',
+  'purchase.monthYouPick': 'the month you pick',
+  'reserve.errorTarget': 'Target amount must be a positive number, e.g. 1200.00',
+  'reserve.errorPeriod': 'Period must be a whole number of months, at least 1',
+  'reserve.errorMonth': 'Month must look like 2026-03',
+  'accounts.qrbill': 'QR bill',
+  'accounts.lastCannotDelete': 'The last remaining account cannot be deleted',
+  'accounts.errorAmount': 'Enter an amount like 1234.50',
+  'accounts.errorDate': 'Enter the date the balance was true',
+  'accountDelete.remove': 'Remove {account}?',
+  'accountDelete.routed.one': '{count} entry is routed through it and must move somewhere else.',
+  'accountDelete.routed.other': '{count} entries are routed through it and must move somewhere else.',
+  'accountDelete.collapsing.one': '{count} entry currently moves money between {account} and {target}. After the move both ends are {target}, so it becomes money set aside within one account. That is allowed, but it no longer means the same thing.',
+  'accountDelete.collapsing.other': '{count} entries currently move money between {account} and {target}. After the move both ends are {target}, so they become money set aside within one account. That is allowed, but it no longer means the same thing.',
+  'qrbill.qrIbanRule': 'A QR-IBAN accepts only a QR reference.',
+  'qrbill.regularIbanRule': 'A regular IBAN accepts no reference or a creditor reference — never a QR reference.',
+  'error.saveCategory': 'could not save this category',
+  'error.renameArchive': 'could not rename this archive',
+  'error.archivePlan': 'could not archive the plan',
 } as const
 
 /**

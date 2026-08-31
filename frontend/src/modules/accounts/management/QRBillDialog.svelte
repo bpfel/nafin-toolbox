@@ -131,7 +131,7 @@
       errors = [
         {
           field: 'payload',
-          message: e instanceof Error ? e.message : 'Failed to generate the QR code',
+          message: e instanceof Error ? e.message : t('error.generateQr'),
         },
       ]
     } finally {
@@ -149,7 +149,7 @@
     try {
       const file = new File([svg], 'qr-bill.svg', { type: 'image/svg+xml' })
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'QR bill' })
+        await navigator.share({ files: [file], title: t('qrbill.shareTitle') })
       }
     } catch {
       // The user dismissing the share sheet is not an error worth reporting.
@@ -171,14 +171,12 @@
   <div class="modal" role="dialog" aria-label={t('qrbill.dialogLabel')} use:focusTrap>
     <h3>{t('qrbill.title', { account: account.name })}</h3>
     <p class="sub">
-      Pays into this account. The IBAN and address come from the account — only the amount and
-      reference are per bill.
+      {t('qrbill.payHint')}
     </p>
 
     {#if creditorIncomplete}
       <p class="notice">
-        This account has no complete holder address. Add it under the account's payment details —
-        a QR bill cannot be produced without it.
+        {t('qrbill.noAddress')}
       </p>
     {/if}
 
@@ -205,9 +203,9 @@
     </label>
     <p class="hint">
       {#if account.ibanKind === 'qr-iban'}
-        A QR-IBAN accepts only a QR reference.
+        {t('qrbill.qrIbanRule')}
       {:else}
-        A regular IBAN accepts no reference or a creditor reference — never a QR reference.
+        {t('qrbill.regularIbanRule')}
       {/if}
     </p>
 
@@ -298,8 +296,7 @@
       {#if shareSupported}
         <button class="btn ghost share" onclick={shareImage}>{t('qrbill.share')}</button>
         <p class="hint">
-          Shares the picture to Files, Photos or a chat. Banking apps scan with the camera and will
-          not read it from a screenshot.
+          {t('qrbill.shareHint')}
         </p>
       {/if}
     {/if}
@@ -307,7 +304,7 @@
     <div class="actions">
       <button class="btn cancel" onclick={onclose}>{t('action.close')}</button>
       <button class="btn save" onclick={generate} disabled={generating}>
-        {generating ? 'Generating...' : svg ? 'Regenerate' : 'Generate'}
+        {generating ? 'Generating...' : svg ? t('qrbill.regenerate') : t('qrbill.generate')}
       </button>
     </div>
   </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../lib/i18n/index.svelte'
+  import { t, tn } from '../../lib/i18n/index.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { markDirty } from '../../lib/crypto/vaultStore.svelte'
@@ -34,7 +34,7 @@
     } catch (e) {
       // The engine refuses an unnamed archive. Say so where the name was typed
       // rather than letting the throw escape into the console.
-      archiveError = e instanceof Error ? e.message : 'could not archive the plan'
+      archiveError = e instanceof Error ? e.message : t('error.archivePlan')
     }
   }
 
@@ -82,16 +82,14 @@
         <path d="M4 2 L10 6 L4 10 Z" />
       </svg>
     </span>
-    Archives
+    {t('archive.panelTitle')}
     <span class="count">{archives.length}</span>
   </button>
 
   {#if panelOpen}
     <div class="panel-body">
       <p class="blurb">
-        An archive is a named copy of the plan as it stands now. It keeps the names
-        and amounts it was taken with, so later edits to your entries leave it
-        alone.
+        {t('archive.blurb')}
       </p>
 
       <div class="archive-form">
@@ -132,7 +130,7 @@
                 </button>
                 <span class="archive-meta">
                   {fmtDate(archive.createdAt)} · {archive.lines.length}
-                  {archive.lines.length === 1 ? 'line' : 'lines'}
+                  {tn('archive.lines', archive.lines.length)}
                 </span>
                 <button
                   class="delete-btn"

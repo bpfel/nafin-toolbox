@@ -54,7 +54,7 @@
       onsaved()
       onclose()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'could not save this category'
+      error = e instanceof Error ? e.message : t('error.saveCategory')
     }
   }
 

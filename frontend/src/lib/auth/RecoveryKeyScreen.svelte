@@ -79,14 +79,13 @@
         </p>
 
         <button class="btn primary" onclick={() => (step = 'confirm')}>
-          I've saved my recovery key
+          {t('recoveryKey.saved')}
         </button>
       {:else}
         <h1>{t('recoveryKey.confirmTitle')}</h1>
 
         <p class="lead">
-          Paste the key back, so you find out now rather than the day you need it.
-          After this it is never shown again.
+          {t('recoveryKey.pasteHint')}
         </p>
 
         <label class="field">
@@ -103,11 +102,11 @@
 
         <p class="status" class:failed={typed.trim() !== '' && !matches} aria-live="polite">
           {#if matches}
-            That matches. Keep it somewhere you will still have in a year.
+            {t('recoveryKey.matches')}
           {:else if nearMiss}
-            Almost — the key is case-sensitive.
+            {t('recoveryKey.caseMismatch')}
           {:else if typed.trim() !== ''}
-            That does not match the key.
+            {t('recoveryKey.noMatch')}
           {/if}
         </p>
 

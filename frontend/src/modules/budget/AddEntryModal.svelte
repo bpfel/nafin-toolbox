@@ -129,7 +129,7 @@
       oncreated()
       onclose()
     } catch (e) {
-      error = e instanceof Error ? e.message : isEdit ? 'Failed to update entry' : 'Failed to create entry'
+      error = e instanceof Error ? e.message : isEdit ? t('error.updateEntry') : t('error.createEntry')
     }
   }
 

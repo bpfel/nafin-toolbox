@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../../lib/i18n/index.svelte'
+  import { t, tn, tAround } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { focusTrap } from '../../../lib/util/focusTrap'
@@ -39,6 +39,11 @@
 
   let targetName = $derived(otherAccounts.find(a => a.id === reassignToId)?.name ?? '')
 
+  // The account name is emphasised inside the question, so the sentence is
+  // split around that one slot rather than concatenated from fragments — a
+  // language that puts the name elsewhere can still translate it whole.
+  let [removeBefore, removeAfter] = $derived(tAround('accountDelete.remove', 'account'))
+
   function confirm() {
     if (!reassignToId) return
     ondelete(reassignToId)
@@ -60,12 +65,11 @@
     <h3>{t('accountDelete.title')}</h3>
 
     <p>
-      Remove <strong>{account.name}</strong>?
+      {removeBefore}<strong>{account.name}</strong>{removeAfter}
       {#if affected.length === 0}
-        No entries are routed through it.
+        {t('accountDelete.noneRouted')}
       {:else}
-        {affected.length}
-        {affected.length === 1 ? 'entry is' : 'entries are'} routed through it and must move somewhere else.
+        {tn('accountDelete.routed', affected.length)}
       {/if}
     </p>
 
@@ -81,12 +85,10 @@
     {#if collapsing.length > 0}
       <div class="notice">
         <p>
-          {collapsing.length}
-          {collapsing.length === 1 ? 'entry currently moves' : 'entries currently move'}
-          money between <strong>{account.name}</strong> and <strong>{targetName}</strong>. After the
-          move both ends are {targetName}, so
-          {collapsing.length === 1 ? 'it becomes' : 'they become'}
-          money set aside within one account. That is allowed, but it no longer means the same thing.
+          {tn('accountDelete.collapsing', collapsing.length, {
+            account: account.name,
+            target: targetName,
+          })}
         </p>
         <ul>
           {#each collapsing as c}
@@ -99,7 +101,7 @@
     <div class="actions">
       <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn delete" onclick={confirm} disabled={!reassignToId}>
-        Delete and reassign
+        {t('accountDelete.confirm')}
       </button>
     </div>
   </div>

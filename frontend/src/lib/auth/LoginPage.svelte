@@ -83,7 +83,7 @@
         <p class="hint">{t('twofa.enterRecoveryCode')}</p>
         <form onsubmit={(e) => { e.preventDefault(); handleVerify2FA() }}>
           <label>
-            Recovery Code
+            {t('field.recoveryCode')}
             <input
               type="text"
               bind:value={recoveryCode}
@@ -129,7 +129,7 @@
 
       <form onsubmit={handleSubmit}>
         <label>
-          Email
+          {t('field.email')}
           <input
             type="email"
             bind:value={email}
@@ -140,7 +140,7 @@
         </label>
 
         <label>
-          Password
+          {t('field.password')}
           <input
             type="password"
             bind:value={password}

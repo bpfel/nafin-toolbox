@@ -121,7 +121,7 @@
         {#if openInfo === 'info-unallocated'}
           <span class="info-popover" id="info-unallocated" role="note">
             Income {money(plannedIncome)} − expenses {money(plannedExpenses)}.
-            Zero means every franc has a job.
+            {t('alloc.zeroMeans')}
           </span>
         {/if}
       </span>

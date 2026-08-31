@@ -144,7 +144,7 @@
       markDirty()
       version++
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to reorder the accounts'
+      error = e instanceof Error ? e.message : t('error.reorderAccounts')
     }
   }
 
@@ -199,7 +199,7 @@
       version++
       closeForm()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to save the account'
+      error = e instanceof Error ? e.message : t('error.saveAccount')
     }
   }
 
@@ -214,7 +214,7 @@
       markDirty()
       version++
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to correct the balance'
+      error = e instanceof Error ? e.message : t('error.correctBalance')
     }
   }
 
@@ -228,7 +228,7 @@
       version++
       deleteTarget = null
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to delete the account'
+      error = e instanceof Error ? e.message : t('error.deleteAccount')
     }
   }
 </script>

@@ -404,8 +404,7 @@
     <p class="empty">{t('state.loading')}</p>
   {:else if entries.length === 0}
     <p class="empty">
-      No budget entries yet. Add them in the Budget module and they will appear here, ready to
-      route.
+      {t('alloc.noEntries')}
     </p>
   {:else}
     <AllocationSummary
@@ -438,8 +437,7 @@
           {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
         {/each}
         <p class="section-note">
-          Set-asides total {money(totals.setAside)} this month. They count as budgeted expenses
-          but stay in your accounts.
+          {t('alloc.setAsideTotal', { amount: money(totals.setAside) })}
         </p>
       </section>
     {/if}

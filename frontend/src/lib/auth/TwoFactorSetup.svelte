@@ -80,7 +80,7 @@
     <p class="info">{t('twofa.scanHint')}</p>
 
     <div class="qr-container">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(otpauthURL)}" alt="QR Code" width="200" height="200" />
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(otpauthURL)}" alt={t('twofa.qrAlt')} width="200" height="200" />
     </div>
 
     <details class="manual-entry">
@@ -122,15 +122,14 @@
 
     <p class="copy-status" class:failed={copier.failed} aria-live="polite">
       {#if copier.failed}
-        Could not reach the clipboard. Select the codes above and copy them by
-        hand, or use Download.
+        {t('twofa.codesCopyFailed')}
       {:else if copier.copied}
-        Recovery codes copied to the clipboard.
+        {t('twofa.codesCopied')}
       {/if}
     </p>
 
     <button onclick={() => onDone?.()}>
-      I've Saved My Codes
+      {t('twofa.codesSaved')}
     </button>
   {/if}
 </div>

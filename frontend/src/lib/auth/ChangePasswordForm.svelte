@@ -15,7 +15,7 @@
     error = null
 
     if (newPassword !== confirmPassword) {
-      error = 'New passwords do not match'
+      error = t('password.mismatchNew')
       return
     }
 
@@ -40,7 +40,7 @@
 
     <form onsubmit={handleSubmit}>
       <label>
-        Current Password
+        {t('password.current')}
         <input
           type="password"
           bind:value={currentPassword}
@@ -51,7 +51,7 @@
       </label>
 
       <label>
-        New Password
+        {t('password.new')}
         <input
           type="password"
           bind:value={newPassword}
@@ -63,7 +63,7 @@
       </label>
 
       <label>
-        Confirm New Password
+        {t('password.confirmNew')}
         <input
           type="password"
           bind:value={confirmPassword}

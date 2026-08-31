@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t } from '../../../lib/i18n/index.svelte'
+  import { t, tn } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
   import { toCents } from '../../../lib/accounts/reserveMath'
   import { focusTrap } from '../../../lib/util/focusTrap'
@@ -122,10 +122,11 @@
       <p class="error">{t('purchase.priceError')}</p>
     {:else}
       <p class="effect">
-        The next cycle saves towards {money(normalizedPrice)} over {reserve.periodMonths}
-        {reserve.periodMonths === 1 ? 'month' : 'months'}, starting
-        {validMonth ? monthLabel(purchaseMonth) : 'the month you pick'}. Nothing is required in that
-        first month, and the amount climbs from there.
+        {t('purchase.effect', {
+          price: money(normalizedPrice),
+          months: `${reserve.periodMonths} ${tn('time.months', reserve.periodMonths)}`,
+          start: validMonth ? monthLabel(purchaseMonth) : t('purchase.monthYouPick'),
+        })}
       </p>
     {/if}
 

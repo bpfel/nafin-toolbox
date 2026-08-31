@@ -87,7 +87,7 @@
   function changeTarget(raw: string) {
     const amount = normalizeMoney(raw)
     if (amount === null) {
-      error = 'Target amount must be a positive number, e.g. 1200.00'
+      error = t('reserve.errorTarget')
       return
     }
     update({ targetAmount: amount })
@@ -96,7 +96,7 @@
   function changePeriod(raw: string) {
     const months = Number(raw)
     if (!Number.isInteger(months) || months < 1) {
-      error = 'Period must be a whole number of months, at least 1'
+      error = t('reserve.errorPeriod')
       return
     }
     // Re-propose the target only while it is still the untouched proposal for the
@@ -115,7 +115,7 @@
 
   function changeAnchor(raw: string) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(raw)) {
-      error = 'Month must look like 2026-03'
+      error = t('reserve.errorMonth')
       return
     }
     update({ anchorMonth: raw })
@@ -174,7 +174,7 @@
     <div class="grid">
       <label class="control">
         <span class="control-label">
-          Target amount
+          {t('reserve.targetAmount')}
           {#if isProposed}<span class="proposed">proposed</span>{/if}
         </span>
         <input

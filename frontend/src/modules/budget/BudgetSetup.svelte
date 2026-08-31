@@ -13,10 +13,10 @@
   <p>{t('budget.setupHint')}</p>
   <div class="actions">
     <button class="primary" onclick={onseeded}>
-      Load Swiss defaults
+      {t('budget.loadDefaults')}
     </button>
     <button class="secondary" onclick={onstartblank}>
-      Start blank
+      {t('budget.startBlank')}
     </button>
   </div>
 </div>

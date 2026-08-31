@@ -92,7 +92,7 @@
     <div class="section">
       <h3>{t('security.twofaTitle')}</h3>
       {#if authState.currentUser?.totp_enabled}
-        <p class="status enabled">2FA is enabled</p>
+        <p class="status enabled">{t('security.twofaEnabled')}</p>
 
         {#if showDisable}
           <div class="confirm-box">
@@ -122,10 +122,9 @@
               </button>
               <p class="copy-status" class:failed={copier.failed} aria-live="polite">
                 {#if copier.failed}
-                  Could not reach the clipboard. Select the codes above and copy
-                  them by hand.
+                  {t('twofa.codesCopyFailedPlain')}
                 {:else if copier.copied}
-                  Recovery codes copied to the clipboard.
+                  {t('twofa.codesCopied')}
                 {/if}
               </p>
               <button onclick={() => { showRegenCodes = false; recoveryCodes = null; password = '' }}>{t('action.done')}</button>
@@ -150,7 +149,7 @@
           </div>
         {/if}
       {:else}
-        <p class="status">2FA is not enabled</p>
+        <p class="status">{t('security.twofaNotEnabled')}</p>
         <button onclick={() => showSetup2FA = true}>{t('security.enable2fa')}</button>
       {/if}
     </div>

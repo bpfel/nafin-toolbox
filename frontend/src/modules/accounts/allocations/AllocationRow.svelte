@@ -232,12 +232,12 @@
           {#if amortization}
             <span class="timing">
               {#if amortization.monthsAway === 0}
-                Affordable now
+                {t('alloc.affordableNow')}
               {:else if amortization.affordableFrom}
                 At {money(fromCents(amortization.rateCents))}/month, affordable from
                 {monthLabel(amortization.affordableFrom)}
               {:else}
-                No monthly amount planned — budget something towards this to get a date
+                {t('alloc.noMonthlyAmount')}
               {/if}
             </span>
             <button class="purchase" onclick={onpurchase}>{t('alloc.bought')}</button>

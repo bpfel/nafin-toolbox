@@ -35,7 +35,7 @@
     error = null
 
     if (password !== confirmPassword) {
-      error = 'Passwords do not match'
+      error = t('password.mismatch')
       return
     }
 
@@ -78,7 +78,7 @@
 
       <form onsubmit={handleSubmit}>
         <label>
-          Password
+          {t('field.password')}
           <input
             type="password"
             bind:value={password}
@@ -90,7 +90,7 @@
         </label>
 
         <label>
-          Confirm Password
+          {t('field.confirmPassword')}
           <input
             type="password"
             bind:value={confirmPassword}

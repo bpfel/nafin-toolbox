@@ -56,24 +56,24 @@
   const isAdmin = $derived(authState.currentUser?.role === 'admin')
 
   const availableModules = [
-    { id: 'budget', name: 'Budget', description: 'Track income and expenses by entry' },
+    { id: 'budget', name: 'Budget', description: () => t('module.budget.description') },
     // Allocations ships inside Accounts as a second view rather than as its own
     // module: it is meaningless without accounts, and the flat module list has no
     // way to express that dependency. The `allocations` registry id stays unused.
     {
       id: 'accounts',
       name: 'Accounts',
-      description: 'Accounts, money flows between them, and reserves for future costs',
+      description: () => t('module.accounts.description'),
     },
-    { id: 'provision3a', name: 'Pillar 3a', description: 'Swiss retirement savings (3a)' },
-    { id: 'investments', name: 'Investments', description: 'Track stocks, ETFs, and other assets' },
+    { id: 'provision3a', name: 'Pillar 3a', description: () => t('module.provision3a.description') },
+    { id: 'investments', name: 'Investments', description: () => t('module.investments.description') },
   ]
 
   async function loadModules() {
     try {
       modules = await fetchModules()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load modules'
+      error = e instanceof Error ? e.message : t('error.loadModules')
     }
   }
 
@@ -91,7 +91,7 @@
       }
       await loadModules()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to update module'
+      error = e instanceof Error ? e.message : t('error.updateModule')
     } finally {
       toggling = null
     }
@@ -173,7 +173,7 @@
     try {
       await completeVaultSetup()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to set up encryption'
+      error = e instanceof Error ? e.message : t('error.setupEncryption')
     } finally {
       settingUpVault = false
     }
@@ -193,7 +193,7 @@
         unlockError = err
       }
     } catch (e) {
-      unlockError = e instanceof Error ? e.message : 'Failed to unlock vault'
+      unlockError = e instanceof Error ? e.message : t('error.unlockVault')
     } finally {
       unlocking = false
       unlockPassword = ''
@@ -210,7 +210,7 @@
         recoveryError = err
       }
     } catch (e) {
-      recoveryError = e instanceof Error ? e.message : 'Recovery failed'
+      recoveryError = e instanceof Error ? e.message : t('error.recoveryFailed')
     } finally {
       recovering = false
     }
@@ -474,7 +474,7 @@
               <div class="module-row" class:enabled={isEnabled(mod.id)}>
                 <div class="module-info">
                   <span class="module-name">{mod.name}</span>
-                  <span class="module-desc">{mod.description}</span>
+                  <span class="module-desc">{mod.description()}</span>
                 </div>
                 <button
                   class="toggle"

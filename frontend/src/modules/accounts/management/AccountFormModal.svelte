@@ -145,7 +145,7 @@
       {#if showAdvanced}
         <div class="advanced-body">
           <p class="hint">
-            Only needed to generate a Swiss QR bill for this account. Leave empty otherwise.
+            {t('accountForm.ibanHint')}
           </p>
 
           <label class="field">
@@ -163,15 +163,15 @@
           </label>
           <p id="iban-status" class="hint" class:bad={ibanState === 'invalid'}>
             {#if ibanState === 'invalid'}
-              Not a valid Swiss or Liechtenstein IBAN — check for a mistyped digit.
+              {t('accountForm.ibanInvalid')}
             {:else if ibanState === 'incomplete'}
               {21 - cleanedIban.length} more character{21 - cleanedIban.length === 1 ? '' : 's'} to go.
             {:else if ibanState === 'valid'}
               Checksum valid. Detected as {ibanKind === 'qr-iban'
-                ? 'a QR-IBAN — bills will use a QR reference (QRR)'
-                : 'a regular IBAN — bills will use no reference or SCOR'}.
+                ? t('accountForm.qrIbanNote')
+                : t('accountForm.regularIbanNote')}.
             {:else}
-              Only needed for QR bills.
+              {t('accountForm.holderHint')}
             {/if}
           </p>
 

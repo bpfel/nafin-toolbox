@@ -11,7 +11,7 @@
     <div class="actions">
       <button class="reload" onclick={() => location.reload()}>{t('action.reload')}</button>
       <button class="dismiss" onclick={dismissUpdate} aria-label={t('update.dismiss')}>
-        Not now
+        {t('update.notNow')}
       </button>
     </div>
   </div>

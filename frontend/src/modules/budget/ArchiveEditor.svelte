@@ -63,7 +63,7 @@
       onrename(nameDraft)
       nameError = null
     } catch (e) {
-      nameError = e instanceof Error ? e.message : 'could not rename this archive'
+      nameError = e instanceof Error ? e.message : t('error.renameArchive')
     }
   }
 

@@ -89,11 +89,11 @@
   function submitCorrection() {
     const amount = normalizeAmount(amountInput)
     if (amount === null) {
-      correctionError = 'Enter an amount like 1234.50'
+      correctionError = t('accounts.errorAmount')
       return
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-      correctionError = 'Enter the date the balance was true'
+      correctionError = t('accounts.errorDate')
       return
     }
     // The amount and the date it holds as of are set together, always.
@@ -143,7 +143,7 @@
   {#if correcting}
     <div class="correction">
       <p class="correction-hint">
-        The balance and the date it is true as of are one entry — both are set together.
+          {t('accounts.correctionHint')}
       </p>
       <div class="correction-fields">
         <label class="field">
@@ -185,7 +185,7 @@
       <!-- Generating a bill reads the account; it changes nothing. -->
       {#if qrCapable}
         <button class="btn ghost" onclick={onqrbill} aria-label={t('accounts.qrbillFor', { account: account.name })}>
-          QR bill
+          {t('accounts.qrbill')}
         </button>
       {/if}
       {#if editing}
@@ -194,9 +194,9 @@
           onclick={ondelete}
           disabled={!canDelete}
           aria-label={t('accounts.deleteOne', { account: account.name })}
-          title={canDelete ? undefined : 'The last remaining account cannot be deleted'}
+          title={canDelete ? undefined : t('accounts.lastCannotDelete')}
         >
-          Delete
+          {t('action.delete')}
         </button>
       {/if}
     </div>
