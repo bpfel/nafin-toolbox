@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   let { value = $bindable(''), disabled = false, onSubmit }: {
     value: string
     disabled?: boolean
@@ -28,7 +29,7 @@
   inputmode="numeric"
   autocomplete="one-time-code"
   maxlength="8"
-  placeholder="Enter code"
+  placeholder={t('twofa.enterCode.label')}
   {disabled}
   value={value}
   oninput={handleInput}

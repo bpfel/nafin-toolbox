@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { verifyEmail } from './authStore.svelte'
 
   interface Props {
@@ -34,7 +35,7 @@
     error = null
 
     if (password !== confirmPassword) {
-      error = 'Passwords do not match'
+      error = t('password.mismatch')
       return
     }
 
@@ -62,22 +63,22 @@
 <div class="verify-container">
   <div class="verify-card">
     {#if !token}
-      <h1>Invalid Link</h1>
-      <p class="error-msg">This verification link is invalid. Please check your email for the correct link.</p>
+      <h1>{t('verify.invalidTitle')}</h1>
+      <p class="error-msg">{t('verify.invalidHint')}</p>
     {:else if spent}
-      <h1>Link Already Used</h1>
-      <p class="hint">This account has already been set up. Sign in with the password you chose.</p>
-      <button class="leave" onclick={leave}>Go to sign in</button>
+      <h1>{t('verify.usedTitle')}</h1>
+      <p class="hint">{t('verify.usedHint')}</p>
+      <button class="leave" onclick={leave}>{t('verify.goToSignIn')}</button>
     {:else if success}
-      <h1>Account Verified</h1>
-      <p class="success-msg">Your account has been set up. Redirecting...</p>
+      <h1>{t('verify.doneTitle')}</h1>
+      <p class="success-msg">{t('verify.doneHint')}</p>
     {:else}
-      <h1>Set Up Your Account</h1>
-      <p class="hint">Choose a password to complete your account setup.</p>
+      <h1>{t('verify.setupTitle')}</h1>
+      <p class="hint">{t('verify.setupHint')}</p>
 
       <form onsubmit={handleSubmit}>
         <label>
-          Password
+          {t('field.password')}
           <input
             type="password"
             bind:value={password}
@@ -89,7 +90,7 @@
         </label>
 
         <label>
-          Confirm Password
+          {t('field.confirmPassword')}
           <input
             type="password"
             bind:value={confirmPassword}
@@ -105,7 +106,7 @@
         {/if}
 
         <button type="submit" disabled={submitting}>
-          {submitting ? 'Setting up...' : 'Set Password & Sign In'}
+          {submitting ? t('verify.settingUp') : t('verify.setPassword')}
         </button>
       </form>
     {/if}

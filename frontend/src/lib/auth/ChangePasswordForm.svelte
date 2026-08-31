@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { changePassword, logout } from './authStore.svelte'
 
   let { message = '', onDone, showLogout = false }: { message?: string; onDone?: () => void; showLogout?: boolean } = $props()
@@ -14,7 +15,7 @@
     error = null
 
     if (newPassword !== confirmPassword) {
-      error = 'New passwords do not match'
+      error = t('password.mismatchNew')
       return
     }
 
@@ -32,14 +33,14 @@
 
 <div class="change-pw-container">
   <div class="change-pw-card">
-    <h2>Change Password</h2>
+    <h2>{t('password.changeTitle')}</h2>
     {#if message}
       <p class="hint">{message}</p>
     {/if}
 
     <form onsubmit={handleSubmit}>
       <label>
-        Current Password
+        {t('password.current')}
         <input
           type="password"
           bind:value={currentPassword}
@@ -50,7 +51,7 @@
       </label>
 
       <label>
-        New Password
+        {t('password.new')}
         <input
           type="password"
           bind:value={newPassword}
@@ -62,7 +63,7 @@
       </label>
 
       <label>
-        Confirm New Password
+        {t('password.confirmNew')}
         <input
           type="password"
           bind:value={confirmPassword}
@@ -78,12 +79,12 @@
       {/if}
 
       <button type="submit" disabled={submitting}>
-        {submitting ? 'Changing...' : 'Change Password'}
+        {submitting ? t('password.changing') : t('password.changeTitle')}
       </button>
     </form>
 
     {#if showLogout}
-      <button class="btn-logout" onclick={logout}>Log out</button>
+      <button class="btn-logout" onclick={logout}>{t('menu.logout')}</button>
     {/if}
   </div>
 </div>

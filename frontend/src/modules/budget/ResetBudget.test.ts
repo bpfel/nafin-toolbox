@@ -30,13 +30,13 @@ afterEach(() => {
   markDirty.mockClear()
 })
 
-function load(archives: VaultData['budget']['archives'] = []) {
-  vaultState.vault = makeVault(archives)
+function load(snapshots: VaultData['budget']['snapshots'] = []) {
+  vaultState.vault = makeVault(snapshots)
 }
 
-function makeVault(archives: VaultData['budget']['archives'] = []): VaultData {
+function makeVault(snapshots: VaultData['budget']['snapshots'] = []): VaultData {
   return {
-    version: 5,
+    version: 6,
     accounts: [],
     budget: {
       categories: [
@@ -51,7 +51,7 @@ function makeVault(archives: VaultData['budget']['archives'] = []): VaultData {
         { entryId: 'salary', plannedAmount: '6000.00' },
         { entryId: 'rent', plannedAmount: '1350.00' },
       ],
-      archives,
+      snapshots,
     },
   } as VaultData
 }
@@ -124,23 +124,23 @@ describe('resetting the budget', () => {
     expect(await screen.findByRole('heading', { name: 'Set up your budget' })).toBeTruthy()
   })
 
-  test('says archives survive when there are any', async () => {
+  test('says snapshots survive when there are any', async () => {
     load([{ id: 'a1', name: 'Q1', createdAt: '2026-01-01', lines: [] }])
     toggleEditing('budget')
     render(BudgetModule)
 
     await fireEvent.click(resetButton()!)
 
-    expect(await screen.findByText(/1 archive is/i)).toBeTruthy()
+    expect(await screen.findByText(/1 snapshot is/i)).toBeTruthy()
   })
 
-  test('warns when nothing is archived', async () => {
+  test('warns when there are no snapshots', async () => {
     load()
     toggleEditing('budget')
     render(BudgetModule)
 
     await fireEvent.click(resetButton()!)
 
-    expect(await screen.findByText(/nothing is archived/i)).toBeTruthy()
+    expect(await screen.findByText(/no snapshots/i)).toBeTruthy()
   })
 })

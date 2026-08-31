@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import type { PlanSummary } from '../../lib/budget/budgetEngine'
 
   interface Props {
@@ -21,21 +22,21 @@
 <div class="summary-bar">
   <div class="summary-grid">
     <div class="summary-item">
-      <span class="label">Income /yr</span>
+      <span class="label">{t('budget.incomeYr')}</span>
       <span class="value income">{fmtYr(summary.totalPlannedIncome)}</span>
     </div>
     <div class="summary-item">
-      <span class="label">Expenses /yr</span>
+      <span class="label">{t('budget.expensesYr')}</span>
       <span class="value expense">{fmtYr(summary.totalPlannedExpenses)}</span>
     </div>
     <div class="summary-item">
-      <span class="label">Unallocated /mo</span>
+      <span class="label">{t('budget.unallocatedMo')}</span>
       <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
         {fmt(summary.plannedBalance)}
       </span>
     </div>
     <div class="summary-item">
-      <span class="label">Unallocated /yr</span>
+      <span class="label">{t('budget.unallocatedYr')}</span>
       <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
         {fmtYr(summary.plannedBalance)}
       </span>

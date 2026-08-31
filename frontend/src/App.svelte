@@ -18,6 +18,9 @@
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
+  import SettingsMenu from './lib/nav/SettingsMenu.svelte'
+  import LanguagePicker from './lib/nav/LanguagePicker.svelte'
+  import { t } from './lib/i18n/index.svelte'
 
   const authState = getAuthState()
   const vaultState = getVaultState()
@@ -34,7 +37,6 @@
   let showUsers = $state(false)
   let showSecurity = $state(false)
   let toggling = $state<string | null>(null)
-  let menuOpen = $state(false)
 
   let require2FA = $state(false)
   let show2FAEnforcement = $state(false)
@@ -55,24 +57,24 @@
   const isAdmin = $derived(authState.currentUser?.role === 'admin')
 
   const availableModules = [
-    { id: 'budget', name: 'Budget', description: 'Track income and expenses by entry' },
+    { id: 'budget', name: 'Budget', description: () => t('module.budget.description') },
     // Allocations ships inside Accounts as a second view rather than as its own
     // module: it is meaningless without accounts, and the flat module list has no
     // way to express that dependency. The `allocations` registry id stays unused.
     {
       id: 'accounts',
       name: 'Accounts',
-      description: 'Accounts, money flows between them, and reserves for future costs',
+      description: () => t('module.accounts.description'),
     },
-    { id: 'provision3a', name: 'Pillar 3a', description: 'Swiss retirement savings (3a)' },
-    { id: 'investments', name: 'Investments', description: 'Track stocks, ETFs, and other assets' },
+    { id: 'provision3a', name: 'Pillar 3a', description: () => t('module.provision3a.description') },
+    { id: 'investments', name: 'Investments', description: () => t('module.investments.description') },
   ]
 
   async function loadModules() {
     try {
       modules = await fetchModules()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load modules'
+      error = e instanceof Error ? e.message : t('error.loadModules')
     }
   }
 
@@ -90,7 +92,7 @@
       }
       await loadModules()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to update module'
+      error = e instanceof Error ? e.message : t('error.updateModule')
     } finally {
       toggling = null
     }
@@ -98,19 +100,13 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (showConfig && e.key === 'Escape') showConfig = false
-    if (menuOpen && e.key === 'Escape') menuOpen = false
   }
 
   function handleBackdrop(e: MouseEvent) {
     if (e.target === e.currentTarget) showConfig = false
   }
 
-  function handleMenuBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) menuOpen = false
-  }
-
   function navigateTo(view: 'users' | 'security' | 'modules') {
-    menuOpen = false
     if (view === 'users') {
       showUsers = true; showSecurity = false; showConfig = false
     } else if (view === 'security') {
@@ -178,7 +174,7 @@
     try {
       await completeVaultSetup()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to set up encryption'
+      error = e instanceof Error ? e.message : t('error.setupEncryption')
     } finally {
       settingUpVault = false
     }
@@ -198,7 +194,7 @@
         unlockError = err
       }
     } catch (e) {
-      unlockError = e instanceof Error ? e.message : 'Failed to unlock vault'
+      unlockError = e instanceof Error ? e.message : t('error.unlockVault')
     } finally {
       unlocking = false
       unlockPassword = ''
@@ -215,18 +211,48 @@
         recoveryError = err
       }
     } catch (e) {
-      recoveryError = e instanceof Error ? e.message : 'Recovery failed'
+      recoveryError = e instanceof Error ? e.message : t('error.recoveryFailed')
     } finally {
       recovering = false
     }
   }
+  /**
+   * True on every screen that renders its own centred card instead of the app's
+   * top bar — loading, sign-up, login, and each enforcement gate.
+   *
+   * These are exactly the screens with nowhere to put the language picker in
+   * flow, so it floats there instead. The condition mirrors the branch chain
+   * below and has to move with it: a gate added there wants a term here too, or
+   * that screen silently loses the picker.
+   */
+  let chromeless = $derived(
+    authState.loading ||
+      isVerifyPage ||
+      !authState.currentUser ||
+      authState.currentUser.must_change_password ||
+      show2FAEnforcement ||
+      (!isAdmin &&
+        (authState.recoveryKeyToShow != null ||
+          vaultState.versionAhead ||
+          authState.vaultNeedsSetup ||
+          authState.vaultDecryptFailed ||
+          authState.vaultLocked ||
+          !vaultState.unlocked)),
+  )
 </script>
+
+{#if chromeless}
+  <div class="floating-language">
+    <LanguagePicker />
+  </div>
+{/if}
+
 
 <svelte:window onkeydown={handleKeydown} />
 
 {#if authState.loading}
   <main>
-    <p class="loading">Loading...</p>
+    <p class="loading">{t('state.loading')}</p>
   </main>
 {:else if isVerifyPage}
   <VerifyEmailPage
@@ -237,15 +263,15 @@
   <LoginPage onSuccess={handleLoginSuccess} />
 {:else if authState.currentUser.must_change_password}
   <ChangePasswordForm
-    message="Please set a new password to continue."
+    message={t('password.mustChange')}
     showLogout={true}
   />
 {:else if show2FAEnforcement}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Two-Factor Authentication Required</h1>
-        <p class="hint">Your administrator requires all users to enable two-factor authentication before continuing.</p>
+        <h1>{t('twofa.requiredTitle')}</h1>
+        <p class="hint">{t('twofa.requiredHint')}</p>
         <TwoFactorSetup onDone={() => { show2FAEnforcement = false; window.location.reload() }} />
       </div>
     </div>
@@ -259,18 +285,16 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>This page is out of date</h1>
+        <h1>{t('vault.outOfDateTitle')}</h1>
         <p class="hint">
-          Your data was saved by a newer version of the app than the one this page is
-          running, so this page cannot read it. Reloading picks up the current version.
+          {t('vault.outOfDateHint')}
         </p>
         <p class="hint">
-          Nothing has been lost, and nothing will be written while this page cannot read
-          your data.
+          {t('vault.outOfDateSafe')}
         </p>
 
-        <button class="btn-primary" onclick={() => location.reload()}>Reload</button>
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="btn-primary" onclick={() => location.reload()}>{t('action.reload')}</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
@@ -278,11 +302,11 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Set Up Encryption</h1>
-        <p class="hint">Your data will be encrypted end-to-end. Only you can read it — the server never sees your data in plain text.</p>
+        <h1>{t('vault.setupTitle')}</h1>
+        <p class="hint">{t('vault.setupHint')}</p>
 
         <button class="btn-primary" onclick={handleVaultSetup} disabled={settingUpVault}>
-          {settingUpVault ? 'Setting up encryption...' : 'Set up encryption'}
+          {settingUpVault ? t('vault.setupBusy') : t('vault.setupAction')}
         </button>
 
         {#if error}
@@ -295,12 +319,12 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Vault Decryption Failed</h1>
-        <p class="hint">Your encrypted vault could not be decrypted with your current password. This can happen if your password was reset by an admin. Use your recovery key to restore access.</p>
+        <h1>{t('vault.decryptFailedTitle')}</h1>
+        <p class="hint">{t('vault.decryptFailedHint')}</p>
 
         <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleRecovery() }}>
           <label>
-            Recovery Key
+            {t('vault.recoveryKeyLabel')}
             <input
               type="text"
               bind:value={recoveryKey}
@@ -316,11 +340,11 @@
           {/if}
 
           <button class="btn-primary" type="submit" disabled={recovering || !recoveryKey.trim()}>
-            {recovering ? 'Recovering...' : 'Recover vault'}
+            {recovering ? t('vault.recoverBusy') : t('vault.recoverAction')}
           </button>
         </form>
 
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
@@ -328,12 +352,12 @@
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Unlock Vault</h1>
-        <p class="hint">Enter your password to decrypt your data.</p>
+        <h1>{t('vault.unlockTitle')}</h1>
+        <p class="hint">{t('vault.unlockHint')}</p>
 
         <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleUnlock() }}>
           <label>
-            Password
+            {t('field.password')}
             <input
               type="password"
               bind:value={unlockPassword}
@@ -348,11 +372,11 @@
           {/if}
 
           <button class="btn-primary" type="submit" disabled={unlocking || !unlockPassword}>
-            {unlocking ? 'Unlocking...' : 'Unlock'}
+            {unlocking ? t('vault.unlockBusy') : t('vault.unlockAction')}
           </button>
         </form>
 
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
@@ -360,51 +384,33 @@
 
   <main>
     <div class="top-bar">
-      <h1>Finance Tracker</h1>
+      <h1>{t('app.title')}</h1>
       <div class="user-info">
-        <span class="role-tag">{authState.currentUser.role}</span>
+        <span class="role-tag">{t(`role.${authState.currentUser.role}` as 'role.user')}</span>
         <span class="user-email">{authState.currentUser.email}</span>
         {#if !isAdmin}
           {#if vaultState.saving}
-            <span class="save-indicator">Saving...</span>
+            <span class="save-indicator">{t('state.saving')}</span>
           {:else if vaultState.dirty}
-            <span class="save-indicator unsaved">Unsaved</span>
+            <span class="save-indicator unsaved">{t('state.unsaved')}</span>
           {/if}
         {/if}
         {#if authState.currentUser.role === 'admin'}
-          <button class="btn-secondary" onclick={() => navigateTo('users')}>Users</button>
+          <button class="btn-secondary" onclick={() => navigateTo('users')}>{t('menu.users')}</button>
         {/if}
-        <button class="btn-secondary" onclick={() => navigateTo('security')}>Security</button>
-        <button class="btn-secondary" onclick={() => navigateTo('modules')}>Modules</button>
-        <button class="btn-secondary" onclick={() => { handleLogout() }}>Logout</button>
       </div>
-      <button class="hamburger-btn" onclick={() => (menuOpen = !menuOpen)} aria-label="Toggle menu">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
+      <!-- One menu at every width. The hamburger it replaces held the same items
+           and a copy of the role and email, which now live in the panel. -->
+      <div class="bar-controls">
+        <LanguagePicker />
+        <SettingsMenu
+          role={authState.currentUser.role}
+          email={authState.currentUser.email}
+          onnavigate={navigateTo}
+          onlogout={handleLogout}
+        />
+      </div>
     </div>
-
-    {#if menuOpen}
-      <div class="backdrop menu-backdrop" role="presentation" onclick={handleMenuBackdrop}>
-        <div class="menu-modal" role="dialog" aria-label="Navigation menu" use:focusTrap>
-          <div class="menu-header">
-            <span class="role-tag">{authState.currentUser.role}</span>
-            <span class="user-email">{authState.currentUser.email}</span>
-          </div>
-          <div class="menu-items">
-            {#if authState.currentUser.role === 'admin'}
-              <button class="menu-item" onclick={() => navigateTo('users')}>Users</button>
-            {/if}
-            <button class="menu-item" onclick={() => navigateTo('security')}>Security</button>
-            <button class="menu-item" onclick={() => navigateTo('modules')}>Modules</button>
-            <button class="menu-item menu-item-danger" onclick={() => { handleLogout(); menuOpen = false }}>Logout</button>
-          </div>
-        </div>
-      </div>
-    {/if}
 
     {#if showSecurity}
       <SecuritySettings onDone={navigateBack} />
@@ -414,8 +420,8 @@
       <p class="error">{error}</p>
     {:else if modules.length === 0}
       <div class="empty-state">
-        <p>No modules enabled yet.</p>
-        <button onclick={() => (showConfig = true)}>Configure modules</button>
+        <p>{t('modules.none')}</p>
+        <button onclick={() => (showConfig = true)}>{t('modules.configure')}</button>
       </div>
     {:else}
       {#each modules as mod}
@@ -459,7 +465,7 @@
                 aria-pressed={isEditing(mod.id)}
                 onclick={() => toggleEditing(mod.id)}
               >
-                {isEditing(mod.id) ? 'Done' : 'Edit'}
+                {isEditing(mod.id) ? t('action.done') : t('action.edit')}
               </button>
             {/if}
           </div>
@@ -475,7 +481,7 @@
           <div class="module-body" id="module-body-{mod.id}" hidden={!isExpanded(mod.id)}>
             {#if isAdmin}
               <div class="module-card admin-notice">
-                <p>Sign in with a regular account to use encrypted modules.</p>
+                <p>{t('app.adminNoVault')}</p>
               </div>
             {:else if mod.id === 'budget'}
               <BudgetModule />
@@ -484,7 +490,7 @@
             {:else}
               <div class="module-card">
                 <span class="module-id">{mod.id}</span>
-                <p>Coming soon.</p>
+                <p>{t('modules.comingSoon')}</p>
               </div>
             {/if}
           </div>
@@ -494,22 +500,22 @@
 
     {#if showConfig}
       <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-        <div class="modal" role="dialog" aria-label="Configure modules" use:focusTrap>
-          <h3>Modules</h3>
-          <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
+        <div class="modal" role="dialog" aria-label={t('modules.configure')} use:focusTrap>
+          <h3>{t('menu.modules')}</h3>
+          <p class="modal-hint">{t('modules.configureHint')}</p>
           <div class="module-list">
             {#each availableModules as mod}
               <div class="module-row" class:enabled={isEnabled(mod.id)}>
                 <div class="module-info">
                   <span class="module-name">{mod.name}</span>
-                  <span class="module-desc">{mod.description}</span>
+                  <span class="module-desc">{mod.description()}</span>
                 </div>
                 <button
                   class="toggle"
                   class:active={isEnabled(mod.id)}
                   disabled={toggling === mod.id}
                   onclick={() => toggleModule(mod.id)}
-                  aria-label="{isEnabled(mod.id) ? 'Disable' : 'Enable'} {mod.name}"
+                  aria-label="{isEnabled(mod.id) ? t('modules.disable') : t('modules.enable')} {mod.name}"
                 >
                   <span class="toggle-track">
                     <span class="toggle-thumb"></span>
@@ -518,7 +524,7 @@
               </div>
             {/each}
           </div>
-          <button class="close-btn" onclick={() => (showConfig = false)}>Done</button>
+          <button class="close-btn" onclick={() => (showConfig = false)}>{t('action.done')}</button>
         </div>
       </div>
     {/if}
@@ -537,6 +543,21 @@
     color: #666;
   }
 
+  /* Anchored to the viewport, because these screens centre a card and have no
+     bar to sit in. */
+  .floating-language {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+  }
+
+  .bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
   .top-bar {
     display: flex;
     align-items: center;
@@ -547,20 +568,6 @@
     margin: 0;
   }
 
-  .hamburger-btn {
-    display: none;
-    background: none;
-    border: none;
-    color: #666;
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    align-items: center;
-  }
-  .hamburger-btn:hover {
-    color: #333;
-    background: #f1f3f5;
-  }
 
   .user-info {
     display: flex;
@@ -675,65 +682,10 @@
   }
 
   /* Mobile menu overlay */
-  .menu-backdrop {
-    align-items: flex-start;
-    justify-content: flex-end;
-    padding-top: 3.5rem;
-  }
-  .menu-modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.25rem;
-    width: 100%;
-    max-width: 280px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-    margin: 0 1rem;
-  }
-  .menu-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #eee;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-    color: #666;
-  }
-  .menu-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  .menu-item {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    padding: 0.65rem 0.75rem;
-    background: none;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    color: #333;
-    cursor: pointer;
-    text-align: left;
-    min-height: 44px;
-  }
-  .menu-item:hover {
-    background: #f1f3f5;
-  }
-  .menu-item-danger {
-    color: #c0392b;
-  }
-  .menu-item-danger:hover {
-    background: #fdecea;
-  }
 
   @media (max-width: 768px) {
     .top-bar h1 {
       font-size: 1.2rem;
-    }
-    .hamburger-btn {
-      display: flex;
     }
     .user-info {
       display: none;

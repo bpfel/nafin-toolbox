@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { login, setup, verify2FA, getAuthState } from './authStore.svelte'
   import TOTPInput from './TOTPInput.svelte'
 
@@ -76,20 +77,20 @@
 <div class="login-container">
   <div class="login-card">
     {#if mfaToken}
-      <h1>Two-Factor Authentication</h1>
+      <h1>{t('twofa.title')}</h1>
 
       {#if useRecoveryCode}
-        <p class="hint">Enter one of your recovery codes.</p>
+        <p class="hint">{t('twofa.enterRecoveryCode')}</p>
         <form onsubmit={(e) => { e.preventDefault(); handleVerify2FA() }}>
           <label>
-            Recovery Code
+            {t('field.recoveryCode')}
             <input
               type="text"
               bind:value={recoveryCode}
               required
               autocomplete="off"
               disabled={submitting}
-              placeholder="e.g. a1b2c3d4"
+              placeholder={t('twofa.recoveryCodePlaceholder')}
             />
           </label>
 
@@ -98,12 +99,12 @@
           {/if}
 
           <button type="submit" disabled={submitting || !recoveryCode}>
-            {submitting ? 'Verifying...' : 'Verify'}
+            {submitting ? t('twofa.verifying') : t('twofa.verify')}
           </button>
         </form>
-        <button class="link-btn" onclick={() => { useRecoveryCode = false; error = null }}>Use authenticator code instead</button>
+        <button class="link-btn" onclick={() => { useRecoveryCode = false; error = null }}>{t('twofa.useAuthenticator')}</button>
       {:else}
-        <p class="hint">Enter the 6-digit code from your authenticator app.</p>
+        <p class="hint">{t('twofa.enterCode')}</p>
         <div class="totp-wrapper">
           <TOTPInput bind:value={totpCode} disabled={submitting} onSubmit={handleVerify2FA} />
         </div>
@@ -113,22 +114,22 @@
         {/if}
 
         <button onclick={handleVerify2FA} disabled={submitting || totpCode.length < 6}>
-          {submitting ? 'Verifying...' : 'Verify'}
+          {submitting ? t('twofa.verifying') : t('twofa.verify')}
         </button>
-        <button class="link-btn" onclick={() => { useRecoveryCode = true; error = null }}>Use a recovery code instead</button>
+        <button class="link-btn" onclick={() => { useRecoveryCode = true; error = null }}>{t('twofa.useRecoveryCode')}</button>
       {/if}
 
-      <button class="link-btn" onclick={backToLogin}>Back to login</button>
+      <button class="link-btn" onclick={backToLogin}>{t('auth.backToLogin')}</button>
 
     {:else}
-      <h1>{authState.needsSetup ? 'Create First Account' : 'Sign In'}</h1>
+      <h1>{authState.needsSetup ? t('auth.createFirstAccount') : t('auth.signIn')}</h1>
       {#if authState.needsSetup}
-        <p class="setup-hint">No users exist yet. Create the admin account to get started.</p>
+        <p class="setup-hint">{t('auth.noUsersYet')}</p>
       {/if}
 
       <form onsubmit={handleSubmit}>
         <label>
-          Email
+          {t('field.email')}
           <input
             type="email"
             bind:value={email}
@@ -139,7 +140,7 @@
         </label>
 
         <label>
-          Password
+          {t('field.password')}
           <input
             type="password"
             bind:value={password}
@@ -154,12 +155,12 @@
         {/if}
 
         <button type="submit" disabled={submitting}>
-          {submitting ? 'Please wait...' : authState.needsSetup ? 'Create Account' : 'Sign In'}
+          {submitting ? t('auth.pleaseWait') : authState.needsSetup ? t('auth.createAccount') : t('auth.signIn')}
         </button>
       </form>
 
       {#if !authState.needsSetup}
-        <p class="forgot-hint">Forgot your password? Contact your administrator to reset it. You'll need your recovery key to restore your encrypted data.</p>
+        <p class="forgot-hint">{t('auth.forgotHint')}</p>
       {/if}
     {/if}
   </div>

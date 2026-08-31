@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/bpfel/nafin-toolbox/internal/apierror"
 	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
@@ -42,7 +44,7 @@ func handleGetVault(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -64,7 +66,7 @@ func handlePutVault(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -101,7 +103,7 @@ func handlePutVault(store VaultStorer) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			http.Error(w, `{"error":"failed to save vault"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to save vault")
 			return
 		}
 
@@ -113,7 +115,7 @@ func handleGetKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -134,7 +136,7 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -159,12 +161,12 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 		// The client sends the raw recovery key; we bcrypt-hash it for storage
 		hashedRecoveryKey, err := bcrypt.GenerateFromPassword([]byte(req.RecoveryKeyHash), bcrypt.DefaultCost)
 		if err != nil {
-			http.Error(w, `{"error":"failed to hash recovery key"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to hash recovery key")
 			return
 		}
 
 		if err := store.SetEncryptedMEK(r.Context(), user.ID, req.EncryptedMEK, string(hashedRecoveryKey), req.EncryptedMEKRecovery); err != nil {
-			http.Error(w, `{"error":"failed to save keys"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to save keys")
 			return
 		}
 
@@ -176,7 +178,7 @@ func handleUpdateKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -192,7 +194,7 @@ func handleUpdateKeys(store VaultStorer) http.HandlerFunc {
 		}
 
 		if err := store.UpdateEncryptedMEK(r.Context(), user.ID, req.EncryptedMEK); err != nil {
-			http.Error(w, `{"error":"failed to update keys"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to update keys")
 			return
 		}
 
@@ -204,7 +206,7 @@ func handleRecovery(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 

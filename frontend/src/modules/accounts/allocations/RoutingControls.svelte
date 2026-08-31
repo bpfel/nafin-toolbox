@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import type { VaultAccount } from '../../../lib/crypto/vault'
   import { isLegalRouting } from '../../../lib/accounts/routing'
   import { accountLabel } from '../../../lib/accounts/labels'
@@ -75,7 +76,7 @@
 <div class="routing-controls">
   {#if type === 'income'}
     <label class="control">
-      <span class="control-label">Lands in</span>
+      <span class="control-label">{t('routing.landsIn')}</span>
       <select
         value={selectedSink}
         onchange={(e) => chooseIncomeSink(e.currentTarget.value)}
@@ -85,10 +86,10 @@
         {/each}
       </select>
     </label>
-    <p class="hint">Income always arrives from outside your accounts.</p>
+    <p class="hint">{t('routing.incomeHint')}</p>
   {:else}
     <label class="control">
-      <span class="control-label">Paid from</span>
+      <span class="control-label">{t('routing.paidFrom')}</span>
       <select
         value={selectedSource}
         onchange={(e) => chooseSource(e.currentTarget.value)}
@@ -100,7 +101,7 @@
     </label>
 
     <div class="control">
-      <span class="control-label">Destination</span>
+      <span class="control-label">{t('routing.destination')}</span>
       <label class="radio">
         <input
           type="radio"
@@ -108,7 +109,7 @@
           checked={!isSetAside}
           onchange={chooseSpending}
         />
-        <span>Leaves my accounts</span>
+        <span>{t('routing.leaves')}</span>
       </label>
       <div class="radio-row">
         <label class="radio">
@@ -118,11 +119,11 @@
             checked={isSetAside}
             onchange={chooseSetAside}
           />
-          <span>Set aside into</span>
+          <span>{t('routing.setAsideInto')}</span>
         </label>
         {#if isSetAside}
           <select
-            aria-label="Set-aside account"
+            aria-label={t('routing.setAsideAccount')}
             value={selectedSink}
             onchange={(e) => chooseSetAsideAccount(e.currentTarget.value)}
           >

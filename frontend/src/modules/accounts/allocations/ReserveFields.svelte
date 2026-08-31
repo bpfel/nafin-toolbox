@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
   import { moneyInput, integerInput } from '../../../lib/util/money'
 
@@ -86,7 +87,7 @@
   function changeTarget(raw: string) {
     const amount = normalizeMoney(raw)
     if (amount === null) {
-      error = 'Target amount must be a positive number, e.g. 1200.00'
+      error = t('reserve.errorTarget')
       return
     }
     update({ targetAmount: amount })
@@ -95,7 +96,7 @@
   function changePeriod(raw: string) {
     const months = Number(raw)
     if (!Number.isInteger(months) || months < 1) {
-      error = 'Period must be a whole number of months, at least 1'
+      error = t('reserve.errorPeriod')
       return
     }
     // Re-propose the target only while it is still the untouched proposal for the
@@ -114,7 +115,7 @@
 
   function changeAnchor(raw: string) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(raw)) {
-      error = 'Month must look like 2026-03'
+      error = t('reserve.errorMonth')
       return
     }
     update({ anchorMonth: raw })
@@ -148,7 +149,7 @@
   }
 
   let anchorLabel = $derived(
-    selectedKind === 'obligation' ? 'Next month it is due' : 'Cycle started',
+    selectedKind === 'obligation' ? t('reserve.dueNextMonth') : t('reserve.cycleStarted'),
   )
   let anchorHint = $derived(
     selectedKind === 'obligation'
@@ -161,11 +162,11 @@
 
 <div class="reserve-fields">
   <label class="control">
-    <span class="control-label">Saving towards</span>
+    <span class="control-label">{t('reserve.savingTowards')}</span>
     <select value={selectedKind} onchange={(e) => chooseKind(e.currentTarget.value)}>
-      <option value="none">Nothing in particular</option>
-      <option value="obligation">An obligation — a bill that will arrive</option>
-      <option value="amortization">An amortization — something to replace</option>
+      <option value="none">{t('reserve.nothingInParticular')}</option>
+      <option value="obligation">{t('reserve.obligation')}</option>
+      <option value="amortization">{t('reserve.amortization')}</option>
     </select>
   </label>
 
@@ -173,7 +174,7 @@
     <div class="grid">
       <label class="control">
         <span class="control-label">
-          Target amount
+          {t('reserve.targetAmount')}
           {#if isProposed}<span class="proposed">proposed</span>{/if}
         </span>
         <input
@@ -187,7 +188,7 @@
       </label>
 
       <label class="control">
-        <span class="control-label">Period in months</span>
+        <span class="control-label">{t('reserve.periodMonths')}</span>
         <!-- text + inputmode rather than type="number": the number spinner is
              awkward on desktop (a stray scroll changes the value) and inputmode
              already brings up the digit pad on a phone. -->
@@ -225,10 +226,12 @@
 
     {#if isProposed && Number(plannedAmount) > 0}
       <p class="hint">
-        Target proposed from the {Number(plannedAmount).toLocaleString('de-CH', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })} already budgeted each month. Overwrite it with the real figure if you know it.
+        {t('reserve.proposedFrom', {
+          amount: Number(plannedAmount).toLocaleString('de-CH', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+        })}
       </p>
     {/if}
     <p class="hint">{anchorHint}</p>

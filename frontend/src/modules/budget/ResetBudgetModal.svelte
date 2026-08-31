@@ -1,14 +1,15 @@
 <script lang="ts">
+  import { t, tn } from '../../lib/i18n/index.svelte'
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
     entryCount: number
-    archiveCount: number
+    snapshotCount: number
     onreset: () => void
     onclose: () => void
   }
 
-  let { entryCount, archiveCount, onreset, onclose }: Props = $props()
+  let { entryCount, snapshotCount, onreset, onclose }: Props = $props()
 
   function confirm() {
     onreset()
@@ -27,31 +28,27 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Reset budget" use:focusTrap>
-    <h3>Reset budget</h3>
+  <div class="modal" role="dialog" aria-label={t('reset.title')} use:focusTrap>
+    <h3>{t('reset.title')}</h3>
     <p>
-      This removes all {entryCount}
-      {entryCount === 1 ? 'entry' : 'entries'}, their categories and every
-      planned amount. You start again from an empty budget.
+      {tn('reset.explain', entryCount)}
     </p>
 
     <!-- Whether anything survives this depends entirely on whether the user ever
          archived, and they should not have to remember which. -->
-    {#if archiveCount > 0}
+    {#if snapshotCount > 0}
       <p class="kept">
-        Your {archiveCount} {archiveCount === 1 ? 'archive is' : 'archives are'} records
-        of what was budgeted and {archiveCount === 1 ? 'is' : 'are'} kept.
+        {tn('reset.snapshotsKept', snapshotCount)}
       </p>
     {:else}
       <p class="warning">
-        Nothing is archived, so no record of this plan will remain. Cancel and
-        archive it first if you want to keep one.
+        {t('reset.noSnapshots')}
       </p>
     {/if}
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
-      <button class="btn delete" onclick={confirm}>Reset budget</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
+      <button class="btn delete" onclick={confirm}>{t('reset.title')}</button>
     </div>
   </div>
 </div>

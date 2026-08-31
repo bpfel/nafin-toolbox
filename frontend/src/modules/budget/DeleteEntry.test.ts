@@ -85,7 +85,7 @@ describe('deleting an entry from the dialog', () => {
   })
 
   // The budget stopped having periods when v4 replaced them with one plan plus
-  // archives. The dialog described the old model for long enough that it is
+  // snapshots. The dialog described the old model for long enough that it is
   // worth pinning the new one.
   test('the confirmation describes what actually happens', async () => {
     const vault = makeVault()
@@ -96,13 +96,13 @@ describe('deleting an entry from the dialog', () => {
     await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
     const confirm = await screen.findByRole('dialog', { name: 'Delete entry' })
 
-    expect(confirm.textContent).toMatch(/archive/i)
+    expect(confirm.textContent).toMatch(/snapshot/i)
     expect(confirm.textContent).not.toMatch(/periods/i)
   })
 
-  test('archives really do keep the entry after it is deleted', async () => {
+  test('snapshots really do keep the entry after it is deleted', async () => {
     const vault = makeVault()
-    const archive = engine.archivePlan(vault, 'Before the cull')
+    const snapshot = engine.takeSnapshot(vault, 'Before the cull')
     toggleEditing('budget')
     show(vault)
 
@@ -112,7 +112,7 @@ describe('deleting an entry from the dialog', () => {
     await fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }))
 
     expect(engine.listEntries(vault).map(c => c.name)).toEqual(['Food'])
-    expect(archive.lines.map(l => l.entryName)).toContain('Rent')
+    expect(snapshot.lines.map(l => l.entryName)).toContain('Rent')
   })
 
   test('confirming removes the entry', async () => {

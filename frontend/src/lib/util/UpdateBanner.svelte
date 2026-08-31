@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { getBuildVersionState, dismissUpdate } from './buildVersion.svelte'
 
   const version = getBuildVersionState()
@@ -6,11 +7,11 @@
 
 {#if version.showBanner}
   <div class="update-banner" role="status" aria-live="polite">
-    <span class="message">A new version of the app is available.</span>
+    <span class="message">{t('update.available')}</span>
     <div class="actions">
-      <button class="reload" onclick={() => location.reload()}>Reload</button>
-      <button class="dismiss" onclick={dismissUpdate} aria-label="Dismiss update notice">
-        Not now
+      <button class="reload" onclick={() => location.reload()}>{t('action.reload')}</button>
+      <button class="dismiss" onclick={dismissUpdate} aria-label={t('update.dismiss')}>
+        {t('update.notNow')}
       </button>
     </div>
   </div>

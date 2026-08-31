@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import Sortable from 'sortablejs'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import * as engine from '../../lib/budget/budgetEngine'
@@ -211,19 +212,19 @@
   <div class="table-toolbar">
     <button
       class="view-toggle"
-      aria-label="Showing {viewMode} amounts — switch to {viewMode === 'monthly' ? 'yearly' : 'monthly'}"
+      aria-label={t('budget.viewToggle', { mode: viewMode === 'monthly' ? t('budget.monthly') : t('budget.yearly'), other: viewMode === 'monthly' ? t('budget.yearly') : t('budget.monthly') })}
       onclick={() => viewMode = viewMode === 'monthly' ? 'yearly' : 'monthly'}
     >
-      {viewMode === 'monthly' ? 'Month' : 'Year'}
+      {viewMode === 'monthly' ? t('budget.month') : t('budget.year')}
     </button>
   </div>
 
   <table use:categorySortable>
     <thead>
       <tr>
-        <th class="col-name">Income</th>
-        <th class="right col-amount col-planned-mo">Planned/mo</th>
-        <th class="right col-amount col-planned-yr">Planned/yr</th>
+        <th class="col-name">{t('budget.income')}</th>
+        <th class="right col-amount col-planned-mo">{t('budget.plannedMo')}</th>
+        <th class="right col-amount col-planned-yr">{t('budget.plannedYr')}</th>
       </tr>
     </thead>
     {#each incomeCategories as category (category.categoryId)}
@@ -234,7 +235,7 @@
               {#if editing}
                 <span
                   class="category-drag-handle"
-                  title="Drag to reorder"
+                  title={t('budget.dragToReorder')}
                   role="presentation"
                   onclick={(e) => e.stopPropagation()}
                 >⠿</span>
@@ -251,17 +252,17 @@
               {#if editing}
                 <button
                   class="category-name category-name-btn"
-                  aria-label="Edit category {category.categoryName || 'Other'}"
+                  aria-label={t('budget.editCategoryOf', { category: category.categoryName || t('budget.uncategorised') })}
                   onclick={(e) => openCategoryEditor(e, category.categoryId)}
-                >{category.categoryName || 'Other'}</button>
+                >{category.categoryName || t('budget.uncategorised')}</button>
               {:else}
-                <span class="category-name">{category.categoryName || 'Other'}</span>
+                <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
               {/if}
               {#if editing}
                 <button
                   class="category-add"
-                  title="Add an entry to {category.categoryName || 'Other'}"
-                  aria-label="Add an entry to {category.categoryName || 'Other'}"
+                  title={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
+                  aria-label={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
                   onclick={(e) => addToCategory(e, 'income', category.categoryName)}
                 >+</button>
               {/if}
@@ -287,9 +288,9 @@
   <table use:categorySortable>
     <thead>
       <tr>
-        <th class="col-name">Expenses</th>
-        <th class="right col-amount col-planned-mo">Planned/mo</th>
-        <th class="right col-amount col-planned-yr">Planned/yr</th>
+        <th class="col-name">{t('budget.expenses')}</th>
+        <th class="right col-amount col-planned-mo">{t('budget.plannedMo')}</th>
+        <th class="right col-amount col-planned-yr">{t('budget.plannedYr')}</th>
       </tr>
     </thead>
     {#each expenseCategories as category (category.categoryId)}
@@ -300,7 +301,7 @@
               {#if editing}
                 <span
                   class="category-drag-handle"
-                  title="Drag to reorder"
+                  title={t('budget.dragToReorder')}
                   role="presentation"
                   onclick={(e) => e.stopPropagation()}
                 >⠿</span>
@@ -317,17 +318,17 @@
               {#if editing}
                 <button
                   class="category-name category-name-btn"
-                  aria-label="Edit category {category.categoryName || 'Other'}"
+                  aria-label={t('budget.editCategoryOf', { category: category.categoryName || t('budget.uncategorised') })}
                   onclick={(e) => openCategoryEditor(e, category.categoryId)}
-                >{category.categoryName || 'Other'}</button>
+                >{category.categoryName || t('budget.uncategorised')}</button>
               {:else}
-                <span class="category-name">{category.categoryName || 'Other'}</span>
+                <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
               {/if}
               {#if editing}
                 <button
                   class="category-add"
-                  title="Add an entry to {category.categoryName || 'Other'}"
-                  aria-label="Add an entry to {category.categoryName || 'Other'}"
+                  title={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
+                  aria-label={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
                   onclick={(e) => addToCategory(e, 'expense', category.categoryName)}
                 >+</button>
               {/if}

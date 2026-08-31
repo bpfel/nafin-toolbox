@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   interface Props {
     onseeded: () => void
     onstartblank: () => void
@@ -8,14 +9,14 @@
 </script>
 
 <div class="setup">
-  <h3>Set up your budget</h3>
-  <p>Start with default Swiss budget entries based on BFS household survey data (HABE 2023, single person). You can customize everything later.</p>
+  <h3>{t('budget.setupTitle')}</h3>
+  <p>{t('budget.setupHint')}</p>
   <div class="actions">
     <button class="primary" onclick={onseeded}>
-      Load Swiss defaults
+      {t('budget.loadDefaults')}
     </button>
     <button class="secondary" onclick={onstartblank}>
-      Start blank
+      {t('budget.startBlank')}
     </button>
   </div>
 </div>

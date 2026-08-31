@@ -1,6 +1,6 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 5
+export const VAULT_VERSION = 6
 
 /**
  * A stored vault written by a build newer than this one.
@@ -19,7 +19,7 @@ export class VaultVersionAheadError extends Error {
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 5
+  version: 6
   budget: BudgetVaultData
   accounts: VaultAccount[]
 }
@@ -35,10 +35,11 @@ export interface BudgetVaultData {
    * v4 removed monthly periods. The budget is a standing plan rather than a
    * per-month ledger — which is what it always was in practice, since the
    * calculator never tracked real money movement. Points in time are captured
-   * deliberately, as named archives, instead of accruing one row per month.
+   * deliberately, as named snapshots, instead of accruing one row per month.
    */
   plan: VaultPlanEntry[]
-  archives: VaultArchive[]
+  /** Named snapshots of the plan. Called archives before v6. */
+  snapshots: VaultSnapshot[]
 }
 
 export interface VaultPlanEntry {
@@ -49,21 +50,26 @@ export interface VaultPlanEntry {
 /**
  * A named snapshot of the plan.
  *
+ * Called an snapshot before v6, which used one word in two senses: the heading
+ * "Snapshots" meant the collection, while each item meant a packaged copy. The
+ * verb misled too — "snapshot the plan" reads as retiring it, when the plan
+ * stays live and this is only a copy taken alongside it. The word the interface
+ * had already reached for, in all four languages, was snapshot.
+ *
  * Deliberately DENORMALISED: it stores the names and amounts as they were,
- * rather than pointing at live entries. An archive that referenced entries
+ * rather than pointing at live entries. A snapshot that referenced entries
  * would be rewritten by a later rename and would lose lines to a later delete —
- * it would stop being a record of anything. The cost is that an
- * archive cannot be diffed against the plan by id, which is not something we
- * need.
+ * it would stop being a record of anything. The cost is that a snapshot cannot
+ * be diffed against the plan by id, which is not something we need.
  */
-export interface VaultArchive {
+export interface VaultSnapshot {
   id: string
   name: string
   createdAt: string
-  lines: VaultArchiveLine[]
+  lines: VaultSnapshotLine[]
 }
 
-export interface VaultArchiveLine {
+export interface VaultSnapshotLine {
   entryName: string
   categoryName: string
   type: 'income' | 'expense'
@@ -155,12 +161,16 @@ export function assertVaultShape(vault: VaultData): void {
     throw new VaultShapeError('budget is missing')
   }
 
-  // The tell of the bug this exists to catch: v4's key still present.
+  // The tell of the bug this exists to catch: an older version's key still
+  // present, meaning something stamped the number without reshaping the data.
   if ('categoryGroups' in budget) {
     throw new VaultShapeError('budget still carries v4 categoryGroups')
   }
+  if ('archives' in budget) {
+    throw new VaultShapeError('budget still carries v5 archives')
+  }
 
-  for (const key of ['categories', 'entries', 'plan', 'archives'] as const) {
+  for (const key of ['categories', 'entries', 'plan', 'snapshots'] as const) {
     if (!Array.isArray(budget[key])) {
       throw new VaultShapeError(
         `budget.${key} is ${budget[key] === undefined ? 'missing' : 'not an array'}`,
@@ -199,7 +209,7 @@ export async function encryptVault(
  *
  * `String.fromCharCode(...bytes)` spreads every byte as a separate argument and
  * overflows the call stack somewhere around a hundred kilobytes — which is to
- * say, it fails on a large vault by throwing while SAVING. Archives make large
+ * say, it fails on a large vault by throwing while SAVING. Snapshots make large
  * vaults ordinary, so this is the difference between growing a vault and being
  * unable to persist it.
  */
@@ -244,7 +254,13 @@ export function migrateVault(parsed: unknown): VaultData {
 
   const vault = parsed as {
     version?: unknown
-    budget?: { categories?: unknown; entries?: unknown; categoryGroups?: unknown }
+    budget?: {
+      categories?: unknown
+      entries?: unknown
+      categoryGroups?: unknown
+      archives?: unknown
+      snapshots?: unknown
+    }
   }
 
   // The number is a claim; the keys are the evidence. A vault stamped v5 whose
@@ -257,12 +273,29 @@ export function migrateVault(parsed: unknown): VaultData {
     vault.budget.entries === undefined &&
     vault.budget.categoryGroups !== undefined
 
-  if (vault.version === VAULT_VERSION && !wearingV4Keys) return vault as unknown as VaultData
+  // Same reasoning one version on: v6 renamed `archives` to `snapshots`, so a
+  // vault claiming v6 while still holding `archives` was renumbered without
+  // being reshaped, and every reader of `snapshots` would see undefined.
+  const wearingV5Keys =
+    vault.budget != null &&
+    vault.budget.snapshots === undefined &&
+    vault.budget.archives !== undefined
+
+  if (vault.version === VAULT_VERSION && !wearingV4Keys && !wearingV5Keys) {
+    return vault as unknown as VaultData
+  }
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
-  // for being three steps behind.
-  if (vault.version === 2) return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault)))
-  if (vault.version === 3) return migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape))
-  if (vault.version === 4 || wearingV4Keys) return migrateV4ToV5(vault as unknown as V4Shape)
+  // for being four steps behind.
+  if (vault.version === 2) {
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault))))
+  }
+  if (vault.version === 3) {
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape)))
+  }
+  if (vault.version === 4 || wearingV4Keys) {
+    return migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape))
+  }
+  if (vault.version === 5 || wearingV5Keys) return migrateV5ToV6(vault as unknown as V5Shape)
 
   // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
   // the data. Refuse it so the app can say so, instead of handing back an empty
@@ -331,11 +364,11 @@ const MIGRATION_MONTH_NAMES = [
  * `actual` amount is dropped.
  *
  * The most recent period becomes the plan — it is the one the user was last
- * working in. Every earlier period becomes an archive named for its month, so
+ * working in. Every earlier period becomes an snapshot named for its month, so
  * nothing entered is lost: it stops being a timeline and becomes a set of
  * snapshots, which is what the months were serving as anyway.
  *
- * Archives are denormalised here using the category and group names as they
+ * Snapshots are denormalised here using the category and group names as they
  * stand now. Periods never stored names, so today's are the only ones available.
  */
 function migrateV3ToV4(vault: V3Shape): V4Shape {
@@ -362,7 +395,7 @@ function migrateV3ToV4(vault: V3Shape): V4Shape {
     lines: (period.entries ?? []).flatMap(entry => {
       const category = categoryById.get(entry.categoryId)
       // An entry whose category was deleted has no name left to record, so
-      // there is nothing meaningful to archive.
+      // there is nothing meaningful to snapshot.
       if (!category) return []
       return [{
         categoryName: category.name,
@@ -388,18 +421,18 @@ function migrateV3ToV4(vault: V3Shape): V4Shape {
  * v4 -> v5: the vocabulary changes, nothing else does.
  *
  * What v4 called a group is a category, and what it called a category is an
- * entry. Only the words move — every id, amount and archive line survives, so
+ * entry. Only the words move — every id, amount and snapshot line survives, so
  * this is a pure key rename rather than a reshaping.
  *
  * The names are worth the migration because the old pair was actively
  * misleading: "category" named the line item in the budget and the heading in
  * the accounts screen at the same time.
  */
-function migrateV4ToV5(vault: V4Shape): VaultData {
+function migrateV4ToV5(vault: V4Shape): V5Shape {
   const budget = vault.budget ?? {}
 
-  const migrated = vault as unknown as VaultData
-  migrated.version = VAULT_VERSION
+  const migrated = vault as unknown as V5Shape
+  migrated.version = 5
   migrated.budget = {
     categories: (budget.categoryGroups ?? []) as unknown as VaultCategory[],
     entries: (budget.categories ?? []).map(({ groupId, ...rest }) => ({
@@ -421,6 +454,43 @@ function migrateV4ToV5(vault: V4Shape): VaultData {
         plannedAmount: line.plannedAmount,
       })),
     })),
+  }
+  return migrated
+}
+
+/**
+ * The v5 shape: everything v6 has, under the name `archives`.
+ */
+interface V5Shape {
+  version: number
+  budget?: {
+    categories?: VaultCategory[]
+    entries?: VaultEntry[]
+    plan?: VaultPlanEntry[]
+    archives?: VaultSnapshot[]
+  }
+  accounts?: VaultAccount[]
+}
+
+/**
+ * v5 -> v6: archives become snapshots. Only the name changes.
+ *
+ * The contents are identical — same ids, same lines, same order — so this is a
+ * key move rather than a transformation. It still has to happen in stored data
+ * rather than being papered over at read time: leaving both names alive is how
+ * a vault ends up stamped with a version its shape does not match, which is the
+ * failure the v4 tell above exists to catch.
+ */
+function migrateV5ToV6(vault: V5Shape): VaultData {
+  const budget = vault.budget ?? {}
+
+  const migrated = vault as unknown as VaultData
+  migrated.version = VAULT_VERSION
+  migrated.budget = {
+    categories: budget.categories ?? [],
+    entries: budget.entries ?? [],
+    plan: budget.plan ?? [],
+    snapshots: budget.archives ?? [],
   }
   return migrated
 }
@@ -453,7 +523,7 @@ export function createEmptyVault(): VaultData {
       categories: [],
       entries: [],
       plan: [],
-      archives: [],
+      snapshots: [],
     },
     // Invariant: a vault always holds at least one account, so every category
     // can be routed from the moment it is created.

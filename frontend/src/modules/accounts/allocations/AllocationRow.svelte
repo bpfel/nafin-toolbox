@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tn } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition, VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { flowKindOf } from '../../../lib/accounts/routing'
   import { accountShortLabel } from '../../../lib/accounts/labels'
@@ -111,7 +112,7 @@
       : kind === 'spending'
         ? 'Spending'
         : kind === 'setaside'
-          ? isPlainSavings ? 'Savings' : 'Set-aside'
+          ? isPlainSavings ? t('alloc.savings') : t('alloc.setAside')
           : 'Unrouted',
   )
 
@@ -207,7 +208,7 @@
         aria-expanded={expanded}
         onclick={() => (expanded = !expanded)}
       >
-        {expanded ? 'Done' : 'Edit routing'}
+        {expanded ? t('action.done') : t('alloc.editRouting')}
       </button>
     {/if}
   </div>
@@ -219,27 +220,35 @@
       {#if showStatus}
         <div class="reserve-status">
           <span class="required">
-            {money(requiredNow!)} of {money(reserve!.targetAmount)} should be set aside by now
+            {t('reserve.requiredNow', {
+              current: money(requiredNow!),
+              target: money(reserve!.targetAmount),
+            })}
           </span>
           {#if obligation}
             <span class="timing">
               {obligation.monthsAway === 0
-                ? 'Due this month'
-                : `Due ${monthLabel(obligation.due)} — ${obligation.monthsAway} ${obligation.monthsAway === 1 ? 'month' : 'months'} to go`}
+                ? t('reserve.dueThisMonth')
+                : t('reserve.dueIn', {
+                    month: monthLabel(obligation.due),
+                    away: tn('time.monthsToGo', obligation.monthsAway),
+                  })}
             </span>
           {/if}
           {#if amortization}
             <span class="timing">
               {#if amortization.monthsAway === 0}
-                Affordable now
+                {t('alloc.affordableNow')}
               {:else if amortization.affordableFrom}
-                At {money(fromCents(amortization.rateCents))}/month, affordable from
-                {monthLabel(amortization.affordableFrom)}
+                {t('alloc.affordableFrom', {
+                  rate: money(fromCents(amortization.rateCents)),
+                  month: monthLabel(amortization.affordableFrom),
+                })}
               {:else}
-                No monthly amount planned — budget something towards this to get a date
+                {t('alloc.noMonthlyAmount')}
               {/if}
             </span>
-            <button class="purchase" onclick={onpurchase}>Bought it…</button>
+            <button class="purchase" onclick={onpurchase}>{t('alloc.bought')}</button>
           {/if}
         </div>
       {/if}

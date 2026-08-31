@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { t, tn } from '../../lib/i18n/index.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { markDirty } from '../../lib/crypto/vaultStore.svelte'
-  import ArchiveEditor from './ArchiveEditor.svelte'
-  import DeleteArchiveModal from './DeleteArchiveModal.svelte'
+  import SnapshotEditor from './SnapshotEditor.svelte'
+  import DeleteSnapshotModal from './DeleteSnapshotModal.svelte'
 
   interface Props {
     vault: VaultData
@@ -16,31 +17,31 @@
 
   let panelOpen = $state(false)
   let newName = $state('')
-  let archiveError = $state<string | null>(null)
+  let snapshotError = $state<string | null>(null)
   let expandedId = $state<string | null>(null)
   let deleteTarget = $state<{ id: string; name: string; lineCount: number } | null>(null)
 
-  let archives = $derived(version >= 0 ? engine.listArchives(vault) : [])
+  let snapshots = $derived(version >= 0 ? engine.listSnapshots(vault) : [])
 
-  function archiveCurrentPlan() {
+  function takeSnapshotOfPlan() {
     try {
-      const created = engine.archivePlan(vault, newName)
+      const created = engine.takeSnapshot(vault, newName)
       newName = ''
-      archiveError = null
+      snapshotError = null
       expandedId = created.id
       markDirty()
       version++
     } catch (e) {
-      // The engine refuses an unnamed archive. Say so where the name was typed
+      // The engine refuses an unnamed snapshot. Say so where the name was typed
       // rather than letting the throw escape into the console.
-      archiveError = e instanceof Error ? e.message : 'could not archive the plan'
+      snapshotError = e instanceof Error ? e.message : t('error.takeSnapshot')
     }
   }
 
   function handleNameKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault()
-      archiveCurrentPlan()
+      takeSnapshotOfPlan()
     }
   }
 
@@ -48,16 +49,16 @@
     expandedId = expandedId === id ? null : id
   }
 
-  function renameArchive(id: string, name: string) {
-    // Deliberately not caught: ArchiveEditor shows the message next to its field.
-    engine.renameArchive(vault, id, name)
+  function renameSnapshot(id: string, name: string) {
+    // Deliberately not caught: SnapshotEditor shows the message next to its field.
+    engine.renameSnapshot(vault, id, name)
     markDirty()
     version++
   }
 
   function confirmDelete() {
     if (!deleteTarget) return
-    engine.deleteArchive(vault, deleteTarget.id)
+    engine.deleteSnapshot(vault, deleteTarget.id)
     if (expandedId === deleteTarget.id) expandedId = null
     markDirty()
     version++
@@ -70,7 +71,7 @@
   }
 </script>
 
-<section class="archives">
+<section class="snapshots">
   <button
     class="panel-toggle"
     aria-expanded={panelOpen}
@@ -81,66 +82,64 @@
         <path d="M4 2 L10 6 L4 10 Z" />
       </svg>
     </span>
-    Archives
-    <span class="count">{archives.length}</span>
+    {t('snapshot.panelTitle')}
+    <span class="count">{snapshots.length}</span>
   </button>
 
   {#if panelOpen}
     <div class="panel-body">
       <p class="blurb">
-        An archive is a named copy of the plan as it stands now. It keeps the names
-        and amounts it was taken with, so later edits to your entries leave it
-        alone.
+        {t('snapshot.blurb')}
       </p>
 
-      <div class="archive-form">
+      <div class="snapshot-form">
         <label class="name-field">
-          <span class="visually-hidden">Name for the new archive</span>
+          <span class="visually-hidden">{t('snapshot.newNameLabel')}</span>
           <input
             type="text"
-            placeholder="e.g. Before the raise"
+            placeholder={t('snapshot.newNamePlaceholder')}
             bind:value={newName}
             onkeydown={handleNameKeydown}
           />
         </label>
-        <button class="primary" onclick={archiveCurrentPlan}>Archive current plan</button>
+        <button class="primary" onclick={takeSnapshotOfPlan}>{t('snapshot.create')}</button>
       </div>
 
-      {#if archiveError}
-        <p class="error" role="alert">{archiveError}</p>
+      {#if snapshotError}
+        <p class="error" role="alert">{snapshotError}</p>
       {/if}
 
-      {#if archives.length === 0}
-        <p class="empty">No archives yet.</p>
+      {#if snapshots.length === 0}
+        <p class="empty">{t('snapshot.none')}</p>
       {:else}
-        <ul class="archive-list">
-          {#each archives as archive (archive.id)}
-            <li class="archive-item">
-              <div class="archive-head">
+        <ul class="snapshot-list">
+          {#each snapshots as snapshot (snapshot.id)}
+            <li class="snapshot-item">
+              <div class="snapshot-head">
                 <button
-                  class="archive-name"
-                  aria-expanded={expandedId === archive.id}
-                  onclick={() => toggleExpanded(archive.id)}
+                  class="snapshot-name"
+                  aria-expanded={expandedId === snapshot.id}
+                  onclick={() => toggleExpanded(snapshot.id)}
                 >
-                  <span class="chevron" class:open={expandedId === archive.id} aria-hidden="true">
+                  <span class="chevron" class:open={expandedId === snapshot.id} aria-hidden="true">
                     <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
                       <path d="M4 2 L10 6 L4 10 Z" />
                     </svg>
                   </span>
-                  {archive.name}
+                  {snapshot.name}
                 </button>
-                <span class="archive-meta">
-                  {fmtDate(archive.createdAt)} · {archive.lines.length}
-                  {archive.lines.length === 1 ? 'line' : 'lines'}
+                <span class="snapshot-meta">
+                  {fmtDate(snapshot.createdAt)} · {snapshot.lines.length}
+                  {tn('snapshot.lines', snapshot.lines.length)}
                 </span>
                 <button
                   class="delete-btn"
-                  aria-label="Delete archive {archive.name}"
+                  aria-label={t('snapshot.deleteOne', { name: snapshot.name })}
                   onclick={() =>
                     (deleteTarget = {
-                      id: archive.id,
-                      name: archive.name,
-                      lineCount: archive.lines.length,
+                      id: snapshot.id,
+                      name: snapshot.name,
+                      lineCount: snapshot.lines.length,
                     })}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -150,10 +149,10 @@
                 </button>
               </div>
 
-              {#if expandedId === archive.id}
-                <ArchiveEditor
-                  {archive}
-                  onrename={(name) => renameArchive(archive.id, name)}
+              {#if expandedId === snapshot.id}
+                <SnapshotEditor
+                  {snapshot}
+                  onrename={(name) => renameSnapshot(snapshot.id, name)}
                 />
               {/if}
             </li>
@@ -165,8 +164,8 @@
 </section>
 
 {#if deleteTarget}
-  <DeleteArchiveModal
-    archiveName={deleteTarget.name}
+  <DeleteSnapshotModal
+    snapshotName={deleteTarget.name}
     lineCount={deleteTarget.lineCount}
     ondeleted={confirmDelete}
     onclose={() => (deleteTarget = null)}
@@ -174,7 +173,7 @@
 {/if}
 
 <style>
-  .archives {
+  .snapshots {
     background: white;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -230,7 +229,7 @@
     line-height: 1.4;
     max-width: 46rem;
   }
-  .archive-form {
+  .snapshot-form {
     display: flex;
     gap: 0.5rem;
     align-items: center;
@@ -290,23 +289,23 @@
     color: #888;
     font-size: 0.9rem;
   }
-  .archive-list {
+  .snapshot-list {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
   }
-  .archive-item {
+  .snapshot-item {
     border-top: 1px solid #eee;
     padding: 0.25rem 0;
   }
-  .archive-head {
+  .snapshot-head {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
-  .archive-name {
+  .snapshot-name {
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -323,12 +322,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .archive-name:hover {
+  .snapshot-name:hover {
     text-decoration: underline;
     text-decoration-color: #aaa;
     text-underline-offset: 2px;
   }
-  .archive-meta {
+  .snapshot-meta {
     margin-left: auto;
     font-size: 0.8rem;
     color: #adb5bd;
@@ -348,7 +347,7 @@
   }
 
   @media (max-width: 480px) {
-    .archive-meta {
+    .snapshot-meta {
       display: none;
     }
     .name-field input {

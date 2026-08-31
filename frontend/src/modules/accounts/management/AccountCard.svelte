@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
   import { moneyInput } from '../../../lib/util/money'
   import { isEditing } from '../../../lib/util/editMode.svelte'
@@ -88,11 +89,11 @@
   function submitCorrection() {
     const amount = normalizeAmount(amountInput)
     if (amount === null) {
-      correctionError = 'Enter an amount like 1234.50'
+      correctionError = t('accounts.errorAmount')
       return
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-      correctionError = 'Enter the date the balance was true'
+      correctionError = t('accounts.errorDate')
       return
     }
     // The amount and the date it holds as of are set together, always.
@@ -108,7 +109,7 @@
       <!-- The sole drag affordance: `handle: '.drag-handle'` confines dragging
            to this element, so the buttons and the correction inputs below stay
            clickable and selectable. -->
-      <span class="drag-handle" role="img" aria-label="Drag to reorder {account.name}">&#x2807;</span>
+      <span class="drag-handle" role="img" aria-label={t('accounts.dragToReorder', { account: account.name })}>&#x2807;</span>
     {/if}
     <div class="identity">
       <h3>{account.name}</h3>
@@ -121,32 +122,35 @@
 
   <dl class="figures">
     <div class="figure">
-      <dt>Projected balance</dt>
+      <dt>{t('accounts.projected')}</dt>
       <dd class="amount">{fmt(projected)}</dd>
     </div>
     <div class="figure">
-      <dt>Required</dt>
+      <dt>{t('accounts.required')}</dt>
       <dd class="amount muted">{fmt(required)}</dd>
     </div>
     <div class="figure">
-      <dt>Available</dt>
+      <dt>{t('accounts.available')}</dt>
       <dd class="amount" class:negative={Number(available) < 0}>{fmt(available)}</dd>
     </div>
   </dl>
 
   <p class="anchor" class:stale>
-    Corrected {formatDate(account.lastCorrectedAt)} to {fmt(account.currentAmount)}
-    {#if stale}<span class="stale-note">· projected forward since then</span>{/if}
+    {t('accounts.correctedOn', {
+      date: formatDate(account.lastCorrectedAt),
+      amount: fmt(account.currentAmount),
+    })}
+    {#if stale}<span class="stale-note">{t('accounts.projectedSince')}</span>{/if}
   </p>
 
   {#if correcting}
     <div class="correction">
       <p class="correction-hint">
-        The balance and the date it is true as of are one entry — both are set together.
+          {t('accounts.correctionHint')}
       </p>
       <div class="correction-fields">
         <label class="field">
-          <span class="label">Balance</span>
+          <span class="label">{t('accounts.balance')}</span>
           <input
             type="text"
             inputmode="decimal"
@@ -157,7 +161,7 @@
           />
         </label>
         <label class="field">
-          <span class="label">As at</span>
+          <span class="label">{t('accounts.asAt')}</span>
           <input
             type="date"
             bind:value={dateInput}
@@ -169,22 +173,22 @@
         <p class="error">{correctionError}</p>
       {/if}
       <div class="actions">
-        <button class="btn cancel" onclick={cancelCorrection}>Cancel</button>
-        <button class="btn primary" onclick={submitCorrection}>Save correction</button>
+        <button class="btn cancel" onclick={cancelCorrection}>{t('action.cancel')}</button>
+        <button class="btn primary" onclick={submitCorrection}>{t('accounts.saveCorrection')}</button>
       </div>
     </div>
   {:else}
     <div class="actions">
       <!-- Never gated: the anchor going stale is the failure the anchor pair
            exists to avoid, so correcting it must always be one click away. -->
-      <button class="btn ghost" onclick={startCorrection}>Correct balance</button>
+      <button class="btn ghost" onclick={startCorrection}>{t('accounts.correct')}</button>
       {#if editing}
-        <button class="btn ghost" onclick={onedit} aria-label="Edit {account.name}">Edit</button>
+        <button class="btn ghost" onclick={onedit} aria-label={t('accounts.edit', { account: account.name })}>{t('action.edit')}</button>
       {/if}
       <!-- Generating a bill reads the account; it changes nothing. -->
       {#if qrCapable}
-        <button class="btn ghost" onclick={onqrbill} aria-label="QR bill for {account.name}">
-          QR bill
+        <button class="btn ghost" onclick={onqrbill} aria-label={t('accounts.qrbillFor', { account: account.name })}>
+          {t('accounts.qrbill')}
         </button>
       {/if}
       {#if editing}
@@ -192,10 +196,10 @@
           class="btn danger-ghost"
           onclick={ondelete}
           disabled={!canDelete}
-          aria-label="Delete {account.name}"
-          title={canDelete ? undefined : 'The last remaining account cannot be deleted'}
+          aria-label={t('accounts.deleteOne', { account: account.name })}
+          title={canDelete ? undefined : t('accounts.lastCannotDelete')}
         >
-          Delete
+          {t('action.delete')}
         </button>
       {/if}
     </div>

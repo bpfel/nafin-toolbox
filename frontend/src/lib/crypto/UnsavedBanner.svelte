@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { getVaultState } from './vaultStore.svelte'
 
   const vaultState = getVaultState()
@@ -18,10 +19,10 @@
 {#if reason}
   <div class="banner" role="alert">
     <div class="text">
-      <strong>Your changes are not being saved.</strong>
+      <strong>{t('unsaved.title')}</strong>
       <span>{reason}</span>
     </div>
-    <button onclick={() => location.reload()}>Reload</button>
+    <button onclick={() => location.reload()}>{t('action.reload')}</button>
   </div>
 {/if}
 

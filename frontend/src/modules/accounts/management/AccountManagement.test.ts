@@ -38,8 +38,8 @@ function account(id: string, name: string, currentAmount = '100.00'): VaultAccou
 
 function vault(...accounts: VaultAccount[]): VaultData {
   return {
-    version: 5,
-    budget: { categories: [], entries: [], plan: [], archives: [] },
+    version: 6,
+    budget: { categories: [], entries: [], plan: [], snapshots: [] },
     accounts,
   }
 }

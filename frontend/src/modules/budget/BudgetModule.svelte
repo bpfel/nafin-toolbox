@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { t, getLocale } from '../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
-  import ArchivePanel from './ArchivePanel.svelte'
+  import SnapshotPanel from './SnapshotPanel.svelte'
   import ResetBudgetModal from './ResetBudgetModal.svelte'
   import { isEditing } from '../../lib/util/editMode.svelte'
 
@@ -42,7 +43,7 @@
 
   function handleSeeded() {
     if (!vaultState.vault) return
-    engine.seedDefaults(vaultState.vault)
+    engine.seedDefaults(vaultState.vault, getLocale())
     markDirty()
     version++
   }
@@ -66,13 +67,13 @@
 
 <div class="budget-module">
   {#if !vaultState.vault}
-    <p class="loading">Loading...</p>
+    <p class="loading">{t('state.loading')}</p>
   {:else if needsSetup}
     <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
   {:else if summary}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">
-        <button class="btn-reset" onclick={() => confirmingReset = true}>Reset budget</button>
+        <button class="btn-reset" onclick={() => confirmingReset = true}>{t('budget.reset')}</button>
       </div>
     {/if}
     {#if summary.entries.length > 0}
@@ -86,12 +87,12 @@
       onentrydeleted={handleEntryChange}
       oncategorychanged={handleEntryChange}
     />
-    <ArchivePanel vault={vaultState.vault} />
+    <SnapshotPanel vault={vaultState.vault} />
 
     {#if confirmingReset}
       <ResetBudgetModal
         entryCount={vaultState.vault.budget.entries.length}
-        archiveCount={vaultState.vault.budget.archives.length}
+        snapshotCount={vaultState.vault.budget.snapshots.length}
         onreset={handleReset}
         onclose={() => confirmingReset = false}
       />

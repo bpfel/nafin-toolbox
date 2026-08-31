@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/budget/budgetEngine'
   import type {
@@ -288,7 +289,7 @@
     // The controls cannot produce an illegal pair; this is the assertion that
     // keeps that true if they ever change.
     if (!isLegalRouting(entry.type, routing.sourceAccountId, routing.sinkAccountId)) {
-      error = `${entry.name} cannot be routed that way.`
+      error = t('alloc.cannotRoute', { entry: entry.name })
       return
     }
 
@@ -316,7 +317,7 @@
     if (!isLegalEntryRouting(entry)) {
       if (previous === undefined) delete entry.reserve
       else entry.reserve = previous
-      error = `${entry.name} must be set aside into an account before it can have a target.`
+      error = t('alloc.mustSetAside', { entry: entry.name })
       return
     }
 
@@ -375,7 +376,7 @@
             <path d="M2 4 L6 10 L10 4 Z" />
           </svg>
         </span>
-        <span class="category-name">{category.categoryName || 'Other'}</span>
+        <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
         <span class="category-subtotal">{money(category.plannedTotal)}</span>
       </button>
     {/if}
@@ -400,11 +401,10 @@
 
 <div class="allocation-screen">
   {#if !vaultState.vault}
-    <p class="empty">Loading…</p>
+    <p class="empty">{t('state.loading')}</p>
   {:else if entries.length === 0}
     <p class="empty">
-      No budget entries yet. Add them in the Budget module and they will appear here, ready to
-      route.
+      {t('alloc.noEntries')}
     </p>
   {:else}
     <AllocationSummary
@@ -423,7 +423,7 @@
 
     {#if incomeCategories.length > 0}
       <section class="flow-section">
-        <h3>Money in</h3>
+        <h3>{t('alloc.moneyIn')}</h3>
         {#each incomeCategories as category (category.categoryName)}
           {@render categoryBlock('income', category, showsHeaders(incomeCategories))}
         {/each}
@@ -432,13 +432,12 @@
 
     {#if expenseCategories.length > 0}
       <section class="flow-section">
-        <h3>Money out and money set aside</h3>
+        <h3>{t('alloc.moneyOut')}</h3>
         {#each expenseCategories as category (category.categoryName)}
           {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
         {/each}
         <p class="section-note">
-          Set-asides total {money(totals.setAside)} this month. They count as budgeted expenses
-          but stay in your accounts.
+          {t('alloc.setAsideTotal', { amount: money(totals.setAside) })}
         </p>
       </section>
     {/if}

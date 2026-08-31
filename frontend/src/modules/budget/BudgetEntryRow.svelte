@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import { isEditing } from '../../lib/util/editMode.svelte'
 
@@ -35,7 +36,7 @@
   <td class="name-cell">
     <div class="name-cell-inner">
       {#if editing}
-        <span class="drag-handle" aria-label="Drag to reorder">&#x2807;</span>
+        <span class="drag-handle" aria-label={t('budget.dragToReorder')}>&#x2807;</span>
         <button
           class="name-text"
           onclick={openEditor}
@@ -50,7 +51,7 @@
   </td>
   <td class="amount-cell planned-mo-cell">
     {#if editing}
-      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per month for {entry.entryName}">
+      <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedMo', { entry: entry.entryName })}>
         {fmt(planned)}
       </button>
     {:else}
@@ -59,7 +60,7 @@
   </td>
   <td class="amount-cell yearly planned-yr-cell">
     {#if editing}
-      <button class="cell-value cell-button" onclick={openEditor} aria-label="Edit planned per year for {entry.entryName}">
+      <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedYr', { entry: entry.entryName })}>
         {fmt(planned * 12)}
       </button>
     {:else}

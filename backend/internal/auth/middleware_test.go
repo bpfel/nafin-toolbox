@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -25,8 +26,13 @@ func TestRequireAuth_NoCookie(t *testing.T) {
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusUnauthorized)
 	}
-	if w.Body.String() != `{"error":"unauthorized"}`+"\n" {
-		t.Errorf("body = %q, want unauthorized error", w.Body.String())
+	// The code travels with the message so a user can quote it back regardless
+	// of the language their interface is in.
+	if !strings.Contains(w.Body.String(), `"error":"unauthorized"`) {
+		t.Errorf("body = %q, want an unauthorized error", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"code":"AUTH-002"`) {
+		t.Errorf("body = %q, want the AUTH-002 code", w.Body.String())
 	}
 }
 

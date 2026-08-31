@@ -134,7 +134,7 @@ describe('single-category budgets hide the category name', () => {
   // anywhere else would only be restating the implementation.
   function vaultWith(categories: { id: string; name: string; type: 'income' | 'expense' }[]): VaultData {
     return {
-      version: 5,
+      version: 6,
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',
@@ -143,7 +143,7 @@ describe('single-category budgets hide the category name', () => {
         categories: categories.map((g, i) => ({ ...g, sortOrder: (i + 1) * 10 })),
         entries: [],
         plan: [],
-        archives: [],
+        snapshots: [],
       },
     }
   }

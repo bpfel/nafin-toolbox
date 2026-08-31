@@ -1,14 +1,23 @@
 <script lang="ts">
+  import { t, tAround } from '../../lib/i18n/index.svelte'
   import { focusTrap } from '../../lib/util/focusTrap'
 
   interface Props {
-    archiveName: string
+    snapshotName: string
     lineCount: number
     ondeleted: () => void
     onclose: () => void
   }
 
-  let { archiveName, lineCount, ondeleted, onclose }: Props = $props()
+  let { snapshotName, lineCount, ondeleted, onclose }: Props = $props()
+
+  let explain = $derived(
+    tAround(
+      lineCount === 1 ? 'snapshot.deleteExplain.one' : 'snapshot.deleteExplain.other',
+      'name',
+      { count: lineCount },
+    ),
+  )
 
   function confirm() {
     ondeleted()
@@ -27,20 +36,19 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Delete archive" use:focusTrap>
-    <h3>Delete archive</h3>
+  <div class="modal" role="dialog" aria-label={t('snapshot.deleteTitle')} use:focusTrap>
+    <h3>{t('snapshot.deleteTitle')}</h3>
     <p>
-      Delete <strong>{archiveName}</strong> and its {lineCount}
-      {lineCount === 1 ? 'line' : 'lines'}?
+      {explain[0]}<strong>{snapshotName}</strong>{explain[1]}
     </p>
-    <!-- An archive is the only copy of the plan as it stood: the entries it
+    <!-- An snapshot is the only copy of the plan as it stood: the entries it
          names may since have been renamed or deleted, so nothing can rebuild it. -->
-    <p class="warning">This snapshot cannot be recovered.</p>
+    <p class="warning">{t('snapshot.unrecoverable')}</p>
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn delete" onclick={confirm}>
-        Delete
+        {t('action.delete')}
       </button>
     </div>
   </div>

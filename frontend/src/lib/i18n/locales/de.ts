@@ -1,0 +1,491 @@
+import type { Messages } from './en'
+
+/**
+ * German, in the Swiss register: ß is not used in Switzerland, so "Schliessen"
+ * rather than "Schließen".
+ */
+export const de: Messages = {
+  // --- Settings menu ---
+  'menu.settings': 'Einstellungen',
+  'menu.security': 'Sicherheit',
+  'menu.modules': 'Module',
+  'menu.language': 'Sprache',
+  'menu.logout': 'Abmelden',
+  'menu.users': 'Benutzer',
+  'menu.close': 'Menü schliessen',
+
+  // --- Language names ---
+  'language.de': 'Deutsch',
+  'language.fr': 'Français',
+  'language.it': 'Italiano',
+  'language.rm': 'Rumantsch',
+  'language.en': 'English',
+  'language.provisional': 'teilweise übersetzt',
+
+  // --- Common actions ---
+  'action.cancel': 'Abbrechen',
+  'action.save': 'Speichern',
+  'action.delete': 'Löschen',
+  'action.back': 'Zurück',
+  'action.reload': 'Neu laden',
+  'action.continue': 'Weiter',
+
+  // --- Counted things ---
+  'entries.count.one': '{count} Eintrag',
+  'entries.count.other': '{count} Einträge',
+
+  // --- App shell ---
+  'app.title': 'Finanz-Tracker',
+  'app.adminNoVault': 'Melden Sie sich mit einem regulären Konto an, um verschlüsselte Module zu nutzen.',
+
+  // --- Modules ---
+  'modules.none': 'Noch keine Module aktiviert.',
+  'modules.configure': 'Module konfigurieren',
+  'modules.configureHint': 'Module aktivieren oder deaktivieren. Daten bleiben beim Deaktivieren erhalten.',
+  'modules.comingSoon': 'Demnächst verfügbar.',
+  'modules.enable': 'Aktivieren',
+  'modules.disable': 'Deaktivieren',
+
+  // --- Vault gates ---
+  'vault.setupTitle': 'Verschlüsselung einrichten',
+  'vault.setupHint': 'Ihre Daten werden Ende-zu-Ende verschlüsselt. Nur Sie können sie lesen — der Server sieht Ihre Daten nie im Klartext.',
+  'vault.setupAction': 'Verschlüsselung einrichten',
+  'vault.setupBusy': 'Verschlüsselung wird eingerichtet...',
+  'vault.decryptFailedTitle': 'Entschlüsselung fehlgeschlagen',
+  'vault.decryptFailedHint': 'Ihr verschlüsselter Datentresor konnte mit Ihrem aktuellen Passwort nicht entschlüsselt werden. Das kann vorkommen, wenn ein Administrator Ihr Passwort zurückgesetzt hat. Stellen Sie den Zugriff mit Ihrem Wiederherstellungsschlüssel wieder her.',
+  'vault.recoveryKeyLabel': 'Wiederherstellungsschlüssel',
+  'vault.recoverAction': 'Tresor wiederherstellen',
+  'vault.recoverBusy': 'Wird wiederhergestellt...',
+  'vault.unlockTitle': 'Tresor entsperren',
+  'vault.unlockHint': 'Geben Sie Ihr Passwort ein, um Ihre Daten zu entschlüsseln.',
+  'vault.unlockAction': 'Entsperren',
+  'vault.unlockBusy': 'Wird entsperrt...',
+  'vault.outOfDateTitle': 'Diese Seite ist nicht aktuell',
+  'vault.outOfDateHint': 'Ihre Daten wurden von einer neueren Version der App gespeichert als der, die diese Seite ausführt — diese Seite kann sie daher nicht lesen. Ein Neuladen holt die aktuelle Version.',
+  'vault.outOfDateSafe': 'Es ist nichts verloren gegangen, und es wird nichts geschrieben, solange diese Seite Ihre Daten nicht lesen kann.',
+
+  // --- Two-factor enforcement ---
+  'twofa.requiredTitle': 'Zwei-Faktor-Authentifizierung erforderlich',
+  'twofa.requiredHint': 'Ihr Administrator verlangt, dass alle Benutzer vor dem Fortfahren die Zwei-Faktor-Authentifizierung aktivieren.',
+
+  // --- Common fields and actions ---
+  'field.password': 'Passwort',
+  'action.done': 'Fertig',
+
+  // --- Sign in ---
+  'auth.signIn': 'Anmelden',
+  'auth.createFirstAccount': 'Erstes Konto erstellen',
+  'auth.createAccount': 'Konto erstellen',
+  'auth.noUsersYet': 'Es gibt noch keine Benutzer. Erstellen Sie das Administratorkonto, um zu beginnen.',
+  'auth.pleaseWait': 'Bitte warten...',
+  'auth.forgotHint': 'Passwort vergessen? Wenden Sie sich an Ihren Administrator, um es zurückzusetzen. Zum Wiederherstellen Ihrer verschlüsselten Daten benötigen Sie Ihren Wiederherstellungsschlüssel.',
+  'auth.backToLogin': 'Zurück zur Anmeldung',
+
+  // --- Two-factor challenge ---
+  'twofa.title': 'Zwei-Faktor-Authentifizierung',
+  'twofa.enterCode': 'Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.',
+  'twofa.enterRecoveryCode': 'Geben Sie einen Ihrer Wiederherstellungscodes ein.',
+  'twofa.useRecoveryCode': 'Wiederherstellungscode verwenden',
+  'twofa.useAuthenticator': 'Stattdessen Authenticator-Code verwenden',
+  'twofa.recoveryCodePlaceholder': 'z. B. a1b2c3d4',
+  'twofa.verify': 'Bestätigen',
+  'twofa.verifying': 'Wird bestätigt...',
+
+  // --- Account setup from an invitation ---
+  'verify.invalidTitle': 'Ungültiger Link',
+  'verify.invalidHint': 'Dieser Bestätigungslink ist ungültig. Bitte prüfen Sie Ihre E-Mail auf den richtigen Link.',
+  'verify.usedTitle': 'Link bereits verwendet',
+  'verify.usedHint': 'Dieses Konto wurde bereits eingerichtet. Melden Sie sich mit dem von Ihnen gewählten Passwort an.',
+  'verify.goToSignIn': 'Zur Anmeldung',
+  'verify.doneTitle': 'Konto bestätigt',
+  'verify.doneHint': 'Ihr Konto wurde eingerichtet. Sie werden weitergeleitet...',
+  'verify.setupTitle': 'Konto einrichten',
+  'verify.setupHint': 'Wählen Sie ein Passwort, um die Einrichtung abzuschliessen.',
+  'verify.setPassword': 'Passwort setzen & anmelden',
+  'verify.settingUp': 'Wird eingerichtet...',
+
+  // --- Changing a password ---
+  'password.changeTitle': 'Passwort ändern',
+  'password.changing': 'Wird geändert...',
+
+  // --- QR bill ---
+  // Field names quoted from SIX's Style Guide QR-bill, not translated.
+  'qrbill.title': 'QR-Rechnung für {account}',
+  'qrbill.dialogLabel': 'QR-Rechnung erstellen',
+  'qrbill.amountPlaceholder': 'Leer lassen für einen offenen Betrag',
+  'qrbill.referenceType': 'Referenztyp',
+  'qrbill.reference': 'Referenz',
+  'qrbill.referenceQRR': 'QR-Referenz (QRR)',
+  'qrbill.referenceSCOR': 'Creditor Reference (SCOR)',
+  'qrbill.referenceNON': 'Keine Referenz',
+  'qrbill.additionalInfo': 'Zusätzliche Informationen',
+  'qrbill.additionalInfoPlaceholder': 'z. B. Reserven-Einzahlung, März',
+  'qrbill.scanHint': 'Scannen Sie dies mit der Kamera Ihres Telefons von diesem Bildschirm ab.',
+  'qrbill.share': 'Als Bild teilen',
+
+  // --- Address fields ---
+  'address.name': 'Name',
+  'address.street': 'Strasse',
+  'address.number': 'Nr.',
+  'address.postalCode': 'PLZ',
+  'address.city': 'Ort',
+  'address.country': 'Land',
+
+  'action.close': 'Schliessen',
+
+  // --- Security settings ---
+  'security.title': 'Sicherheitseinstellungen',
+  'security.twofaTitle': 'Zwei-Faktor-Authentifizierung',
+  'security.currentPasswordPlaceholder': 'Aktuelles Passwort',
+  'security.disablePrompt': 'Geben Sie Ihr Passwort ein, um 2FA zu deaktivieren:',
+  'security.confirmDisable': 'Deaktivieren bestätigen',
+  'security.disabling': 'Wird deaktiviert...',
+  'security.disable2fa': '2FA deaktivieren',
+  'security.enable2fa': '2FA aktivieren',
+  'security.regeneratePrompt': 'Geben Sie Ihr Passwort ein, um neue Wiederherstellungscodes zu erzeugen:',
+  'security.regenerate': 'Codes neu erzeugen',
+  'security.regenerating': 'Wird erzeugt...',
+  'security.regenerateCodes': 'Wiederherstellungscodes neu erzeugen',
+  'security.newCodesWarning': 'Bewahren Sie diese neuen Wiederherstellungscodes auf. Die alten Codes sind jetzt ungültig.',
+  'security.passwordTitle': 'Passwort',
+  'security.deleteAccountTitle': 'Konto löschen',
+  'security.deleteAccountHint': 'Löscht Ihr Konto und alle zugehörigen Daten dauerhaft. Dies kann nicht rückgängig gemacht werden.',
+  'security.deletePrompt': 'Geben Sie Ihr Passwort ein, um die Kontolöschung zu bestätigen:',
+  'security.deleteMyAccount': 'Mein Konto löschen',
+  'security.deleting': 'Wird gelöscht...',
+
+  // --- Setting up two-factor ---
+  'twofa.setupTitle': 'Zwei-Faktor-Authentifizierung aktivieren',
+  'twofa.setupHint': 'Schützen Sie Ihr Konto zusätzlich mit einer TOTP-Authenticator-App.',
+  'twofa.setupAction': '2FA einrichten',
+  'twofa.settingUp': 'Wird eingerichtet...',
+  'twofa.scanTitle': 'QR-Code scannen',
+  'twofa.scanHint': 'Scannen Sie diesen QR-Code mit Ihrer Authenticator-App (Google Authenticator, Authy usw.)',
+  'twofa.manualEntry': 'Scannen nicht möglich? Manuell eingeben',
+  'twofa.verifyPrompt': 'Geben Sie zur Bestätigung den 6-stelligen Code aus Ihrer App ein:',
+  'twofa.verifyAndEnable': 'Bestätigen & aktivieren',
+  'twofa.codesTitle': 'Wiederherstellungscodes sichern',
+  'twofa.codesWarning': 'Bewahren Sie diese Wiederherstellungscodes an einem sicheren Ort auf. Jeder Code ist nur einmal verwendbar. Wenn Sie Ihren Authenticator verlieren, sind diese Codes der einzige Zugang zu Ihrem Konto.',
+  'twofa.copyAll': 'Alle kopieren',
+
+  // --- Recovery key ---
+  'recoveryKey.title': 'Wiederherstellungsschlüssel sichern',
+  'recoveryKey.copy': 'Schlüssel kopieren',
+  'recoveryKey.confirmTitle': 'Prüfen Sie, ob Sie ihn wirklich haben',
+  'recoveryKey.label': 'Wiederherstellungsschlüssel',
+  'recoveryKey.backToKey': 'Zurück zum Schlüssel',
+  'recoveryKey.confirm': 'Bestätigen',
+
+  // --- Banners ---
+  'update.available': 'Eine neue Version der App ist verfügbar.',
+  'update.dismiss': 'Hinweis ausblenden',
+  'unsaved.title': 'Ihre Änderungen werden nicht gespeichert.',
+
+  'action.copied': 'Kopiert',
+  'action.download': 'Herunterladen',
+
+  // --- Budget ---
+  'budget.income': 'Einnahmen',
+  'budget.expenses': 'Ausgaben',
+  'budget.savings': 'Ersparnisse',
+  'budget.plannedMo': 'Geplant/Mt.',
+  'budget.plannedYr': 'Geplant/J.',
+  'budget.incomeYr': 'Einnahmen /J.',
+  'budget.expensesYr': 'Ausgaben /J.',
+  'budget.unallocatedMo': 'Nicht zugewiesen /Mt.',
+  'budget.unallocatedYr': 'Nicht zugewiesen /J.',
+  'budget.month': 'Monat',
+  'budget.year': 'Jahr',
+  'budget.viewToggle': 'Zeigt {mode} Beträge — wechseln zu {other}',
+  'budget.monthly': 'monatliche',
+  'budget.yearly': 'jährliche',
+  'budget.dragToReorder': 'Zum Umsortieren ziehen',
+  'budget.editPlannedMo': 'Monatsbetrag für {entry} bearbeiten',
+  'budget.editPlannedYr': 'Jahresbetrag für {entry} bearbeiten',
+  'budget.editCategoryOf': 'Kategorie {category} bearbeiten',
+  'budget.addEntryTo': 'Eintrag zu {category} hinzufügen',
+  'budget.uncategorised': 'Übrige',
+  'budget.reset': 'Budget zurücksetzen',
+  'budget.setupTitle': 'Budget einrichten',
+  'budget.setupHint': 'Beginnen Sie mit Schweizer Standardeinträgen auf Basis der BFS-Haushaltsbudgeterhebung (HABE 2023, Einpersonenhaushalt). Sie können später alles anpassen.',
+
+  // --- Entry dialog ---
+  'entry.editTitle': 'Eintrag bearbeiten',
+  'entry.addTitle': 'Eintrag hinzufügen',
+  'entry.category': 'Kategorie',
+  'entry.newCategoryPlaceholder': 'Name der neuen Kategorie',
+  'entry.namePlaceholder': 'z. B. Fitnessabo',
+  'entry.values': 'Beträge',
+  'entry.deleteTitle': 'Eintrag löschen',
+
+  // --- Category dialog ---
+  'category.editTitle': 'Kategorie bearbeiten',
+  'category.type': 'Typ',
+
+  // --- Snapshots ---
+  'snapshot.newNameLabel': 'Name für die neue Momentaufnahme',
+  'snapshot.newNamePlaceholder': 'z. B. Vor der Lohnerhöhung',
+  'snapshot.create': 'Momentaufnahme erstellen',
+  'snapshot.none': 'Noch keine Momentaufnahmen.',
+  'snapshot.empty': 'Diese Momentaufnahme hat keine Zeilen.',
+  'snapshot.entryColumn': 'Eintrag',
+  'snapshot.deleteOne': 'Momentaufnahme {name} löschen',
+  'snapshot.deleteTitle': 'Momentaufnahme löschen',
+  'snapshot.unrecoverable': 'Diese Momentaufnahme kann nicht wiederhergestellt werden.',
+
+  'field.name': 'Name',
+
+  // --- Destructive confirmations ---
+  'reset.title': 'Budget zurücksetzen',
+  'reset.explain.one': 'Damit werden der eine Eintrag, seine Kategorie und alle geplanten Beträge entfernt. Sie beginnen wieder mit einem leeren Budget.',
+  'reset.explain.other': 'Damit werden alle {count} Einträge, ihre Kategorien und alle geplanten Beträge entfernt. Sie beginnen wieder mit einem leeren Budget.',
+  'reset.snapshotsKept.one': 'Ihre {count} Momentaufnahme ist eine Aufzeichnung des damals Budgetierten und bleibt erhalten.',
+  'reset.snapshotsKept.other': 'Ihre {count} Momentaufnahmen sind Aufzeichnungen des damals Budgetierten und bleiben erhalten.',
+  'reset.noSnapshots': 'Es gibt keine Momentaufnahmen, es bleibt also keine Aufzeichnung dieses Plans. Brechen Sie ab und erstellen Sie zuerst eine, wenn Sie eine behalten möchten.',
+
+  'entry.deleteExplain': 'Soll {name} aus Ihrem Budget entfernt werden? Der geplante Betrag geht mit. Eine Momentaufnahme, die ihn bereits erfasst hat, behält ihre Kopie.',
+
+  'snapshot.deleteExplain.one': '{name} und die {count} Zeile löschen?',
+  'snapshot.deleteExplain.other': '{name} und seine {count} Zeilen löschen?',
+
+  // --- Accounts ---
+  'accounts.title': 'Konten',
+  'accounts.subtitle': 'Salden werden ab der letzten Korrektur hochgerechnet, nicht aufsummiert.',
+  'accounts.add': 'Hinzufügen',
+  'accounts.all': 'Alle Konten',
+  'accounts.projected': 'Hochgerechneter Saldo',
+  'accounts.required': 'Benötigt',
+  'accounts.available': 'Verfügbar',
+  'accounts.balance': 'Saldo',
+  'accounts.asAt': 'Stand',
+  'accounts.correct': 'Saldo korrigieren',
+  'accounts.saveCorrection': 'Korrektur speichern',
+  'accounts.edit': '{account} bearbeiten',
+  'accounts.qrbillFor': 'QR-Rechnung für {account}',
+  'accounts.deleteOne': '{account} löschen',
+  'accounts.dragToReorder': '{account} zum Umsortieren ziehen',
+  'accounts.viewsLabel': 'Kontoansichten',
+
+  // 'Säule 3a' is the official Swiss term; it is not translated further.
+  'accountKind.transactional': 'Zahlungsverkehr',
+  'accountKind.reserves': 'Reserven',
+  'accountKind.savings': 'Sparen',
+  'accountKind.cash': 'Bargeld',
+  'accountKind.retirement3a': 'Säule 3a',
+  'accountKind.investment': 'Anlagen',
+
+  // --- Account dialog ---
+  'accountForm.addTitle': 'Konto hinzufügen',
+  'accountForm.editTitle': 'Konto bearbeiten',
+  'accountForm.namePlaceholder': 'z. B. Reserven',
+  'accountForm.kind': 'Art',
+  'accountForm.bank': 'Bank',
+  'accountForm.bankPlaceholder': 'z. B. Raiffeisen',
+  'accountForm.paymentDetails': 'Zahlungsangaben (für QR-Rechnungen)',
+  'accountForm.iban': 'IBAN',
+
+  // --- Deleting an account ---
+  'accountDelete.title': 'Konto löschen',
+  'accountDelete.moveTo': 'Seine Einträge verschieben nach',
+
+  'action.edit': 'Bearbeiten',
+
+  // --- Allocations ---
+  'alloc.moneyIn': 'Geld herein',
+  'alloc.moneyOut': 'Geld hinaus und Zurückgelegtes',
+  'alloc.unallocated': 'Nicht zugewiesen',
+  'alloc.netWorthChange': 'Veränderung des Vermögens',
+  'alloc.account': 'Konto',
+  'alloc.projected': 'Hochgerechnet',
+  'alloc.required': 'Benötigt',
+  'alloc.available': 'Verfügbar',
+  'alloc.savings': 'Ersparnisse',
+  'alloc.setAside': 'Zurückgelegt',
+  'alloc.editRouting': 'Zuordnung bearbeiten',
+  'alloc.bought': 'Gekauft…',
+  'alloc.whatMeans': 'Was bedeutet {what}?',
+  'alloc.nothingBlocked': 'Nichts ist blockiert — passen Sie einen geplanten Betrag an oder korrigieren Sie den Saldo.',
+
+  // --- Routing ---
+  'routing.landsIn': 'Geht ein auf',
+  'routing.incomeHint': 'Einnahmen kommen immer von ausserhalb Ihrer Konten.',
+  'routing.paidFrom': 'Bezahlt ab',
+  'routing.destination': 'Ziel',
+  'routing.leaves': 'Verlässt meine Konten',
+  'routing.setAsideInto': 'Zurücklegen auf',
+  'routing.setAsideAccount': 'Konto für Zurückgelegtes',
+
+  // --- Reserves ---
+  'reserve.savingTowards': 'Sparen für',
+  'reserve.nothingInParticular': 'Nichts Bestimmtes',
+  'reserve.obligation': 'Eine Verpflichtung — eine Rechnung, die kommen wird',
+  'reserve.amortization': 'Eine Amortisation — etwas zu ersetzen',
+  'reserve.periodMonths': 'Zeitraum in Monaten',
+  'reserve.dueNextMonth': 'Nächsten Monat fällig',
+  'reserve.cycleStarted': 'Zyklus begonnen',
+
+  // --- Purchase ---
+  'purchase.dialogLabel': 'Kauf erfassen',
+  'purchase.pricePaid': 'Bezahlter Preis',
+  'purchase.month': 'Monat des Kaufs',
+  'purchase.priceError': 'Geben Sie den Preis als Zahl ein, z. B. 1249.00',
+  'purchase.infoOnly': 'Nur zur Information — der Kauf wird so oder so erfasst.',
+  'purchase.scope': 'Es wird kein Geld bewegt und keine andere Position verändert. Nur diese Reserve wird aktualisiert.',
+  'purchase.confirm': 'Kauf erfassen',
+
+  // --- Category dialog notices ---
+  'category.typeIncome': 'Einnahmen',
+  'category.typeExpense': 'Ausgaben',
+  'category.movingSides.one': 'Wenn Sie diese Kategorie zu {type} verschieben, kommt ihr {count} Eintrag mit. Dessen Kontozuordnung wird auf den Standard zurückgesetzt.',
+  'category.movingSides.other': 'Wenn Sie diese Kategorie zu {type} verschieben, kommen ihre {count} Einträge mit. Deren Kontozuordnung wird auf den Standard zurückgesetzt.',
+  'category.reservesLost.one': '{count} Reserve wird entfernt: Geld auf ein Ziel hin zurückzulegen ist etwas, das nur eine Ausgabe tut.',
+  'category.reservesLost.other': '{count} Reserven werden entfernt: Geld auf ein Ziel hin zurückzulegen ist etwas, das nur eine Ausgabe tut.',
+  'category.conflictIncome': 'Eine Einnahmenkategorie namens {name} existiert bereits. Zwei Kategorien können auf derselben Seite des Budgets nicht denselben Namen tragen.',
+  'category.conflictExpense': 'Eine Ausgabenkategorie namens {name} existiert bereits. Zwei Kategorien können auf derselben Seite des Budgets nicht denselben Namen tragen.',
+  'category.mergeExplain.one': 'Beim Zusammenführen wandert der {count} Eintrag dieser Kategorie dorthin und {name} wird entfernt.',
+  'category.mergeExplain.other': 'Beim Zusammenführen wandern die {count} Einträge dieser Kategorie dorthin und {name} wird entfernt.',
+  'category.mergeInto': 'Zusammenführen mit {name}',
+
+  // --- Entry dialog titles ---
+  'entry.editTypeTitle': '{type}-Eintrag bearbeiten',
+  'entry.addTypeTitle': '{type}-Eintrag hinzufügen',
+  'entry.add': 'Hinzufügen',
+
+  // --- Recovery key stakes ---
+  'recoveryKey.noReset': 'Dies lässt sich nicht zurücksetzen.',
+  'recoveryKey.stakes': 'Wenn Sie Ihr Passwort vergessen und diesen Schlüssel nicht mehr haben, ist alles in Ihrem Tresor verloren — Ihr Budget, Ihre Konten, alles.',
+  'recoveryKey.noAdmin': 'Kein Administrator kann ihn für Sie wiederherstellen. Der Server hält Ihre Daten immer nur verschlüsselt und sieht den Schlüssel nie, der sie öffnet.',
+  'recoveryKey.copyFailed': 'Die Zwischenablage war nicht erreichbar. Markieren Sie den Schlüssel oben und kopieren Sie ihn von Hand, oder nutzen Sie Herunterladen.',
+  'recoveryKey.copied': 'Wiederherstellungsschlüssel in die Zwischenablage kopiert.',
+
+  'address.holderName': 'Name des Inhabers',
+
+  'budget.loadDefaults': 'Schweizer Standardwerte laden',
+  'budget.startBlank': 'Leer beginnen',
+  'snapshot.panelTitle': 'Archiv',
+  'snapshot.blurb': 'Eine Momentaufnahme ist eine benannte Kopie des Plans, wie er jetzt steht. Sie behält die Namen und Beträge, mit denen sie erstellt wurde — spätere Änderungen an Ihren Einträgen lassen sie unberührt.',
+  'accounts.tabAccounts': 'Konten',
+  'accounts.tabAllocations': 'Zuordnungen',
+  'alloc.noEntries': 'Noch keine Budgeteinträge. Legen Sie sie im Budget-Modul an, dann erscheinen sie hier und können zugeordnet werden.',
+  'alloc.affordableNow': 'Jetzt bezahlbar',
+  'alloc.noMonthlyAmount': 'Kein Monatsbetrag geplant — budgetieren Sie etwas dafür, um ein Datum zu erhalten',
+  'alloc.zeroMeans': 'Null bedeutet, dass jeder Franken eine Aufgabe hat.',
+  'reserve.targetAmount': 'Zielbetrag',
+  'password.current': 'Aktuelles Passwort',
+  'password.new': 'Neues Passwort',
+  'password.confirmNew': 'Neues Passwort bestätigen',
+  'field.confirmPassword': 'Passwort bestätigen',
+  'field.email': 'E-Mail',
+  'field.recoveryCode': 'Wiederherstellungscode',
+  'update.notNow': 'Jetzt nicht',
+  'twofa.codesCopyFailed': 'Die Zwischenablage war nicht erreichbar. Markieren Sie die Codes oben und kopieren Sie sie von Hand, oder nutzen Sie Herunterladen.',
+  'twofa.codesCopied': 'Wiederherstellungscodes in die Zwischenablage kopiert.',
+  'recoveryKey.pasteHint': 'Fügen Sie den Schlüssel wieder ein, damit Sie es jetzt merken und nicht erst am Tag, an dem Sie ihn brauchen. Danach wird er nie wieder angezeigt.',
+  'recoveryKey.matches': 'Das stimmt. Bewahren Sie ihn dort auf, wo Sie ihn in einem Jahr noch haben.',
+  'recoveryKey.caseMismatch': 'Fast — beim Schlüssel wird Gross- und Kleinschreibung unterschieden.',
+  'recoveryKey.noMatch': 'Das stimmt nicht mit dem Schlüssel überein.',
+  'accounts.correctionHint': 'Der Saldo und das Datum, zu dem er gilt, gehören zusammen — beides wird gemeinsam gesetzt.',
+  'accountForm.ibanHint': 'Nur nötig, um für dieses Konto eine Schweizer QR-Rechnung zu erzeugen. Sonst leer lassen.',
+  'accountForm.ibanInvalid': 'Keine gültige Schweizer oder Liechtensteiner IBAN — prüfen Sie auf eine vertippte Ziffer.',
+  'accountForm.holderHint': 'Nur für QR-Rechnungen nötig.',
+  'accountDelete.noneRouted': 'Es sind keine Einträge darüber geführt.',
+  'accountDelete.confirm': 'Löschen und neu zuordnen',
+  'qrbill.payHint': 'Zahlt auf dieses Konto ein. IBAN und Adresse stammen vom Konto — hier werden nur Betrag und Referenz gesetzt.',
+  'qrbill.noAddress': 'Für dieses Konto fehlt eine vollständige Inhaberadresse. Ergänzen Sie sie unter den Zahlungsangaben des Kontos — eine QR-Rechnung braucht sie.',
+  'qrbill.shareHint': 'Teilt das Bild an Dateien, Fotos oder einen Chat. Banking-Apps scannen mit der Kamera und lesen es nicht von hier.',
+
+  'module.budget.description': 'Einnahmen und Ausgaben nach Eintrag verfolgen',
+  'module.accounts.description': 'Konten, Geldflüsse dazwischen und Reserven für künftige Kosten',
+  'module.provision3a.description': 'Schweizer Altersvorsorge (3a)',
+  'module.investments.description': 'Aktien, ETFs und andere Anlagen verfolgen',
+
+  'error.loadModules': 'Module konnten nicht geladen werden',
+  'error.updateModule': 'Modul konnte nicht aktualisiert werden',
+  'error.setupEncryption': 'Verschlüsselung konnte nicht eingerichtet werden',
+  'error.unlockVault': 'Tresor konnte nicht entsperrt werden',
+  'error.recoveryFailed': 'Wiederherstellung fehlgeschlagen',
+  'error.reorderAccounts': 'Konten konnten nicht umsortiert werden',
+  'error.saveAccount': 'Konto konnte nicht gespeichert werden',
+  'error.correctBalance': 'Saldo konnte nicht korrigiert werden',
+  'error.deleteAccount': 'Konto konnte nicht gelöscht werden',
+  'error.generateQr': 'QR-Code konnte nicht erzeugt werden',
+  'error.createEntry': 'Eintrag konnte nicht erstellt werden',
+
+  'security.twofaEnabled': '2FA ist aktiviert',
+  'security.twofaNotEnabled': '2FA ist nicht aktiviert',
+  'twofa.enterCode.label': 'Code eingeben',
+  'time.months.one': 'Monat',
+  'time.months.other': 'Monate',
+  'snapshot.lines.one': 'Zeile',
+  'snapshot.lines.other': 'Zeilen',
+  'accountForm.qrIbanNote': 'eine QR-IBAN — Rechnungen verwenden eine QR-Referenz (QRR)',
+  'accountForm.regularIbanNote': 'eine normale IBAN — Rechnungen verwenden keine Referenz oder SCOR',
+  'qrbill.generate': 'Erzeugen',
+  'qrbill.regenerate': 'Neu erzeugen',
+  'qrbill.shareTitle': 'QR-Rechnung',
+
+  'error.updateEntry': 'Eintrag konnte nicht aktualisiert werden',
+
+  // --- Common states ---
+  'state.loading': 'Wird geladen...',
+  'state.saving': 'Wird gespeichert...',
+  'state.unsaved': 'Nicht gespeichert',
+
+  // --- Found by the untranslated-strings scan ---
+  'password.mismatchNew': 'Die neuen Passwörter stimmen nicht überein',
+  'password.mismatch': 'Die Passwörter stimmen nicht überein',
+  'recoveryKey.saved': 'Schlüssel gesichert',
+  'twofa.codesSaved': 'Ich habe meine Codes gesichert',
+  'twofa.qrAlt': 'QR-Code',
+  'twofa.codesCopyFailedPlain': 'Die Zwischenablage war nicht erreichbar. Markieren Sie die Codes oben und kopieren Sie sie von Hand.',
+  'alloc.setAsideTotal': 'Rückstellungen diesen Monat insgesamt {amount}. Sie zählen als budgetierte Ausgaben, bleiben aber auf Ihren Konten.',
+  'purchase.effect': 'Der nächste Zyklus spart {price} über {months} an, beginnend {start}. Im ersten Monat ist nichts fällig, danach steigt der Betrag.',
+  'purchase.monthYouPick': 'im gewählten Monat',
+  'reserve.errorTarget': 'Der Zielbetrag muss eine positive Zahl sein, z. B. 1200.00',
+  'reserve.errorPeriod': 'Die Dauer muss eine ganze Zahl von Monaten sein, mindestens 1',
+  'reserve.errorMonth': 'Der Monat muss dem Muster 2026-03 entsprechen',
+  'accounts.qrbill': 'QR-Rechnung',
+  'accounts.lastCannotDelete': 'Das letzte verbleibende Konto kann nicht gelöscht werden',
+  'accounts.errorAmount': 'Geben Sie einen Betrag wie 1234.50 ein',
+  'accounts.errorDate': 'Geben Sie das Datum ein, an dem der Saldo galt',
+  'accountDelete.remove': '{account} entfernen?',
+  'accountDelete.routed.one': '{count} Eintrag läuft darüber und muss anderswohin verschoben werden.',
+  'accountDelete.routed.other': '{count} Einträge laufen darüber und müssen anderswohin verschoben werden.',
+  'accountDelete.collapsing.one': '{count} Eintrag verschiebt derzeit Geld zwischen {account} und {target}. Nach der Verschiebung sind beide Enden {target}, der Eintrag wird also zu einer Rückstellung innerhalb eines einzigen Kontos. Das ist zulässig, bedeutet aber nicht mehr dasselbe.',
+  'accountDelete.collapsing.other': '{count} Einträge verschieben derzeit Geld zwischen {account} und {target}. Nach der Verschiebung sind beide Enden {target}, die Einträge werden also zu Rückstellungen innerhalb eines einzigen Kontos. Das ist zulässig, bedeutet aber nicht mehr dasselbe.',
+  'qrbill.qrIbanRule': 'Eine QR-IBAN akzeptiert ausschliesslich eine QR-Referenz.',
+  'qrbill.regularIbanRule': 'Eine normale IBAN akzeptiert keine Referenz oder eine Creditor Reference — niemals eine QR-Referenz.',
+  'error.saveCategory': 'diese Kategorie konnte nicht gespeichert werden',
+  'error.renameSnapshot': 'diese Momentaufnahme konnte nicht umbenannt werden',
+  'error.takeSnapshot': 'es konnte keine Momentaufnahme erstellt werden',
+  'password.mustChange': 'Bitte legen Sie ein neues Passwort fest, um fortzufahren.',
+
+  // --- Sentences assembled around their values ---
+  'reserve.requiredNow': '{current} von {target} sollten bis jetzt zurückgestellt sein',
+  'reserve.dueThisMonth': 'Diesen Monat fällig',
+  'reserve.dueIn': 'Fällig {month} — {away}',
+  'reserve.proposedFrom': 'Zielbetrag vorgeschlagen aus den {amount}, die monatlich bereits budgetiert sind. Überschreiben Sie ihn mit dem tatsächlichen Wert, wenn Sie ihn kennen.',
+  'time.monthsToGo.one': 'noch {count} Monat',
+  'time.monthsToGo.other': 'noch {count} Monate',
+  'alloc.affordableFrom': 'Bei {rate}/Monat leistbar ab {month}',
+  'alloc.cannotRoute': '{entry} kann nicht so geführt werden.',
+  'alloc.mustSetAside': '{entry} muss auf ein Konto zurückgestellt werden, bevor es ein Ziel haben kann.',
+  'alloc.unallocatedInfo': 'Einnahmen {income} − Ausgaben {expenses}.',
+  'alloc.netWorthInfo': 'Einnahmen {income} − Geld, das tatsächlich abfliesst {outflow}. {setAside} wird zurückgestellt und bleibt Ihres.',
+  'alloc.shortOf': 'Auf {account} fehlen {amount} gegenüber dem, was dafür geplant ist.',
+  'alloc.shortOfDue': 'Auf {account} fehlen {amount} gegenüber dem, was dafür geplant ist, und die nächste Verpflichtung wird {month} fällig ({away}).',
+  'alloc.thisMonth': 'diesen Monat',
+  'purchase.leavesShort': 'Damit liegt {account} {amount} unter dem erforderlichen Betrag.',
+  'accounts.correctedOn': 'Korrigiert am {date} auf {amount}',
+  'accounts.projectedSince': '· seither fortgeschrieben',
+  'accountForm.charsToGo.one': 'Noch {count} Zeichen.',
+  'accountForm.charsToGo.other': 'Noch {count} Zeichen.',
+  'accountForm.checksumValid': 'Prüfsumme gültig. Erkannt als {kind}.',
+  'qrbill.amount': 'Betrag',
+  'qrbill.amountLabel': 'Betrag ({currency})',
+  'qrbill.debtorOptional': 'Zahlbar durch (optional)',
+
+  // --- Roles. Server-supplied values, so no scan can see them. ---
+  'role.user': 'Benutzer',
+  'role.admin': 'Admin',
+}

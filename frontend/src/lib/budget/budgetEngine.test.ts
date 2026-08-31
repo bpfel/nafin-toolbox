@@ -15,11 +15,11 @@ import {
   plannedFor,
   setPlanned,
   getPlanSummary,
-  listArchives,
-  archivePlan,
-  renameArchive,
+  listSnapshots,
+  takeSnapshot,
+  renameSnapshot,
   resetBudget,
-  deleteArchive,
+  deleteSnapshot,
   seedDefaults,
 } from './budgetEngine'
 import { createEmptyVault, type VaultData } from '../crypto/vault'
@@ -484,7 +484,7 @@ describe('updateEntry', () => {
     expect(updated?.sortOrder).toBe(99)
   })
 
-  test('archives entry', () => {
+  test('snapshots entry', () => {
     const vault = createEmptyVault()
     const entry = createEntry(vault, { name: 'Test', type: 'income', categoryName: 'Category' })
 
@@ -845,7 +845,7 @@ describe('getPlanSummary', () => {
   })
 })
 
-describe('archivePlan', () => {
+describe('takeSnapshot', () => {
   function planned(vault: VaultData) {
     const salary = createEntry(vault, { name: 'Salary', type: 'income', categoryName: 'Employment' })
     const rent = createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
@@ -858,26 +858,26 @@ describe('archivePlan', () => {
     const vault = createEmptyVault()
     planned(vault)
 
-    const archive = archivePlan(vault, '2026 baseline')
+    const snapshot = takeSnapshot(vault, '2026 baseline')
 
-    expect(archive.name).toBe('2026 baseline')
-    expect(archive.id).toBeTruthy()
-    expect(archive.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-    expect(archive.lines).toEqual([
+    expect(snapshot.name).toBe('2026 baseline')
+    expect(snapshot.id).toBeTruthy()
+    expect(snapshot.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(snapshot.lines).toEqual([
       { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
       { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
     ])
-    expect(vault.budget.archives).toContain(archive)
+    expect(vault.budget.snapshots).toContain(snapshot)
   })
 
-  test('includes entries left at 0.00, so the archive reads like the plan did', () => {
+  test('includes entries left at 0.00, so the snapshot reads like the plan did', () => {
     const vault = createEmptyVault()
     createEntry(vault, { name: 'Holidays', type: 'expense', categoryName: 'Lifestyle' })
 
-    const archive = archivePlan(vault, 'Empty start')
+    const snapshot = takeSnapshot(vault, 'Empty start')
 
-    expect(archive.lines).toHaveLength(1)
-    expect(archive.lines[0].plannedAmount).toBe('0.00')
+    expect(snapshot.lines).toHaveLength(1)
+    expect(snapshot.lines[0].plannedAmount).toBe('0.00')
   })
 
   test('does not snapshot archived entries', () => {
@@ -885,171 +885,171 @@ describe('archivePlan', () => {
     const { rent } = planned(vault)
     updateEntry(vault, rent.id, { archived: true })
 
-    const archive = archivePlan(vault, 'After archiving Rent')
+    const snapshot = takeSnapshot(vault, 'After archiving Rent')
 
-    expect(archive.lines.map(l => l.entryName)).toEqual(['Salary'])
+    expect(snapshot.lines.map(l => l.entryName)).toEqual(['Salary'])
   })
 
   test('rejects an empty or whitespace-only name', () => {
     const vault = createEmptyVault()
     planned(vault)
 
-    expect(() => archivePlan(vault, '')).toThrow(/name/)
-    expect(() => archivePlan(vault, '   ')).toThrow(/name/)
-    expect(() => archivePlan(vault, '\t\n')).toThrow(/name/)
-    // A rejected archive must not be half-stored.
-    expect(vault.budget.archives).toHaveLength(0)
+    expect(() => takeSnapshot(vault, '')).toThrow(/name/)
+    expect(() => takeSnapshot(vault, '   ')).toThrow(/name/)
+    expect(() => takeSnapshot(vault, '\t\n')).toThrow(/name/)
+    // A rejected snapshot must not be half-stored.
+    expect(vault.budget.snapshots).toHaveLength(0)
   })
 
   test('trims the name', () => {
     const vault = createEmptyVault()
 
-    expect(archivePlan(vault, '  March review  ').name).toBe('March review')
+    expect(takeSnapshot(vault, '  March review  ').name).toBe('March review')
   })
 
-  test('renaming an entry afterwards does not rewrite the archive', () => {
+  test('renaming an entry afterwards does not rewrite the snapshot', () => {
     const vault = createEmptyVault()
     const { rent } = planned(vault)
-    const archive = archivePlan(vault, 'Before the rename')
+    const snapshot = takeSnapshot(vault, 'Before the rename')
 
     updateEntry(vault, rent.id, { name: 'Rent (new flat)', categoryName: 'Accommodation' })
 
-    // The archive records what the plan said at the time. A later rename is a
+    // The snapshot records what the plan said at the time. A later rename is a
     // fact about today's budget, not about the snapshot.
-    expect(archive.lines[1].entryName).toBe('Rent')
-    expect(archive.lines[1].categoryName).toBe('Housing')
-    expect(listArchives(vault)[0].lines[1].entryName).toBe('Rent')
+    expect(snapshot.lines[1].entryName).toBe('Rent')
+    expect(snapshot.lines[1].categoryName).toBe('Housing')
+    expect(listSnapshots(vault)[0].lines[1].entryName).toBe('Rent')
   })
 
   test('deleting an entry afterwards does not remove its archived line', () => {
     const vault = createEmptyVault()
     const { rent } = planned(vault)
-    const archive = archivePlan(vault, 'Before the delete')
+    const snapshot = takeSnapshot(vault, 'Before the delete')
 
     deleteEntry(vault, rent.id)
 
     expect(vault.budget.entries).toHaveLength(1)
     expect(vault.budget.plan.some(e => e.entryId === rent.id)).toBe(false)
     // The snapshot keeps both lines: it holds names, not references.
-    expect(archive.lines).toHaveLength(2)
-    expect(archive.lines[1].entryName).toBe('Rent')
-    expect(archive.lines[1].plannedAmount).toBe('1350.00')
+    expect(snapshot.lines).toHaveLength(2)
+    expect(snapshot.lines[1].entryName).toBe('Rent')
+    expect(snapshot.lines[1].plannedAmount).toBe('1350.00')
   })
 
-  test('editing the plan afterwards does not change the archive', () => {
+  test('editing the plan afterwards does not change the snapshot', () => {
     const vault = createEmptyVault()
     const { rent } = planned(vault)
-    const archive = archivePlan(vault, 'Snapshot')
+    const snapshot = takeSnapshot(vault, 'Snapshot')
 
     setPlanned(vault, rent.id, '1500.00')
 
-    expect(archive.lines[1].plannedAmount).toBe('1350.00')
+    expect(snapshot.lines[1].plannedAmount).toBe('1350.00')
     expect(plannedFor(vault, rent.id)).toBe('1500.00')
   })
 })
 
-describe('listArchives', () => {
+describe('listSnapshots', () => {
   test('returns an empty array for an empty vault', () => {
-    expect(listArchives(createEmptyVault())).toEqual([])
+    expect(listSnapshots(createEmptyVault())).toEqual([])
   })
 
-  test('returns archives newest first', () => {
+  test('returns snapshots newest first', () => {
     const vault = createEmptyVault()
-    const first = archivePlan(vault, 'First')
-    const second = archivePlan(vault, 'Second')
-    const third = archivePlan(vault, 'Third')
+    const first = takeSnapshot(vault, 'First')
+    const second = takeSnapshot(vault, 'Second')
+    const third = takeSnapshot(vault, 'Third')
 
-    expect(listArchives(vault).map(a => a.id)).toEqual([third.id, second.id, first.id])
+    expect(listSnapshots(vault).map(a => a.id)).toEqual([third.id, second.id, first.id])
   })
 
   test('orders by createdAt, not by insertion', () => {
     const vault = createEmptyVault()
-    const older = archivePlan(vault, 'Older')
-    const newer = archivePlan(vault, 'Newer')
+    const older = takeSnapshot(vault, 'Older')
+    const newer = takeSnapshot(vault, 'Newer')
     older.createdAt = '2020-01-01T00:00:00.000Z'
     newer.createdAt = '2030-01-01T00:00:00.000Z'
 
-    expect(listArchives(vault).map(a => a.name)).toEqual(['Newer', 'Older'])
+    expect(listSnapshots(vault).map(a => a.name)).toEqual(['Newer', 'Older'])
   })
 
   test('does not mutate the stored array', () => {
     const vault = createEmptyVault()
-    archivePlan(vault, 'First')
-    archivePlan(vault, 'Second')
-    const original = [...vault.budget.archives]
+    takeSnapshot(vault, 'First')
+    takeSnapshot(vault, 'Second')
+    const original = [...vault.budget.snapshots]
 
-    listArchives(vault)
+    listSnapshots(vault)
 
-    expect(vault.budget.archives).toEqual(original)
+    expect(vault.budget.snapshots).toEqual(original)
   })
 })
 
-describe('renameArchive', () => {
-  test('renames the archive', () => {
+describe('renameSnapshot', () => {
+  test('renames the snapshot', () => {
     const vault = createEmptyVault()
-    const archive = archivePlan(vault, 'Old name')
+    const snapshot = takeSnapshot(vault, 'Old name')
 
-    renameArchive(vault, archive.id, 'New name')
+    renameSnapshot(vault, snapshot.id, 'New name')
 
-    expect(archive.name).toBe('New name')
+    expect(snapshot.name).toBe('New name')
   })
 
   test('trims the new name', () => {
     const vault = createEmptyVault()
-    const archive = archivePlan(vault, 'Old name')
+    const snapshot = takeSnapshot(vault, 'Old name')
 
-    renameArchive(vault, archive.id, '  Tidy  ')
+    renameSnapshot(vault, snapshot.id, '  Tidy  ')
 
-    expect(archive.name).toBe('Tidy')
+    expect(snapshot.name).toBe('Tidy')
   })
 
   test('rejects an empty name, as creation does', () => {
     const vault = createEmptyVault()
-    const archive = archivePlan(vault, 'Keep me')
+    const snapshot = takeSnapshot(vault, 'Keep me')
 
-    expect(() => renameArchive(vault, archive.id, '   ')).toThrow(/name/)
-    expect(archive.name).toBe('Keep me')
+    expect(() => renameSnapshot(vault, snapshot.id, '   ')).toThrow(/name/)
+    expect(snapshot.name).toBe('Keep me')
   })
 
   test('an unknown id is a no-op', () => {
     const vault = createEmptyVault()
-    const archive = archivePlan(vault, 'Only one')
+    const snapshot = takeSnapshot(vault, 'Only one')
 
-    expect(() => renameArchive(vault, 'no-such-archive', 'Whatever')).not.toThrow()
-    expect(archive.name).toBe('Only one')
+    expect(() => renameSnapshot(vault, 'no-such-snapshot', 'Whatever')).not.toThrow()
+    expect(snapshot.name).toBe('Only one')
   })
 })
 
-describe('deleteArchive', () => {
-  test('removes the archive', () => {
+describe('deleteSnapshot', () => {
+  test('removes the snapshot', () => {
     const vault = createEmptyVault()
-    const archive = archivePlan(vault, 'Doomed')
+    const snapshot = takeSnapshot(vault, 'Doomed')
 
-    deleteArchive(vault, archive.id)
+    deleteSnapshot(vault, snapshot.id)
 
-    expect(vault.budget.archives).toHaveLength(0)
-    expect(listArchives(vault)).toEqual([])
+    expect(vault.budget.snapshots).toHaveLength(0)
+    expect(listSnapshots(vault)).toEqual([])
   })
 
-  test('leaves the other archives and the plan alone', () => {
+  test('leaves the other snapshots and the plan alone', () => {
     const vault = createEmptyVault()
     const entry = createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
     setPlanned(vault, entry.id, '1350.00')
-    const keep = archivePlan(vault, 'Keep')
-    const drop = archivePlan(vault, 'Drop')
+    const keep = takeSnapshot(vault, 'Keep')
+    const drop = takeSnapshot(vault, 'Drop')
 
-    deleteArchive(vault, drop.id)
+    deleteSnapshot(vault, drop.id)
 
-    expect(listArchives(vault).map(a => a.id)).toEqual([keep.id])
+    expect(listSnapshots(vault).map(a => a.id)).toEqual([keep.id])
     expect(plannedFor(vault, entry.id)).toBe('1350.00')
   })
 
   test('deleting an unknown id is a no-op', () => {
     const vault = createEmptyVault()
-    archivePlan(vault, 'Keep')
+    takeSnapshot(vault, 'Keep')
 
-    expect(() => deleteArchive(vault, 'no-such-archive')).not.toThrow()
-    expect(vault.budget.archives).toHaveLength(1)
+    expect(() => deleteSnapshot(vault, 'no-such-snapshot')).not.toThrow()
+    expect(vault.budget.snapshots).toHaveLength(1)
   })
 })
 
@@ -1074,12 +1074,12 @@ describe('seedDefaults', () => {
     }
   })
 
-  test('seeds no archives — a fresh budget has no history', () => {
+  test('seeds no snapshots — a fresh budget has no history', () => {
     const vault = createEmptyVault()
 
     seedDefaults(vault)
 
-    expect(vault.budget.archives).toEqual([])
+    expect(vault.budget.snapshots).toEqual([])
   })
 
   test('does not seed if entries already exist', () => {
@@ -1252,17 +1252,17 @@ describe('resetBudget', () => {
     expect(vault.budget.plan).toEqual([])
   })
 
-  // Archives hold names, not references, so they read the same after the
+  // Snapshots hold names, not references, so they read the same after the
   // entries they describe are gone. Resetting the plan is not erasing history.
-  test('leaves archives standing', () => {
+  test('leaves snapshots standing', () => {
     const { vault } = vaultWithPlan()
-    const archive = archivePlan(vault, 'Before the reset')
+    const snapshot = takeSnapshot(vault, 'Before the reset')
 
     resetBudget(vault)
 
-    expect(vault.budget.archives).toHaveLength(1)
-    expect(vault.budget.archives[0].name).toBe('Before the reset')
-    expect(archive.lines).toEqual([
+    expect(vault.budget.snapshots).toHaveLength(1)
+    expect(vault.budget.snapshots[0].name).toBe('Before the reset')
+    expect(snapshot.lines).toEqual([
       { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
       { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
     ])
@@ -1493,5 +1493,77 @@ describe('empty categories do not linger', () => {
     for (const g of listCategories(vault)) {
       expect(entriesInCategory(vault, g.id).length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('seedDefaults in another language', () => {
+  test('writes the starter budget in the language asked for', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'fr')
+
+    expect(listCategories(vault).map(c => c.name)).toContain('Logement')
+    expect(listEntries(vault).map(e => e.name)).toContain('Loyer')
+    expect(listEntries(vault).map(e => e.name)).toContain('Assurance maladie')
+  })
+
+  test('entries land under the category of the same language', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'it')
+
+    const housing = listCategories(vault).find(c => c.name === 'Abitazione')!
+    expect(entriesInCategory(vault, housing.id).map(e => e.name).sort())
+      .toEqual(['Affitto', 'Spese accessorie'])
+  })
+
+  test('the amounts are the same whatever the language', () => {
+    const en = createEmptyVault()
+    const de = createEmptyVault()
+
+    seedDefaults(en, 'en')
+    seedDefaults(de, 'de')
+
+    // Only the words differ. The Swiss figures behind them do not.
+    expect(de.budget.plan.map(p => p.plannedAmount))
+      .toEqual(en.budget.plan.map(p => p.plannedAmount))
+    expect(listEntries(de)).toHaveLength(listEntries(en).length)
+  })
+
+  test('official Swiss terms keep their names', () => {
+    for (const [locale, expected] of [['de', 'Säule 3a'], ['fr', 'Pilier 3a'], ['it', 'Pilastro 3a']] as const) {
+      const vault = createEmptyVault()
+      seedDefaults(vault, locale)
+      expect(listEntries(vault).map(e => e.name)).toContain(expected)
+    }
+  })
+
+  // Seeding in a language we cannot check would write guessed words into a
+  // budget as data, where they persist and get edited rather than corrected.
+  test('a language with no seed names falls back to English', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'rm')
+
+    expect(listCategories(vault).map(c => c.name)).toContain('Housing')
+  })
+
+  test('defaults to English when no language is given', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+
+    expect(listCategories(vault).map(c => c.name)).toContain('Housing')
+  })
+
+  // The names are the user's once written: nothing re-translates them later.
+  test('renaming a seeded entry survives, because it is data', () => {
+    const vault = createEmptyVault()
+    seedDefaults(vault, 'de')
+    const rent = listEntries(vault).find(e => e.name === 'Miete')!
+
+    updateEntry(vault, rent.id, { name: 'Miete WG' })
+
+    expect(listEntries(vault).find(e => e.id === rent.id)!.name).toBe('Miete WG')
   })
 })

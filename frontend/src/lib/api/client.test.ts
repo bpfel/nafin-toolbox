@@ -15,6 +15,7 @@ import {
   type ModuleInfo,
   type VaultKeysResponse,
   type VaultPayloadResponse,
+  withCode,
 } from './client'
 
 // Mock global fetch
@@ -981,5 +982,22 @@ describe('putVault — optimistic locking', () => {
     await expect(
       putVault({ ciphertext: 'c', nonce: 'n', version: 3 }),
     ).rejects.not.toBeInstanceOf(VaultConflictError)
+  })
+})
+
+describe('withCode', () => {
+  // The messages stay English by decision; the code is what a user running the
+  // app in Rumantsch can read back to whoever runs the server.
+  test('appends the code the server sent', () => {
+    expect(withCode({ error: 'invalid or expired token', code: 'AUTH-020' }))
+      .toBe('invalid or expired token (AUTH-020)')
+  })
+
+  test('leaves a message alone when there is no code', () => {
+    expect(withCode({ error: 'something older' })).toBe('something older')
+  })
+
+  test('survives a body with neither', () => {
+    expect(withCode({})).toBe('')
   })
 })

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tn } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
   import { toCents } from '../../../lib/accounts/reserveMath'
   import { focusTrap } from '../../../lib/util/focusTrap'
@@ -93,11 +94,11 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Record purchase" use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('purchase.dialogLabel')} use:focusTrap>
     <h3>Bought {entryName}</h3>
 
     <label class="field">
-      <span class="label">Price paid</span>
+      <span class="label">{t('purchase.pricePaid')}</span>
       <input
         type="text"
         inputmode="decimal"
@@ -109,7 +110,7 @@
     </label>
 
     <label class="field">
-      <span class="label">Month of purchase</span>
+      <span class="label">{t('purchase.month')}</span>
       <input
         type="month"
         value={purchaseMonth}
@@ -118,28 +119,32 @@
     </label>
 
     {#if normalizedPrice === null}
-      <p class="error">Enter the price as a number, e.g. 1249.00</p>
+      <p class="error">{t('purchase.priceError')}</p>
     {:else}
       <p class="effect">
-        The next cycle saves towards {money(normalizedPrice)} over {reserve.periodMonths}
-        {reserve.periodMonths === 1 ? 'month' : 'months'}, starting
-        {validMonth ? monthLabel(purchaseMonth) : 'the month you pick'}. Nothing is required in that
-        first month, and the amount climbs from there.
+        {t('purchase.effect', {
+          price: money(normalizedPrice),
+          months: `${reserve.periodMonths} ${tn('time.months', reserve.periodMonths)}`,
+          start: validMonth ? monthLabel(purchaseMonth) : t('purchase.monthYouPick'),
+        })}
       </p>
     {/if}
 
     {#if leavesShort}
       <p class="info">
-        This leaves {accountName} {money(leavesShort)} below its required amount.
-        <span class="advice">Information only — the purchase is recorded either way.</span>
+        {t('purchase.leavesShort', {
+          account: accountName,
+          amount: money(leavesShort),
+        })}
+        <span class="advice">{t('purchase.infoOnly')}</span>
       </p>
     {/if}
 
-    <p class="scope">No money is moved and no other item changes. Only this reserve is updated.</p>
+    <p class="scope">{t('purchase.scope')}</p>
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
-      <button class="btn save" onclick={confirm} disabled={!canConfirm}>Record purchase</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
+      <button class="btn save" onclick={confirm} disabled={!canConfirm}>{t('purchase.confirm')}</button>
     </div>
   </div>
 </div>

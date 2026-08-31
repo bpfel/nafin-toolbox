@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { createCopier } from '../util/copier.svelte'
 
   interface Props {
@@ -47,17 +48,14 @@
   <div class="screen">
     <div class="card">
       {#if step === 'save'}
-        <h1>Save Your Recovery Key</h1>
+        <h1>{t('recoveryKey.title')}</h1>
 
         <div class="stakes">
           <p>
-            <strong>There is no way to reset this.</strong> If you forget your password
-            and no longer have this key, everything in your vault is gone — your budget,
-            your accounts, all of it.
+            <strong>{t('recoveryKey.noReset')}</strong> {t('recoveryKey.stakes')}
           </p>
           <p>
-            No administrator can recover it for you. The server only ever holds your data
-            encrypted, and never sees the key that opens it.
+            {t('recoveryKey.noAdmin')}
           </p>
         </div>
 
@@ -67,33 +65,31 @@
 
         <div class="actions">
           <button class="btn secondary" onclick={() => copier.copy(recoveryKey)}>
-            {copier.copied ? 'Copied' : 'Copy key'}
+            {copier.copied ? t('action.copied') : t('recoveryKey.copy')}
           </button>
-          <button class="btn secondary" onclick={download}>Download</button>
+          <button class="btn secondary" onclick={download}>{t('action.download')}</button>
         </div>
 
         <p class="status" class:failed={copier.failed} aria-live="polite">
           {#if copier.failed}
-            Could not reach the clipboard. Select the key above and copy it manually,
-            or use Download.
+            {t('recoveryKey.copyFailed')}
           {:else if copier.copied}
-            Recovery key copied to the clipboard.
+            {t('recoveryKey.copied')}
           {/if}
         </p>
 
         <button class="btn primary" onclick={() => (step = 'confirm')}>
-          I've saved my recovery key
+          {t('recoveryKey.saved')}
         </button>
       {:else}
-        <h1>Check you really have it</h1>
+        <h1>{t('recoveryKey.confirmTitle')}</h1>
 
         <p class="lead">
-          Paste the key back, so you find out now rather than the day you need it.
-          After this it is never shown again.
+          {t('recoveryKey.pasteHint')}
         </p>
 
         <label class="field">
-          <span class="label">Recovery key</span>
+          <span class="label">{t('recoveryKey.label')}</span>
           <input
             type="text"
             bind:value={typed}
@@ -106,17 +102,17 @@
 
         <p class="status" class:failed={typed.trim() !== '' && !matches} aria-live="polite">
           {#if matches}
-            That matches. Keep it somewhere you will still have in a year.
+            {t('recoveryKey.matches')}
           {:else if nearMiss}
-            Almost — the key is case-sensitive.
+            {t('recoveryKey.caseMismatch')}
           {:else if typed.trim() !== ''}
-            That does not match the key.
+            {t('recoveryKey.noMatch')}
           {/if}
         </p>
 
         <div class="actions">
-          <button class="btn secondary" onclick={() => (step = 'save')}>Back to the key</button>
-          <button class="btn primary" onclick={onconfirmed} disabled={!matches}>Confirm</button>
+          <button class="btn secondary" onclick={() => (step = 'save')}>{t('recoveryKey.backToKey')}</button>
+          <button class="btn primary" onclick={onconfirmed} disabled={!matches}>{t('recoveryKey.confirm')}</button>
         </div>
       {/if}
     </div>

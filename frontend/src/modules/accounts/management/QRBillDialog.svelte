@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { QRAddress, VaultAccount } from '../../../lib/crypto/vault'
   import type { QRBillRequest, ReferenceType, ValidationError } from '../../../lib/qrbill/types'
@@ -30,10 +31,10 @@
     account.ibanKind === 'qr-iban' ? ['QRR'] : ['NON', 'SCOR'],
   )
 
-  const REFERENCE_LABELS: Record<ReferenceType, string> = {
-    QRR: 'QR reference (QRR)',
-    SCOR: 'Creditor reference (SCOR)',
-    NON: 'No reference',
+  const REFERENCE_LABELS: Record<ReferenceType, () => string> = {
+    QRR: () => t('qrbill.referenceQRR'),
+    SCOR: () => t('qrbill.referenceSCOR'),
+    NON: () => t('qrbill.referenceNON'),
   }
 
   let amount = $state('')
@@ -130,7 +131,7 @@
       errors = [
         {
           field: 'payload',
-          message: e instanceof Error ? e.message : 'Failed to generate the QR code',
+          message: e instanceof Error ? e.message : t('error.generateQr'),
         },
       ]
     } finally {
@@ -148,7 +149,7 @@
     try {
       const file = new File([svg], 'qr-bill.svg', { type: 'image/svg+xml' })
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'QR bill' })
+        await navigator.share({ files: [file], title: t('qrbill.shareTitle') })
       }
     } catch {
       // The user dismissing the share sheet is not an error worth reporting.
@@ -167,52 +168,50 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Generate QR bill" use:focusTrap>
-    <h3>QR bill for {account.name}</h3>
+  <div class="modal" role="dialog" aria-label={t('qrbill.dialogLabel')} use:focusTrap>
+    <h3>{t('qrbill.title', { account: account.name })}</h3>
     <p class="sub">
-      Pays into this account. The IBAN and address come from the account — only the amount and
-      reference are per bill.
+      {t('qrbill.payHint')}
     </p>
 
     {#if creditorIncomplete}
       <p class="notice">
-        This account has no complete holder address. Add it under the account's payment details —
-        a QR bill cannot be produced without it.
+        {t('qrbill.noAddress')}
       </p>
     {/if}
 
     <label class="field">
-      <span class="label">Amount ({account.currency})</span>
+      <span class="label">{t('qrbill.amountLabel', { currency: account.currency })}</span>
       <input
         type="text"
         inputmode="decimal"
         enterkeyhint="next"
         use:moneyInput
         bind:value={amount}
-        placeholder="Leave empty for an open amount"
+        placeholder={t('qrbill.amountPlaceholder')}
       />
     </label>
-    {#if errorFor('amount')}<p class="error">Amount {errorFor('amount')}</p>{/if}
+    {#if errorFor('amount')}<p class="error">{t('qrbill.amount')} {errorFor('amount')}</p>{/if}
 
     <label class="field">
-      <span class="label">Reference type</span>
+      <span class="label">{t('qrbill.referenceType')}</span>
       <select bind:value={referenceType} disabled={allowedReferenceTypes.length === 1}>
         {#each allowedReferenceTypes as type}
-          <option value={type}>{REFERENCE_LABELS[type]}</option>
+          <option value={type}>{REFERENCE_LABELS[type]()}</option>
         {/each}
       </select>
     </label>
     <p class="hint">
       {#if account.ibanKind === 'qr-iban'}
-        A QR-IBAN accepts only a QR reference.
+        {t('qrbill.qrIbanRule')}
       {:else}
-        A regular IBAN accepts no reference or a creditor reference — never a QR reference.
+        {t('qrbill.regularIbanRule')}
       {/if}
     </p>
 
     {#if referenceType !== 'NON'}
       <label class="field">
-        <span class="label">Reference</span>
+        <span class="label">{t('qrbill.reference')}</span>
         <!-- A QRR reference is 27 digits, so the phone gets the digit pad;
              SCOR is alphanumeric (RF...) and needs the full keyboard. -->
         <input
@@ -223,15 +222,15 @@
           placeholder={referenceType === 'QRR' ? '27 digits' : 'RF...'}
         />
       </label>
-      {#if errorFor('reference')}<p class="error">Reference {errorFor('reference')}</p>{/if}
+      {#if errorFor('reference')}<p class="error">{t('qrbill.reference')} {errorFor('reference')}</p>{/if}
     {/if}
 
     <label class="field">
-      <span class="label">Additional information</span>
-      <input type="text" bind:value={additionalInfo} placeholder="e.g. Reserves funding, March" />
+      <span class="label">{t('qrbill.additionalInfo')}</span>
+      <input type="text" bind:value={additionalInfo} placeholder={t('qrbill.additionalInfoPlaceholder')} />
     </label>
     {#if errorFor('additionalInfo')}
-      <p class="error">Additional information {errorFor('additionalInfo')}</p>
+      <p class="error">{t('qrbill.additionalInfo')} {errorFor('additionalInfo')}</p>
     {/if}
 
     <div class="advanced">
@@ -240,36 +239,36 @@
         aria-expanded={showDebtor}
         onclick={() => (showDebtor = !showDebtor)}
       >
-        {showDebtor ? '−' : '+'} Debtor (optional)
+        {showDebtor ? '−' : '+'} {t('qrbill.debtorOptional')}
       </button>
 
       {#if showDebtor}
         <div class="advanced-body">
           <label class="field">
-            <span class="label">Name</span>
+            <span class="label">{t('address.name')}</span>
             <input type="text" autocomplete="name" enterkeyhint="next" bind:value={debtorName} />
           </label>
           <div class="row">
             <label class="field grow">
-              <span class="label">Street</span>
+              <span class="label">{t('address.street')}</span>
               <input type="text" autocomplete="address-line1" enterkeyhint="next" bind:value={debtorStreet} />
             </label>
             <label class="field narrow">
-              <span class="label">No.</span>
+              <span class="label">{t('address.number')}</span>
               <input type="text" inputmode="numeric" enterkeyhint="next" bind:value={debtorBuildingNumber} />
             </label>
           </div>
           <div class="row">
             <label class="field narrow">
-              <span class="label">Postal code</span>
+              <span class="label">{t('address.postalCode')}</span>
               <input type="text" inputmode="numeric" autocomplete="postal-code" enterkeyhint="next" bind:value={debtorPostalCode} />
             </label>
             <label class="field grow">
-              <span class="label">City</span>
+              <span class="label">{t('address.city')}</span>
               <input type="text" autocomplete="address-level2" enterkeyhint="next" bind:value={debtorCity} />
             </label>
             <label class="field narrow">
-              <span class="label">Country</span>
+              <span class="label">{t('address.country')}</span>
               <input type="text" autocomplete="country" autocapitalize="characters" maxlength="2" enterkeyhint="done" bind:value={debtorCountry} />
             </label>
           </div>
@@ -292,21 +291,20 @@
       <figure class="code">
         <!-- Locally generated from a fixed template in svg.ts; no external input. -->
         {@html svg}
-        <figcaption>Scan this with your phone's camera from this screen.</figcaption>
+        <figcaption>{t('qrbill.scanHint')}</figcaption>
       </figure>
       {#if shareSupported}
-        <button class="btn ghost share" onclick={shareImage}>Share as an image</button>
+        <button class="btn ghost share" onclick={shareImage}>{t('qrbill.share')}</button>
         <p class="hint">
-          Shares the picture to Files, Photos or a chat. Banking apps scan with the camera and will
-          not read it from a screenshot.
+          {t('qrbill.shareHint')}
         </p>
       {/if}
     {/if}
 
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>Close</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.close')}</button>
       <button class="btn save" onclick={generate} disabled={generating}>
-        {generating ? 'Generating...' : svg ? 'Regenerate' : 'Generate'}
+        {generating ? 'Generating...' : svg ? t('qrbill.regenerate') : t('qrbill.generate')}
       </button>
     </div>
   </div>

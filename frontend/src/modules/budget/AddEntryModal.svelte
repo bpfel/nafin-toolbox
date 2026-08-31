@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
@@ -128,7 +129,7 @@
       oncreated()
       onclose()
     } catch (e) {
-      error = e instanceof Error ? e.message : isEdit ? 'Failed to update entry' : 'Failed to create entry'
+      error = e instanceof Error ? e.message : isEdit ? t('error.updateEntry') : t('error.createEntry')
     }
   }
 
@@ -144,17 +145,17 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? 'Edit entry' : 'Add entry'} use:focusTrap>
-    <h3>{isEdit ? 'Edit' : 'Add'} {type === 'income' ? 'income' : 'expense'} entry</h3>
+  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap>
+    <h3>{t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', { type: type === 'income' ? t('category.typeIncome') : t('category.typeExpense') })}</h3>
 
     <label class="field">
-      <span class="label">Category</span>
+      <span class="label">{t('entry.category')}</span>
       {#if useNewCategory}
         <div class="category-input-row">
           <input
             type="text"
             bind:value={newCategoryName}
-            placeholder="New category name"
+            placeholder={t('entry.newCategoryPlaceholder')}
           />
           <button class="link-btn" onclick={() => { useNewCategory = false; newCategoryName = '' }}>
             existing
@@ -164,7 +165,7 @@
         <div class="category-input-row">
           <select bind:value={selectedCategory}>
             {#each categories as g}
-              <option value={g.name}>{g.name || 'Other'}</option>
+              <option value={g.name}>{g.name || t('budget.uncategorised')}</option>
             {/each}
           </select>
           <button class="link-btn" onclick={() => (useNewCategory = true)}>
@@ -175,21 +176,21 @@
     </label>
 
     <label class="field">
-      <span class="label">Name</span>
+      <span class="label">{t('field.name')}</span>
       <input
         type="text"
         bind:value={name}
-        placeholder="e.g. Gym membership"
+        placeholder={t('entry.namePlaceholder')}
         onkeydown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
       />
     </label>
 
     {#if isEdit && editEntry?.plannedAmount != null}
       <div class="values-section">
-        <span class="label">Values</span>
+        <span class="label">{t('entry.values')}</span>
         <div class="values-grid">
           <label class="value-field">
-            <span class="value-label">Planned/mo</span>
+            <span class="value-label">{t('budget.plannedMo')}</span>
             <input
               type="text"
               inputmode="decimal"
@@ -202,7 +203,7 @@
             />
           </label>
           <label class="value-field">
-            <span class="value-label">Planned/yr</span>
+            <span class="value-label">{t('budget.plannedYr')}</span>
             <input
               type="text"
               inputmode="decimal"
@@ -224,12 +225,12 @@
 
     <div class="actions">
       {#if isEdit && ondelete}
-        <button class="btn delete" onclick={ondelete}>Delete</button>
+        <button class="btn delete" onclick={ondelete}>{t('action.delete')}</button>
       {/if}
       <span class="spacer"></span>
-      <button class="btn cancel" onclick={onclose}>Cancel</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedCategoryName}>
-        {isEdit ? 'Save' : 'Add'}
+        {isEdit ? t('action.save') : t('entry.add')}
       </button>
     </div>
   </div>

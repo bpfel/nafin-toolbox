@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/bpfel/nafin-toolbox/internal/apierror"
+
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/go-chi/chi/v5"
 )
@@ -67,7 +69,7 @@ func handleEnable(db *sql.DB) http.HandlerFunc {
 
 		var req enableRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+			apierror.Write(w, apierror.Module, http.StatusBadRequest, "invalid JSON")
 			return
 		}
 
