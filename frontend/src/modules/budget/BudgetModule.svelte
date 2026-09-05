@@ -135,7 +135,7 @@
     background: #fdecea;
   }
   .loading {
-    color: #888;
+    color: var(--ink-faint);
     text-align: center;
     padding: 2rem;
   }

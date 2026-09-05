@@ -245,7 +245,7 @@
 </script>
 
 {#snippet typeSection(type: EntryType, sectionCategories: EntryCategory[])}
-  <table use:categorySortable>
+  <table class="section-{type}" use:categorySortable>
     <thead>
       <tr>
         <th class="col-name">
@@ -396,7 +396,7 @@
     padding: 0;
     border: none;
     background: none;
-    color: #999;
+    color: var(--ink-faint);
     cursor: pointer;
     vertical-align: middle;
   }
@@ -453,14 +453,33 @@
   }
   th {
     text-align: left;
-    padding: 0.75rem;
-    background: #f8f9fa;
-    border-bottom: 2px solid #dee2e6;
-    font-size: 0.85rem;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    /*
+     * The section is the level you look for first, so it is the level that
+     * looks like something. It used to be a small uppercase label on a grey
+     * fill — the same device as the category below it, three percent lighter,
+     * and *smaller* than the entries it contained. Three levels ranked by
+     * shades of one thing, with size pointing the wrong way.
+     *
+     * Type and space instead of fill and border. Space is the cheapest
+     * separator there is and the one this table spent nothing on.
+     */
+    padding: 1.75rem 0.75rem 0.5rem;
+    background: none;
+    border-bottom: 1px solid var(--rule);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-transform: none;
+    color: var(--ink);
   }
+
+  /* The one place the direction colour is worth spending: once per section,
+     rather than on every figure in every row beneath it. */
+  .section-income th { color: var(--money-in); }
+  .section-expense th { color: var(--ink); }
+  .section-savings th,
+  .section-bill th,
+  .section-purchase th { color: var(--money-held); }
   th.right {
     text-align: right;
   }
@@ -469,22 +488,27 @@
     user-select: none;
   }
   :global(.category-header) td {
-    padding: 0.5rem 0.75rem;
-    background: #f1f3f5;
+    /* A sub-heading inside a section you have already located, so the quietest
+       of the three rather than the middle one. No fill, no rule: told apart by
+       being small, faint and spaced out. */
+    padding: 0.9rem 0.75rem 0.3rem;
+    background: none;
     font-weight: 600;
-    font-size: 0.85rem;
-    color: #495057;
-    border-bottom: 1px solid #dee2e6;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    border-bottom: none;
   }
   :global(.category-header.collapsed) td {
-    border-bottom: 2px solid #ced4da;
+    border-bottom: 1px solid var(--rule);
   }
   :global(.category-header) .subtotal {
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
   :global(.category-header) .yearly {
-    color: #888;
+    color: var(--ink-faint);
   }
   /* These two exist only inside edit mode — outside it they are not rendered at
      all, so the header still reads as a label. That makes a hover-reveal pure

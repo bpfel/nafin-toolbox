@@ -257,7 +257,7 @@
 
   .nowrap { white-space: nowrap; }
   .mono { font-family: monospace; font-size: 0.8rem; }
-  .muted { color: #999; }
+  .muted { color: var(--ink-faint); }
 
   .badge {
     display: inline-block;

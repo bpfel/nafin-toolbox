@@ -303,7 +303,7 @@
   }
   .hint {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
     margin: 0 0 0.75rem;
   }
   .hint.bad {

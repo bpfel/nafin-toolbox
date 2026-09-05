@@ -168,7 +168,7 @@
   .btn-logout {
     margin-top: 1rem;
     background: transparent;
-    color: #888;
+    color: var(--ink-faint);
     border: 1px solid #ddd;
     font-size: 0.85rem;
     width: 100%;

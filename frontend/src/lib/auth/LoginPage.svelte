@@ -252,7 +252,7 @@
   .link-btn:hover { color: #245a42; }
 
   .forgot-hint {
-    color: #999;
+    color: var(--ink-faint);
     font-size: 0.8rem;
     margin-top: 1.25rem;
     text-align: center;

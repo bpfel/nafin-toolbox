@@ -19,10 +19,63 @@
    */
   --app-rail-width: 0px;
 
+  /* ---------------------------------------------------------------------
+   * Colour
+   *
+   * There were seventy-seven distinct hex values in the components and not one
+   * name, so the same idea was spelled differently in different files and three
+   * of them were unreadable — var(--ink-faint) at 3.54:1 and var(--ink-faint) at 2.85:1 against white,
+   * both short of the 4.5:1 that small text needs.
+   *
+   * What colour encodes is *where the money goes*, in three values, not which
+   * of the five types a line is. Five hues is past what anyone separates
+   * reliably — savings and bill were four percent apart in hue — and the type
+   * is already written beside the figure. Colour is good at coarse and instant,
+   * so it answers the coarse and instant question: arriving, leaving, or
+   * staying? Which is `sideOf()` and `holdsMoney()`, so the palette falls out
+   * of the model rather than being decided over it.
+   *
+   * And it marks the exception, not the routine. Expenses used to be red —
+   * every one of them, always — so a budget in good order rendered as a wall of
+   * red and the one row that was genuinely a problem had nowhere left to shout
+   * from. Spending money is what a budget is for; it is not a warning.
+   *
+   * Never the only carrier: a negative figure has a minus sign, a type has a
+   * label, an error has a sentence. Roughly one man in twelve cannot separate
+   * the red from the green.
+   * ------------------------------------------------------------------- */
+
+  --ink: #1a1a2e;         /* 17.1:1 — body text, and money going out */
+  --ink-muted: #5c6068;   /*  6.3:1 — secondary text */
+  --ink-faint: #6e737b;   /*  4.8:1 — labels and hints; replaces var(--ink-faint) and var(--ink-faint) */
+
+  --surface: #ffffff;
+  --ground: #f5f5f7;
+  --sunken: #f1f3f5;
+  --rule: #e0e2e6;
+
+  /* Where the money goes. Out is the ordinary ink: it is the routine. */
+  --money-in: #2d6a4f;    /*  6.4:1 */
+  --money-out: var(--ink);
+  --money-held: #1d4e89;  /*  8.4:1 — savings, bill and purchase alike */
+
+  /* The exceptions, which is why these are the loud ones. */
+  --alarm: #c0392b;       /*  5.4:1 — overspent, under-funded, errors, delete */
+  --alarm-soft: #fdecea;
+  --warn: #8f4f13;        /*  6.4:1 — unsaved, provisional, a date that will not settle */
+  --warn-soft: #fdf3e0;
+
+  /* The app's own green. Shares a value with money-in, which is tolerable:
+     a filled green button is obviously a button, and a figure is obviously a
+     figure. Named separately so one can move without dragging the other. */
+  --accent: #2d6a4f;
+  --accent-dark: #245a42;
+  --accent-soft: #eaf1ee;
+
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
-  color: #1a1a2e;
-  background-color: #f5f5f7;
+  color: var(--ink);
+  background-color: var(--ground);
 }
 
 @media (min-width: 768px) {
@@ -103,7 +156,7 @@ h1 {
 
 .module-id {
   font-size: 0.8rem;
-  color: #888;
+  color: var(--ink-faint);
 }
 
 button {

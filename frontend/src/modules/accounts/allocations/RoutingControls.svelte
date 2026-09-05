@@ -153,7 +153,7 @@
   .hint {
     margin: 0;
     font-size: 0.8rem;
-    color: #888;
+    color: var(--ink-faint);
   }
 
   @media (max-width: 480px) {

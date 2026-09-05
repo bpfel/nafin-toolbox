@@ -143,7 +143,7 @@
     padding: 0.25rem 0.35rem;
   }
   .amount-cell.yearly .cell-value {
-    color: #888;
+    color: var(--ink-faint);
   }
   .cell-value {
     display: block;

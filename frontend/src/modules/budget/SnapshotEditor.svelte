@@ -154,7 +154,7 @@
   }
   .rename-label {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -178,7 +178,7 @@
     border-radius: 4px;
   }
   .empty {
-    color: #888;
+    color: var(--ink-faint);
     font-size: 0.9rem;
     margin: 0;
   }
@@ -198,7 +198,7 @@
     text-align: left;
     padding: 0.4rem 0.5rem;
     font-size: 0.7rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 1px solid #dee2e6;

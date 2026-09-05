@@ -227,7 +227,7 @@
     flex-shrink: 0;
   }
   .drag-handle:hover {
-    color: #888;
+    color: var(--ink-faint);
   }
   .drag-handle:active {
     cursor: grabbing;
@@ -237,7 +237,7 @@
      as a control rather than as decoration. */
   @media (hover: none) {
     .drag-handle {
-      color: #888;
+      color: var(--ink-faint);
     }
   }
   /* Scoped to this card so it cannot collide with another module's ghost. */
@@ -258,7 +258,7 @@
   .meta {
     margin: 0.15rem 0 0;
     font-size: 0.8rem;
-    color: #888;
+    color: var(--ink-faint);
   }
   .figures {
     display: grid;
@@ -273,7 +273,7 @@
   }
   dt {
     font-size: 0.72rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
@@ -294,7 +294,7 @@
   .anchor {
     margin: 0;
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
   }
   .anchor.stale {
     color: #b26a00;
@@ -312,7 +312,7 @@
   .correction-hint {
     margin: 0;
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
   }
   .correction-fields {
     display: grid;

@@ -88,7 +88,7 @@
 
   .label {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -112,12 +112,16 @@
     letter-spacing: 0.04em;
   }
 
-  .income { color: #2d6a4f; }
-  .expense { color: #c0392b; }
-  .savings { color: #1d4e89; }
-  .unallocated { color: #2d6a4f; }
-  /* Overspent. Last, so it wins over the colour the figure carries by name. */
-  .unallocated.short { color: #c0392b; }
+  /* Where the money goes, not which type it is. Out keeps the ordinary ink:
+     spending is the routine, and colouring the routine spends the one thing
+     that could have marked an exception. */
+  .income { color: var(--money-in); }
+  .expense { color: var(--money-out); }
+  .savings { color: var(--money-held); }
+
+  /* The exception, and the only figure here whose sign means something. */
+  .unallocated { color: var(--money-in); }
+  .unallocated.short { color: var(--alarm); }
 
   @media (max-width: 767px) {
     .summary-bar {

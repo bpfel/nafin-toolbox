@@ -314,28 +314,23 @@
     border-radius: 999px;
     white-space: nowrap;
   }
+  /* Three colours for five types. The badge already says which type it is in
+     words; what the hue adds is the thing words are slow at — is this arriving,
+     leaving, or staying? Savings, bill and purchase share one, and were three
+     blues four percent apart when they did not. */
   .kind-income {
-    background: #e6f4ec;
-    color: #2d6a4f;
+    background: var(--accent-soft);
+    color: var(--money-in);
   }
   .kind-expense {
-    background: #fdecea;
-    color: #c0392b;
+    background: var(--sunken);
+    color: var(--ink-muted);
   }
-  /* The three that keep the money share a family: it is still yours. Savings
-     reads closest to income because nothing is spoken for; a bill and a
-     purchase are already promised to something, so they sit apart from it. */
-  .kind-savings {
-    background: #eaf1f8;
-    color: #1d4e89;
-  }
-  .kind-bill {
-    background: #e7f0fa;
-    color: #1f5c99;
-  }
+  .kind-savings,
+  .kind-bill,
   .kind-purchase {
-    background: #eef0fb;
-    color: #40449b;
+    background: #eaf1f8;
+    color: var(--money-held);
   }
   .kind-none {
     background: #fff3cd;
@@ -391,7 +386,7 @@
   /* Not a failure — the item is optional and buying it later is a valid answer
      — but the date will never stop receding until the amount changes. */
   .timing.warn {
-    color: #b3641a;
+    color: var(--warn);
   }
   .editor {
     display: flex;

@@ -151,7 +151,7 @@
   }
 
   .chevron {
-    color: #999;
+    color: var(--ink-faint);
   }
 
 

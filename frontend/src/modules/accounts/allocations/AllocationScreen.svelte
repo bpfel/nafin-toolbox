@@ -446,13 +446,13 @@
     margin: 0;
     padding: 0.6rem 1rem;
     font-size: 0.8rem;
-    color: #888;
+    color: var(--ink-faint);
     border-top: 1px solid #f1f3f5;
   }
   .empty {
     padding: 2rem;
     text-align: center;
-    color: #888;
+    color: var(--ink-faint);
     background: white;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);

@@ -672,7 +672,7 @@
   }
   .value-label {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--ink-faint);
   }
   .value-input {
     padding: 0.5rem;
@@ -690,7 +690,7 @@
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }
   .value-input.yearly {
-    color: #888;
+    color: var(--ink-faint);
   }
 
   @media (max-width: 480px) {

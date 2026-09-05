@@ -22,7 +22,7 @@
   .add-btn {
     background: none;
     border: none;
-    color: #888;
+    color: var(--ink-faint);
     cursor: pointer;
     font-size: 0.85rem;
     padding: 0.25rem 0;

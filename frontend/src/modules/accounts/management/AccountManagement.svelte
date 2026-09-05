@@ -330,7 +330,7 @@
   }
   .sub {
     margin: 0.2rem 0 0;
-    color: #888;
+    color: var(--ink-faint);
     font-size: 0.85rem;
   }
   /* The row scrolls, the page does not. `min-width: 0` is what stops a flex
@@ -389,7 +389,7 @@
   }
   dt {
     font-size: 0.72rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
@@ -431,7 +431,7 @@
     border-radius: 4px;
   }
   .loading {
-    color: #888;
+    color: var(--ink-faint);
     text-align: center;
     padding: 2rem;
   }

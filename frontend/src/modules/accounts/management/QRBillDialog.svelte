@@ -338,7 +338,7 @@
   .sub {
     margin: 0 0 1rem;
     font-size: 0.82rem;
-    color: #888;
+    color: var(--ink-faint);
     line-height: 1.4;
   }
   .field {
@@ -383,7 +383,7 @@
   }
   .hint {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
     margin: -0.25rem 0 1rem;
     line-height: 1.35;
   }
@@ -446,7 +446,7 @@
   }
   figcaption {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
     text-align: center;
   }
   .share {

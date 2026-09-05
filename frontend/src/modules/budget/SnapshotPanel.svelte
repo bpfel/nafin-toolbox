@@ -286,7 +286,7 @@
   }
   .empty {
     margin: 0;
-    color: #888;
+    color: var(--ink-faint);
     font-size: 0.9rem;
   }
   .snapshot-list {
