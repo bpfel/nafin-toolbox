@@ -25,6 +25,22 @@
   }
 }
 
+/*
+ * A figure the user has asked not to be readable over their shoulder.
+ *
+ * Global rather than scoped to <Money>, because an amount interpolated into a
+ * sentence — "CHF 380.00 short of the tax bill" — cannot be a component, so the
+ * element holding the sentence wears this instead. Both need one definition.
+ *
+ * Blur, not dots: nothing reflows, so switching it off does not move the page
+ * out from under whoever was reading it. `user-select` stops a blurred figure
+ * being dragged out as text, which is the one trivial way round it.
+ */
+.amount-hidden {
+  filter: blur(0.35em);
+  user-select: none;
+}
+
 * {
   margin: 0;
   padding: 0;

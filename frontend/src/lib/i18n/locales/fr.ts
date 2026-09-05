@@ -15,6 +15,8 @@ export const fr: Messages = {
   'nav.profile': 'Profil',
   'nav.audit': 'Journal',
   'nav.label': 'Sections',
+  'privacy.hide': 'Masquer les montants',
+  'privacy.show': 'Afficher les montants',
   'menu.security': 'Sécurité',
   'menu.language': 'Langue',
   'menu.logout': 'Se déconnecter',

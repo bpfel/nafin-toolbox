@@ -19,6 +19,8 @@ export const en = {
   'nav.profile': 'Profile',
   'nav.audit': 'Audit',
   'nav.label': 'Sections',
+  'privacy.hide': 'Hide amounts',
+  'privacy.show': 'Show amounts',
   'menu.security': 'Security',
   'menu.language': 'Language',
   'menu.logout': 'Log out',

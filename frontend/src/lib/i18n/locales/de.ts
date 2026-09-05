@@ -11,6 +11,8 @@ export const de: Messages = {
   'nav.profile': 'Profil',
   'nav.audit': 'Protokoll',
   'nav.label': 'Bereiche',
+  'privacy.hide': 'Beträge verbergen',
+  'privacy.show': 'Beträge zeigen',
   'menu.security': 'Sicherheit',
   'menu.language': 'Sprache',
   'menu.logout': 'Abmelden',

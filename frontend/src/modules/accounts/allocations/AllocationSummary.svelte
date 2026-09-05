@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t, tn, tAround } from '../../../lib/i18n/index.svelte'
   import { formatAmount } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   // The two totals, side by side. They differ by exactly the set-asides:
   //
@@ -128,7 +129,7 @@
         <span class="total-label">{t('alloc.unallocated')}</span>
         {@render infoToggle('info-unallocated', t('alloc.unallocated'))}
         {#if openInfo === 'info-unallocated'}
-          <span class="info-popover" id="info-unallocated" role="note">
+          <span class="info-popover" id="info-unallocated" role="note" class:amount-hidden={amountsHidden()}>
             {t('alloc.unallocatedInfo', {
               income: formatAmount(plannedIncome),
               expenses: formatAmount(plannedExpenses),
@@ -151,7 +152,7 @@
         <span class="total-label">{t('alloc.netWorthChange')}</span>
         {@render infoToggle('info-net-change', t('alloc.netWorthChange'))}
         {#if openInfo === 'info-net-change'}
-          <span class="info-popover" id="info-net-change" role="note">
+          <span class="info-popover" id="info-net-change" role="note" class:amount-hidden={amountsHidden()}>
             {t('alloc.netWorthInfo', {
               income: formatAmount(plannedIncome),
               outflow: formatAmount(trueOutflow),
@@ -198,7 +199,8 @@
   {#each underFunded as account (account.id)}
     {@const short = shortfall(account)}
     <p class="warning">
-      {short.before}<strong>{account.name}</strong>{short.after}
+      <span class:amount-hidden={amountsHidden()}>{short.before}</span><strong>{account.name}</strong><span
+        class:amount-hidden={amountsHidden()}>{short.after}</span>
       <span class="advice">{t('alloc.nothingBlocked')}</span>
     </p>
   {/each}

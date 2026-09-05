@@ -21,7 +21,7 @@
   let { email, role, onlogout }: Props = $props()
 </script>
 
-<ScreenHeader title={t('nav.profile')} />
+<ScreenHeader title={t('nav.profile')} eye={false} />
 
 <div class="identity">
   <span class="email">{email}</span>

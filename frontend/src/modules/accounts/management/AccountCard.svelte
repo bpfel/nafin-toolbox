@@ -2,6 +2,7 @@
   import { t } from '../../../lib/i18n/index.svelte'
   import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
   import { formatAmount, moneyInput } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
 
@@ -130,7 +131,7 @@
     </div>
   </dl>
 
-  <p class="anchor" class:stale>
+  <p class="anchor" class:stale class:amount-hidden={amountsHidden()}>
     {t('accounts.correctedOn', {
       date: formatDate(account.lastCorrectedAt),
       amount: formatAmount(account.currentAmount),

@@ -16,6 +16,7 @@
   } from '../../../lib/accounts/accountMath'
   import { fromCents, monthsBetween, nextDue, toCents } from '../../../lib/accounts/reserveMath'
   import { formatAmount } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import AllocationRow from './AllocationRow.svelte'
   import AllocationSummary from './AllocationSummary.svelte'
@@ -431,7 +432,7 @@
         {#each expenseCategories as category (category.categoryName)}
           {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
         {/each}
-        <p class="section-note">
+        <p class="section-note" class:amount-hidden={amountsHidden()}>
           {t('alloc.setAsideTotal', { amount: formatAmount(totals.setAside) })}
         </p>
       </section>

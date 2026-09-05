@@ -40,6 +40,13 @@ const FORMATTERS = [
   { pattern: /Intl\.NumberFormat/, what: 'Intl.NumberFormat' },
 ]
 
+/** Everything outside `<script>` — where a figure is rendered rather than computed. */
+function markupOf(source: string): string {
+  return source
+    .replace(/<script[\s\S]*?<\/script>/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+}
+
 describe('every rendered amount goes through Money', () => {
   test('no component formats a franc amount by hand', () => {
     const offenders: string[] = []
@@ -50,6 +57,41 @@ describe('every rendered amount goes through Money', () => {
           offenders.push(`${path} — ${what}; use <Money> or formatAmount()`)
         }
       }
+    }
+
+    expect(offenders.length, `\n${offenders.join('\n')}\n`).toBe(0)
+  })
+})
+
+describe('every rendered amount can be hidden', () => {
+  /**
+   * The companion rule. `<Money>` blurs itself, but an amount interpolated into
+   * a sentence — "CHF 380.00 short of the tax bill" — cannot be a component, so
+   * the element holding that sentence has to carry the class instead.
+   *
+   * Forgetting is silent and stays silent: the figure sits sharp among blurred
+   * neighbours, every test passes, and the first person to find out is whoever
+   * turned hiding on precisely because someone was reading over their shoulder.
+   *
+   * Coarse on purpose — it asks whether a component that renders a prose amount
+   * knows about hiding at all, not whether every one of them is marked. A file
+   * with two such sentences that marks only one still passes, and a component
+   * that formats in `<script>` and renders the result through a variable is
+   * invisible to it. It catches the whole-component omission, which is the one
+   * that actually happens when a screen is written.
+   */
+  test('a component that prints an amount in prose knows how to hide it', () => {
+    const offenders: string[] = []
+
+    for (const [path, source] of Object.entries(COMPONENTS)) {
+      if (path.endsWith('/Money.svelte')) continue
+      if (!markupOf(source).includes('formatAmount(')) continue
+      if (source.includes('amountsHidden')) continue
+
+      offenders.push(
+        `${path} — renders formatAmount() in markup without amountsHidden(); ` +
+          'the sentence around it needs class:amount-hidden',
+      )
     }
 
     expect(offenders.length, `\n${offenders.join('\n')}\n`).toBe(0)

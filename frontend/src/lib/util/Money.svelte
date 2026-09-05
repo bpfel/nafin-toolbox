@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatAmount } from './money'
+  import { amountsHidden } from './privacy.svelte'
 
   /**
    * One rendered franc amount.
@@ -39,7 +40,7 @@
   let { value, cents = false, abs = false }: Props = $props()
 </script>
 
-<span class="money">{formatAmount(value, { cents, abs })}</span>
+<span class="money" class:amount-hidden={amountsHidden()}>{formatAmount(value, { cents, abs })}</span>
 
 <style>
   /* Figures are read in columns and compared against each other far more often

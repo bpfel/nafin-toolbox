@@ -13,6 +13,7 @@
   } from '../../../lib/accounts/reserveMath'
   import { isEditing } from '../../../lib/util/editMode.svelte'
   import { formatAmount } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import RoutingControls from './RoutingControls.svelte'
   import ReserveFields from './ReserveFields.svelte'
@@ -214,7 +215,7 @@
     <div class="row-detail">
       {#if showStatus}
         <div class="reserve-status">
-          <span class="required">
+          <span class="required" class:amount-hidden={amountsHidden()}>
             {t('reserve.requiredNow', {
               current: formatAmount(requiredNow!),
               target: formatAmount(reserve!.targetAmount),
@@ -235,10 +236,12 @@
               {#if amortization.monthsAway === 0}
                 {t('alloc.affordableNow')}
               {:else if amortization.affordableFrom}
-                {t('alloc.affordableFrom', {
-                  rate: formatAmount(fromCents(amortization.rateCents)),
-                  month: monthLabel(amortization.affordableFrom),
-                })}
+                <span class:amount-hidden={amountsHidden()}>
+                  {t('alloc.affordableFrom', {
+                    rate: formatAmount(fromCents(amortization.rateCents)),
+                    month: monthLabel(amortization.affordableFrom),
+                  })}
+                </span>
               {:else}
                 {t('alloc.noMonthlyAmount')}
               {/if}

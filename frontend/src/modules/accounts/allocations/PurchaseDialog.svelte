@@ -4,6 +4,7 @@
   import { toCents } from '../../../lib/accounts/reserveMath'
   import { focusTrap } from '../../../lib/util/focusTrap'
   import { formatAmount, moneyInput } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
 
   // Recording the purchase of an amortized item. Deliberately narrow: it takes
   // the real price paid, makes that the target for the next cycle so the
@@ -114,7 +115,7 @@
     {#if normalizedPrice === null}
       <p class="error">{t('purchase.priceError')}</p>
     {:else}
-      <p class="effect">
+      <p class="effect" class:amount-hidden={amountsHidden()}>
         {t('purchase.effect', {
           price: formatAmount(normalizedPrice),
           months: `${reserve.periodMonths} ${tn('time.months', reserve.periodMonths)}`,
@@ -124,7 +125,7 @@
     {/if}
 
     {#if leavesShort}
-      <p class="info">
+      <p class="info" class:amount-hidden={amountsHidden()}>
         {t('purchase.leavesShort', {
           account: accountName,
           amount: formatAmount(leavesShort),

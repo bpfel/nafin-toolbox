@@ -2,6 +2,7 @@
   import { t } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
   import { formatAmount, moneyInput, integerInput } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
 
   // The reserve definition, only ever rendered by a set-aside row. The gate is
   // structural: `reserve implies expense AND sink !== null` holds because the
@@ -225,7 +226,7 @@
     </div>
 
     {#if isProposed && Number(plannedAmount) > 0}
-      <p class="hint">
+      <p class="hint" class:amount-hidden={amountsHidden()}>
         {t('reserve.proposedFrom', {
           amount: formatAmount(plannedAmount),
         })}

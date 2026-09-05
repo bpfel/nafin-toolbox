@@ -2,6 +2,12 @@
   import { t } from '../i18n/index.svelte'
   import { isEditing, toggleEditing } from '../util/editMode.svelte'
   import { getVaultState } from '../crypto/vaultStore.svelte'
+  import {
+    beginPeek,
+    endPeek,
+    hidingAmounts,
+    toggleHidingAmounts,
+  } from '../util/privacy.svelte'
 
   /**
    * The top line of a screen: what you are looking at, and the controls that act
@@ -22,11 +28,52 @@
      * structure to rearrange.
      */
     editKey?: string
+    /**
+     * Whether this screen shows figures. Profile does not, and an eye there
+     * would offer to hide nothing.
+     */
+    eye?: boolean
   }
 
-  let { title, editKey }: Props = $props()
+  let { title, editKey, eye = true }: Props = $props()
 
   const vaultState = getVaultState()
+
+  // Hold to look, rather than tapping twice and having to remember to tap back.
+  // 250ms: long enough that an ordinary tap never trips it, short enough that a
+  // deliberate hold does not feel like it has been ignored.
+  const PEEK_AFTER_MS = 250
+
+  let peekTimer: ReturnType<typeof setTimeout> | null = null
+  let peeked = false
+
+  function pressed() {
+    if (!hidingAmounts()) return
+    peeked = false
+    peekTimer = setTimeout(() => {
+      peeked = true
+      beginPeek()
+    }, PEEK_AFTER_MS)
+  }
+
+  function released() {
+    if (peekTimer) {
+      clearTimeout(peekTimer)
+      peekTimer = null
+    }
+    endPeek()
+  }
+
+  function clicked() {
+    // A hold that revealed the figures was a request to look, not a request to
+    // change the setting. `pointerup` runs before `click`, so by here the peek
+    // is already over and this only has to decline to toggle.
+    if (peeked) {
+      peeked = false
+      return
+    }
+    toggleHidingAmounts()
+  }
 </script>
 
 <header class="screen-header">
@@ -37,6 +84,41 @@
       <span class="save-indicator">{t('state.saving')}</span>
     {:else if vaultState.dirty}
       <span class="save-indicator unsaved">{t('state.unsaved')}</span>
+    {/if}
+
+    {#if eye}
+      <button
+        class="eye"
+        class:armed={hidingAmounts()}
+        aria-pressed={hidingAmounts()}
+        aria-label={hidingAmounts() ? t('privacy.show') : t('privacy.hide')}
+        title={hidingAmounts() ? t('privacy.show') : t('privacy.hide')}
+        onclick={clicked}
+        onpointerdown={pressed}
+        onpointerup={released}
+        onpointerleave={released}
+        onpointercancel={released}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          {#if hidingAmounts()}
+            <path
+              d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+            />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          {:else}
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          {/if}
+        </svg>
+      </button>
     {/if}
 
     {#if editKey}
@@ -101,6 +183,39 @@
     background: #2d6a4f;
     border-color: #2d6a4f;
     color: #fff;
+  }
+
+  .eye {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 44px, like every other thumb target — and a hold has to stay on it. */
+    width: 44px;
+    height: 44px;
+    margin-right: -0.5rem;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: #777;
+    cursor: pointer;
+    /* A long press must reveal the figures, not select them or raise the
+       system's own menu over the top of them. */
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  .eye:hover {
+    color: #444;
+  }
+
+  .eye.armed {
+    color: #2d6a4f;
+  }
+
+  .eye svg {
+    width: 19px;
+    height: 19px;
   }
 
   @media (max-width: 480px) {
