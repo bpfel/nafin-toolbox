@@ -196,7 +196,7 @@ describe('a partial locale', () => {
 
     setLocale('rm')
 
-    expect(t('menu.modules')).toBe('Modules')
+    expect(t('nav.accounts')).toBe('Accounts')
     expect(t('state.loading')).toBe('Loading...')
     expect(tn('entries.count', 2)).toBe('2 entries')
   })

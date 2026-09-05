@@ -9,14 +9,16 @@ import type { Messages } from './en'
  * verbatim and warns that variations can stop a payment going through.
  */
 export const fr: Messages = {
-  // --- Settings menu ---
-  'menu.settings': 'Paramètres',
+  // --- Navigation and profile ---
+  'nav.budget': 'Budget',
+  'nav.accounts': 'Comptes',
+  'nav.profile': 'Profil',
+  'nav.audit': 'Journal',
+  'nav.label': 'Sections',
   'menu.security': 'Sécurité',
-  'menu.modules': 'Modules',
   'menu.language': 'Langue',
   'menu.logout': 'Se déconnecter',
   'menu.users': 'Utilisateurs',
-  'menu.close': 'Fermer le menu',
   'action.edit': 'Modifier',
 
   // --- Language names (endonyms, never translated) ---
@@ -44,18 +46,6 @@ export const fr: Messages = {
   'entries.count.other': '{count} entrées',
 
   // --- App shell ---
-  'app.title': 'Gestionnaire de finances',
-  'app.adminNoVault': 'Connectez-vous avec un compte ordinaire pour utiliser les modules chiffrés.',
-
-  // --- Modules ---
-  'modules.none': 'Aucun module activé pour le moment.',
-  'modules.configure': 'Configurer les modules',
-  'modules.configureHint': 'Activez ou désactivez des modules. Les données sont conservées lors de la désactivation.',
-  'modules.comingSoon': 'Bientôt disponible.',
-  'modules.enable': 'Activer',
-  'modules.disable': 'Désactiver',
-
-  // --- Vault gates ---
   'vault.setupTitle': 'Configurer le chiffrement',
   'vault.setupHint': 'Vos données seront chiffrées de bout en bout. Vous seul pouvez les lire — le serveur ne voit jamais vos données en clair.',
   'vault.setupAction': 'Configurer le chiffrement',
@@ -381,11 +371,6 @@ export const fr: Messages = {
   'qrbill.payHint': 'Verse sur ce compte. L’IBAN et l’adresse proviennent du compte — seuls le montant et la référence se définissent ici.',
   'qrbill.noAddress': 'Ce compte n’a pas d’adresse de titulaire complète. Ajoutez-la dans les coordonnées de paiement du compte — une QR-facture en a besoin.',
   'qrbill.shareHint': 'Partage l’image vers Fichiers, Photos ou une discussion. Les applications bancaires scannent avec l’appareil photo et ne la liront pas depuis ici.',
-
-  'module.budget.description': 'Suivre les revenus et les dépenses par entrée',
-  'module.accounts.description': 'Comptes, flux d’argent entre eux et réserves pour des coûts futurs',
-  'module.provision3a.description': 'Prévoyance vieillesse suisse (3a)',
-  'module.investments.description': 'Suivre actions, ETF et autres placements',
 
   'error.loadModules': 'Échec du chargement des modules',
   'error.updateModule': 'Échec de la mise à jour du module',

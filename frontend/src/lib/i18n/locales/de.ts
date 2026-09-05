@@ -5,16 +5,16 @@ import type { Messages } from './en'
  * rather than "Schließen".
  */
 export const de: Messages = {
-  // --- Settings menu ---
-  'menu.settings': 'Einstellungen',
+  // --- Navigation and profile ---
+  'nav.budget': 'Budget',
+  'nav.accounts': 'Konten',
+  'nav.profile': 'Profil',
+  'nav.audit': 'Protokoll',
+  'nav.label': 'Bereiche',
   'menu.security': 'Sicherheit',
-  'menu.modules': 'Module',
   'menu.language': 'Sprache',
   'menu.logout': 'Abmelden',
   'menu.users': 'Benutzer',
-  'menu.close': 'Menü schliessen',
-
-  // --- Language names ---
   'language.de': 'Deutsch',
   'language.fr': 'Français',
   'language.it': 'Italiano',
@@ -35,18 +35,6 @@ export const de: Messages = {
   'entries.count.other': '{count} Einträge',
 
   // --- App shell ---
-  'app.title': 'Finanz-Tracker',
-  'app.adminNoVault': 'Melden Sie sich mit einem regulären Konto an, um verschlüsselte Module zu nutzen.',
-
-  // --- Modules ---
-  'modules.none': 'Noch keine Module aktiviert.',
-  'modules.configure': 'Module konfigurieren',
-  'modules.configureHint': 'Module aktivieren oder deaktivieren. Daten bleiben beim Deaktivieren erhalten.',
-  'modules.comingSoon': 'Demnächst verfügbar.',
-  'modules.enable': 'Aktivieren',
-  'modules.disable': 'Deaktivieren',
-
-  // --- Vault gates ---
   'vault.setupTitle': 'Verschlüsselung einrichten',
   'vault.setupHint': 'Ihre Daten werden Ende-zu-Ende verschlüsselt. Nur Sie können sie lesen — der Server sieht Ihre Daten nie im Klartext.',
   'vault.setupAction': 'Verschlüsselung einrichten',
@@ -393,11 +381,6 @@ export const de: Messages = {
   'qrbill.payHint': 'Zahlt auf dieses Konto ein. IBAN und Adresse stammen vom Konto — hier werden nur Betrag und Referenz gesetzt.',
   'qrbill.noAddress': 'Für dieses Konto fehlt eine vollständige Inhaberadresse. Ergänzen Sie sie unter den Zahlungsangaben des Kontos — eine QR-Rechnung braucht sie.',
   'qrbill.shareHint': 'Teilt das Bild an Dateien, Fotos oder einen Chat. Banking-Apps scannen mit der Kamera und lesen es nicht von hier.',
-
-  'module.budget.description': 'Einnahmen und Ausgaben nach Eintrag verfolgen',
-  'module.accounts.description': 'Konten, Geldflüsse dazwischen und Reserven für künftige Kosten',
-  'module.provision3a.description': 'Schweizer Altersvorsorge (3a)',
-  'module.investments.description': 'Aktien, ETFs und andere Anlagen verfolgen',
 
   'error.loadModules': 'Module konnten nicht geladen werden',
   'error.updateModule': 'Modul konnte nicht aktualisiert werden',

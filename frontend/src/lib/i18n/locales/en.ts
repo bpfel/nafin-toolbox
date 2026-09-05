@@ -13,19 +13,16 @@
  * `.other` siblings and is read with `tn()`.
  */
 export const en = {
-  // --- Settings menu ---
-  'menu.settings': 'Settings',
+  // --- Navigation and profile ---
+  'nav.budget': 'Budget',
+  'nav.accounts': 'Accounts',
+  'nav.profile': 'Profile',
+  'nav.audit': 'Audit',
+  'nav.label': 'Sections',
   'menu.security': 'Security',
-  'menu.modules': 'Modules',
   'menu.language': 'Language',
   'menu.logout': 'Log out',
   'menu.users': 'Users',
-  'menu.close': 'Close menu',
-
-  // --- Language names ---
-  //
-  // Endonyms, deliberately untranslated: someone looking for their own language
-  // has to recognise it while the interface is still in one they do not read.
   'language.de': 'Deutsch',
   'language.fr': 'Français',
   'language.it': 'Italiano',
@@ -48,18 +45,6 @@ export const en = {
   'entries.count.other': '{count} entries',
 
   // --- App shell ---
-  'app.title': 'Finance Tracker',
-  'app.adminNoVault': 'Sign in with a regular account to use encrypted modules.',
-
-  // --- Modules ---
-  'modules.none': 'No modules enabled yet.',
-  'modules.configure': 'Configure modules',
-  'modules.configureHint': 'Enable or disable modules. Data is kept when disabling.',
-  'modules.comingSoon': 'Coming soon.',
-  'modules.enable': 'Enable',
-  'modules.disable': 'Disable',
-
-  // --- Vault gates ---
   'vault.setupTitle': 'Set Up Encryption',
   'vault.setupHint': 'Your data will be encrypted end-to-end. Only you can read it — the server never sees your data in plain text.',
   'vault.setupAction': 'Set up encryption',
@@ -427,12 +412,6 @@ export const en = {
   'qrbill.shareHint': 'Shares the picture to Files, Photos or a chat. Banking apps scan with the camera and will not read it from here.',
 
   // --- Module descriptions ---
-  'module.budget.description': 'Track income and expenses by entry',
-  'module.accounts.description': 'Accounts, money flows between them, and reserves for future costs',
-  'module.provision3a.description': 'Swiss retirement savings (3a)',
-  'module.investments.description': 'Track stocks, ETFs, and other assets',
-
-  // --- Failures the app reports when it has nothing better ---
   'error.loadModules': 'Failed to load modules',
   'error.updateModule': 'Failed to update module',
   'error.setupEncryption': 'Failed to set up encryption',

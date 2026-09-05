@@ -20,27 +20,49 @@
 // nginx has served `try_files $uri $uri/ /index.html` since the beginning, so
 // deep links have worked in production all along; nothing was reading them.
 
-/** Every screen the address bar can name. */
-export type Screen = 'home' | 'security' | 'users' | 'verify'
+/**
+ * Every screen the address bar can name.
+ *
+ * `home` is not a screen. It is what `/` and anything unrecognised parse to,
+ * meaning "no screen chosen" — the shell resolves it to whichever destination
+ * comes first for that role, which differs between a user and an administrator
+ * and so cannot be decided here.
+ */
+export type Screen = 'home' | 'budget' | 'accounts' | 'profile' | 'users' | 'audit' | 'verify'
 
 const SCREENS: Record<string, Screen> = {
-  '/': 'home',
-  '/security': 'security',
-  '/users': 'users',
-  '/verify': 'verify',
+  budget: 'budget',
+  accounts: 'accounts',
+  profile: 'profile',
+  users: 'users',
+  audit: 'audit',
+  verify: 'verify',
+}
+
+export interface Route {
+  screen: Screen
+  /**
+   * The second segment, un-validated. `/accounts/allocations` gives
+   * `'allocations'`; so does `/accounts/nonsense`. Which tabs a screen has is
+   * the screen's business, and it falls back to its first one — keeping that
+   * knowledge here would mean this file learning every screen's contents.
+   */
+  tab: string | null
+  pathname: string
 }
 
 /**
- * An unrecognised path renders home rather than a not-found screen, and the
- * address bar is left showing whatever was typed.
+ * Two segments, hard stop: a screen and a tab. Anything deeper is a modal or a
+ * disclosure, not a place, and that rule is what keeps this a `split` and keeps
+ * the back button meaning exactly one thing.
  *
- * Rewriting it to `/` would be tidier to look at and worse to debug: a
- * mistyped link would correct itself silently, and the one person who could
- * tell you the link is wrong — whoever followed it — would never find out.
+ * An unrecognised path parses to `home` and is *not* rewritten here — the
+ * router only reads. The shell sends it on to the landing screen, which is
+ * where the role is known.
  */
-function parse(pathname: string): Screen {
-  const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
-  return SCREENS[trimmed || '/'] ?? 'home'
+function parse(pathname: string): { screen: Screen; tab: string | null } {
+  const [head = '', tab = ''] = pathname.replace(/^\/+/, '').split('/')
+  return { screen: SCREENS[head] ?? 'home', tab: tab || null }
 }
 
 /** Strips any query or hash, so state holds a path and nothing else. */
@@ -50,10 +72,13 @@ function pathOf(url: string): string {
 
 let pathname = $state(window.location.pathname)
 
-export function getRoute() {
+export function getRoute(): Route {
   return {
     get screen(): Screen {
-      return parse(pathname)
+      return parse(pathname).screen
+    },
+    get tab(): string | null {
+      return parse(pathname).tab
     },
     /** The raw path, for the rare caller that needs more than the screen. */
     get pathname(): string {

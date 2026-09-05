@@ -21,7 +21,7 @@
   .update-banner {
     position: fixed;
     left: 50%;
-    bottom: 1rem;
+    bottom: calc(1rem + var(--app-nav-height, 0px) + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     z-index: 200;
     display: flex;

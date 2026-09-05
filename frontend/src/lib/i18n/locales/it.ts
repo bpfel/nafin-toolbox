@@ -9,14 +9,16 @@ import type { Messages } from './en'
  * warns that variations can stop a payment going through.
  */
 export const it: Messages = {
-  // --- Settings menu ---
-  'menu.settings': 'Impostazioni',
+  // --- Navigation and profile ---
+  'nav.budget': 'Budget',
+  'nav.accounts': 'Conti',
+  'nav.profile': 'Profilo',
+  'nav.audit': 'Registro',
+  'nav.label': 'Sezioni',
   'menu.security': 'Sicurezza',
-  'menu.modules': 'Moduli',
   'menu.language': 'Lingua',
   'menu.logout': 'Esci',
   'menu.users': 'Utenti',
-  'menu.close': 'Chiudi il menu',
   'action.edit': 'Modifica',
 
   // --- Language names (endonyms, never translated) ---
@@ -44,18 +46,6 @@ export const it: Messages = {
   'entries.count.other': '{count} voci',
 
   // --- App shell ---
-  'app.title': 'Gestione finanze',
-  'app.adminNoVault': 'Accedi con un account normale per usare i moduli cifrati.',
-
-  // --- Modules ---
-  'modules.none': 'Nessun modulo ancora attivato.',
-  'modules.configure': 'Configura i moduli',
-  'modules.configureHint': 'Attiva o disattiva i moduli. Disattivandoli i dati vengono conservati.',
-  'modules.comingSoon': 'Presto disponibile.',
-  'modules.enable': 'Attiva',
-  'modules.disable': 'Disattiva',
-
-  // --- Vault gates ---
   'vault.setupTitle': 'Configura la cifratura',
   'vault.setupHint': 'I tuoi dati saranno cifrati end-to-end. Solo tu puoi leggerli — il server non vede mai i tuoi dati in chiaro.',
   'vault.setupAction': 'Configura la cifratura',
@@ -381,11 +371,6 @@ export const it: Messages = {
   'qrbill.payHint': 'Versa su questo conto. L’IBAN e l’indirizzo provengono dal conto — qui si impostano solo importo e riferimento.',
   'qrbill.noAddress': 'Questo conto non ha un indirizzo del titolare completo. Aggiungilo nei dati di pagamento del conto — una QR-fattura ne ha bisogno.',
   'qrbill.shareHint': 'Condivide l’immagine su File, Foto o una chat. Le app bancarie scansionano con la fotocamera e non la leggeranno da qui.',
-
-  'module.budget.description': 'Segui entrate e uscite per voce',
-  'module.accounts.description': 'Conti, flussi di denaro fra loro e riserve per costi futuri',
-  'module.provision3a.description': 'Previdenza per la vecchiaia svizzera (3a)',
-  'module.investments.description': 'Segui azioni, ETF e altri investimenti',
 
   'error.loadModules': 'Caricamento dei moduli non riuscito',
   'error.updateModule': 'Aggiornamento del modulo non riuscito',

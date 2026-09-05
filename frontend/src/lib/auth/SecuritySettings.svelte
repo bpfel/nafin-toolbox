@@ -3,7 +3,6 @@
   import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount } from './authStore.svelte'
   import TwoFactorSetup from './TwoFactorSetup.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
-  import AuditLogViewer from './AuditLogViewer.svelte'
   import { createCopier } from '../util/copier.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
@@ -159,13 +158,6 @@
       <h3>{t('security.passwordTitle')}</h3>
       <button class="btn-secondary" onclick={() => showChangePassword = true}>{t('password.changeTitle')}</button>
     </div>
-
-    <!-- Audit Log (admin only) -->
-    {#if authState.currentUser?.role === 'admin'}
-      <div class="section">
-        <AuditLogViewer />
-      </div>
-    {/if}
 
     <!-- Delete Account Section -->
     <div class="section danger-zone">

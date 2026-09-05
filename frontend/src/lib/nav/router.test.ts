@@ -20,8 +20,11 @@ afterEach(() => {
 describe('reading the address bar', () => {
   test.each([
     ['/', 'home'],
-    ['/security', 'security'],
+    ['/budget', 'budget'],
+    ['/accounts', 'accounts'],
+    ['/profile', 'profile'],
     ['/users', 'users'],
+    ['/audit', 'audit'],
     ['/verify', 'verify'],
   ] as const)('%s is the %s screen', (path, screen) => {
     window.history.replaceState({}, '', path)
@@ -30,15 +33,29 @@ describe('reading the address bar', () => {
   })
 
   test('a trailing slash names the same screen', () => {
-    window.history.replaceState({}, '', '/security/')
+    window.history.replaceState({}, '', '/accounts/')
     syncFromLocation()
-    expect(route.screen).toBe('security')
+    expect(route.screen).toBe('accounts')
+    expect(route.tab).toBeNull()
   })
 
-  test('an unrecognised path renders home and is left in the address bar', () => {
-    // Rewriting it would be tidier and worse to debug: a mistyped link would
-    // correct itself silently, and whoever followed it — the only person who
-    // could tell you it is wrong — would never notice.
+  test('a second segment is the tab, handed over without being judged', () => {
+    // Which tabs a screen has is the screen's business. Teaching the router
+    // would mean it learning every screen's contents to answer a question the
+    // screen can answer for itself by falling back to its first tab.
+    window.history.replaceState({}, '', '/accounts/allocations')
+    syncFromLocation()
+    expect(route.screen).toBe('accounts')
+    expect(route.tab).toBe('allocations')
+
+    window.history.replaceState({}, '', '/accounts/nonsense')
+    syncFromLocation()
+    expect(route.tab).toBe('nonsense')
+  })
+
+  test('an unrecognised path is home, and the router does not rewrite it', () => {
+    // Reading only. The shell sends it on to the landing screen, because that
+    // is where the role is known and an admin starts somewhere a user does not.
     window.history.replaceState({}, '', '/budgt')
     syncFromLocation()
     expect(route.screen).toBe('home')
@@ -58,16 +75,27 @@ describe('reading the address bar', () => {
 
 describe('going somewhere', () => {
   test('navigate moves the address bar and the screen together', () => {
-    navigate('/security')
-    expect(window.location.pathname).toBe('/security')
-    expect(route.screen).toBe('security')
+    navigate('/accounts/allocations')
+    expect(window.location.pathname).toBe('/accounts/allocations')
+    expect(route.screen).toBe('accounts')
+    expect(route.tab).toBe('allocations')
   })
 
   test('navigating where you already are changes nothing', () => {
-    navigate('/security')
+    navigate('/budget')
     const depth = window.history.length
-    navigate('/security')
+    navigate('/budget')
     expect(window.history.length).toBe(depth)
+  })
+
+  test('a tab switch is a step back can undo', () => {
+    // Push rather than replace: this is a web app reached in a browser, and a
+    // back gesture that leaps past the whole app to the previous website reads
+    // as broken rather than as native.
+    navigate('/budget')
+    const depth = window.history.length
+    navigate('/accounts')
+    expect(window.history.length).toBe(depth + 1)
   })
 
   test('replace drops the query along with the screen', () => {

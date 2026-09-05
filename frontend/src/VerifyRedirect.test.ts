@@ -4,9 +4,6 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 let currentUser: { id: number; email: string; role: string; must_change_password: boolean } | null = null
 
 vi.mock('./lib/api/client', () => ({
-  fetchModules: vi.fn(async () => []),
-  enableModule: vi.fn(),
-  disableModule: vi.fn(),
   setOnUnauthorized: vi.fn(),
 }))
 
@@ -18,6 +15,11 @@ vi.mock('./lib/auth/authStore.svelte', () => ({
   completeVaultSetup: vi.fn(),
   recoverAccount: vi.fn(),
   unlockVault: vi.fn(),
+  inviteUser: vi.fn(),
+  listUsers: vi.fn(async () => []),
+  deleteUser: vi.fn(),
+  resendVerification: vi.fn(),
+  adminResetPassword: vi.fn(),
   getAuthState: () => ({
     get currentUser() { return currentUser },
     loading: false,
@@ -30,7 +32,7 @@ vi.mock('./lib/auth/authStore.svelte', () => ({
 }))
 
 vi.mock('./lib/crypto/vaultStore.svelte', () => ({
-  getVaultState: () => ({ unlocked: true, vault: null, dirty: false, saving: false, conflicted: false, lastSaved: null }),
+  getVaultState: () => ({ unlocked: true, vault: null, dirty: false, saving: false, conflicted: false, lastSaved: null, versionAhead: false }),
   markDirty: vi.fn(),
 }))
 
@@ -64,7 +66,9 @@ describe('a verification link opened again', () => {
     currentUser = admin
     render(App)
 
-    await waitFor(() => expect(window.location.pathname).toBe('/'))
+    // Onto the admin's landing screen rather than `/`, which names nothing: the
+    // spent link is replaced with the app, and the token goes with it.
+    await waitFor(() => expect(window.location.pathname).toBe('/users'))
     expect(window.location.search).toBe('')
     expect(screen.queryByText('Set Up Your Account')).toBeNull()
   })

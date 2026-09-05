@@ -20,12 +20,38 @@ personal situation should be asked for, not estimated (see above).
 ## Architecture Decisions
 
 ### Modularity (core principle)
-- The app starts completely empty — no default accounts, categories, or modules.
-- Each domain (Budget, Accounts, Allocations, 3a, Investments) is an independent module the user opts into.
-- Modules are self-contained: you can use any subset without the others.
-- Cross-cutting views (net worth dashboard, snapshots) dynamically aggregate only the active modules.
+**The app starts empty of _data_, not of features.** Every screen is present from the first
+sign-in; a screen with nothing in it explains what it is for and offers the one action that
+starts it. Nothing is seeded on the user's behalf — the first franc in the app is one they
+typed.
+
+This replaced opt-in modules, which the user administered from a picker. That picker could
+not do the job asked of it: a name and one line of description is not enough to decide
+whether Allocations is worth an evening, so the feature most in need of explaining was the
+one nobody could see.
+
+The modularity that mattered was always architectural, and it stands:
+- Modules are self-contained: no module may require another to function, and each degrades
+  to its empty state alone. Accounts must not break because Budget is empty.
+- Cross-cutting views (net worth dashboard, snapshots) aggregate whatever modules hold data.
+- Backend stays loosely coupled, sharing a common interface for net-worth contribution.
 - UI uses progressive disclosure: simple setup first, advanced config revealed as needed.
-- Backend should reflect this: modules are loosely coupled, share a common interface for net-worth contribution, but don't depend on each other.
+
+**Empty is not the same as unbuilt.** A screen earns its place in the navigation when the
+feature behind it exists and the user simply has no data yet. Pillar 3a and Investments are
+not built, so there is no Savings destination — it appears when there is something behind
+it, which is one line in `lib/nav/destinations.ts`.
+
+### Navigation
+- Destinations are data (`lib/nav/destinations.ts`), rendered as a bottom bar under 768px
+  and a left rail above. A user gets Budget · Accounts · Profile; an admin gets a different
+  list — Users · Audit · Profile — because an admin has no vault and cannot budget.
+- Two levels, hard stop: a screen and a sub-tab (`/accounts/allocations`). Anything deeper
+  is a modal or a disclosure, not a place.
+- Tab switches push onto history, so the browser back gesture undoes the last move.
+- `lib/nav/gate.ts` decides which enforcement screen stands in the way, if any. The URL must
+  never decide that — a gate suspends the route rather than replacing it, so unlocking lands
+  you where you asked to go.
 
 ### Tech Stack
 - **Frontend:** Svelte 5 + Vite — pure SPA, no SvelteKit (server role belongs to Go)
@@ -64,7 +90,9 @@ nafin-toolbox/
 │       ├── main.ts                 # Svelte mount
 │       ├── App.svelte              # Root component
 │       ├── app.css                 # Global styles
+│       ├── screens/                # One file per navigation destination
 │       ├── lib/
+│       │   ├── nav/                # Router, gate chain, bar/rail, screen header
 │       │   ├── api/client.ts       # Typed API client
 │       │   ├── auth/               # Auth UI components + authStore
 │       │   ├── crypto/             # E2EE: key derivation, vault encrypt/decrypt, vaultStore

@@ -1,8 +1,28 @@
 :root {
+  /*
+   * How much room the bottom navigation bar takes.
+   *
+   * Anything else anchored to the bottom of the viewport — the unsaved-changes
+   * banner, the stale-build prompt — sits clear of it by this much. They carry
+   * a far higher z-index than the bar, so without the offset they would cover
+   * the navigation rather than sit above it, and an unsaved banner that hides
+   * every tab strands the user on one screen until they save.
+   *
+   * Zero from 768px up, where the navigation is a rail in the flow and nothing
+   * is over the bottom edge at all.
+   */
+  --app-nav-height: 60px;
+
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   color: #1a1a2e;
   background-color: #f5f5f7;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-nav-height: 0px;
+  }
 }
 
 * {

@@ -18,7 +18,6 @@ import type { Messages } from './en'
  */
 export const rm: Partial<Messages> = {
   // --- Settings menu ---
-  'menu.settings': 'Parameters',
   'menu.security': 'Segirezza',
   'menu.language': 'Lingua',
   'menu.logout': 'Sortir',
