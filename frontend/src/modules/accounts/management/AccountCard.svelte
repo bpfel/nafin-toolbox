@@ -1,7 +1,8 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
   import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
-  import { moneyInput } from '../../../lib/util/money'
+  import { formatAmount, moneyInput } from '../../../lib/util/money'
+  import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
 
   interface Props {
@@ -50,12 +51,6 @@
   let amountInput = $state('')
   let dateInput = $state('')
   let correctionError = $state<string | null>(null)
-
-  function fmt(value: string): string {
-    const n = Number(value)
-    if (!isFinite(n)) return value
-    return n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
 
   function todayISO(): string {
     return new Date().toISOString().slice(0, 10)
@@ -123,22 +118,22 @@
   <dl class="figures">
     <div class="figure">
       <dt>{t('accounts.projected')}</dt>
-      <dd class="amount">{fmt(projected)}</dd>
+      <dd class="amount"><Money value={projected} /></dd>
     </div>
     <div class="figure">
       <dt>{t('accounts.required')}</dt>
-      <dd class="amount muted">{fmt(required)}</dd>
+      <dd class="amount muted"><Money value={required} /></dd>
     </div>
     <div class="figure">
       <dt>{t('accounts.available')}</dt>
-      <dd class="amount" class:negative={Number(available) < 0}>{fmt(available)}</dd>
+      <dd class="amount" class:negative={Number(available) < 0}><Money value={available} /></dd>
     </div>
   </dl>
 
   <p class="anchor" class:stale>
     {t('accounts.correctedOn', {
       date: formatDate(account.lastCorrectedAt),
-      amount: fmt(account.currentAmount),
+      amount: formatAmount(account.currentAmount),
     })}
     {#if stale}<span class="stale-note">{t('accounts.projectedSince')}</span>{/if}
   </p>

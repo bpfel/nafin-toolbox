@@ -2,6 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import { isEditing } from '../../lib/util/editMode.svelte'
+  import Money from '../../lib/util/Money.svelte'
 
   interface Props {
     entry: PlanEntryView
@@ -20,10 +21,6 @@
 
   function openEditor() {
     onedit(entry.entryId, entry.entryName, entry.entryType, entry.categoryName, entry.plannedAmount)
-  }
-
-  function fmt(val: number): string {
-    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
 </script>
@@ -52,19 +49,19 @@
   <td class="amount-cell planned-mo-cell">
     {#if editing}
       <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedMo', { entry: entry.entryName })}>
-        {fmt(planned)}
+        <Money value={planned} />
       </button>
     {:else}
-      <span class="cell-value">{fmt(planned)}</span>
+      <span class="cell-value"><Money value={planned} /></span>
     {/if}
   </td>
   <td class="amount-cell yearly planned-yr-cell">
     {#if editing}
       <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedYr', { entry: entry.entryName })}>
-        {fmt(planned * 12)}
+        <Money value={planned * 12} />
       </button>
     {:else}
-      <span class="cell-value">{fmt(planned * 12)}</span>
+      <span class="cell-value"><Money value={planned * 12} /></span>
     {/if}
   </td>
 </tr>

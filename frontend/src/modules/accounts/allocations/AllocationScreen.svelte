@@ -15,6 +15,8 @@
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
   import { fromCents, monthsBetween, nextDue, toCents } from '../../../lib/accounts/reserveMath'
+  import { formatAmount } from '../../../lib/util/money'
+  import Money from '../../../lib/util/Money.svelte'
   import AllocationRow from './AllocationRow.svelte'
   import AllocationSummary from './AllocationSummary.svelte'
   import PurchaseDialog from './PurchaseDialog.svelte'
@@ -70,13 +72,6 @@
 
   let error = $state<string | null>(null)
   let purchaseEntryId = $state<string | null>(null)
-
-  function money(amount: string): string {
-    return Number(amount).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
 
   function cents(amount: string): number {
     try {
@@ -377,7 +372,7 @@
           </svg>
         </span>
         <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
-        <span class="category-subtotal">{money(category.plannedTotal)}</span>
+        <span class="category-subtotal"><Money value={category.plannedTotal} /></span>
       </button>
     {/if}
     {#if !withHeader || !isCollapsed(type, category.categoryName)}
@@ -437,7 +432,7 @@
           {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
         {/each}
         <p class="section-note">
-          {t('alloc.setAsideTotal', { amount: money(totals.setAside) })}
+          {t('alloc.setAsideTotal', { amount: formatAmount(totals.setAside) })}
         </p>
       </section>
     {/if}

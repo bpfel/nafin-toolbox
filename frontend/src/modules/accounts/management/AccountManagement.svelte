@@ -8,9 +8,10 @@
     projectedBalance,
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
-  import { fromCents, toCents } from '../../../lib/accounts/reserveMath'
+  import { toCents } from '../../../lib/accounts/reserveMath'
   import type { VaultAccount } from '../../../lib/crypto/vault'
   import { isEditing } from '../../../lib/util/editMode.svelte'
+  import Money from '../../../lib/util/Money.svelte'
   import AccountCard from './AccountCard.svelte'
   import AccountFormModal from './AccountFormModal.svelte'
   import DeleteAccountModal from './DeleteAccountModal.svelte'
@@ -72,15 +73,6 @@
     }
     return { projected, required, available }
   })
-
-  // Display only: the sum is already exact, this just categories the thousands the
-  // way the cards do.
-  function fmt(cents: number): string {
-    return Number(fromCents(cents)).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
 
   // The vault invariant guarantees at least one account, and `deleteAccount`
   // throws on the last one — so the card hides the action instead of offering
@@ -280,11 +272,11 @@
         <dl class="figures">
           <div class="figure">
             <dt>{t('accounts.projected')}</dt>
-            <dd class="amount" data-testid="total-projected">{fmt(totals.projected)}</dd>
+            <dd class="amount" data-testid="total-projected"><Money value={totals.projected} cents /></dd>
           </div>
           <div class="figure">
             <dt>{t('accounts.required')}</dt>
-            <dd class="amount muted" data-testid="total-required">{fmt(totals.required)}</dd>
+            <dd class="amount muted" data-testid="total-required"><Money value={totals.required} cents /></dd>
           </div>
           <div class="figure">
             <dt>{t('accounts.available')}</dt>
@@ -293,7 +285,7 @@
               class:negative={totals.available < 0}
               data-testid="total-available"
             >
-              {fmt(totals.available)}
+              <Money value={totals.available} cents />
             </dd>
           </div>
         </dl>

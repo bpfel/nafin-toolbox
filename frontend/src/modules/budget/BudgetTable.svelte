@@ -5,6 +5,7 @@
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
+  import Money from '../../lib/util/Money.svelte'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
   import AddEntryRow from './AddEntryRow.svelte'
   import AddEntryModal from './AddEntryModal.svelte'
@@ -202,10 +203,6 @@
     })
     return register(instance)
   }
-
-  function fmt(val: number): string {
-    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
 </script>
 
 <div class="budget-table" class:view-yearly={viewMode === 'yearly'}>
@@ -267,8 +264,8 @@
                 >+</button>
               {/if}
             </td>
-            <td class="right subtotal col-planned-mo">{fmt(category.plannedTotal)}</td>
-            <td class="right subtotal yearly col-planned-yr">{fmt(category.plannedTotal * 12)}</td>
+            <td class="right subtotal col-planned-mo"><Money value={category.plannedTotal} /></td>
+            <td class="right subtotal yearly col-planned-yr"><Money value={category.plannedTotal * 12} /></td>
           </tr>
         {/if}
         {#if !isCollapsed('income', category.categoryName)}
@@ -333,8 +330,8 @@
                 >+</button>
               {/if}
             </td>
-            <td class="right subtotal col-planned-mo">{fmt(category.plannedTotal)}</td>
-            <td class="right subtotal yearly col-planned-yr">{fmt(category.plannedTotal * 12)}</td>
+            <td class="right subtotal col-planned-mo"><Money value={category.plannedTotal} /></td>
+            <td class="right subtotal yearly col-planned-yr"><Money value={category.plannedTotal * 12} /></td>
           </tr>
         {/if}
         {#if !isCollapsed('expense', category.categoryName)}

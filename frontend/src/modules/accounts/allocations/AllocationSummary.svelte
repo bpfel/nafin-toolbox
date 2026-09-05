@@ -1,5 +1,7 @@
 <script lang="ts">
   import { t, tn, tAround } from '../../../lib/i18n/index.svelte'
+  import { formatAmount } from '../../../lib/util/money'
+  import Money from '../../../lib/util/Money.svelte'
   // The two totals, side by side. They differ by exactly the set-asides:
   //
   //   unallocated = income − all expenses    "what has no job yet?"
@@ -80,20 +82,6 @@
     return `${MONTH_NAMES[Number(index) - 1] ?? month} ${year}`
   }
 
-  function money(amount: string): string {
-    return Number(amount).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
-
-  function moneyAbs(amount: string): string {
-    return Math.abs(Number(amount)).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
-
   let underFunded = $derived(accounts.filter(a => Number(a.available) < 0))
 
   /**
@@ -104,7 +92,7 @@
    * end of the first half in English word order.
    */
   function shortfall(account: AccountStatus): { before: string; after: string } {
-    const amount = moneyAbs(account.available)
+    const amount = formatAmount(account.available, { abs: true })
     const due = account.soonestObligation
     const [before, after] = due
       ? tAround('alloc.shortOfDue', 'account', {
@@ -142,8 +130,8 @@
         {#if openInfo === 'info-unallocated'}
           <span class="info-popover" id="info-unallocated" role="note">
             {t('alloc.unallocatedInfo', {
-              income: money(plannedIncome),
-              expenses: money(plannedExpenses),
+              income: formatAmount(plannedIncome),
+              expenses: formatAmount(plannedExpenses),
             })}
             {t('alloc.zeroMeans')}
           </span>
@@ -154,7 +142,7 @@
         class:negative={Number(unallocated) < 0}
         data-testid="total-unallocated"
       >
-        {money(unallocated)}
+        <Money value={unallocated} />
       </span>
     </div>
 
@@ -165,9 +153,9 @@
         {#if openInfo === 'info-net-change'}
           <span class="info-popover" id="info-net-change" role="note">
             {t('alloc.netWorthInfo', {
-              income: money(plannedIncome),
-              outflow: money(trueOutflow),
-              setAside: money(setAside),
+              income: formatAmount(plannedIncome),
+              outflow: formatAmount(trueOutflow),
+              setAside: formatAmount(setAside),
             })}
           </span>
         {/if}
@@ -177,7 +165,7 @@
         class:negative={Number(netChange) < 0}
         data-testid="total-net-change"
       >
-        {money(netChange)}
+        <Money value={netChange} />
       </span>
     </div>
   </div>
@@ -196,10 +184,10 @@
         {#each accounts as account (account.id)}
           <tr class:short={Number(account.available) < 0}>
             <td>{account.name}</td>
-            <td class="right">{money(account.projected)}</td>
-            <td class="right">{money(account.required)}</td>
+            <td class="right"><Money value={account.projected} /></td>
+            <td class="right"><Money value={account.required} /></td>
             <td class="right value" class:negative={Number(account.available) < 0}>
-              {money(account.available)}
+              <Money value={account.available} />
             </td>
           </tr>
         {/each}

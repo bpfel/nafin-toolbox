@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import type { PlanSummary } from '../../lib/budget/budgetEngine'
+  import Money from '../../lib/util/Money.svelte'
 
   interface Props {
     summary: PlanSummary
@@ -9,36 +10,28 @@
   let { summary }: Props = $props()
 
   let unallocatedPositive = $derived(Number(summary.plannedBalance) >= 0)
-
-  function fmt(val: string): string {
-    return Number(val).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-
-  function fmtYr(val: string): string {
-    return (Number(val) * 12).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
 </script>
 
 <div class="summary-bar">
   <div class="summary-grid">
     <div class="summary-item">
       <span class="label">{t('budget.incomeYr')}</span>
-      <span class="value income">{fmtYr(summary.totalPlannedIncome)}</span>
+      <span class="value income"><Money value={Number(summary.totalPlannedIncome) * 12} /></span>
     </div>
     <div class="summary-item">
       <span class="label">{t('budget.expensesYr')}</span>
-      <span class="value expense">{fmtYr(summary.totalPlannedExpenses)}</span>
+      <span class="value expense"><Money value={Number(summary.totalPlannedExpenses) * 12} /></span>
     </div>
     <div class="summary-item">
       <span class="label">{t('budget.unallocatedMo')}</span>
       <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
-        {fmt(summary.plannedBalance)}
+        <Money value={summary.plannedBalance} />
       </span>
     </div>
     <div class="summary-item">
       <span class="label">{t('budget.unallocatedYr')}</span>
       <span class="value" class:unallocated-positive={unallocatedPositive} class:unallocated-negative={!unallocatedPositive}>
-        {fmtYr(summary.plannedBalance)}
+        <Money value={Number(summary.plannedBalance) * 12} />
       </span>
     </div>
   </div>

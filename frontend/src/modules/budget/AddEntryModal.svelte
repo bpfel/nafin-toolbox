@@ -4,7 +4,7 @@
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
-  import { parseAmount } from '../../lib/util/money'
+  import { formatAmount, parseAmount } from '../../lib/util/money'
 
   interface Props {
     type: 'income' | 'expense'
@@ -39,16 +39,12 @@
   let error = $state<string | null>(null)
 
   let plannedMoValue = $state(
-    untrack(() => (editEntry?.plannedAmount ? fmt(Number(editEntry.plannedAmount)) : '')),
+    untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount)) : '')),
   )
   let plannedYrValue = $state(
-    untrack(() => (editEntry?.plannedAmount ? fmt(Number(editEntry.plannedAmount) * 12) : '')),
+    untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount) * 12) : '')),
   )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
-
-  function fmt(val: number): string {
-    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
 
   function handleValueFocus(field: 'planned_mo' | 'planned_yr', event: FocusEvent) {
     valueFocusedField = field
@@ -64,13 +60,13 @@
     if (isNaN(val) || !isFinite(val)) return false
 
     if (field === 'planned_mo') {
-      plannedMoValue = fmt(val)
-      plannedYrValue = fmt(val * 12)
+      plannedMoValue = formatAmount(val)
+      plannedYrValue = formatAmount(val * 12)
       onsave(editEntry.id, val.toFixed(2))
     } else {
       const monthly = val / 12
-      plannedYrValue = fmt(val)
-      plannedMoValue = fmt(monthly)
+      plannedYrValue = formatAmount(val)
+      plannedMoValue = formatAmount(monthly)
       onsave(editEntry.id, monthly.toFixed(4))
     }
     return true
@@ -99,9 +95,9 @@
     if (isNaN(val) || !isFinite(val)) return
 
     if (field === 'planned_mo') {
-      plannedYrValue = fmt(val * 12)
+      plannedYrValue = formatAmount(val * 12)
     } else {
-      plannedMoValue = fmt(val / 12)
+      plannedMoValue = formatAmount(val / 12)
     }
   }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
-  import { moneyInput, integerInput } from '../../../lib/util/money'
+  import { formatAmount, moneyInput, integerInput } from '../../../lib/util/money'
 
   // The reserve definition, only ever rendered by a set-aside row. The gate is
   // structural: `reserve implies expense AND sink !== null` holds because the
@@ -227,10 +227,7 @@
     {#if isProposed && Number(plannedAmount) > 0}
       <p class="hint">
         {t('reserve.proposedFrom', {
-          amount: Number(plannedAmount).toLocaleString('de-CH', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }),
+          amount: formatAmount(plannedAmount),
         })}
       </p>
     {/if}

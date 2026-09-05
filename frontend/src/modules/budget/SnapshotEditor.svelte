@@ -2,6 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultSnapshot, VaultSnapshotLine } from '../../lib/crypto/vault'
+  import Money from '../../lib/util/Money.svelte'
 
   interface Props {
     snapshot: VaultSnapshot
@@ -78,10 +79,6 @@
       ;(e.target as HTMLInputElement).blur()
     }
   }
-
-  function fmt(val: number): string {
-    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
 </script>
 
 <div class="editor">
@@ -117,7 +114,7 @@
           {#each category.rows as row (row.index)}
             <tr class="line-row" class:income={row.line.type === 'income'}>
               <td class="line-name">{row.line.entryName}</td>
-              <td class="line-amount">{fmt(Number(row.line.plannedAmount))}</td>
+              <td class="line-amount"><Money value={row.line.plannedAmount} /></td>
             </tr>
           {/each}
         </tbody>
@@ -125,16 +122,16 @@
       <tfoot>
         <tr>
           <td>{t('budget.income')}</td>
-          <td class="right total income-total">{fmt(incomeTotal)}</td>
+          <td class="right total income-total"><Money value={incomeTotal} /></td>
         </tr>
         <tr>
           <td>{t('budget.expenses')}</td>
-          <td class="right total expense-total">{fmt(expenseTotal)}</td>
+          <td class="right total expense-total"><Money value={expenseTotal} /></td>
         </tr>
         <tr>
           <td>{t('budget.savings')}</td>
           <td class="right total" class:income-total={balance >= 0} class:expense-total={balance < 0}>
-            {fmt(balance)}
+            <Money value={balance} />
           </td>
         </tr>
       </tfoot>

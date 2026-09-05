@@ -3,7 +3,7 @@
   import type { ReserveDefinition } from '../../../lib/crypto/vault'
   import { toCents } from '../../../lib/accounts/reserveMath'
   import { focusTrap } from '../../../lib/util/focusTrap'
-  import { moneyInput } from '../../../lib/util/money'
+  import { formatAmount, moneyInput } from '../../../lib/util/money'
 
   // Recording the purchase of an amortized item. Deliberately narrow: it takes
   // the real price paid, makes that the target for the next cycle so the
@@ -44,13 +44,6 @@
   function monthLabel(month: string): string {
     const [year, index] = month.split('-')
     return `${MONTH_NAMES[Number(index) - 1] ?? month} ${year}`
-  }
-
-  function money(amount: string): string {
-    return Number(amount).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
   }
 
   function normalizeMoney(raw: string): string | null {
@@ -123,7 +116,7 @@
     {:else}
       <p class="effect">
         {t('purchase.effect', {
-          price: money(normalizedPrice),
+          price: formatAmount(normalizedPrice),
           months: `${reserve.periodMonths} ${tn('time.months', reserve.periodMonths)}`,
           start: validMonth ? monthLabel(purchaseMonth) : t('purchase.monthYouPick'),
         })}
@@ -134,7 +127,7 @@
       <p class="info">
         {t('purchase.leavesShort', {
           account: accountName,
-          amount: money(leavesShort),
+          amount: formatAmount(leavesShort),
         })}
         <span class="advice">{t('purchase.infoOnly')}</span>
       </p>

@@ -12,6 +12,8 @@
     toCents,
   } from '../../../lib/accounts/reserveMath'
   import { isEditing } from '../../../lib/util/editMode.svelte'
+  import { formatAmount } from '../../../lib/util/money'
+  import Money from '../../../lib/util/Money.svelte'
   import RoutingControls from './RoutingControls.svelte'
   import ReserveFields from './ReserveFields.svelte'
 
@@ -61,13 +63,6 @@
   function monthLabel(month: string): string {
     const [year, index] = month.split('-')
     return `${MONTH_NAMES[Number(index) - 1] ?? month} ${year}`
-  }
-
-  function money(amount: string): string {
-    return Number(amount).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
   }
 
   function cents(amount: string | null): number {
@@ -201,7 +196,7 @@
       <span class="name">{entry.name}</span>
       <span class="kind kind-{kindClass}">{kindLabel}</span>
     </div>
-    <span class="planned">{money(plannedAmount)}</span>
+    <span class="planned"><Money value={plannedAmount} /></span>
     {#if editing}
       <button
         class="toggle"
@@ -221,8 +216,8 @@
         <div class="reserve-status">
           <span class="required">
             {t('reserve.requiredNow', {
-              current: money(requiredNow!),
-              target: money(reserve!.targetAmount),
+              current: formatAmount(requiredNow!),
+              target: formatAmount(reserve!.targetAmount),
             })}
           </span>
           {#if obligation}
@@ -241,7 +236,7 @@
                 {t('alloc.affordableNow')}
               {:else if amortization.affordableFrom}
                 {t('alloc.affordableFrom', {
-                  rate: money(fromCents(amortization.rateCents)),
+                  rate: formatAmount(fromCents(amortization.rateCents)),
                   month: monthLabel(amortization.affordableFrom),
                 })}
               {:else}
