@@ -537,6 +537,12 @@
     padding: 1.5rem;
     width: 100%;
     max-width: 400px;
+    /* A dialog taller than the screen is a dialog whose buttons cannot be
+       reached. `dvh` rather than `vh`: on a phone the two disagree by exactly
+       the height of the browser's own chrome, which is the margin that decides
+       whether the last row is on screen. */
+    max-height: 88dvh;
+    overflow-y: auto;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
   }
   h3 {

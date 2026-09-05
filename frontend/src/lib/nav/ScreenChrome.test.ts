@@ -1,6 +1,6 @@
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte'
 import { describe, test, expect, afterEach } from 'vitest'
-import ScreenHeader from './ScreenHeader.svelte'
+import ScreenChrome from './ScreenChrome.svelte'
 import { amountsHidden, hidingAmounts, resetHidingAmounts } from '../util/privacy.svelte'
 
 afterEach(() => {
@@ -8,11 +8,25 @@ afterEach(() => {
   resetHidingAmounts()
 })
 
+describe('the screen heading', () => {
+  afterEach(cleanup)
+
+  test('names the screen for anything reading the document', () => {
+    // Not visible: the navigation bar already highlights the screen you are on,
+    // and on Accounts the sub-tabs say it a third time. It stays in the document
+    // because screen readers navigate by heading, and a page with none is a page
+    // that cannot be jumped into.
+    render(ScreenChrome, { title: 'Budget' })
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Budget' })).toBeTruthy()
+  })
+})
+
 describe('the hide-amounts eye', () => {
   test('offers to hide, then to show', async () => {
     // Never "lock" or "protect". This defeats a glance over the shoulder and
     // nothing else, and must not be mistaken for the vault.
-    render(ScreenHeader, { title: 'Budget' })
+    render(ScreenChrome, { title: 'Budget' })
 
     const eye = screen.getByRole('button', { name: 'Hide amounts' })
     expect(eye.getAttribute('aria-pressed')).toBe('false')
@@ -25,13 +39,13 @@ describe('the hide-amounts eye', () => {
   })
 
   test('is absent where there is nothing to hide', async () => {
-    render(ScreenHeader, { title: 'Profile', eye: false })
+    render(ScreenChrome, { title: 'Profile', eye: false })
 
     expect(screen.queryByRole('button', { name: 'Hide amounts' })).toBeNull()
   })
 
   test('holding it reveals the figures, and letting go puts them back', async () => {
-    render(ScreenHeader, { title: 'Budget' })
+    render(ScreenChrome, { title: 'Budget' })
     await fireEvent.click(screen.getByRole('button', { name: 'Hide amounts' }))
 
     const eye = screen.getByRole('button', { name: 'Show amounts' })
@@ -50,7 +64,7 @@ describe('the hide-amounts eye', () => {
   test('and the hold is not also a request to change the setting', async () => {
     // pointerup is followed by a click. Without this, one hold would reveal the
     // figures and then leave them permanently revealed.
-    render(ScreenHeader, { title: 'Budget' })
+    render(ScreenChrome, { title: 'Budget' })
     await fireEvent.click(screen.getByRole('button', { name: 'Hide amounts' }))
 
     const eye = screen.getByRole('button', { name: 'Show amounts' })
@@ -66,7 +80,7 @@ describe('the hide-amounts eye', () => {
   test('a plain tap still toggles', async () => {
     // The tap has to be quick enough not to start a peek, which is the whole
     // reason the hold has a delay in front of it.
-    render(ScreenHeader, { title: 'Budget' })
+    render(ScreenChrome, { title: 'Budget' })
     const eye = screen.getByRole('button', { name: 'Hide amounts' })
 
     await fireEvent.pointerDown(eye)

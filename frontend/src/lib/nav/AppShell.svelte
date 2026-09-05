@@ -91,9 +91,9 @@
 
 <style>
   main {
-    /* Room at the foot for the bar, which is fixed over the page rather than in
-       it, plus whatever the home indicator takes. */
-    padding: 1.5rem 1rem calc(5rem + env(safe-area-inset-bottom, 0));
+    /* Room at the foot for two fixed layers — the navigation and the action
+       strip above it — plus whatever the home indicator takes. */
+    padding: 1.5rem 1rem calc(8rem + env(safe-area-inset-bottom, 0));
   }
 
   .screen[hidden] {

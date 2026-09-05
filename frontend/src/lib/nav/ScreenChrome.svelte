@@ -10,18 +10,25 @@
   } from '../util/privacy.svelte'
 
   /**
-   * The top line of a screen: what you are looking at, and the controls that act
-   * on the whole of it.
+   * A screen's heading and the controls that act on the whole of it.
    *
-   * There is no app-wide title bar any more. Every screen names itself here, so
-   * a second bar above saying "Finance Tracker" was a row of pixels that told a
-   * user who deliberately opened their own finance app nothing they did not know.
+   * Neither is a title bar. The bar at the foot of the screen already says
+   * which screen this is — it highlights the tab — so a strip repeating the
+   * word above the content said it a second time, and on Accounts a third,
+   * because the sub-tabs say it too. The heading survives for screen readers,
+   * which navigate by heading and would otherwise find a document with none.
    *
-   * This is also where the hide-amounts eye will sit, which is what settled the
-   * question of whether the header survives on a phone: the eye needs one fixed,
-   * predictable place on every screen, and it must never scroll away.
+   * The controls move to the foot for the same reason the navigation is there:
+   * a thumb reaches the bottom of a phone and does not reach the top corner.
+   * Edit and the hide-amounts eye are pressed while working, which is exactly
+   * the case a top-right corner serves worst.
+   *
+   * Above 768px the strip is an ordinary toolbar at the top of the content —
+   * the same trade the navigation makes when it becomes a rail. Bottom-anchored
+   * controls on a wide screen solve a problem a mouse does not have.
    */
   interface Props {
+    /** Names the screen for anything that reads the document rather than sees it. */
     title: string
     /**
      * Which module's edit mode the toggle acts on. Omitted on screens with no
@@ -76,14 +83,31 @@
   }
 </script>
 
-<header class="screen-header">
-  <h1>{title}</h1>
+<h1 class="screen-heading">{title}</h1>
 
-  <div class="controls">
+<!--
+  Nothing to do, nothing to show: an empty strip is a bar of chrome that earns
+  none of the room it takes, and on a phone that room is the scarce thing.
+-->
+{#if eye || editKey || vaultState.saving || vaultState.dirty}
+  <div class="screen-actions">
     {#if vaultState.saving}
       <span class="save-indicator">{t('state.saving')}</span>
     {:else if vaultState.dirty}
       <span class="save-indicator unsaved">{t('state.unsaved')}</span>
+    {/if}
+
+    <span class="spacer"></span>
+
+    {#if editKey}
+      <button
+        class="edit-toggle"
+        class:active={isEditing(editKey)}
+        aria-pressed={isEditing(editKey)}
+        onclick={() => toggleEditing(editKey)}
+      >
+        {isEditing(editKey) ? t('action.done') : t('action.edit')}
+      </button>
     {/if}
 
     {#if eye}
@@ -120,38 +144,48 @@
         </svg>
       </button>
     {/if}
-
-    {#if editKey}
-      <button
-        class="edit-toggle"
-        class:active={isEditing(editKey)}
-        aria-pressed={isEditing(editKey)}
-        onclick={() => toggleEditing(editKey)}
-      >
-        {isEditing(editKey) ? t('action.done') : t('action.edit')}
-      </button>
-    {/if}
   </div>
-</header>
+{/if}
 
 <style>
-  .screen-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
+  /*
+   * Present to anything that reads the document, absent to anything that looks
+   * at it. `clip-path` with a 1px box rather than `display: none`, which would
+   * take it out of the accessibility tree along with the pixels.
+   */
+  .screen-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
-  h1 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
-
-  .controls {
+  .screen-actions {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+
+    /* Phone: fixed just above the navigation, in the half of the screen a thumb
+       actually covers. It never scrolls away, which is what the header was
+       chosen for — and unlike the header it can be reached one-handed. */
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--app-nav-height) + env(safe-area-inset-bottom, 0px));
+    z-index: 39;
+    padding: 0.4rem 1rem;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(6px);
+    border-top: 1px solid #ececec;
+  }
+
+  .spacer {
+    flex: 1;
   }
 
   .save-indicator {
@@ -191,9 +225,7 @@
     justify-content: center;
     /* 44px, like every other thumb target — and a hold has to stay on it.
        `padding: 0` is load-bearing: app.css styles every button with 1.5rem of
-       side padding, and with border-box that is 48px inside a 44px box. The
-       content column collapses to nothing and the icon disappears entirely —
-       which is exactly what it did. */
+       side padding, and with border-box that is 48px inside a 44px box. */
     width: 44px;
     height: 44px;
     padding: 0;
@@ -211,6 +243,7 @@
   }
 
   .eye:hover {
+    background: none;
     color: #444;
   }
 
@@ -221,13 +254,21 @@
   .eye svg {
     width: 19px;
     height: 19px;
-    /* Never let it be shrunk by a flex parent, whatever the padding does. */
     flex: none;
   }
 
-  @media (max-width: 480px) {
-    h1 {
-      font-size: 1.25rem;
+  @media (min-width: 768px) {
+    /* Wide: an ordinary toolbar at the top of the content, the same trade the
+       navigation makes when it becomes a rail. Bottom-anchored controls solve a
+       reach problem a mouse does not have. */
+    .screen-actions {
+      position: static;
+      padding: 0 0 0.75rem;
+      background: none;
+      backdrop-filter: none;
+      border-top: none;
+      border-bottom: 1px solid #ececec;
+      margin-bottom: 1.25rem;
     }
   }
 </style>

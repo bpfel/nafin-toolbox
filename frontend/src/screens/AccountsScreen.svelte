@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../lib/i18n/index.svelte'
   import { getRoute, navigate } from '../lib/nav/router.svelte'
-  import ScreenHeader from '../lib/nav/ScreenHeader.svelte'
+  import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
   import AccountManagement from '../modules/accounts/management/AccountManagement.svelte'
   import AllocationScreen from '../modules/accounts/allocations/AllocationScreen.svelte'
 
@@ -28,7 +28,7 @@
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 </script>
 
-<ScreenHeader title={t('nav.accounts')} editKey="accounts" />
+<ScreenChrome title={t('nav.accounts')} editKey="accounts" />
 
 <nav class="view-tabs" aria-label={t('accounts.viewsLabel')}>
   <a

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../lib/i18n/index.svelte'
   import { navigate } from '../lib/nav/router.svelte'
-  import ScreenHeader from '../lib/nav/ScreenHeader.svelte'
+  import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
   import LanguagePicker from '../lib/nav/LanguagePicker.svelte'
 
   /**
@@ -21,7 +21,7 @@
   let { email, role, onlogout }: Props = $props()
 </script>
 
-<ScreenHeader title={t('nav.profile')} eye={false} />
+<ScreenChrome title={t('nav.profile')} eye={false} />
 
 <div class="profile">
   <div class="identity">
