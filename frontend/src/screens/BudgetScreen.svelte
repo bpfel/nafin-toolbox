@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../lib/i18n/index.svelte'
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
+  import ActionButton from '../lib/nav/ActionButton.svelte'
   import BudgetModule from '../modules/budget/BudgetModule.svelte'
 
   /**
@@ -17,42 +18,42 @@
 
 <ScreenChrome title={t('nav.budget')} editKey="budget">
   {#snippet children()}
-    <button
-      class="view-toggle"
-      aria-label={t('budget.viewToggle', {
-        mode: viewMode === 'monthly' ? t('budget.monthly') : t('budget.yearly'),
-        other: viewMode === 'monthly' ? t('budget.yearly') : t('budget.monthly'),
-      })}
-      onclick={() => (viewMode = viewMode === 'monthly' ? 'yearly' : 'monthly')}
-    >
-      {viewMode === 'monthly' ? t('budget.month') : t('budget.year')}
-    </button>
+    <!--
+      The number of months it is showing: 1 or 12. A digit rather than a word,
+      because there is no icon for "switch to yearly" and *Month* / *Year* is a
+      pair whose widths differ in every language. It says the state it is in, as
+      the eye beside it does.
+    -->
+    <span class="period-toggle">
+      <ActionButton
+        label={t('budget.viewToggle', {
+          mode: viewMode === 'monthly' ? t('budget.monthly') : t('budget.yearly'),
+          other: viewMode === 'monthly' ? t('budget.yearly') : t('budget.monthly'),
+        })}
+        onclick={() => (viewMode = viewMode === 'monthly' ? 'yearly' : 'monthly')}
+      >
+        <span class="period">{viewMode === 'monthly' ? '1' : '12'}</span>
+      </ActionButton>
+    </span>
   {/snippet}
 </ScreenChrome>
 
 <BudgetModule bind:viewMode />
 
 <style>
-  .view-toggle {
-    min-height: 34px;
-    padding: 0.25rem 0.7rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background: #e9ecef;
-    color: #495057;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    cursor: pointer;
+  .period {
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 
-  .view-toggle:hover {
-    background: #dee2e6;
-  }
+
 
   @media (min-width: 768px) {
     /* Both columns fit up here, so there is nothing to choose between. */
-    .view-toggle {
+    .period-toggle {
       display: none;
     }
   }

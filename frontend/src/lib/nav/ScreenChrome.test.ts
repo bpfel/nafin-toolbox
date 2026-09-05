@@ -90,3 +90,30 @@ describe('the hide-amounts eye', () => {
     expect(hidingAmounts()).toBe(true)
   })
 })
+
+describe('the strip is one row of one kind of control', () => {
+  afterEach(cleanup)
+
+  test('every control carries words for anything that cannot see the symbol', () => {
+    // Icon-only is what makes the row uniform and what stops it shifting
+    // sideways when Edit becomes Done, or when the language changes and both
+    // become longer. It also says nothing on its own, which is why the label is
+    // required rather than optional.
+    render(ScreenChrome, { title: 'Budget', editKey: 'budget' })
+
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) {
+      expect(button.getAttribute('aria-label')?.trim()).toBeTruthy()
+      expect(button.getAttribute('title')?.trim()).toBeTruthy()
+      expect(button.textContent?.trim()).toBe('')
+    }
+  })
+
+  test('a toggle says whether it is on', () => {
+    render(ScreenChrome, { title: 'Budget', editKey: 'budget' })
+
+    const edit = screen.getByRole('button', { name: 'Edit' })
+    expect(edit.getAttribute('aria-pressed')).toBe('false')
+  })
+})

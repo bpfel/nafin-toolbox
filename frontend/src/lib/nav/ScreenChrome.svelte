@@ -3,6 +3,7 @@
   import { t } from '../i18n/index.svelte'
   import { isEditing, toggleEditing } from '../util/editMode.svelte'
   import { getVaultState } from '../crypto/vaultStore.svelte'
+  import ActionButton from './ActionButton.svelte'
   import {
     beginPeek,
     endPeek,
@@ -112,23 +113,35 @@
     {/if}
 
     {#if editKey}
-      <button
-        class="edit-toggle"
-        class:active={isEditing(editKey)}
-        aria-pressed={isEditing(editKey)}
+      <ActionButton
+        label={isEditing(editKey) ? t('action.done') : t('action.edit')}
+        pressed={isEditing(editKey)}
         onclick={() => toggleEditing(editKey)}
       >
-        {isEditing(editKey) ? t('action.done') : t('action.edit')}
-      </button>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          {#if isEditing(editKey)}
+            <!-- A tick while the mode is on: the button now means "finished". -->
+            <polyline points="20 6 9 17 4 12" />
+          {:else}
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          {/if}
+        </svg>
+      </ActionButton>
     {/if}
 
     {#if eye}
-      <button
-        class="eye"
-        class:armed={hidingAmounts()}
-        aria-pressed={hidingAmounts()}
-        aria-label={hidingAmounts() ? t('privacy.show') : t('privacy.hide')}
-        title={hidingAmounts() ? t('privacy.show') : t('privacy.hide')}
+      <ActionButton
+        label={hidingAmounts() ? t('privacy.show') : t('privacy.hide')}
+        pressed={hidingAmounts()}
         onclick={clicked}
         onpointerdown={pressed}
         onpointerup={released}
@@ -154,7 +167,7 @@
             <circle cx="12" cy="12" r="3" />
           {/if}
         </svg>
-      </button>
+      </ActionButton>
     {/if}
   </div>
 {/if}
@@ -210,64 +223,12 @@
     color: #e67e22;
   }
 
-  .edit-toggle {
-    background: none;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.85rem;
-    color: #555;
-    cursor: pointer;
-  }
 
-  .edit-toggle:hover {
-    border-color: #999;
-    color: #333;
-  }
 
-  .edit-toggle.active {
-    background: #2d6a4f;
-    border-color: #2d6a4f;
-    color: #fff;
-  }
 
-  .eye {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* 44px, like every other thumb target — and a hold has to stay on it.
-       `padding: 0` is load-bearing: app.css styles every button with 1.5rem of
-       side padding, and with border-box that is 48px inside a 44px box. */
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    margin-right: -0.5rem;
-    background: none;
-    border: none;
-    border-radius: 6px;
-    color: #777;
-    cursor: pointer;
-    /* A long press must reveal the figures, not select them or raise the
-       system's own menu over the top of them. */
-    touch-action: manipulation;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
 
-  .eye:hover {
-    background: none;
-    color: #444;
-  }
 
-  .eye.armed {
-    color: #2d6a4f;
-  }
 
-  .eye svg {
-    width: 19px;
-    height: 19px;
-    flex: none;
-  }
 
   @media (min-width: 768px) {
     /* Wide: an ordinary toolbar at the top of the content, the same trade the

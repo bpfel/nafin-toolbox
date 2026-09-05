@@ -3,6 +3,7 @@
   import { navigate } from '../lib/nav/router.svelte'
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
   import LanguagePicker from '../lib/nav/LanguagePicker.svelte'
+  import ActionButton from '../lib/nav/ActionButton.svelte'
 
   /**
    * Everything about the person rather than their money.
@@ -28,7 +29,21 @@
       so it sits with the screen's controls rather than at the end of the
       content — where reaching it meant scrolling past everything else.
     -->
-    <button class="logout" onclick={onlogout}>{t('menu.logout')}</button>
+    <ActionButton label={t('menu.logout')} danger onclick={onlogout}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+    </ActionButton>
   {/snippet}
 </ScreenChrome>
 
@@ -139,20 +154,7 @@
     color: #999;
   }
 
-  .logout {
-    background: none;
-    border: 1px solid #e0b4b4;
-    border-radius: 6px;
-    color: #c0392b;
-    padding: 0.35rem 0.9rem;
-    min-height: 34px;
-    font-size: 0.85rem;
-    cursor: pointer;
-  }
 
-  .logout:hover {
-    background: #fdecea;
-  }
 
   @media (min-width: 768px) {
     /* Pointer targets can be smaller than a thumb's, but the type should not
@@ -168,8 +170,5 @@
       font-size: 1rem;
     }
 
-    .logout {
-      padding: 0.4rem 1.1rem;
-    }
   }
 </style>
