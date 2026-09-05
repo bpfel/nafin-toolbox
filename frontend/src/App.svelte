@@ -19,6 +19,8 @@
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
   import SettingsMenu from './lib/nav/SettingsMenu.svelte'
+  import { getRoute, navigate, replace, startRouting, syncFromLocation } from './lib/nav/router.svelte'
+  import { gateFor } from './lib/nav/gate'
   import LanguagePicker from './lib/nav/LanguagePicker.svelte'
   import { t } from './lib/i18n/index.svelte'
 
@@ -29,13 +31,11 @@
     logout()
   })
 
-  let isVerifyPage = $state(window.location.pathname === '/verify')
+  const route = getRoute()
 
   let modules = $state<ModuleInfo[]>([])
   let error = $state<string | null>(null)
   let showConfig = $state(false)
-  let showUsers = $state(false)
-  let showSecurity = $state(false)
   let toggling = $state<string | null>(null)
 
   let require2FA = $state(false)
@@ -106,19 +106,20 @@
     if (e.target === e.currentTarget) showConfig = false
   }
 
+  // Modules is the odd one out and stays a piece of state: it is a modal over
+  // whatever screen you were on, not a place, and giving it an address would
+  // put a dialog in the back button's history.
   function navigateTo(view: 'users' | 'security' | 'modules') {
-    if (view === 'users') {
-      showUsers = true; showSecurity = false; showConfig = false
-    } else if (view === 'security') {
-      showUsers = false; showSecurity = true; showConfig = false
-    } else if (view === 'modules') {
-      showUsers = false; showSecurity = false; showConfig = true
+    if (view === 'modules') {
+      showConfig = true
+      return
     }
+    showConfig = false
+    navigate(view === 'users' ? '/users' : '/security')
   }
 
   function navigateBack() {
-    showUsers = false
-    showSecurity = false
+    navigate('/')
   }
 
   $effect(() => {
@@ -129,11 +130,13 @@
   // to the app. Drop the spent token from the URL and carry on, rather than
   // showing a set-up form the session has plainly outgrown.
   $effect(() => {
-    if (isVerifyPage && authState.currentUser) {
-      window.history.replaceState({}, '', '/')
-      isVerifyPage = false
+    if (route.screen === 'verify' && authState.currentUser) {
+      replace('/')
     }
   })
+
+  // Listen for the back and forward buttons.
+  $effect(() => startRouting())
 
   // Watch for deploys that leave this tab running chunks the server no longer has.
   $effect(() => startBuildVersionWatch())
@@ -162,11 +165,10 @@
     await logout()
     modules = []
     error = null
-    showUsers = false
     showConfig = false
-    showSecurity = false
     show2FAEnforcement = false
     clearEditing()
+    navigate('/')
   }
 
   async function handleVaultSetup() {
@@ -216,29 +218,37 @@
       recovering = false
     }
   }
-  /**
-   * True on every screen that renders its own centred card instead of the app's
-   * top bar — loading, sign-up, login, and each enforcement gate.
-   *
-   * These are exactly the screens with nowhere to put the language picker in
-   * flow, so it floats there instead. The condition mirrors the branch chain
-   * below and has to move with it: a gate added there wants a term here too, or
-   * that screen silently loses the picker.
-   */
-  let chromeless = $derived(
-    authState.loading ||
-      isVerifyPage ||
-      !authState.currentUser ||
-      authState.currentUser.must_change_password ||
-      show2FAEnforcement ||
-      (!isAdmin &&
-        (authState.recoveryKeyToShow != null ||
-          vaultState.versionAhead ||
-          authState.vaultNeedsSetup ||
-          authState.vaultDecryptFailed ||
-          authState.vaultLocked ||
-          !vaultState.unlocked)),
+  /** Which enforcement screen stands in the way, if any. See lib/nav/gate.ts. */
+  let gate = $derived(
+    gateFor({
+      loading: authState.loading,
+      onVerifyPath: route.screen === 'verify',
+      user: authState.currentUser
+        ? {
+            role: authState.currentUser.role,
+            mustChangePassword: authState.currentUser.must_change_password,
+          }
+        : null,
+      enforce2FA: show2FAEnforcement,
+      recoveryKeyPending: authState.recoveryKeyToShow != null,
+      vaultVersionAhead: vaultState.versionAhead,
+      vaultNeedsSetup: authState.vaultNeedsSetup,
+      vaultDecryptFailed: authState.vaultDecryptFailed,
+      vaultLocked: authState.vaultLocked,
+      vaultUnlocked: vaultState.unlocked,
+    }),
   )
+
+  /**
+   * Every gate renders its own centred card instead of the app's top bar, which
+   * makes it exactly the set of screens with nowhere to put the language picker
+   * in flow — so it floats there instead.
+   *
+   * This was a twelve-term boolean restating the branch chain by hand, and a
+   * gate added to one and not the other lost the picker silently. There is one
+   * statement of it now, and this reads it.
+   */
+  let chromeless = $derived(gate !== null)
 </script>
 
 {#if chromeless}
@@ -250,23 +260,25 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if authState.loading}
+{#if gate === 'loading'}
   <main>
     <p class="loading">{t('state.loading')}</p>
   </main>
-{:else if isVerifyPage}
+{:else if gate === 'verify'}
+  <!-- The page rewrites the address itself as it finishes, and neither
+       pushState nor replaceState raises an event, so it has to say so. -->
   <VerifyEmailPage
-    onVerified={() => { isVerifyPage = false }}
-    onLeave={() => { isVerifyPage = false }}
+    onVerified={syncFromLocation}
+    onLeave={syncFromLocation}
   />
-{:else if !authState.currentUser}
+{:else if gate === 'login' || !authState.currentUser}
   <LoginPage onSuccess={handleLoginSuccess} />
-{:else if authState.currentUser.must_change_password}
+{:else if gate === 'mustChangePassword'}
   <ChangePasswordForm
     message={t('password.mustChange')}
     showLogout={true}
   />
-{:else if show2FAEnforcement}
+{:else if gate === 'enforce2FA'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -276,12 +288,12 @@
       </div>
     </div>
   </main>
-{:else if authState.recoveryKeyToShow && !isAdmin}
+{:else if gate === 'recoveryKey' && authState.recoveryKeyToShow}
   <RecoveryKeyScreen
     recoveryKey={authState.recoveryKeyToShow}
     onconfirmed={handleRecoveryKeyDismiss}
   />
-{:else if vaultState.versionAhead && !isAdmin}
+{:else if gate === 'vaultAhead'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -298,7 +310,7 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultNeedsSetup && !isAdmin}
+{:else if gate === 'vaultSetup'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -315,7 +327,7 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultDecryptFailed && !isAdmin}
+{:else if gate === 'vaultDecryptFailed'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -348,7 +360,7 @@
       </div>
     </div>
   </main>
-{:else if (authState.vaultLocked || !vaultState.unlocked) && !isAdmin}
+{:else if gate === 'vaultLocked'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -412,9 +424,11 @@
       </div>
     </div>
 
-    {#if showSecurity}
+    {#if route.screen === 'security'}
       <SecuritySettings onDone={navigateBack} />
-    {:else if showUsers}
+    {:else if route.screen === 'users' && isAdmin}
+      <!-- Guarded, because an address can be typed. The button that leads here
+           only shows for an admin, but the path is now reachable without it. -->
       <InvitePanel onDone={navigateBack} />
     {:else if error}
       <p class="error">{error}</p>
