@@ -339,6 +339,7 @@ export const de: Messages = {
   'accounts.tabAllocations': 'Zuordnungen',
   'alloc.noEntries': 'Noch keine Budgeteinträge. Legen Sie sie im Budget-Modul an, dann erscheinen sie hier und können zugeordnet werden.',
   'alloc.affordableNow': 'Jetzt bezahlbar',
+  'alloc.underCycleRate': 'Monatlich weniger budgetiert, als dieser Zyklus braucht — das Datum rückt weiter.',
   'alloc.noMonthlyAmount': 'Kein Monatsbetrag geplant — budgetieren Sie etwas dafür, um ein Datum zu erhalten',
   'reserve.targetAmount': 'Zielbetrag',
   'password.current': 'Aktuelles Passwort',

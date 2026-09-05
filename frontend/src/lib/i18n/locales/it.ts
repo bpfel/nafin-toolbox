@@ -332,6 +332,7 @@ export const it: Messages = {
   'accounts.tabAllocations': 'Assegnazioni',
   'alloc.noEntries': 'Nessuna voce di budget per ora. Creale nel modulo Budget e appariranno qui, pronte per essere assegnate.',
   'alloc.affordableNow': 'Sostenibile ora',
+  'alloc.underCycleRate': 'Importo mensile inferiore a quanto richiede il ciclo: la data si allontana.',
   'alloc.noMonthlyAmount': 'Nessun importo mensile previsto — destinane uno a questa voce per ottenere una data',
   'reserve.targetAmount': 'Importo obiettivo',
   'password.current': 'Password attuale',

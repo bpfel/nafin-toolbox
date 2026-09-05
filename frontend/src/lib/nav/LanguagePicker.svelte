@@ -118,7 +118,11 @@
     right: 0;
     top: calc(100% + 0.4rem);
     z-index: 91;
-    min-width: 12rem;
+    /* Wide enough for the longest row the catalogue can produce: an endonym
+       beside the provisional badge, which in German reads "teilweise übersetzt".
+       At 12rem that badge wrapped to two lines and the panel looked broken. */
+    min-width: 15rem;
+    max-width: min(22rem, calc(100vw - 1.5rem));
     list-style: none;
     margin: 0;
     background: white;
@@ -153,8 +157,10 @@
     flex: none;
     color: #2d6a4f;
   }
-  .name { flex: 1; }
+  .name { flex: 1; white-space: nowrap; }
   .provisional {
+    /* Never split. It is a label, and a label on two lines reads as an error. */
+    white-space: nowrap;
     font-size: 0.7rem;
     color: #b26a00;
     background: #fdf3e0;

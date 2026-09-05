@@ -362,6 +362,7 @@ export const en = {
   'accounts.tabAllocations': 'Allocations',
   'alloc.noEntries': 'No budget entries yet. Add them in the Budget module and they will appear here, ready to route.',
   'alloc.affordableNow': 'Affordable now',
+  'alloc.underCycleRate': 'Budgeted less each month than this cycle needs, so the date keeps moving.',
   'alloc.noMonthlyAmount': 'No monthly amount planned — budget something towards this to get a date',
   'reserve.targetAmount': 'Target amount',
   'password.current': 'Current Password',

@@ -205,13 +205,25 @@ describe('AllocationScreen', () => {
     expect(laptop.reserve).toBeDefined()
   })
 
-  test('an under-funded amortization moves its date instead of warning', () => {
+  test('an under-funded purchase moves its date instead of warning', () => {
     // Nothing accumulated yet, 1200 to find at the 100/month planned.
     testVault!.accounts[1].currentAmount = '0.00'
     render(AllocationScreen)
 
     expect(screen.getByText(/affordable from/i)).toBeTruthy()
     expect(screen.queryByText(/short of what is planned/)).toBeNull()
+  })
+
+  test('a purchase budgeted below its own cycle rate says so', () => {
+    // 1200 over 60 months needs 20 a month. At 10 the requirement climbs faster
+    // than the money does and the date recedes for ever — which reads as a
+    // baffling result unless something says why.
+    const laptop = testVault!.budget.plan.find(p => p.entryId === 'laptop')!
+    laptop.plannedAmount = '10.00'
+
+    render(AllocationScreen)
+
+    expect(screen.getByText(/date keeps moving/i)).toBeTruthy()
   })
 
   describe('grouping', () => {

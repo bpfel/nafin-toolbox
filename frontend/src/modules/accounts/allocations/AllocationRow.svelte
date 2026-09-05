@@ -175,18 +175,39 @@
       ? plannedCents
       : Math.round(targetCents / reserve.periodMonths)
 
-    // The nominal accumulation, reduced by whatever the sink account is short.
-    // A shortfall belongs to the account, so it is not attributed to any single
-    // item — it simply pushes every date on that account further out.
-    const shortfall = Math.min(0, cents(sinkAvailable))
-    const accumulated = Math.max(0, cents(requiredNow) + shortfall)
+    // What is aside for this item: the schedule's own figure.
+    //
+    // It used to be reduced by whatever the *sink account* was short, on the
+    // reasoning that a shortfall pushes every date on that account further out.
+    // It cannot: an account short by 875 tells each of its items it is short by
+    // 875, and with two items that is 1750 of missing money that does not
+    // exist. Worse, the effect was invisible — the date simply moved years out
+    // with nothing on screen to say why, since the account's shortfall is not
+    // shown on this screen at all.
+    //
+    // A shortfall belongs to the account and is the account's to report.
+    const accumulated = cents(requiredNow)
     const remaining = targetCents - accumulated
 
-    if (remaining <= 0) return { rateCents, affordableFrom: null, monthsAway: 0 }
-    if (rateCents <= 0) return { rateCents: 0, affordableFrom: null, monthsAway: null }
+    if (remaining <= 0) {
+      return { rateCents, underfunded: false, affordableFrom: null, monthsAway: 0 }
+    }
+    if (rateCents <= 0) {
+      return { rateCents: 0, underfunded: false, affordableFrom: null, monthsAway: null }
+    }
+
+    // What the cycle asks for each month, against what is actually budgeted.
+    // Below it, the schedule can never be met: the requirement climbs faster
+    // than the money does, and the item recedes a little further every month.
+    const cycleRateCents = Math.round(targetCents / reserve.periodMonths)
 
     const monthsAway = Math.ceil(remaining / rateCents)
-    return { rateCents, affordableFrom: addMonths(currentMonth, monthsAway), monthsAway }
+    return {
+      rateCents,
+      underfunded: rateCents < cycleRateCents,
+      affordableFrom: addMonths(currentMonth, monthsAway),
+      monthsAway,
+    }
   })
 
   // The row has two halves: what this line *is* (name, kind, amount, flow) and
@@ -236,6 +257,9 @@
                     away: tn('time.monthsToGo', obligation.monthsAway),
                   })}
             </span>
+          {/if}
+          {#if amortization?.underfunded}
+            <span class="timing warn">{t('alloc.underCycleRate')}</span>
           {/if}
           {#if amortization}
             <span class="timing">
@@ -394,6 +418,11 @@
   }
   .timing {
     color: #1f5c99;
+  }
+  /* Not a failure — the item is optional and buying it later is a valid answer
+     — but the date will never stop receding until the amount changes. */
+  .timing.warn {
+    color: #b3641a;
   }
   .editor {
     display: flex;

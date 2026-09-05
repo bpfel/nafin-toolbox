@@ -332,6 +332,7 @@ export const fr: Messages = {
   'accounts.tabAllocations': 'Affectations',
   'alloc.noEntries': 'Aucune entrée de budget pour l’instant. Créez-les dans le module Budget et elles apparaîtront ici, prêtes à être affectées.',
   'alloc.affordableNow': 'Abordable maintenant',
+  'alloc.underCycleRate': 'Montant mensuel inférieur à ce que ce cycle exige ; la date recule.',
   'alloc.noMonthlyAmount': 'Aucun montant mensuel prévu — budgétez quelque chose pour obtenir une date',
   'reserve.targetAmount': 'Montant cible',
   'password.current': 'Mot de passe actuel',
