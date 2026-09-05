@@ -25,22 +25,36 @@
 
   let { summary, viewMode = 'monthly' }: Props = $props()
 
+  /**
+   * Three things the money does, and what is left over having done them.
+   *
+   * Unallocated is income minus all three, so at zero every franc has a job.
+   * It is the only one whose sign matters, hence the only one coloured by its
+   * value rather than by what it is.
+   */
   let figures = $derived([
     { key: 'income', label: t('budget.income'), amount: summary.totalPlannedIncome },
     { key: 'expense', label: t('budget.expenses'), amount: summary.totalPlannedExpenses },
     { key: 'savings', label: t('budget.savings'), amount: summary.totalPlannedSavings },
+    {
+      key: 'unallocated',
+      label: t('budget.unallocated'),
+      amount: summary.plannedBalance,
+      signed: true,
+    },
   ])
 </script>
 
 <div class="summary-bar" class:view-yearly={viewMode === 'yearly'}>
   <div class="summary-grid">
     {#each figures as figure (figure.key)}
+      {@const short = figure.signed && Number(figure.amount) < 0}
       <div class="summary-item">
         <span class="label">{figure.label}</span>
-        <span class="value monthly {figure.key}">
+        <span class="value monthly {figure.key}" class:short>
           <Money value={figure.amount} />
         </span>
-        <span class="value yearly {figure.key}">
+        <span class="value yearly {figure.key}" class:short>
           <Money value={Number(figure.amount) * 12} />
           <span class="per">{t('budget.perYear')}</span>
         </span>
@@ -57,11 +71,11 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
-  /* One row of three figures. With the actual column gone there is only one
+  /* One row of four figures. With the actual column gone there is only one
      reading of the budget, so the planned/actual two-column split went with it. */
   .summary-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.5rem;
   }
 
@@ -101,6 +115,9 @@
   .income { color: #2d6a4f; }
   .expense { color: #c0392b; }
   .savings { color: #1d4e89; }
+  .unallocated { color: #2d6a4f; }
+  /* Overspent. Last, so it wins over the colour the figure carries by name. */
+  .unallocated.short { color: #c0392b; }
 
   @media (max-width: 767px) {
     .summary-bar {
@@ -108,6 +125,7 @@
     }
 
     .summary-grid {
+      grid-template-columns: 1fr 1fr;
       gap: 0.75rem 1rem;
     }
 
