@@ -255,7 +255,7 @@
           aria-label={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
           title={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
           onclick={() => (guideType = type)}
-        >?</button>
+        ><span class="info-glyph" aria-hidden="true">i</span></button>
       </th>
         <th class="right col-amount col-planned-mo">{t('budget.plannedMo')}</th>
         <th class="right col-amount col-planned-yr">{t('budget.plannedYr')}</th>
@@ -385,25 +385,60 @@
   .section-name {
     vertical-align: middle;
   }
-  /* A question mark rather than an icon: it is the shape people already read as
-     "explain this", and it costs no glyph that has to survive four languages. */
+  /*
+   * The mark is small; the target is not. The button keeps its full size and
+   * carries no border of its own — what you see is the glyph inside it, at
+   * about half the diameter, while the region that answers a thumb stays as
+   * big as it ever was.
+   *
+   * `background: none` is repeated on :hover deliberately. app.css styles every
+   * button green and darker green on hover, and `button:hover` outranks a plain
+   * class for the background property — without this the mark filled with dark
+   * green when pointed at.
+   */
   .section-info {
-    margin-left: 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.35rem;
     width: 1.25rem;
     height: 1.25rem;
     padding: 0;
-    border-radius: 50%;
-    border: 1px solid #c8ccd0;
+    border: none;
     background: none;
-    color: #777;
-    font-size: 0.75rem;
-    line-height: 1;
+    color: #999;
     cursor: pointer;
     vertical-align: middle;
   }
   .section-info:hover {
-    border-color: #2d6a4f;
+    background: none;
     color: #2d6a4f;
+  }
+  /* Its own rule, not grouped with :hover — a :focus-visible block that sets
+     only colours is how a focus ring goes missing, which is what the guard in
+     HoverControls.test.ts is watching for. */
+  .section-info:focus-visible {
+    background: none;
+    color: #2d6a4f;
+    outline: 2px solid #2d6a4f;
+    outline-offset: 1px;
+    border-radius: 50%;
+  }
+
+  .info-glyph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    font-size: 0.5rem;
+    font-weight: 700;
+    font-style: normal;
+    line-height: 1;
+    /* The 'i' sits left of centre in most faces; a hair of padding evens it. */
+    padding-left: 0.03em;
   }
 
   .budget-table {
