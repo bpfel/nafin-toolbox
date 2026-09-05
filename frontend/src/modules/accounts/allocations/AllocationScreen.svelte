@@ -2,11 +2,12 @@
   import { t } from '../../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/budget/budgetEngine'
-  import type {
-    ReserveDefinition,
-    VaultEntry,
-    VaultCategory,
-    VaultData,
+  import {
+    sideOf,
+    type ReserveDefinition,
+    type VaultEntry,
+    type VaultCategory,
+    type VaultData,
   } from '../../../lib/crypto/vault'
   import { isLegalEntryRouting, isLegalRouting } from '../../../lib/accounts/routing'
   import {
@@ -114,8 +115,8 @@
     }))
   })
 
-  let incomeRows = $derived(rows.filter(r => r.entry.type === 'income'))
-  let expenseRows = $derived(rows.filter(r => r.entry.type === 'expense'))
+  let incomeRows = $derived(rows.filter(r => sideOf(r.entry.type) === 'income'))
+  let expenseRows = $derived(rows.filter(r => sideOf(r.entry.type) === 'expense'))
 
   // --- Grouping ----------------------------------------------------------
   // Same shape as the budget table: rows are grouped by their budget category and
@@ -211,7 +212,7 @@
     let best: { month: string; monthsAway: number } | null = null
     for (const entry of vault.budget.entries) {
       if (entry.archived) continue
-      if (entry.reserve?.kind !== 'obligation') continue
+      if (entry.type !== 'bill' || !entry.reserve) continue
       if (entry.sinkAccountId !== accountId) continue
       try {
         const due = nextDue(entry.reserve.anchorMonth, entry.reserve.periodMonths, currentMonth)

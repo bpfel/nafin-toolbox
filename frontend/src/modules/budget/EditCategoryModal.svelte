@@ -16,28 +16,28 @@
 
   // Seeded once: the dialog is created fresh each time it opens.
   let name = $state(untrack(() => category.name))
-  let type = $state<'income' | 'expense'>(untrack(() => category.type))
+  let side = $state<'income' | 'expense'>(untrack(() => category.side))
   let error = $state<string | null>(null)
 
   let trimmed = $derived(name.trim())
   let members = $derived(engine.entriesInCategory(vault, category.id))
-  let movingSides = $derived(type !== category.type)
+  let movingSides = $derived(side !== category.side)
 
   // A reserve is an expense idea — it says money is being set aside towards a
   // target. updateEntry drops it on the way to income, so say so first.
   let reservesLost = $derived(
-    movingSides && type === 'income' ? members.filter(c => c.reserve).length : 0,
+    movingSides && side === 'income' ? members.filter(c => c.reserve).length : 0,
   )
 
   let conflict = $derived(
-    trimmed === '' ? null : engine.findCategoryConflict(vault, category.id, trimmed, type),
+    trimmed === '' ? null : engine.findCategoryConflict(vault, category.id, trimmed, side),
   )
 
   let changed = $derived(trimmed !== category.name || movingSides)
 
   // Whole sentences with a slot, split only for rendering — see tAround.
   let conflictParts = $derived(
-    tAround(type === 'income' ? 'category.conflictIncome' : 'category.conflictExpense', 'name'),
+    tAround(side === 'income' ? 'category.conflictIncome' : 'category.conflictExpense', 'name'),
   )
   let mergeParts = $derived(
     tAround(
@@ -50,7 +50,7 @@
   function save() {
     error = null
     try {
-      engine.updateCategory(vault, category.id, { name: trimmed, type })
+      engine.updateCategory(vault, category.id, { name: trimmed, side })
       onsaved()
       onclose()
     } catch (e) {
@@ -87,7 +87,7 @@
 
     <label class="field">
       <span class="label">{t('category.type')}</span>
-      <select bind:value={type}>
+      <select bind:value={side}>
         <option value="income">{t('budget.income')}</option>
         <option value="expense">{t('budget.expenses')}</option>
       </select>
@@ -97,7 +97,7 @@
       <div class="notice">
         <p>
           {tn('category.movingSides', members.length, {
-            type: type === 'income' ? t('category.typeIncome') : t('category.typeExpense'),
+            type: side === 'income' ? t('category.typeIncome') : t('category.typeExpense'),
           })}
           {#if reservesLost > 0}
             {tn('category.reservesLost', reservesLost)}

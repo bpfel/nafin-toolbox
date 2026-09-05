@@ -14,6 +14,14 @@
   // entry changes underneath it.
 
   interface Props {
+    /**
+     * Which schedule this reserve is on. Chosen when the entry is created, not
+     * here — until v7 this panel asked, with a select offering "nothing in
+     * particular", "an obligation" and "an amortization", which meant the same
+     * fact was recorded in two places and a bill could only be set up by
+     * creating an expense and then converting it.
+     */
+    type: 'bill' | 'purchase'
     reserve: ReserveDefinition | undefined
     currentMonth: string
     /** What the budget already plans monthly for this entry. Used to propose a target. */
@@ -21,11 +29,9 @@
     onchange: (reserve: ReserveDefinition | undefined) => void
   }
 
-  let { reserve, currentMonth, plannedAmount, onchange }: Props = $props()
+  let { type, reserve, currentMonth, plannedAmount, onchange }: Props = $props()
 
   let error = $state<string | null>(null)
-
-  let selectedKind = $derived(reserve?.kind ?? 'none')
 
   // True while the target is still exactly what we proposed from the budgeted
   // amount, so the label can say so and the user knows it is a starting point.
@@ -52,7 +58,6 @@
   function base(): ReserveDefinition {
     return (
       reserve ?? {
-        kind: 'obligation',
         targetAmount: proposedTarget(DEFAULT_PERIOD_MONTHS),
         periodMonths: DEFAULT_PERIOD_MONTHS,
         anchorMonth: currentMonth,
@@ -63,16 +68,6 @@
   function update(patch: Partial<ReserveDefinition>) {
     error = null
     onchange({ ...base(), ...patch })
-  }
-
-  function chooseKind(value: string) {
-    if (value === 'none') {
-      error = null
-      onchange(undefined)
-      return
-    }
-    if (value !== 'obligation' && value !== 'amortization') return
-    update({ kind: value })
   }
 
   // Money arrives from a human: apostrophe thousands separators and a comma
@@ -127,18 +122,18 @@
     'July', 'August', 'September', 'October', 'November', 'December',
   ]
 
-  // For an obligation the anchor picks a residue class: the series is every
+  // For a bill the anchor picks a residue class: the series is every
   // `periodMonths` from it, extending in both directions. So shifting the anchor
   // by a whole year changes nothing whenever the period divides 12 — which every
   // real billing cycle does (monthly, quarterly, half-yearly, yearly). In that
   // case the year is noise and we ask only for the month.
   //
-  // It is NOT noise otherwise. An amortization's anchor is a real point in time
-  // (the month the item was bought), and an obligation on an odd period such as
-  // 5 months has a series that genuinely depends on the year. Both keep the full
+  // It is NOT noise otherwise. A purchase's anchor is a real point in time (the
+  // month the item was bought), and a bill on an odd period such as 5 months has
+  // a series that genuinely depends on the year. Both keep the full
   // month-and-year input.
   let monthOnly = $derived(
-    selectedKind === 'obligation' && reserve != null && 12 % reserve.periodMonths === 0,
+    type === 'bill' && reserve != null && 12 % reserve.periodMonths === 0,
   )
 
   let anchorMonthNumber = $derived(reserve ? reserve.anchorMonth.slice(5, 7) : '01')
@@ -150,20 +145,11 @@
   }
 
   let anchorLabel = $derived(
-    selectedKind === 'obligation' ? t('reserve.dueNextMonth') : t('reserve.cycleStarted'),
+    type === 'bill' ? t('reserve.dueNextMonth') : t('reserve.cycleStarted'),
   )
 </script>
 
 <div class="reserve-fields">
-  <label class="control">
-    <span class="control-label">{t('reserve.savingTowards')}</span>
-    <select value={selectedKind} onchange={(e) => chooseKind(e.currentTarget.value)}>
-      <option value="none">{t('reserve.nothingInParticular')}</option>
-      <option value="obligation">{t('reserve.obligation')}</option>
-      <option value="amortization">{t('reserve.amortization')}</option>
-    </select>
-  </label>
-
   {#if reserve}
     <div class="grid">
       <label class="control">

@@ -1,4 +1,4 @@
-import type { VaultAccount, VaultEntry, VaultData } from '../crypto/vault'
+import { savesTowardsTarget, type VaultAccount, type VaultEntry, type VaultData } from '../crypto/vault'
 import { flowKindOf } from './routing'
 import { fromCents, monthsBetween, requiredForItem, toCents } from './reserveMath'
 
@@ -34,8 +34,9 @@ export function requiredForAccount(
   for (const entry of vault.budget.entries) {
     if (entry.archived) continue
     if (!entry.reserve) continue
+    if (!savesTowardsTarget(entry.type)) continue
     if (entry.sinkAccountId !== accountId) continue
-    cents += toCents(requiredForItem(entry.reserve, currentMonth))
+    cents += toCents(requiredForItem(entry.type, entry.reserve, currentMonth))
   }
   return fromCents(cents)
 }

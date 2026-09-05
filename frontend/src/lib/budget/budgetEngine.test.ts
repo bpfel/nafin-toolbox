@@ -36,9 +36,9 @@ describe('listCategories', () => {
   test('returns categories sorted by sortOrder', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '3', name: 'Third', type: 'expense', sortOrder: 30 },
-      { id: '1', name: 'First', type: 'income', sortOrder: 10 },
-      { id: '2', name: 'Second', type: 'expense', sortOrder: 20 },
+      { id: '3', name: 'Third', side: 'expense', sortOrder: 30 },
+      { id: '1', name: 'First', side: 'income', sortOrder: 10 },
+      { id: '2', name: 'Second', side: 'expense', sortOrder: 20 },
     ]
 
     const categories = listCategories(vault)
@@ -52,8 +52,8 @@ describe('listCategories', () => {
   test('handles categories with same sortOrder', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'A', type: 'income', sortOrder: 10 },
-      { id: '2', name: 'B', type: 'expense', sortOrder: 10 },
+      { id: '1', name: 'A', side: 'income', sortOrder: 10 },
+      { id: '2', name: 'B', side: 'expense', sortOrder: 10 },
     ]
 
     const categories = listCategories(vault)
@@ -64,8 +64,8 @@ describe('listCategories', () => {
   test('does not mutate original array', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '2', name: 'Second', type: 'expense', sortOrder: 20 },
-      { id: '1', name: 'First', type: 'income', sortOrder: 10 },
+      { id: '2', name: 'Second', side: 'expense', sortOrder: 20 },
+      { id: '1', name: 'First', side: 'income', sortOrder: 10 },
     ]
 
     const originalOrder = [...vault.budget.categories]
@@ -77,9 +77,9 @@ describe('listCategories', () => {
   test('handles negative sortOrder values', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'Negative', type: 'income', sortOrder: -10 },
-      { id: '2', name: 'Zero', type: 'expense', sortOrder: 0 },
-      { id: '3', name: 'Positive', type: 'expense', sortOrder: 10 },
+      { id: '1', name: 'Negative', side: 'income', sortOrder: -10 },
+      { id: '2', name: 'Zero', side: 'expense', sortOrder: 0 },
+      { id: '3', name: 'Positive', side: 'expense', sortOrder: 10 },
     ]
 
     const categories = listCategories(vault)
@@ -96,7 +96,7 @@ describe('createCategory', () => {
     const category = createCategory(vault, 'Employment', 'income')
 
     expect(category.name).toBe('Employment')
-    expect(category.type).toBe('income')
+    expect(category.side).toBe('income')
     expect(category.sortOrder).toBe(10)
     expect(category.id).toBeTruthy()
     expect(vault.budget.categories).toContain(category)
@@ -107,7 +107,7 @@ describe('createCategory', () => {
     const category = createCategory(vault, 'Housing', 'expense')
 
     expect(category.name).toBe('Housing')
-    expect(category.type).toBe('expense')
+    expect(category.side).toBe('expense')
     expect(category.sortOrder).toBe(10)
   })
 
@@ -163,8 +163,8 @@ describe('createCategory', () => {
   test('calculates sortOrder from max of existing categories', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'First', type: 'income', sortOrder: 5 },
-      { id: '2', name: 'Second', type: 'expense', sortOrder: 100 },
+      { id: '1', name: 'First', side: 'income', sortOrder: 5 },
+      { id: '2', name: 'Second', side: 'expense', sortOrder: 100 },
     ]
 
     const category = createCategory(vault, 'Third', 'income')
@@ -175,7 +175,7 @@ describe('createCategory', () => {
   test('handles zero sortOrder in existing categories', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'Zero', type: 'income', sortOrder: 0 },
+      { id: '1', name: 'Zero', side: 'income', sortOrder: 0 },
     ]
 
     const category = createCategory(vault, 'Next', 'income')
@@ -186,7 +186,7 @@ describe('createCategory', () => {
   test('handles negative sortOrder in existing categories', () => {
     const vault = createEmptyVault()
     vault.budget.categories = [
-      { id: '1', name: 'Negative', type: 'income', sortOrder: -50 },
+      { id: '1', name: 'Negative', side: 'income', sortOrder: -50 },
     ]
 
     const category = createCategory(vault, 'Next', 'income')
@@ -212,7 +212,7 @@ describe('getOrCreateCategory', () => {
     const result = getOrCreateCategory(vault, 'Employment', 'income')
 
     expect(result.name).toBe('Employment')
-    expect(result.type).toBe('income')
+    expect(result.side).toBe('income')
     expect(vault.budget.categories).toHaveLength(1)
   })
 
@@ -223,7 +223,7 @@ describe('getOrCreateCategory', () => {
     const result = getOrCreateCategory(vault, 'Transfer', 'expense')
 
     expect(vault.budget.categories).toHaveLength(2)
-    expect(result.type).toBe('expense')
+    expect(result.side).toBe('expense')
   })
 
   test('matches by exact name', () => {
@@ -432,7 +432,6 @@ describe('updateEntry — routing stays legal across a type change', () => {
     const entry = createEntry(vault, { name: 'Taxes', type: 'expense', categoryName: 'Tax' })
     entry.sinkAccountId = primary
     entry.reserve = {
-      kind: 'obligation',
       targetAmount: '10000.00',
       periodMonths: 12,
       anchorMonth: '2026-09',
@@ -1339,9 +1338,9 @@ describe('updateCategory', () => {
   test('changing the type carries the entries across', () => {
     const { vault, housing } = vaultWithCategories()
 
-    updateCategory(vault, housing.id, { type: 'income' })
+    updateCategory(vault, housing.id, { side: 'income' })
 
-    expect(housing.type).toBe('income')
+    expect(housing.side).toBe('income')
     // getPlanSummary reads each entry's own type, so leaving them behind
     // would count this category on the wrong side of the budget.
     expect(entriesInCategory(vault, housing.id).every(c => c.type === 'income')).toBe(true)
@@ -1350,7 +1349,7 @@ describe('updateCategory', () => {
   test('entries arrive on the other side legally routed', () => {
     const { vault, housing } = vaultWithCategories()
 
-    updateCategory(vault, housing.id, { type: 'income' })
+    updateCategory(vault, housing.id, { side: 'income' })
 
     for (const cat of entriesInCategory(vault, housing.id)) {
       expect(isLegalEntryRouting(cat)).toBe(true)
@@ -1360,9 +1359,10 @@ describe('updateCategory', () => {
   test('a reserve does not survive the move to income', () => {
     const { vault, housing } = vaultWithCategories()
     const rent = entriesInCategory(vault, housing.id)[0]
-    rent.reserve = { kind: 'obligation', targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-01' }
+    rent.type = 'bill'
+    rent.reserve = { targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-01' }
 
-    updateCategory(vault, housing.id, { type: 'income' })
+    updateCategory(vault, housing.id, { side: 'income' })
 
     // Setting money aside towards a target is something only an expense does.
     expect(rent.reserve).toBeUndefined()
@@ -1371,10 +1371,10 @@ describe('updateCategory', () => {
   test('renaming and switching type at once still checks the new side', () => {
     const { vault, housing } = vaultWithCategories()
 
-    expect(() => updateCategory(vault, housing.id, { name: 'Employment', type: 'income' })).toThrow(
+    expect(() => updateCategory(vault, housing.id, { name: 'Employment', side: 'income' })).toThrow(
       /already exists/,
     )
-    expect(housing.type).toBe('expense')
+    expect(housing.side).toBe('expense')
     expect(entriesInCategory(vault, housing.id).every(c => c.type === 'expense')).toBe(true)
   })
 

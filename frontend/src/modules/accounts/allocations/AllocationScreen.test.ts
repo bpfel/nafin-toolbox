@@ -39,7 +39,7 @@ function entry(overrides: Partial<VaultEntry> & { id: string; name: string }): V
 
 function makeVault(): VaultData {
   return {
-    version: 6,
+    version: 7,
     accounts: [
       {
         id: 'main',
@@ -62,7 +62,7 @@ function makeVault(): VaultData {
       },
     ],
     budget: {
-      categories: [{ id: 'g1', name: 'Everything', type: 'expense', sortOrder: 0 }],
+      categories: [{ id: 'g1', name: 'Everything', side: 'expense', sortOrder: 0 }],
       entries: [
         entry({
           id: 'salary',
@@ -76,10 +76,10 @@ function makeVault(): VaultData {
         entry({
           id: 'laptop',
           name: 'Laptop',
+          type: 'purchase',
           sortOrder: 2,
           sinkAccountId: 'reserves',
           reserve: {
-            kind: 'amortization',
             targetAmount: '1200.00',
             periodMonths: 60,
             anchorMonth: CURRENT_MONTH,
@@ -102,8 +102,8 @@ function makeVault(): VaultData {
 function groupedVault(): VaultData {
   const vault = makeVault()
   vault.budget.categories = [
-    { id: 'g-housing', name: 'Housing', type: 'expense', sortOrder: 20 },
-    { id: 'g-fun', name: 'Fun', type: 'expense', sortOrder: 10 },
+    { id: 'g-housing', name: 'Housing', side: 'expense', sortOrder: 20 },
+    { id: 'g-fun', name: 'Fun', side: 'expense', sortOrder: 10 },
   ]
   vault.budget.entries = [
     entry({ id: 'rent', name: 'Rent', categoryId: 'g-housing', sortOrder: 0 }),
@@ -154,36 +154,37 @@ describe('AllocationScreen', () => {
     expect(screen.queryByText('Leaves my accounts')).toBeNull()
   })
 
-  test('set-aside is the gate that reveals the reserve fields', async () => {
+  // Until v7 this was the gate: routing an expense into an account was what
+  // made a reserve possible, and a select inside the panel then asked which of
+  // two schedules it was on. The type answers both, so the gate is the type and
+  // the select is gone.
+  test('the target fields belong to the two types that have a target', async () => {
     render(AllocationScreen)
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
-    await fireEvent.click(editButtons[1]) // Rent, routed as spending
 
-    // Spending has nowhere to accumulate, so there is nothing to define.
+    await fireEvent.click(editButtons[1]) // Rent, an expense
     expect(screen.getByLabelText('Paid from')).toBeTruthy()
-    expect(screen.queryByLabelText('Saving towards')).toBeNull()
+    expect(screen.queryByLabelText('Target amount')).toBeNull()
 
-    await fireEvent.click(screen.getByLabelText('Set aside into'))
-
-    // Routing the expense into an account is what makes a reserve possible.
-    expect(screen.getByLabelText('Saving towards')).toBeTruthy()
-    // …and the sink is a real account, never null.
-    expect(testVault!.budget.entries.find(c => c.id === 'rent')!.sinkAccountId).toBe('main')
+    await fireEvent.click(editButtons[2]) // Laptop, a purchase
+    expect(screen.getByLabelText('Target amount')).toBeTruthy()
   })
 
-  test('routing a set-aside back to spending takes its reserve with it', async () => {
+  test('a purchase cannot be routed out of the accounts it saves into', async () => {
+    // The reserve used to be destroyed by this, because routing was what made an
+    // entry a set-aside. Now the type says so, and the routing that contradicts
+    // it is refused instead — the target survives, and nothing is lost silently.
     render(AllocationScreen)
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
-    await fireEvent.click(editButtons[2]) // Laptop, a set-aside with an amortization
-    expect(screen.getByLabelText('Saving towards')).toBeTruthy()
+    await fireEvent.click(editButtons[2]) // Laptop, a purchase
 
     await fireEvent.click(screen.getByLabelText('Leaves my accounts'))
 
-    // A reserve has to accumulate somewhere, so a null sink cannot keep one.
-    expect(screen.queryByLabelText('Saving towards')).toBeNull()
-    expect(testVault!.budget.entries.find(c => c.id === 'laptop')!.reserve).toBeUndefined()
+    const laptop = testVault!.budget.entries.find(c => c.id === 'laptop')!
+    expect(laptop.sinkAccountId).toBe('reserves')
+    expect(laptop.reserve).toBeDefined()
   })
 
   test('an under-funded amortization moves its date instead of warning', () => {
@@ -249,8 +250,8 @@ describe('AllocationScreen', () => {
       // all — a lone category is not a grouping. One would leave nothing to
       // observe about income's ordering.
       testVault!.budget.categories.push(
-        { id: 'g-pay', name: 'Pay', type: 'income', sortOrder: 5 },
-        { id: 'g-side', name: 'Side work', type: 'income', sortOrder: 6 },
+        { id: 'g-pay', name: 'Pay', side: 'income', sortOrder: 5 },
+        { id: 'g-side', name: 'Side work', side: 'income', sortOrder: 6 },
       )
       testVault!.budget.entries.push(
         entry({

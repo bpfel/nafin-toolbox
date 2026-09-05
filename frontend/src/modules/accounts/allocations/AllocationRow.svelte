@@ -1,6 +1,13 @@
 <script lang="ts">
   import { t, tn } from '../../../lib/i18n/index.svelte'
-  import type { ReserveDefinition, VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
+  import {
+    holdsMoney,
+    savesTowardsTarget,
+    sideOf,
+    type ReserveDefinition,
+    type VaultAccount,
+    type VaultEntry,
+  } from '../../../lib/crypto/vault'
   import { flowKindOf } from '../../../lib/accounts/routing'
   import { accountShortLabel } from '../../../lib/accounts/labels'
   import {
@@ -92,7 +99,7 @@
     }
   })
 
-  let isSetAside = $derived(entry.type === 'expense' && entry.sinkAccountId !== null)
+  let isSetAside = $derived(holdsMoney(entry.type))
 
   // A set-aside with no reserve behind it is plain savings — money kept for
   // nothing in particular. Worth naming differently from a targeted set-aside,
@@ -134,17 +141,18 @@
   let requiredNow = $derived.by(() => {
     if (!reserve) return null
     try {
-      return requiredForItem(reserve, currentMonth)
+      if (!savesTowardsTarget(entry.type)) return null
+      return requiredForItem(entry.type, reserve, currentMonth)
     } catch {
       return null
     }
   })
 
-  // --- Obligation: money is the variable ---------------------------------
+  // --- Bill: money is the variable ---------------------------------------
   // The anchor is a recurring due month, so the requirement peaks at the full
   // target in that month. What matters is how long is left to find the money.
   let obligation = $derived.by(() => {
-    if (reserve?.kind !== 'obligation') return null
+    if (!reserve || entry.type !== 'bill') return null
     try {
       const due = nextDue(reserve.anchorMonth, reserve.periodMonths, currentMonth)
       return { due, monthsAway: monthsBetween(currentMonth, due) }
@@ -153,11 +161,11 @@
     }
   })
 
-  // --- Amortization: time is the variable --------------------------------
+  // --- Purchase: time is the variable ------------------------------------
   // Never a warning. If the account is short, the date moves out instead — the
   // item is optional, so buying later or cheaper is the answer.
   let amortization = $derived.by(() => {
-    if (reserve?.kind !== 'amortization' || requiredNow === null) return null
+    if (!reserve || entry.type !== 'purchase' || requiredNow === null) return null
 
     const targetCents = cents(reserve.targetAmount)
     const plannedCents = cents(plannedAmount)
@@ -252,15 +260,21 @@
         <div class="editor">
           <RoutingControls
             fieldId={entry.id}
-            type={entry.type}
+            type={sideOf(entry.type)}
             sourceAccountId={entry.sourceAccountId}
             sinkAccountId={entry.sinkAccountId}
             {accounts}
             onchange={onroutingchange}
           />
 
-          {#if isSetAside}
-            <ReserveFields {reserve} {currentMonth} {plannedAmount} onchange={onreservechange} />
+          {#if savesTowardsTarget(entry.type)}
+            <ReserveFields
+              type={entry.type}
+              {reserve}
+              {currentMonth}
+              {plannedAmount}
+              onchange={onreservechange}
+            />
           {/if}
         </div>
       {/if}

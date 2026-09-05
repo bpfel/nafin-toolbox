@@ -132,9 +132,9 @@ describe('single-category budgets hide the category name', () => {
   // "Employment / Salary" is noise when Employment is the only category there is.
   // Rendered for real: the rule lives in the table's markup, so asserting it
   // anywhere else would only be restating the implementation.
-  function vaultWith(categories: { id: string; name: string; type: 'income' | 'expense' }[]): VaultData {
+  function vaultWith(categories: { id: string; name: string; side: 'income' | 'expense' }[]): VaultData {
     return {
-      version: 6,
+      version: 7,
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',
@@ -161,8 +161,8 @@ describe('single-category budgets hide the category name', () => {
 
   test('one category on a side renders no header for it', () => {
     const vault = vaultWith([
-      { id: 'g1', name: 'Employment', type: 'income' },
-      { id: 'g2', name: 'Housing', type: 'expense' },
+      { id: 'g1', name: 'Employment', side: 'income' },
+      { id: 'g2', name: 'Housing', side: 'expense' },
     ])
     render(BudgetTable, {
       props: {
@@ -187,9 +187,9 @@ describe('single-category budgets hide the category name', () => {
 
   test('a second category on a side brings both its headers back', () => {
     const vault = vaultWith([
-      { id: 'g1', name: 'Employment', type: 'income' },
-      { id: 'g2', name: 'Housing', type: 'expense' },
-      { id: 'g3', name: 'Living', type: 'expense' },
+      { id: 'g1', name: 'Employment', side: 'income' },
+      { id: 'g2', name: 'Housing', side: 'expense' },
+      { id: 'g3', name: 'Living', side: 'expense' },
     ])
     render(BudgetTable, {
       props: {

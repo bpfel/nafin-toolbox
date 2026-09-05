@@ -148,8 +148,7 @@ describe('moving a category to the other side', () => {
   test('names the reserves it would remove', async () => {
     const vault = makeVault()
     const housing = engine.listCategories(vault).find(g => g.name === 'Housing')!
-    engine.entriesInCategory(vault, housing.id)[0].reserve = {
-      kind: 'obligation', targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-01',
+    engine.entriesInCategory(vault, housing.id)[0].reserve = { targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-01',
     }
     toggleEditing('budget')
     show(vault)
@@ -170,7 +169,7 @@ describe('moving a category to the other side', () => {
     await fireEvent.click(within(d).getByRole('button', { name: 'Save' }))
 
     const housing = engine.listCategories(vault).find(g => g.name === 'Housing')!
-    expect(housing.type).toBe('income')
+    expect(housing.side).toBe('income')
     expect(engine.entriesInCategory(vault, housing.id).every(c => c.type === 'income')).toBe(true)
   })
 
@@ -186,7 +185,7 @@ describe('moving a category to the other side', () => {
 
     const housing = engine.listCategories(vault).find(g => g.name === 'Housing')!
     expect(housing.name).toBe('Housing')
-    expect(housing.type).toBe('expense')
+    expect(housing.side).toBe('expense')
     expect(oncategorychanged).not.toHaveBeenCalled()
   })
 })

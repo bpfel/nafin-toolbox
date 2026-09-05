@@ -52,6 +52,10 @@
     dismissedSetup = true
   }
 
+  // Monthly or yearly. Owned here because two children answer to it: the
+  // table's own toolbar flips it, and the summary above has to move with it.
+  let viewMode = $state<'monthly' | 'yearly'>('monthly')
+
   let confirmingReset = $state(false)
 
   function handleReset() {
@@ -77,9 +81,10 @@
       </div>
     {/if}
     {#if summary.entries.length > 0}
-      <BudgetSummary {summary} />
+      <BudgetSummary {summary} {viewMode} />
     {/if}
     <BudgetTable
+      bind:viewMode
       entries={summary.entries}
       vault={vaultState.vault}
       onsave={handleSave}

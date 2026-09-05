@@ -2,12 +2,13 @@
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
-  import type { VaultData } from '../../lib/crypto/vault'
+  import { sideOf, type EntryType, type VaultData } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
   import { formatAmount, parseAmount } from '../../lib/util/money'
 
   interface Props {
-    type: 'income' | 'expense'
+    /** The side the "+" was pressed on, and the type the dialog opens with. */
+    type: EntryType
     categories: { name: string; id: string }[]
     editEntry?: { id: string; name: string; categoryName: string; plannedAmount?: string } | null
     /** Preselects the category when adding — set by the "+" on a category header. */
@@ -27,6 +28,30 @@
   let { type, categories, editEntry = null, presetCategoryName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
 
   let isEdit = $derived(editEntry != null)
+
+  /**
+   * What kind of line this is — chosen here, not on a later screen.
+   *
+   * Before v7 there were two types and the interesting distinctions lived
+   * elsewhere: setting up a tax bill meant creating an expense, going to
+   * Allocations, attaching a reserve and raising its duration past twelve
+   * months. One question, asked once, replaces all of that.
+   */
+  let selectedType = $state<EntryType>(untrack(() => type))
+
+  const TYPES_FOR_SIDE: Record<'income' | 'expense', EntryType[]> = {
+    income: ['income'],
+    expense: ['expense', 'savings', 'bill', 'purchase'],
+  }
+
+  let typeChoices = $derived(TYPES_FOR_SIDE[sideOf(selectedType)])
+
+  // 'YYYY-MM'. A bill or a purchase anchors its cycle here; the engine takes it
+  // as an argument rather than reading a clock of its own.
+  const currentMonth = (() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })()
   // Seeded once: the modal is created fresh each time it opens, so every read of
   // `editEntry` below is deliberately an initial value rather than a reactive
   // one. `untrack` says so out loud, to Svelte and to the next reader.
@@ -52,9 +77,13 @@
     requestAnimationFrame(() => input.select())
   }
 
-  /** Writes the field's amount. False when there was nothing usable to write. */
+  /**
+   * Normalises the pair of amount fields, and on an existing entry writes the
+   * value through. On a new one there is nothing to write to yet — the amount
+   * travels with `createEntry` instead, so this only keeps the monthly and
+   * yearly boxes agreeing with each other.
+   */
   function commitValue(field: 'planned_mo' | 'planned_yr'): boolean {
-    if (!editEntry || !onsave) return false
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
     const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return false
@@ -62,12 +91,12 @@
     if (field === 'planned_mo') {
       plannedMoValue = formatAmount(val)
       plannedYrValue = formatAmount(val * 12)
-      onsave(editEntry.id, val.toFixed(2))
+      if (editEntry && onsave) onsave(editEntry.id, val.toFixed(2))
     } else {
       const monthly = val / 12
       plannedYrValue = formatAmount(val)
       plannedMoValue = formatAmount(monthly)
-      onsave(editEntry.id, monthly.toFixed(4))
+      if (editEntry && onsave) onsave(editEntry.id, monthly.toFixed(4))
     }
     return true
   }
@@ -101,6 +130,13 @@
     }
   }
 
+  /** The monthly figure as it will be stored, or '' when the box is empty. */
+  function monthlyAmount(): string {
+    const value = parseAmount(plannedMoValue)
+    if (plannedMoValue.trim() === '' || isNaN(value) || !isFinite(value)) return ''
+    return value.toFixed(2)
+  }
+
   let resolvedCategoryName = $derived(useNewCategory ? newCategoryName.trim() : selectedCategory)
 
   function save() {
@@ -113,13 +149,16 @@
       if (isEdit && editEntry) {
         engine.updateEntry(vault, editEntry.id, {
           name: trimmed,
+          type: selectedType,
           categoryName: resolvedCategoryName,
         })
       } else {
         engine.createEntry(vault, {
           name: trimmed,
-          type,
+          type: selectedType,
           categoryName: resolvedCategoryName,
+          plannedAmount: monthlyAmount(),
+          anchorMonth: currentMonth,
         })
       }
       oncreated()
@@ -142,7 +181,18 @@
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap>
-    <h3>{t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', { type: type === 'income' ? t('category.typeIncome') : t('category.typeExpense') })}</h3>
+    <h3>{t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', { type: sideOf(selectedType) === 'income' ? t('category.typeIncome') : t('category.typeExpense') })}</h3>
+
+    {#if typeChoices.length > 1}
+      <label class="field">
+        <span class="label">{t('entry.kind')}</span>
+        <select bind:value={selectedType}>
+          {#each typeChoices as choice}
+            <option value={choice}>{t(`entryType.${choice}` as 'entryType.expense')}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
 
     <label class="field">
       <span class="label">{t('entry.category')}</span>
@@ -181,8 +231,7 @@
       />
     </label>
 
-    {#if isEdit && editEntry?.plannedAmount != null}
-      <div class="values-section">
+    <div class="values-section">
         <span class="label">{t('entry.values')}</span>
         <div class="values-grid">
           <label class="value-field">
@@ -213,7 +262,6 @@
           </label>
         </div>
       </div>
-    {/if}
 
     {#if error}
       <p class="error">{error}</p>

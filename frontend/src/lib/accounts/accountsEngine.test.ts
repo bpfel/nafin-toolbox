@@ -30,7 +30,6 @@ function snapshot(vault: VaultData): string {
 }
 
 const reserve: ReserveDefinition = {
-  kind: 'obligation',
   targetAmount: '1200.00',
   periodMonths: 12,
   anchorMonth: '2026-01',
@@ -381,9 +380,9 @@ describe('deleteAccount — reassignment', () => {
   })
 
   test('reassignment can never produce an illegal routing', () => {
-    // Legality depends only on which endpoints are null, and reassignment
-    // substitutes one id for another without ever changing nullness. Every
-    // shape that can reference the deleted account is checked here.
+    // Legality depends on the type and on which endpoints are null;
+    // reassignment substitutes one id for another without touching either.
+    // Every shape that can reference the deleted account is checked here.
     const vault = createEmptyVault()
     const main = vault.accounts[0]
     const doomed = createAccount(vault, { name: 'Doomed' })
@@ -391,11 +390,11 @@ describe('deleteAccount — reassignment', () => {
     const shapes: Partial<VaultEntry>[] = [
       { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: null },
       { type: 'income', sourceAccountId: null, sinkAccountId: doomed.id },
-      { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: doomed.id },
-      { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: main.id },
-      { type: 'expense', sourceAccountId: main.id, sinkAccountId: doomed.id },
-      { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: main.id, reserve },
-      { type: 'expense', sourceAccountId: doomed.id, sinkAccountId: doomed.id, reserve },
+      { type: 'savings', sourceAccountId: doomed.id, sinkAccountId: doomed.id },
+      { type: 'savings', sourceAccountId: doomed.id, sinkAccountId: main.id },
+      { type: 'savings', sourceAccountId: main.id, sinkAccountId: doomed.id },
+      { type: 'bill', sourceAccountId: doomed.id, sinkAccountId: main.id, reserve },
+      { type: 'purchase', sourceAccountId: doomed.id, sinkAccountId: doomed.id, reserve },
     ]
     const entries = shapes.map(shape => addEntry(vault, shape))
     expect(entries.every(isLegalEntryRouting)).toBe(true)

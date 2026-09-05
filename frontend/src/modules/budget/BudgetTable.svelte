@@ -3,7 +3,7 @@
   import Sortable from 'sortablejs'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import * as engine from '../../lib/budget/budgetEngine'
-  import type { VaultData } from '../../lib/crypto/vault'
+  import { sideOf, type EntryType, type VaultData } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
   import Money from '../../lib/util/Money.svelte'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
@@ -26,15 +26,30 @@
     onentrycreated: () => void
     onentrydeleted: () => void
     oncategorychanged: () => void
+    /**
+     * Monthly or yearly, bound to the screen rather than owned here. The button
+     * that flips it lives in this toolbar, but the summary above the table has
+     * to follow it too — a control that changed only half of what is on screen
+     * would read as broken.
+     */
+    viewMode?: 'monthly' | 'yearly'
   }
 
-  let { entries, vault, onsave, onentrycreated, onentrydeleted, oncategorychanged }: Props = $props()
+  let {
+    entries,
+    vault,
+    onsave,
+    onentrycreated,
+    onentrydeleted,
+    oncategorychanged,
+    viewMode = $bindable('monthly'),
+  }: Props = $props()
 
   // Structural affordances — dragging, adding, deleting — appear only in edit
   // mode. Reading the plan and typing amounts stay available always.
   let editing = $derived(isEditing('budget'))
 
-  let addModalContext = $state<{ type: 'income' | 'expense'; categories: { name: string; id: string }[]; presetCategoryName?: string; editEntry?: { id: string; name: string; categoryName: string; plannedAmount: string } } | null>(null)
+  let addModalContext = $state<{ type: EntryType; categories: { name: string; id: string }[]; presetCategoryName?: string; editEntry?: { id: string; name: string; categoryName: string; plannedAmount: string } } | null>(null)
   let deleteModalContext = $state<{ entryId: string; entryName: string } | null>(null)
   let editCategoryId = $state<string | null>(null)
 
@@ -49,7 +64,6 @@
     editCategoryId = categoryId
   }
 
-  let viewMode = $state<'monthly' | 'yearly'>('monthly')
   let collapsedCategories = $state(new Set<string>())
 
   function toggleCategory(type: 'income' | 'expense', categoryName: string) {
@@ -64,8 +78,8 @@
     return collapsedCategories.has(`${type}:${categoryName}`)
   }
 
-  let incomeEntries = $derived(entries.filter(e => e.entryType === 'income'))
-  let expenseEntries = $derived(entries.filter(e => e.entryType === 'expense'))
+  let incomeEntries = $derived(entries.filter(e => sideOf(e.entryType) === 'income'))
+  let expenseEntries = $derived(entries.filter(e => sideOf(e.entryType) === 'expense'))
 
   function categoryEntries(list: PlanEntryView[]): EntryCategory[] {
     const map = new Map<string, EntryCategory>()
@@ -96,12 +110,15 @@
   let incomeCategories = $derived(categoryEntries(incomeEntries))
   let expenseCategories = $derived(categoryEntries(expenseEntries))
 
-  function categoriesForType(type: 'income' | 'expense'): { name: string; id: string }[] {
-    const categories = type === 'income' ? incomeCategories : expenseCategories
+  // Categories are offered by *side*, not by type: a Housing heading holds Rent
+  // and a roof fund alike, so a purchase entry picks from the same list an
+  // expense does.
+  function categoriesForType(type: EntryType): { name: string; id: string }[] {
+    const categories = sideOf(type) === 'income' ? incomeCategories : expenseCategories
     return categories.map(g => ({ name: g.categoryName, id: g.categoryId }))
   }
 
-  function openAddModal(type: 'income' | 'expense', presetCategoryName?: string) {
+  function openAddModal(type: EntryType, presetCategoryName?: string) {
     addModalContext = { type, categories: categoriesForType(type), presetCategoryName }
   }
 
@@ -112,7 +129,7 @@
     openAddModal(type, categoryName)
   }
 
-  function openEditModal(entryId: string, entryName: string, entryType: 'income' | 'expense', categoryName: string, plannedAmount: string) {
+  function openEditModal(entryId: string, entryName: string, entryType: EntryType, categoryName: string, plannedAmount: string) {
     addModalContext = { type: entryType, categories: categoriesForType(entryType), editEntry: { id: entryId, name: entryName, categoryName, plannedAmount } }
   }
 

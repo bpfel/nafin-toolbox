@@ -1,13 +1,20 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
+  import { sideOf, type EntryType } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
   import Money from '../../lib/util/Money.svelte'
 
   interface Props {
     entry: PlanEntryView
     viewMode?: 'monthly' | 'yearly'
-    onedit: (entryId: string, entryName: string, entryType: 'income' | 'expense', categoryName: string, plannedAmount: string) => void
+    onedit: (
+      entryId: string,
+      entryName: string,
+      entryType: EntryType,
+      categoryName: string,
+      plannedAmount: string,
+    ) => void
   }
 
   let { entry, viewMode = 'monthly', onedit }: Props = $props()
@@ -27,7 +34,7 @@
 
 <tr
   class="entry-row"
-  class:income={entry.entryType === 'income'}
+  class:income={sideOf(entry.entryType) === 'income'}
   data-entry-id={entry.entryId}
 >
   <td class="name-cell">
