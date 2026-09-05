@@ -1,9 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   VaultConflictError,
-  fetchModules,
-  enableModule,
-  disableModule,
   healthCheck,
   fetchVaultKeys,
   setupVaultKeys,
@@ -12,7 +9,6 @@ import {
   putVault,
   recoverVaultKeys,
   setOnUnauthorized,
-  type ModuleInfo,
   type VaultKeysResponse,
   type VaultPayloadResponse,
   withCode,
@@ -27,231 +23,6 @@ describe('setOnUnauthorized', () => {
     const callback = vi.fn()
     setOnUnauthorized(callback)
     // Callback will be tested indirectly via 401 responses
-  })
-})
-
-describe('fetchModules', () => {
-  beforeEach(() => {
-    mockFetch.mockClear()
-  })
-
-  test('fetches modules successfully', async () => {
-    const modules: ModuleInfo[] = [
-      { id: 'budget', name: 'Budget', enabled_at: '2024-01-01T00:00:00Z' },
-      { id: 'vault', name: 'Vault', enabled_at: '2024-01-02T00:00:00Z' },
-    ]
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => modules,
-    })
-
-    const result = await fetchModules()
-
-    expect(result).toEqual(modules)
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    })
-  })
-
-  test('handles empty array response', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => [],
-    })
-
-    const result = await fetchModules()
-
-    expect(result).toEqual([])
-  })
-
-  test('throws error on non-200 response', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      json: async () => ({}),
-    })
-
-    await expect(fetchModules()).rejects.toThrow('API error: 500 Internal Server Error')
-  })
-
-  test('throws error with message from response body', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      json: async () => ({ error: 'Module not found' }),
-    })
-
-    await expect(fetchModules()).rejects.toThrow('Module not found')
-  })
-
-  test('handles network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-    await expect(fetchModules()).rejects.toThrow('Network error')
-  })
-
-  test('calls unauthorized callback on 401', async () => {
-    const onUnauth = vi.fn()
-    setOnUnauthorized(onUnauth)
-
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      statusText: 'Unauthorized',
-    })
-
-    await expect(fetchModules()).rejects.toThrow('Unauthorized')
-    expect(onUnauth).toHaveBeenCalled()
-  })
-})
-
-describe('enableModule', () => {
-  beforeEach(() => {
-    mockFetch.mockClear()
-  })
-
-  test('enables a module successfully', async () => {
-    const module: ModuleInfo = {
-      id: 'budget',
-      name: 'Budget',
-      enabled_at: '2024-01-01T00:00:00Z',
-    }
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => module,
-    })
-
-    const result = await enableModule('budget')
-
-    expect(result).toEqual(module)
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      method: 'POST',
-      body: JSON.stringify({ id: 'budget' }),
-    })
-  })
-
-  test('handles empty module id', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      json: async () => ({ error: 'Invalid module id' }),
-    })
-
-    await expect(enableModule('')).rejects.toThrow('Invalid module id')
-  })
-
-  test('handles unknown module id', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      json: async () => ({ error: 'Module not found' }),
-    })
-
-    await expect(enableModule('unknown')).rejects.toThrow('Module not found')
-  })
-
-  test('handles special characters in module id', async () => {
-    const module: ModuleInfo = {
-      id: 'test-module_123',
-      name: 'Test',
-      enabled_at: '2024-01-01T00:00:00Z',
-    }
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => module,
-    })
-
-    const result = await enableModule('test-module_123')
-
-    expect(result).toEqual(module)
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      method: 'POST',
-      body: JSON.stringify({ id: 'test-module_123' }),
-    })
-  })
-})
-
-describe('disableModule', () => {
-  beforeEach(() => {
-    mockFetch.mockClear()
-  })
-
-  test('disables a module successfully', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('budget')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/budget', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles empty module id', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles module id with special characters', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('test-module_123')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/test-module_123', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles module id with slashes', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('module/sub')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/module/sub', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-    await expect(disableModule('budget')).rejects.toThrow('Network error')
   })
 })
 
@@ -829,6 +600,9 @@ describe('recoverVaultKeys', () => {
   })
 })
 
+// These exercise the shared `request` helper rather than any one endpoint.
+// Health is the vehicle because it is the plainest call in the file — it takes
+// no arguments and reads whatever comes back.
 describe('error handling edge cases', () => {
   beforeEach(() => {
     mockFetch.mockClear()
@@ -844,7 +618,7 @@ describe('error handling edge cases', () => {
       },
     })
 
-    await expect(fetchModules()).rejects.toThrow('API error: 500 Internal Server Error')
+    await expect(healthCheck()).rejects.toThrow('API error: 500 Internal Server Error')
   })
 
   test('handles null response body', async () => {
@@ -854,7 +628,7 @@ describe('error handling edge cases', () => {
       json: async () => null,
     })
 
-    const result = await fetchModules()
+    const result = await healthCheck()
 
     expect(result).toBeNull()
   })
@@ -866,7 +640,7 @@ describe('error handling edge cases', () => {
       json: async () => undefined,
     })
 
-    const result = await fetchModules()
+    const result = await healthCheck()
 
     expect(result).toBeUndefined()
   })
@@ -883,7 +657,7 @@ describe('error handling edge cases', () => {
     })
 
     // Should still throw even without callback
-    await expect(fetchModules()).rejects.toThrow('Unauthorized')
+    await expect(healthCheck()).rejects.toThrow('Unauthorized')
   })
 
   test('handles response with error object instead of error string', async () => {
@@ -895,19 +669,19 @@ describe('error handling edge cases', () => {
     })
 
     // body.error is truthy (an object), so it replaces the fallback message
-    await expect(fetchModules()).rejects.toThrow('[object Object]')
+    await expect(healthCheck()).rejects.toThrow('[object Object]')
   })
 
   test('handles fetch rejection', async () => {
     mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
 
-    await expect(fetchModules()).rejects.toThrow('Failed to fetch')
+    await expect(healthCheck()).rejects.toThrow('Failed to fetch')
   })
 
   test('handles timeout error', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Request timeout'))
 
-    await expect(fetchModules()).rejects.toThrow('Request timeout')
+    await expect(healthCheck()).rejects.toThrow('Request timeout')
   })
 })
 

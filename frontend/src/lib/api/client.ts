@@ -1,11 +1,5 @@
 const API_BASE = '/api'
 
-export interface ModuleInfo {
-  id: string
-  name: string
-  enabled_at: string
-}
-
 /**
  * An error message with its code appended, when the server sent one.
  *
@@ -44,23 +38,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(msg)
   }
   return res.json()
-}
-
-// Modules
-
-export async function fetchModules(): Promise<ModuleInfo[]> {
-  return request<ModuleInfo[]>('/modules')
-}
-
-export async function enableModule(id: string): Promise<ModuleInfo> {
-  return request<ModuleInfo>('/modules', {
-    method: 'POST',
-    body: JSON.stringify({ id }),
-  })
-}
-
-export async function disableModule(id: string): Promise<void> {
-  await fetch(`${API_BASE}/modules/${id}`, { method: 'DELETE', credentials: 'include' })
 }
 
 export async function healthCheck(): Promise<{ status: string }> {
