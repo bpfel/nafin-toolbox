@@ -23,32 +23,41 @@
 
 <ScreenHeader title={t('nav.profile')} eye={false} />
 
-<div class="identity">
-  <span class="email">{email}</span>
-  <span class="role-tag">{t(`role.${role}` as 'role.user')}</span>
+<div class="profile">
+  <div class="identity">
+    <span class="email">{email}</span>
+    <span class="role-tag">{t(`role.${role}` as 'role.user')}</span>
+  </div>
+
+  <ul class="rows">
+    <li>
+      <button class="row" onclick={() => navigate('/profile/security')}>
+        <span>{t('menu.security')}</span>
+        <span class="chevron" aria-hidden="true">›</span>
+      </button>
+    </li>
+    <li class="row static">
+      <span>{t('menu.language')}</span>
+      <!--
+        The picker itself, not a link to it. It also floats over the signed-out
+        screens, where there is no bar to sit in and no profile to reach — that
+        is why it exists, and it keeps that second home.
+      -->
+      <LanguagePicker />
+    </li>
+  </ul>
+
+  <button class="logout" onclick={onlogout}>{t('menu.logout')}</button>
 </div>
 
-<ul class="rows">
-  <li>
-    <button class="row" onclick={() => navigate('/profile/security')}>
-      <span>{t('menu.security')}</span>
-      <span class="chevron" aria-hidden="true">›</span>
-    </button>
-  </li>
-  <li class="row static">
-    <span>{t('menu.language')}</span>
-    <!--
-      The picker itself, not a link to it. It also floats over the signed-out
-      screens, where there is no bar to sit in and no profile to reach — that is
-      why it exists, and it keeps that second home.
-    -->
-    <LanguagePicker />
-  </li>
-</ul>
-
-<button class="logout" onclick={onlogout}>{t('menu.logout')}</button>
-
 <style>
+  /* A settings page, not a data screen. Left at the full 960px the content
+     column allows, four short rows read as a handful of things adrift in a
+     field of white — the layout says "sparse" where it should say "settled". */
+  .profile {
+    max-width: 34rem;
+  }
+
   .identity {
     display: flex;
     align-items: center;
@@ -135,5 +144,26 @@
 
   .logout:hover {
     background: #fdecea;
+  }
+
+  @media (min-width: 768px) {
+    /* Pointer targets can be smaller than a thumb's, but the type should not
+       shrink with them — this is the screen people read rather than scan. */
+    .identity {
+      padding: 1.1rem 1.25rem;
+      font-size: 1.05rem;
+    }
+
+    .row {
+      min-height: 52px;
+      padding: 0.8rem 1.25rem;
+      font-size: 1rem;
+    }
+
+    .logout {
+      width: auto;
+      min-width: 12rem;
+      padding: 0.7rem 1.5rem;
+    }
   }
 </style>

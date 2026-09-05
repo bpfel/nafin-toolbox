@@ -30,9 +30,6 @@ export const de: Messages = {
   'action.delete': 'Löschen',
   'action.back': 'Zurück',
   'action.reload': 'Neu laden',
-  'action.continue': 'Weiter',
-
-  // --- Counted things ---
   'entries.count.one': '{count} Eintrag',
   'entries.count.other': '{count} Einträge',
 
@@ -283,20 +280,9 @@ export const de: Messages = {
   // --- Allocations ---
   'alloc.moneyIn': 'Geld herein',
   'alloc.moneyOut': 'Geld hinaus und Zurückgelegtes',
-  'alloc.unallocated': 'Nicht zugewiesen',
-  'alloc.netWorthChange': 'Veränderung des Vermögens',
-  'alloc.account': 'Konto',
-  'alloc.projected': 'Hochgerechnet',
-  'alloc.required': 'Benötigt',
-  'alloc.available': 'Verfügbar',
   'alloc.savings': 'Ersparnisse',
   'alloc.setAside': 'Zurückgelegt',
   'alloc.editRouting': 'Zuordnung bearbeiten',
-  'alloc.bought': 'Gekauft…',
-  'alloc.whatMeans': 'Was bedeutet {what}?',
-  'alloc.nothingBlocked': 'Nichts ist blockiert — passen Sie einen geplanten Betrag an oder korrigieren Sie den Saldo.',
-
-  // --- Routing ---
   'routing.landsIn': 'Geht ein auf',
   'routing.incomeHint': 'Einnahmen kommen immer von ausserhalb Ihrer Konten.',
   'routing.paidFrom': 'Bezahlt ab',
@@ -315,15 +301,6 @@ export const de: Messages = {
   'reserve.cycleStarted': 'Zyklus begonnen',
 
   // --- Purchase ---
-  'purchase.dialogLabel': 'Kauf erfassen',
-  'purchase.pricePaid': 'Bezahlter Preis',
-  'purchase.month': 'Monat des Kaufs',
-  'purchase.priceError': 'Geben Sie den Preis als Zahl ein, z. B. 1249.00',
-  'purchase.infoOnly': 'Nur zur Information — der Kauf wird so oder so erfasst.',
-  'purchase.scope': 'Es wird kein Geld bewegt und keine andere Position verändert. Nur diese Reserve wird aktualisiert.',
-  'purchase.confirm': 'Kauf erfassen',
-
-  // --- Category dialog notices ---
   'category.typeIncome': 'Einnahmen',
   'category.typeExpense': 'Ausgaben',
   'category.movingSides.one': 'Wenn Sie diese Kategorie zu {type} verschieben, kommt ihr {count} Eintrag mit. Dessen Kontozuordnung wird auf den Standard zurückgesetzt.',
@@ -359,7 +336,6 @@ export const de: Messages = {
   'alloc.noEntries': 'Noch keine Budgeteinträge. Legen Sie sie im Budget-Modul an, dann erscheinen sie hier und können zugeordnet werden.',
   'alloc.affordableNow': 'Jetzt bezahlbar',
   'alloc.noMonthlyAmount': 'Kein Monatsbetrag geplant — budgetieren Sie etwas dafür, um ein Datum zu erhalten',
-  'alloc.zeroMeans': 'Null bedeutet, dass jeder Franken eine Aufgabe hat.',
   'reserve.targetAmount': 'Zielbetrag',
   'password.current': 'Aktuelles Passwort',
   'password.new': 'Neues Passwort',
@@ -384,8 +360,6 @@ export const de: Messages = {
   'qrbill.noAddress': 'Für dieses Konto fehlt eine vollständige Inhaberadresse. Ergänzen Sie sie unter den Zahlungsangaben des Kontos — eine QR-Rechnung braucht sie.',
   'qrbill.shareHint': 'Teilt das Bild an Dateien, Fotos oder einen Chat. Banking-Apps scannen mit der Kamera und lesen es nicht von hier.',
 
-  'error.loadModules': 'Module konnten nicht geladen werden',
-  'error.updateModule': 'Modul konnte nicht aktualisiert werden',
   'error.setupEncryption': 'Verschlüsselung konnte nicht eingerichtet werden',
   'error.unlockVault': 'Tresor konnte nicht entsperrt werden',
   'error.recoveryFailed': 'Wiederherstellung fehlgeschlagen',
@@ -399,8 +373,6 @@ export const de: Messages = {
   'security.twofaEnabled': '2FA ist aktiviert',
   'security.twofaNotEnabled': '2FA ist nicht aktiviert',
   'twofa.enterCode.label': 'Code eingeben',
-  'time.months.one': 'Monat',
-  'time.months.other': 'Monate',
   'snapshot.lines.one': 'Zeile',
   'snapshot.lines.other': 'Zeilen',
   'accountForm.qrIbanNote': 'eine QR-IBAN — Rechnungen verwenden eine QR-Referenz (QRR)',
@@ -424,8 +396,6 @@ export const de: Messages = {
   'twofa.qrAlt': 'QR-Code',
   'twofa.codesCopyFailedPlain': 'Die Zwischenablage war nicht erreichbar. Markieren Sie die Codes oben und kopieren Sie sie von Hand.',
   'alloc.setAsideTotal': 'Rückstellungen diesen Monat insgesamt {amount}. Sie zählen als budgetierte Ausgaben, bleiben aber auf Ihren Konten.',
-  'purchase.effect': 'Der nächste Zyklus spart {price} über {months} an, beginnend {start}. Im ersten Monat ist nichts fällig, danach steigt der Betrag.',
-  'purchase.monthYouPick': 'im gewählten Monat',
   'reserve.errorTarget': 'Der Zielbetrag muss eine positive Zahl sein, z. B. 1200.00',
   'reserve.errorPeriod': 'Die Dauer muss eine ganze Zahl von Monaten sein, mindestens 1',
   'reserve.errorMonth': 'Der Monat muss dem Muster 2026-03 entsprechen',
@@ -455,12 +425,6 @@ export const de: Messages = {
   'alloc.affordableFrom': 'Bei {rate}/Monat leistbar ab {month}',
   'alloc.cannotRoute': '{entry} kann nicht so geführt werden.',
   'alloc.mustSetAside': '{entry} muss auf ein Konto zurückgestellt werden, bevor es ein Ziel haben kann.',
-  'alloc.unallocatedInfo': 'Einnahmen {income} − Ausgaben {expenses}.',
-  'alloc.netWorthInfo': 'Einnahmen {income} − Geld, das tatsächlich abfliesst {outflow}. {setAside} wird zurückgestellt und bleibt Ihres.',
-  'alloc.shortOf': 'Auf {account} fehlen {amount} gegenüber dem, was dafür geplant ist.',
-  'alloc.shortOfDue': 'Auf {account} fehlen {amount} gegenüber dem, was dafür geplant ist, und die nächste Verpflichtung wird {month} fällig ({away}).',
-  'alloc.thisMonth': 'diesen Monat',
-  'purchase.leavesShort': 'Damit liegt {account} {amount} unter dem erforderlichen Betrag.',
   'accounts.correctedOn': 'Korrigiert am {date} auf {amount}',
   'accounts.projectedSince': '· seither fortgeschrieben',
   'accountForm.charsToGo.one': 'Noch {count} Zeichen.',

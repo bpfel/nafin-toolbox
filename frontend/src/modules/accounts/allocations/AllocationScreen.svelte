@@ -19,8 +19,6 @@
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import AllocationRow from './AllocationRow.svelte'
-  import AllocationSummary from './AllocationSummary.svelte'
-  import PurchaseDialog from './PurchaseDialog.svelte'
 
   // The monthly flow view: which budget lines move money from where to where,
   // and what accumulates this month.
@@ -72,7 +70,6 @@
   let version = $state(0)
 
   let error = $state<string | null>(null)
-  let purchaseEntryId = $state<string | null>(null)
 
   function cents(amount: string): number {
     try {
@@ -188,33 +185,24 @@
     return categories.length > 1
   }
 
-  // The two totals. They differ by exactly the set-asides: budgeted as
-  // expenses, but they never leave your net worth.
+  /**
+   * What is set aside this month rather than spent.
+   *
+   * Inferred from where the money is routed, because there is no type that says
+   * so: an expense with a sink account keeps its place in the zero-based budget
+   * while never leaving your net worth. That inference is what a Set-aside type
+   * is meant to replace.
+   */
   let totals = $derived.by(() => {
-    let income = 0
-    let expenses = 0
-    let outflow = 0
     let setAside = 0
 
     for (const entry of entries) {
-      const planned = cents(plannedFor(entry.id))
-      if (entry.type === 'income') {
-        income += planned
-        continue
-      }
-      expenses += planned
-      if (entry.sinkAccountId === null) outflow += planned
-      else setAside += planned
+      if (entry.type === 'income') continue
+      if (entry.sinkAccountId === null) continue
+      setAside += cents(plannedFor(entry.id))
     }
 
-    return {
-      income: fromCents(income),
-      expenses: fromCents(expenses),
-      outflow: fromCents(outflow),
-      setAside: fromCents(setAside),
-      unallocated: fromCents(income - expenses),
-      netChange: fromCents(income - outflow),
-    }
+    return { setAside: fromCents(setAside) }
   })
 
   // The soonest obligation sinking into an account gives its shortfall a
@@ -322,38 +310,6 @@
     version++
   }
 
-  // The whole of the purchase: the real price becomes the next cycle's target,
-  // and the anchor moves to the month of purchase so the cycle restarts. No
-  // money moves, nothing else is touched.
-  function applyPurchase(entryId: string, pricePaid: string, purchaseMonth: string) {
-    const entry = findEntry(entryId)
-    if (!entry?.reserve) return
-
-    entry.reserve = {
-      ...entry.reserve,
-      targetAmount: pricePaid,
-      anchorMonth: purchaseMonth,
-    }
-
-    markDirty()
-    version++
-    purchaseEntryId = null
-  }
-
-  let purchaseContext = $derived.by(() => {
-    void version
-    if (purchaseEntryId === null) return null
-    const entry = findEntry(purchaseEntryId)
-    if (!entry?.reserve || entry.reserve.kind !== 'amortization') return null
-    const sink = entry.sinkAccountId
-    return {
-      entryId: entry.id,
-      entryName: entry.name,
-      reserve: entry.reserve,
-      accountName: accounts.find(a => a.id === sink)?.name ?? 'the account',
-      available: sinkAvailable(sink) ?? '0.00',
-    }
-  })
 </script>
 
 {#snippet categoryBlock(type: 'income' | 'expense', category: RowCategory, withHeader: boolean)}
@@ -387,7 +343,6 @@
             sinkAvailable={row.sinkAvailable}
             onroutingchange={(routing) => applyRouting(row.entry.id, routing)}
             onreservechange={(reserve) => applyReserve(row.entry.id, reserve)}
-            onpurchase={() => (purchaseEntryId = row.entry.id)}
           />
         {/each}
       </div>
@@ -403,16 +358,6 @@
       {t('alloc.noEntries')}
     </p>
   {:else}
-    <AllocationSummary
-      plannedIncome={totals.income}
-      plannedExpenses={totals.expenses}
-      trueOutflow={totals.outflow}
-      setAside={totals.setAside}
-      unallocated={totals.unallocated}
-      netChange={totals.netChange}
-      accounts={accountStatuses}
-    />
-
     {#if error}
       <p class="error">{error}</p>
     {/if}
@@ -439,19 +384,6 @@
     {/if}
   {/if}
 </div>
-
-{#if purchaseContext}
-  <PurchaseDialog
-    entryName={purchaseContext.entryName}
-    reserve={purchaseContext.reserve}
-    accountName={purchaseContext.accountName}
-    available={purchaseContext.available}
-    {currentMonth}
-    onconfirm={(price, purchaseMonth) =>
-      applyPurchase(purchaseContext!.entryId, price, purchaseMonth)}
-    onclose={() => (purchaseEntryId = null)}
-  />
-{/if}
 
 <style>
   .allocation-screen {

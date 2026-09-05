@@ -101,14 +101,14 @@
   }
 
   @media (min-width: 768px) {
+    /* Room for the rail, which is fixed to the left edge rather than a column
+       in a grid — see AppNav for why. */
     .shell {
-      display: grid;
-      grid-template-columns: 190px minmax(0, 1fr);
-      align-items: start;
+      padding-left: var(--app-rail-width);
     }
 
     main {
-      /* The rail is in the flow up here, so the page no longer sits under a bar. */
+      /* Nothing is over the bottom edge up here, so no room is kept for it. */
       padding: 2rem;
     }
   }

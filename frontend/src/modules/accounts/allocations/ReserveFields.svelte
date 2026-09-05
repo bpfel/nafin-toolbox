@@ -152,13 +152,6 @@
   let anchorLabel = $derived(
     selectedKind === 'obligation' ? t('reserve.dueNextMonth') : t('reserve.cycleStarted'),
   )
-  let anchorHint = $derived(
-    selectedKind === 'obligation'
-      ? monthOnly
-        ? 'The month the bill falls due. The rest of the series follows from the period.'
-        : 'Any month the bill falls due. With this period the year matters, so give both.'
-      : 'The month the current item was bought. Nothing is required yet in that month.',
-  )
 </script>
 
 <div class="reserve-fields">
@@ -232,7 +225,6 @@
         })}
       </p>
     {/if}
-    <p class="hint">{anchorHint}</p>
   {/if}
 
   {#if error}

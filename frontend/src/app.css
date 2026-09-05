@@ -13,6 +13,12 @@
    */
   --app-nav-height: 60px;
 
+  /*
+   * Width of the left rail, and zero below 768px where navigation is a bar
+   * along the bottom instead. The shell reserves this much room on the left.
+   */
+  --app-rail-width: 0px;
+
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   color: #1a1a2e;
@@ -22,6 +28,7 @@
 @media (min-width: 768px) {
   :root {
     --app-nav-height: 0px;
+    --app-rail-width: 190px;
   }
 }
 

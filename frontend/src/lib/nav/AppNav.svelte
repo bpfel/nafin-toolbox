@@ -105,16 +105,22 @@
 
   @media (min-width: 768px) {
     .app-nav {
-      position: sticky;
-      inset: 0 auto auto 0;
-      top: 0;
-      height: 100vh;
-      height: 100dvh;
+      /*
+       * Fixed rather than sticky. A sticky box has to be given a height, and a
+       * height in viewport units stops short of the bottom the moment the
+       * browser's own units disagree with the window — which showed as the
+       * rail ending in a visible corner partway down a scrolled page. Pinned
+       * to both edges there is no height to get wrong.
+       */
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: var(--app-rail-width);
       flex-direction: column;
       gap: 0.15rem;
       padding: 1rem 0.6rem;
       border-top: none;
       border-right: 1px solid #e0e0e0;
+      overflow-y: auto;
     }
 
     .item {

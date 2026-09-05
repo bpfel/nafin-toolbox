@@ -189,9 +189,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    /* 44px, like every other thumb target — and a hold has to stay on it. */
+    /* 44px, like every other thumb target — and a hold has to stay on it.
+       `padding: 0` is load-bearing: app.css styles every button with 1.5rem of
+       side padding, and with border-box that is 48px inside a 44px box. The
+       content column collapses to nothing and the icon disappears entirely —
+       which is exactly what it did. */
     width: 44px;
     height: 44px;
+    padding: 0;
     margin-right: -0.5rem;
     background: none;
     border: none;
@@ -216,6 +221,8 @@
   .eye svg {
     width: 19px;
     height: 19px;
+    /* Never let it be shrunk by a flex parent, whatever the padding does. */
+    flex: none;
   }
 
   @media (max-width: 480px) {

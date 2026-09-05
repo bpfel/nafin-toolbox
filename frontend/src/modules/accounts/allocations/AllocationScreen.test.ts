@@ -127,13 +127,6 @@ function categoryNames() {
   return categoryHeaders().map(el => el.querySelector('.category-name')!.textContent!.trim())
 }
 
-function totals() {
-  return {
-    unallocated: screen.getByTestId('total-unallocated').textContent?.trim(),
-    netChange: screen.getByTestId('total-net-change').textContent?.trim(),
-  }
-}
-
 describe('AllocationScreen', () => {
   beforeEach(() => {
     testVault = makeVault()
@@ -148,14 +141,6 @@ describe('AllocationScreen', () => {
   afterEach(() => {
     cleanup()
     clearEditing()
-  })
-
-  test('shows both totals, and they differ by exactly the set-aside', () => {
-    render(AllocationScreen)
-
-    // unallocated = 900 − (500 rent + 100 laptop) = 300 — zero-based reading.
-    // netChange = 900 − 500, because the laptop set-aside never leaves net worth.
-    expect(totals()).toEqual({ unallocated: '300.00', netChange: '400.00' })
   })
 
   test('an income entry is asked only where money lands, never where it comes from', async () => {
@@ -187,42 +172,6 @@ describe('AllocationScreen', () => {
     expect(testVault!.budget.entries.find(c => c.id === 'rent')!.sinkAccountId).toBe('main')
   })
 
-  test('routing an expense into an account moves netChange but not unallocated', async () => {
-    render(AllocationScreen)
-
-    const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
-    await fireEvent.click(editButtons[1])
-    await fireEvent.click(screen.getByLabelText('Set aside into'))
-
-    // Just as much is left unallocated: rent is budgeted either way. But
-    // nothing leaves the accounts any more, so net worth grows by the lot.
-    expect(totals()).toEqual({ unallocated: '300.00', netChange: '900.00' })
-  })
-
-  test('an under-funded account is reported, and never blocks anything', async () => {
-    // An obligation far larger than the account can cover.
-    testVault!.budget.entries.push(
-      entry({
-        id: 'tax',
-        name: 'Tax',
-        sortOrder: 3,
-        sinkAccountId: 'reserves',
-        reserve: {
-          kind: 'obligation',
-          targetAmount: '3000.00',
-          periodMonths: 3,
-          anchorMonth: CURRENT_MONTH,
-        },
-      }),
-    )
-
-    render(AllocationScreen)
-
-    // Reserves holds 0.00 against a 3000.00 obligation falling due this month.
-    expect(screen.getByText(/is 3'000\.00 short|is 3’000\.00 short/)).toBeTruthy()
-    expect(screen.getByText(/Nothing is blocked/)).toBeTruthy()
-  })
-
   test('routing a set-aside back to spending takes its reserve with it', async () => {
     render(AllocationScreen)
 
@@ -235,27 +184,6 @@ describe('AllocationScreen', () => {
     // A reserve has to accumulate somewhere, so a null sink cannot keep one.
     expect(screen.queryByLabelText('Saving towards')).toBeNull()
     expect(testVault!.budget.entries.find(c => c.id === 'laptop')!.reserve).toBeUndefined()
-  })
-
-  test('recording a purchase re-prices the next cycle and restarts it', async () => {
-    render(AllocationScreen)
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Bought it…' }))
-    await fireEvent.input(screen.getByLabelText('Price paid'), { target: { value: '1450.00' } })
-    await fireEvent.input(screen.getByLabelText('Month of purchase'), {
-      target: { value: '2026-04' },
-    })
-    await fireEvent.click(screen.getByRole('button', { name: 'Record purchase' }))
-
-    // The real price paid becomes the next cycle's target — replacement cost
-    // keeps itself up to date — and the cycle restarts at the purchase month.
-    expect(testVault!.budget.entries.find(c => c.id === 'laptop')!.reserve).toEqual({
-      kind: 'amortization',
-      targetAmount: '1450.00',
-      periodMonths: 60,
-      anchorMonth: '2026-04',
-    })
-    expect(screen.queryByRole('button', { name: 'Record purchase' })).toBeNull()
   })
 
   test('an under-funded amortization moves its date instead of warning', () => {
@@ -389,28 +317,8 @@ describe('AllocationScreen edit mode', () => {
   test('the figures and the flow lines read fine read-only', () => {
     render(AllocationScreen)
 
-    expect(totals()).toEqual({ unallocated: '300.00', netChange: '400.00' })
     expect(screen.getByText('Rent')).toBeTruthy()
     expect(screen.getByText(/leaves your accounts/)).toBeTruthy()
-  })
-
-  // A purchase records something that actually happened; it restructures nothing.
-  test('recording a purchase stays available read-only', async () => {
-    render(AllocationScreen)
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Bought it…' }))
-    await fireEvent.input(screen.getByLabelText('Price paid'), { target: { value: '1450.00' } })
-    await fireEvent.input(screen.getByLabelText('Month of purchase'), {
-      target: { value: '2026-04' },
-    })
-    await fireEvent.click(screen.getByRole('button', { name: 'Record purchase' }))
-
-    expect(testVault!.budget.entries.find(c => c.id === 'laptop')!.reserve).toEqual({
-      kind: 'amortization',
-      targetAmount: '1450.00',
-      periodMonths: 60,
-      anchorMonth: '2026-04',
-    })
   })
 
   // The row splits into general information (name, kind, amount, flow) and

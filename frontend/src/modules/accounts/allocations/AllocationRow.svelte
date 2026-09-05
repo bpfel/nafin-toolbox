@@ -34,7 +34,6 @@
     sinkAvailable: string | null
     onroutingchange: (routing: Routing) => void
     onreservechange: (reserve: ReserveDefinition | undefined) => void
-    onpurchase: () => void
   }
 
   let {
@@ -45,7 +44,6 @@
     sinkAvailable,
     onroutingchange,
     onreservechange,
-    onpurchase,
   }: Props = $props()
 
   let expanded = $state(false)
@@ -184,7 +182,7 @@
   })
 
   // The row has two halves: what this line *is* (name, kind, amount, flow) and
-  // what it is *doing* (reserve status, timing, purchase). The hairline only
+  // what it is *doing* (reserve status, timing). The hairline only
   // earns its place when there is a second half to separate — a plain spending
   // row with no reserve has nothing below it.
   let showStatus = $derived(reserve != null && requiredNow !== null)
@@ -246,7 +244,6 @@
                 {t('alloc.noMonthlyAmount')}
               {/if}
             </span>
-            <button class="purchase" onclick={onpurchase}>{t('alloc.bought')}</button>
           {/if}
         </div>
       {/if}
@@ -383,18 +380,6 @@
   }
   .timing {
     color: #1f5c99;
-  }
-  .purchase {
-    padding: 0.2rem 0.6rem;
-    font-size: 0.8rem;
-    background: white;
-    border: 1px solid #1f5c99;
-    border-radius: 6px;
-    color: #1f5c99;
-    cursor: pointer;
-  }
-  .purchase:hover {
-    background: #e7f0fa;
   }
   .editor {
     display: flex;
