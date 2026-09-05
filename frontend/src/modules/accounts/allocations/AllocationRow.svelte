@@ -7,7 +7,7 @@
     type VaultAccount,
     type VaultEntry,
   } from '../../../lib/crypto/vault'
-  import { flowKindOf } from '../../../lib/accounts/routing'
+  import { isLegalRouting } from '../../../lib/accounts/routing'
   import { accountShortLabel } from '../../../lib/accounts/labels'
   import {
     addMonths,
@@ -76,51 +76,37 @@
     return account ? accountShortLabel(account) : 'a deleted account'
   }
 
-  // An entry with no endpoints at all is a broken record rather than a flow.
-  // Show it as needing attention instead of letting the classifier throw.
-  let kind = $derived.by(() => {
-    try {
-      return flowKindOf(entry)
-    } catch {
-      return null
-    }
-  })
-
   let isSetAside = $derived(holdsMoney(entry.type))
 
-  // A set-aside with no reserve behind it is plain savings — money kept for
-  // nothing in particular. Worth naming differently from a targeted set-aside,
-  // since the two behave differently: only the targeted one accrues a required
-  // amount against its account.
-  let isPlainSavings = $derived(kind === 'setaside' && !entry.reserve)
+  /**
+   * The row says what the budget says.
+   *
+   * There used to be a second vocabulary here — income, spending, set-aside,
+   * savings — inferred from the endpoints because two entry types could not
+   * distinguish spending from holding. A purchase was badged "set aside", which
+   * is true of three of the five types and says nothing about which. One set of
+   * words now, and it is the one the budget is written in.
+   */
+  let kindLabel = $derived(t(`entryType.${entry.type}` as 'entryType.expense'))
 
-  let kindLabel = $derived(
-    kind === 'income'
-      ? 'Income'
-      : kind === 'spending'
-        ? 'Spending'
-        : kind === 'setaside'
-          ? isPlainSavings ? t('alloc.savings') : t('alloc.setAside')
-          : 'Unrouted',
-  )
-
-  let kindClass = $derived(
-    kind === 'setaside' && isPlainSavings ? 'savings' : (kind ?? 'none'),
+  /**
+   * An entry whose endpoints contradict its own type. Not reachable through
+   * these controls; possible in data written before v7 knew the difference.
+   */
+  let unrouted = $derived(
+    !isLegalRouting(entry.type, entry.sourceAccountId, entry.sinkAccountId),
   )
 
   let flowSummary = $derived.by(() => {
-    switch (kind) {
-      case 'income':
-        return `From outside → ${accountName(entry.sinkAccountId)}`
-      case 'spending':
-        return `${accountName(entry.sourceAccountId)} → leaves your accounts`
-      case 'setaside':
-        return entry.sourceAccountId === entry.sinkAccountId
-          ? `Stays in ${accountName(entry.sourceAccountId)}, set aside`
-          : `${accountName(entry.sourceAccountId)} → ${accountName(entry.sinkAccountId)}`
-      default:
-        return 'No routing — pick where this money comes from'
-    }
+    if (unrouted) return t('flow.unrouted')
+    if (entry.type === 'income') return t('flow.fromOutside', { account: accountName(entry.sinkAccountId) })
+    if (!isSetAside) return t('flow.leaves', { account: accountName(entry.sourceAccountId) })
+    return entry.sourceAccountId === entry.sinkAccountId
+      ? t('flow.staysIn', { account: accountName(entry.sourceAccountId) })
+      : t('flow.between', {
+          source: accountName(entry.sourceAccountId),
+          sink: accountName(entry.sinkAccountId),
+        })
   })
 
   let reserve = $derived(entry.reserve)
@@ -205,11 +191,11 @@
   let hasDetail = $derived(showStatus || showEditor)
 </script>
 
-<div class="allocation-row" class:unrouted={kind === null}>
+<div class="allocation-row" class:unrouted>
   <div class="row-head">
     <div class="identity">
       <span class="name">{entry.name}</span>
-      <span class="kind kind-{kindClass}">{kindLabel}</span>
+      <span class="kind kind-{unrouted ? 'none' : entry.type}">{kindLabel}</span>
     </div>
     <span class="planned"><Money value={plannedAmount} /></span>
     {#if editing}
@@ -332,19 +318,24 @@
     background: #e6f4ec;
     color: #2d6a4f;
   }
-  .kind-spending {
+  .kind-expense {
     background: #fdecea;
     color: #c0392b;
   }
-  .kind-setaside {
+  /* The three that keep the money share a family: it is still yours. Savings
+     reads closest to income because nothing is spoken for; a bill and a
+     purchase are already promised to something, so they sit apart from it. */
+  .kind-savings {
+    background: #eaf1f8;
+    color: #1d4e89;
+  }
+  .kind-bill {
     background: #e7f0fa;
     color: #1f5c99;
   }
-  /* Plain savings: green, like income — the money is still yours, unlike a
-     targeted set-aside which is already spoken for. */
-  .kind-savings {
-    background: #e6f4ec;
-    color: #2d6a4f;
+  .kind-purchase {
+    background: #eef0fb;
+    color: #40449b;
   }
   .kind-none {
     background: #fff3cd;

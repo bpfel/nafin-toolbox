@@ -23,7 +23,7 @@ import {
   seedDefaults,
 } from './budgetEngine'
 import { createEmptyVault, type VaultData } from '../crypto/vault'
-import { isLegalEntryRouting, isLegalRouting, flowKindOf, primaryAccountId } from '../accounts/routing'
+import { isLegalEntryRouting, isLegalRouting, primaryAccountId } from '../accounts/routing'
 
 describe('listCategories', () => {
   test('returns empty array for empty vault', () => {
@@ -1204,14 +1204,16 @@ describe('createEntry routing defaults', () => {
     expect(expense.reserve).toBeUndefined()
   })
 
-  test('defaults classify as income and spending', () => {
+  test('a new entry is born routed the way its type requires', () => {
     const vault = createEmptyVault()
 
     const income = createEntry(vault, { name: 'Salary', type: 'income', categoryName: 'Employment' })
     const expense = createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
 
-    expect(flowKindOf(income)).toBe('income')
-    expect(flowKindOf(expense)).toBe('spending')
+    expect(isLegalEntryRouting(income)).toBe(true)
+    expect(isLegalEntryRouting(expense)).toBe(true)
+    expect(income.sourceAccountId).toBeNull()
+    expect(expense.sinkAccountId).toBeNull()
   })
 
   test('routes to the first account when the vault has several', () => {

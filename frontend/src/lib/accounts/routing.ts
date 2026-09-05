@@ -4,18 +4,6 @@ import { holdsMoney, savesTowardsTarget, type EntryType, type VaultEntry, type V
 // where it goes. `null` on either side means an external counterparty — outside
 // every account the user tracks. Because a vault always holds at least one
 // account, (null, null) cannot occur.
-export type FlowKind = 'income' | 'spending' | 'setaside'
-
-// Read off the type, which since v7 says this outright. It used to be inferred
-// from the endpoints — a null source meant income, a null sink meant the money
-// was gone — because two entry types could not distinguish spending from
-// holding. The endpoints still have to agree, and `isLegalRouting` is what
-// enforces that; this no longer has to work it out from them.
-export function flowKindOf(entry: VaultEntry): FlowKind {
-  if (entry.type === 'income') return 'income'
-  return holdsMoney(entry.type) ? 'setaside' : 'spending'
-}
-
 // The endpoints must say the same thing the type does.
 //
 //   income                     arrives from outside      (null, account)

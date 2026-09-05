@@ -1,6 +1,5 @@
 import { describe, test, expect } from 'vitest'
 import {
-  flowKindOf,
   isLegalRouting,
   isLegalEntryRouting,
   defaultRouting,
@@ -98,27 +97,6 @@ describe('isLegalRouting — the validity matrix', () => {
 // is why there is nothing here about (null, null) any more: it used to be the
 // one case the inference could not classify, and the type has an answer for
 // every entry.
-describe('flowKindOf', () => {
-  test('an expense is spending', () => {
-    expect(flowKindOf(entry({ type: 'expense' }))).toBe('spending')
-  })
-
-  test('income is income', () => {
-    expect(flowKindOf(entry({ type: 'income', sourceAccountId: null, sinkAccountId: A }))).toBe('income')
-  })
-
-  test('all three that hold money are set-asides', () => {
-    for (const type of ['savings', 'bill', 'purchase'] as const) {
-      expect(flowKindOf(entry({ type, sourceAccountId: A, sinkAccountId: B }))).toBe('setaside')
-    }
-  })
-
-  test('including one that holds money inside a single account', () => {
-    // Earmarked where it already sits. It has not gone anywhere; it has a job.
-    expect(flowKindOf(entry({ type: 'savings', sourceAccountId: A, sinkAccountId: A }))).toBe('setaside')
-  })
-})
-
 describe('isLegalEntryRouting', () => {
   test('accepts a legal routing without a reserve', () => {
     expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: null }))).toBe(true)
@@ -169,12 +147,13 @@ describe('defaultRouting', () => {
     }
   })
 
-  test('income defaults classify as income, expense defaults as spending', () => {
-    const income = defaultRouting('income', A)
-    const expense = defaultRouting('expense', A)
-
-    expect(flowKindOf(entry({ type: 'income', ...income }))).toBe('income')
-    expect(flowKindOf(entry({ type: 'expense', ...expense }))).toBe('spending')
+  test('the defaults are legal for the type that asked for them', () => {
+    // What `flowKindOf` used to assert, without the second vocabulary: the
+    // shape a type is born with is one its own rules accept.
+    for (const type of ['income', 'expense', 'savings', 'bill', 'purchase'] as const) {
+      const routing = defaultRouting(type, A)
+      expect(isLegalRouting(type, routing.sourceAccountId, routing.sinkAccountId)).toBe(true)
+    }
   })
 })
 
