@@ -171,19 +171,37 @@ describe('AllocationScreen', () => {
     expect(screen.getByLabelText('Target amount')).toBeTruthy()
   })
 
-  test('a purchase cannot be routed out of the accounts it saves into', async () => {
-    // The reserve used to be destroyed by this, because routing was what made an
-    // entry a set-aside. Now the type says so, and the routing that contradicts
-    // it is refused instead — the target survives, and nothing is lost silently.
+  test('the destination is asked only where the type leaves it open', async () => {
+    // There used to be a two-way choice here — "leaves my accounts" or "set
+    // aside into" — and picking the second is what *made* an entry a set-aside.
+    // The type says that now, so the question had exactly one legal answer and
+    // choosing the other produced an error rather than a change. It is gone.
     render(AllocationScreen)
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
-    await fireEvent.click(editButtons[2]) // Laptop, a purchase
 
-    await fireEvent.click(screen.getByLabelText('Leaves my accounts'))
+    await fireEvent.click(editButtons[1]) // Rent, an expense — it leaves, full stop
+    expect(screen.getByLabelText('Paid from')).toBeTruthy()
+    expect(screen.queryByLabelText('Set aside into')).toBeNull()
+    expect(screen.queryByLabelText('Leaves my accounts')).toBeNull()
+
+    await fireEvent.click(editButtons[2]) // Laptop, a purchase — it lands somewhere
+    expect(screen.getByLabelText('Set aside into')).toBeTruthy()
+  })
+
+  test('choosing where a purchase lands leaves its target alone', async () => {
+    render(AllocationScreen)
+
+    const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
+    await fireEvent.click(editButtons[2])
+
+    await fireEvent.change(screen.getByLabelText('Set aside into'), {
+      target: { value: 'main' },
+    })
 
     const laptop = testVault!.budget.entries.find(c => c.id === 'laptop')!
-    expect(laptop.sinkAccountId).toBe('reserves')
+    expect(laptop.sinkAccountId).toBe('main')
+    // Moving the money's destination is not a statement about what it is for.
     expect(laptop.reserve).toBeDefined()
   })
 

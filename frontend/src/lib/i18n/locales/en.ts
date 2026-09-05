@@ -314,10 +314,8 @@ export const en = {
   'routing.landsIn': 'Lands in',
   'routing.incomeHint': 'Income always arrives from outside your accounts.',
   'routing.paidFrom': 'Paid from',
-  'routing.destination': 'Destination',
-  'routing.leaves': 'Leaves my accounts',
+  'routing.expenseHint': 'Leaves your accounts when you pay it.',
   'routing.setAsideInto': 'Set aside into',
-  'routing.setAsideAccount': 'Set-aside account',
 
   // --- Reserves ---
   'reserve.savingTowards': 'Saving towards',

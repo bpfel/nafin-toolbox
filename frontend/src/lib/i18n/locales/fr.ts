@@ -311,10 +311,8 @@ export const fr: Messages = {
   'routing.landsIn': 'Arrive sur',
   'routing.incomeHint': 'Les revenus proviennent toujours de l’extérieur de vos comptes.',
   'routing.paidFrom': 'Payé depuis',
-  'routing.destination': 'Destination',
-  'routing.leaves': 'Quitte mes comptes',
+  'routing.expenseHint': 'Quitte vos comptes au paiement.',
   'routing.setAsideInto': 'Mis de côté sur',
-  'routing.setAsideAccount': 'Compte de provision',
 
   // --- Reserves ---
   'reserve.savingTowards': 'Épargne en vue de',

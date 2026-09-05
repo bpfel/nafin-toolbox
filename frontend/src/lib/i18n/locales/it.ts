@@ -311,10 +311,8 @@ export const it: Messages = {
   'routing.landsIn': 'Arriva su',
   'routing.incomeHint': 'Le entrate provengono sempre dall’esterno dei tuoi conti.',
   'routing.paidFrom': 'Pagato da',
-  'routing.destination': 'Destinazione',
-  'routing.leaves': 'Esce dai miei conti',
+  'routing.expenseHint': 'Lascia i tuoi conti al pagamento.',
   'routing.setAsideInto': 'Messo da parte su',
-  'routing.setAsideAccount': 'Conto di accantonamento',
 
   // --- Reserves ---
   'reserve.savingTowards': 'Risparmio in vista di',

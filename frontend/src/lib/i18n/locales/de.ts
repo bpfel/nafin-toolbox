@@ -292,10 +292,8 @@ export const de: Messages = {
   'routing.landsIn': 'Geht ein auf',
   'routing.incomeHint': 'Einnahmen kommen immer von ausserhalb Ihrer Konten.',
   'routing.paidFrom': 'Bezahlt ab',
-  'routing.destination': 'Ziel',
-  'routing.leaves': 'Verlässt meine Konten',
+  'routing.expenseHint': 'Verlässt Ihre Konten beim Bezahlen.',
   'routing.setAsideInto': 'Zurücklegen auf',
-  'routing.setAsideAccount': 'Konto für Zurückgelegtes',
 
   // --- Reserves ---
   'reserve.savingTowards': 'Sparen für',

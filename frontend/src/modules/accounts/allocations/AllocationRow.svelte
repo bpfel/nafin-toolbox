@@ -260,7 +260,7 @@
         <div class="editor">
           <RoutingControls
             fieldId={entry.id}
-            type={sideOf(entry.type)}
+            type={entry.type}
             sourceAccountId={entry.sourceAccountId}
             sinkAccountId={entry.sinkAccountId}
             {accounts}
