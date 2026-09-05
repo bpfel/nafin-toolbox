@@ -197,6 +197,10 @@ export function createEntry(
      * what month it is; the engine deliberately does not read a clock.
      */
     anchorMonth?: string
+    /** What a `bill` or `purchase` is saving towards. */
+    targetAmount?: string
+    /** How long it has to get there — the billing cycle, or the item's life. */
+    periodMonths?: number
   },
 ): VaultEntry {
   const category = getOrCreateCategory(vault, opts.categoryName, sideOf(opts.type))
@@ -222,13 +226,14 @@ export function createEntry(
   // the default yearly period that is exactly the annual figure — and is the
   // first thing the user overwrites if they know the real one.
   if (savesTowardsTarget(opts.type) && opts.anchorMonth) {
-    const monthlyCents = Math.round(Number(opts.plannedAmount ?? '0') * 100)
-    const target = Number.isFinite(monthlyCents) && monthlyCents > 0
-      ? ((monthlyCents * DEFAULT_RESERVE_PERIOD_MONTHS) / 100).toFixed(2)
-      : '0.00'
     cat.reserve = {
-      targetAmount: target,
-      periodMonths: DEFAULT_RESERVE_PERIOD_MONTHS,
+      // The target is what the caller states; the monthly figure is what
+      // follows from it. That is the way round people hold these — "two
+      // thousand francs, and it lasts seven years" — and the reverse, deriving
+      // a target from a monthly amount, is how an entry ended up with a rate
+      // that could never meet its own schedule.
+      targetAmount: opts.targetAmount ?? '0.00',
+      periodMonths: opts.periodMonths ?? DEFAULT_RESERVE_PERIOD_MONTHS,
       anchorMonth: opts.anchorMonth,
     }
   }
@@ -237,6 +242,27 @@ export function createEntry(
     setPlanned(vault, cat.id, opts.plannedAmount)
   }
   return cat
+}
+
+/**
+ * Replaces what a bill or purchase is saving towards.
+ *
+ * Refused on the three types that have no target: carrying one without being
+ * either a bill or a purchase is the contradiction `isLegalEntryRouting`
+ * exists to reject, and it is cheaper to refuse here than to write it and
+ * find out on the next save.
+ */
+export function setReserve(
+  vault: VaultData,
+  entryId: string,
+  reserve: { targetAmount: string; periodMonths: number; anchorMonth: string },
+): void {
+  const entry = vault.budget.entries.find(e => e.id === entryId)
+  if (!entry) return
+  if (!savesTowardsTarget(entry.type)) {
+    throw new Error(`a ${entry.type} entry has no target to save towards`)
+  }
+  entry.reserve = { ...reserve }
 }
 
 export function updateEntry(

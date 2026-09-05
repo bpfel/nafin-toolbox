@@ -154,21 +154,19 @@ describe('AllocationScreen', () => {
     expect(screen.queryByText('Leaves my accounts')).toBeNull()
   })
 
-  // Until v7 this was the gate: routing an expense into an account was what
-  // made a reserve possible, and a select inside the panel then asked which of
-  // two schedules it was on. The type answers both, so the gate is the type and
-  // the select is gone.
-  test('the target fields belong to the two types that have a target', async () => {
+  // This screen is about where money flows, and nothing else. What a line is
+  // saving towards — the figure, the cycle, the anchor — is what the line *is*,
+  // and belongs in the budget where it is written. It used to be edited in both
+  // places, which is two surfaces for one fact.
+  test('the target is not edited here', async () => {
     render(AllocationScreen)
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit routing' })
-
-    await fireEvent.click(editButtons[1]) // Rent, an expense
-    expect(screen.getByLabelText('Paid from')).toBeTruthy()
-    expect(screen.queryByLabelText('Target amount')).toBeNull()
-
     await fireEvent.click(editButtons[2]) // Laptop, a purchase
-    expect(screen.getByLabelText('Target amount')).toBeTruthy()
+
+    expect(screen.getByLabelText('Set aside into')).toBeTruthy()
+    expect(screen.queryByLabelText('Target amount')).toBeNull()
+    expect(screen.queryByLabelText('Period in months')).toBeNull()
   })
 
   test('the destination is asked only where the type leaves it open', async () => {

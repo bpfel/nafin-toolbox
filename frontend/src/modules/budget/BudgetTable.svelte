@@ -8,6 +8,7 @@
   import Money from '../../lib/util/Money.svelte'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
   import AddEntryRow from './AddEntryRow.svelte'
+  import TypeGuideModal from './TypeGuideModal.svelte'
   import AddEntryModal from './AddEntryModal.svelte'
   import DeleteEntryModal from './DeleteEntryModal.svelte'
   import EditCategoryModal from './EditCategoryModal.svelte'
@@ -66,7 +67,7 @@
 
   let collapsedCategories = $state(new Set<string>())
 
-  function toggleCategory(type: 'income' | 'expense', categoryName: string) {
+  function toggleCategory(type: EntryType, categoryName: string) {
     const key = `${type}:${categoryName}`
     const next = new Set(collapsedCategories)
     if (next.has(key)) next.delete(key)
@@ -74,7 +75,7 @@
     collapsedCategories = next
   }
 
-  function isCollapsed(type: 'income' | 'expense', categoryName: string): boolean {
+  function isCollapsed(type: EntryType, categoryName: string): boolean {
     return collapsedCategories.has(`${type}:${categoryName}`)
   }
 
@@ -110,6 +111,27 @@
   let incomeCategories = $derived(categoryEntries(incomeEntries))
   let expenseCategories = $derived(categoryEntries(expenseEntries))
 
+  /**
+   * The five sections, in the order money moves through them: what arrives,
+   * what is spent, and the three that hold on to it.
+   *
+   * A section per type rather than one per side. The side still decides which
+   * categories a new entry may join — a Housing heading holds Rent and a roof
+   * fund alike — but reading a budget means seeing what is being kept apart
+   * from what is being spent, and until v7 those were the same column.
+   */
+  const SECTION_TYPES: EntryType[] = ['income', 'expense', 'savings', 'bill', 'purchase']
+
+  /** Which section's explanation is open, if any. */
+  let guideType = $state<EntryType | null>(null)
+
+  let sections = $derived(
+    SECTION_TYPES.map(type => ({
+      type,
+      categories: categoryEntries(entries.filter(e => e.entryType === type)),
+    })),
+  )
+
   // Categories are offered by *side*, not by type: a Housing heading holds Rent
   // and a roof fund alike, so a purchase entry picks from the same list an
   // expense does.
@@ -124,7 +146,7 @@
 
   // The category header toggles collapse on click, so the "+" has to stop the event
   // reaching it — otherwise adding to a category also folds it away underneath you.
-  function addToCategory(event: MouseEvent, type: 'income' | 'expense', categoryName: string) {
+  function addToCategory(event: MouseEvent, type: EntryType, categoryName: string) {
     event.stopPropagation()
     openAddModal(type, categoryName)
   }
@@ -222,6 +244,83 @@
   }
 </script>
 
+{#snippet typeSection(type: EntryType, sectionCategories: EntryCategory[])}
+  <table use:categorySortable>
+    <thead>
+      <tr>
+        <th class="col-name">
+        <span class="section-name">{t(`entryType.${type}` as 'entryType.expense')}</span>
+        <button
+          class="section-info"
+          aria-label={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
+          title={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
+          onclick={() => (guideType = type)}
+        >?</button>
+      </th>
+        <th class="right col-amount col-planned-mo">{t('budget.plannedMo')}</th>
+        <th class="right col-amount col-planned-yr">{t('budget.plannedYr')}</th>
+      </tr>
+    </thead>
+    {#each sectionCategories as category (category.categoryId)}
+      <tbody use:sortable data-category-id={category.categoryId}>
+        {#if sectionCategories.length > 1 || editing}
+          <tr class="category-header" class:editing class:collapsed={isCollapsed(type, category.categoryName)} onclick={() => toggleCategory(type, category.categoryName)}>
+            <td>
+              {#if editing}
+                <span
+                  class="category-drag-handle"
+                  title={t('budget.dragToReorder')}
+                  role="presentation"
+                  onclick={(e) => e.stopPropagation()}
+                >⠿</span>
+              {/if}
+              <span class="category-chevron">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  {#if isCollapsed(type, category.categoryName)}
+                    <path d="M4 2 L10 6 L4 10 Z" />
+                  {:else}
+                    <path d="M2 4 L6 10 L10 4 Z" />
+                  {/if}
+                </svg>
+              </span>
+              {#if editing}
+                <button
+                  class="category-name category-name-btn"
+                  aria-label={t('budget.editCategoryOf', { category: category.categoryName || t('budget.uncategorised') })}
+                  onclick={(e) => openCategoryEditor(e, category.categoryId)}
+                >{category.categoryName || t('budget.uncategorised')}</button>
+              {:else}
+                <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
+              {/if}
+              {#if editing}
+                <button
+                  class="category-add"
+                  title={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
+                  aria-label={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
+                  onclick={(e) => addToCategory(e, type, category.categoryName)}
+                >+</button>
+              {/if}
+            </td>
+            <td class="right subtotal col-planned-mo"><Money value={category.plannedTotal} /></td>
+            <td class="right subtotal yearly col-planned-yr"><Money value={category.plannedTotal * 12} /></td>
+          </tr>
+        {/if}
+        {#if !isCollapsed(type, category.categoryName)}
+          {#each category.entries as entry (entry.entryId)}
+            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
+          {/each}
+        {/if}
+      </tbody>
+    {/each}
+    <tfoot>
+      {#if editing}
+        <AddEntryRow onadd={() => openAddModal(type)} />
+      {/if}
+    </tfoot>
+  </table>
+
+{/snippet}
+
 <div class="budget-table" class:view-yearly={viewMode === 'yearly'}>
   <div class="table-toolbar">
     <button
@@ -233,138 +332,22 @@
     </button>
   </div>
 
-  <table use:categorySortable>
-    <thead>
-      <tr>
-        <th class="col-name">{t('budget.income')}</th>
-        <th class="right col-amount col-planned-mo">{t('budget.plannedMo')}</th>
-        <th class="right col-amount col-planned-yr">{t('budget.plannedYr')}</th>
-      </tr>
-    </thead>
-    {#each incomeCategories as category (category.categoryId)}
-      <tbody use:sortable data-category-id={category.categoryId}>
-        {#if incomeCategories.length > 1 || editing}
-          <tr class="category-header" class:editing class:collapsed={isCollapsed('income', category.categoryName)} onclick={() => toggleCategory('income', category.categoryName)}>
-            <td>
-              {#if editing}
-                <span
-                  class="category-drag-handle"
-                  title={t('budget.dragToReorder')}
-                  role="presentation"
-                  onclick={(e) => e.stopPropagation()}
-                >⠿</span>
-              {/if}
-              <span class="category-chevron">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  {#if isCollapsed('income', category.categoryName)}
-                    <path d="M4 2 L10 6 L4 10 Z" />
-                  {:else}
-                    <path d="M2 4 L6 10 L10 4 Z" />
-                  {/if}
-                </svg>
-              </span>
-              {#if editing}
-                <button
-                  class="category-name category-name-btn"
-                  aria-label={t('budget.editCategoryOf', { category: category.categoryName || t('budget.uncategorised') })}
-                  onclick={(e) => openCategoryEditor(e, category.categoryId)}
-                >{category.categoryName || t('budget.uncategorised')}</button>
-              {:else}
-                <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
-              {/if}
-              {#if editing}
-                <button
-                  class="category-add"
-                  title={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
-                  aria-label={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
-                  onclick={(e) => addToCategory(e, 'income', category.categoryName)}
-                >+</button>
-              {/if}
-            </td>
-            <td class="right subtotal col-planned-mo"><Money value={category.plannedTotal} /></td>
-            <td class="right subtotal yearly col-planned-yr"><Money value={category.plannedTotal * 12} /></td>
-          </tr>
-        {/if}
-        {#if !isCollapsed('income', category.categoryName)}
-          {#each category.entries as entry (entry.entryId)}
-            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
-          {/each}
-        {/if}
-      </tbody>
-    {/each}
-    <tfoot>
-      {#if editing}
-        <AddEntryRow onadd={() => openAddModal('income')} />
-      {/if}
-    </tfoot>
-  </table>
-
-  <table use:categorySortable>
-    <thead>
-      <tr>
-        <th class="col-name">{t('budget.expenses')}</th>
-        <th class="right col-amount col-planned-mo">{t('budget.plannedMo')}</th>
-        <th class="right col-amount col-planned-yr">{t('budget.plannedYr')}</th>
-      </tr>
-    </thead>
-    {#each expenseCategories as category (category.categoryId)}
-      <tbody use:sortable data-category-id={category.categoryId}>
-        {#if expenseCategories.length > 1 || editing}
-          <tr class="category-header" class:editing class:collapsed={isCollapsed('expense', category.categoryName)} onclick={() => toggleCategory('expense', category.categoryName)}>
-            <td>
-              {#if editing}
-                <span
-                  class="category-drag-handle"
-                  title={t('budget.dragToReorder')}
-                  role="presentation"
-                  onclick={(e) => e.stopPropagation()}
-                >⠿</span>
-              {/if}
-              <span class="category-chevron">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  {#if isCollapsed('expense', category.categoryName)}
-                    <path d="M4 2 L10 6 L4 10 Z" />
-                  {:else}
-                    <path d="M2 4 L6 10 L10 4 Z" />
-                  {/if}
-                </svg>
-              </span>
-              {#if editing}
-                <button
-                  class="category-name category-name-btn"
-                  aria-label={t('budget.editCategoryOf', { category: category.categoryName || t('budget.uncategorised') })}
-                  onclick={(e) => openCategoryEditor(e, category.categoryId)}
-                >{category.categoryName || t('budget.uncategorised')}</button>
-              {:else}
-                <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
-              {/if}
-              {#if editing}
-                <button
-                  class="category-add"
-                  title={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
-                  aria-label={t('budget.addEntryTo', { category: category.categoryName || t('budget.uncategorised') })}
-                  onclick={(e) => addToCategory(e, 'expense', category.categoryName)}
-                >+</button>
-              {/if}
-            </td>
-            <td class="right subtotal col-planned-mo"><Money value={category.plannedTotal} /></td>
-            <td class="right subtotal yearly col-planned-yr"><Money value={category.plannedTotal * 12} /></td>
-          </tr>
-        {/if}
-        {#if !isCollapsed('expense', category.categoryName)}
-          {#each category.entries as entry (entry.entryId)}
-            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
-          {/each}
-        {/if}
-      </tbody>
-    {/each}
-    <tfoot>
-      {#if editing}
-        <AddEntryRow onadd={() => openAddModal('expense')} />
-      {/if}
-    </tfoot>
-  </table>
+  <!--
+    One section per type, in the order money moves through them: what comes in,
+    what is spent, and the three that keep it. A type with no entries and no
+    edit mode shows nothing — five empty tables would be five headings to scroll
+    past before reaching the one with anything in it.
+  -->
+  {#each sections as section (section.type)}
+    {#if section.categories.length > 0 || editing}
+      {@render typeSection(section.type, section.categories)}
+    {/if}
+  {/each}
 </div>
+
+{#if guideType}
+  <TypeGuideModal type={guideType} onclose={() => (guideType = null)} />
+{/if}
 
 {#if addModalContext}
   <AddEntryModal
@@ -399,6 +382,30 @@
 {/if}
 
 <style>
+  .section-name {
+    vertical-align: middle;
+  }
+  /* A question mark rather than an icon: it is the shape people already read as
+     "explain this", and it costs no glyph that has to survive four languages. */
+  .section-info {
+    margin-left: 0.4rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid #c8ccd0;
+    background: none;
+    color: #777;
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .section-info:hover {
+    border-color: #2d6a4f;
+    color: #2d6a4f;
+  }
+
   .budget-table {
     display: flex;
     flex-direction: column;

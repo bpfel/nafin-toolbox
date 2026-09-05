@@ -4,7 +4,6 @@
     holdsMoney,
     savesTowardsTarget,
     sideOf,
-    type ReserveDefinition,
     type VaultAccount,
     type VaultEntry,
   } from '../../../lib/crypto/vault'
@@ -19,11 +18,11 @@
     toCents,
   } from '../../../lib/accounts/reserveMath'
   import { isEditing } from '../../../lib/util/editMode.svelte'
+  import { monthLabel } from '../../../lib/util/months'
   import { formatAmount } from '../../../lib/util/money'
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import RoutingControls from './RoutingControls.svelte'
-  import ReserveFields from './ReserveFields.svelte'
 
   interface Routing {
     sourceAccountId: string | null
@@ -40,7 +39,6 @@
     // affordability date instead of raising a warning.
     sinkAvailable: string | null
     onroutingchange: (routing: Routing) => void
-    onreservechange: (reserve: ReserveDefinition | undefined) => void
   }
 
   let {
@@ -50,7 +48,6 @@
     currentMonth,
     sinkAvailable,
     onroutingchange,
-    onreservechange,
   }: Props = $props()
 
   let expanded = $state(false)
@@ -60,16 +57,6 @@
   // open folds it away rather than stranding live controls on the row.
   let editing = $derived(isEditing('accounts'))
   let showEditor = $derived(expanded && editing)
-
-  const MONTH_NAMES = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ]
-
-  function monthLabel(month: string): string {
-    const [year, index] = month.split('-')
-    return `${MONTH_NAMES[Number(index) - 1] ?? month} ${year}`
-  }
 
   function cents(amount: string | null): number {
     if (amount === null) return 0
@@ -291,15 +278,6 @@
             onchange={onroutingchange}
           />
 
-          {#if savesTowardsTarget(entry.type)}
-            <ReserveFields
-              type={entry.type}
-              {reserve}
-              {currentMonth}
-              {plannedAmount}
-              onchange={onreservechange}
-            />
-          {/if}
         </div>
       {/if}
     </div>

@@ -4,7 +4,6 @@
   import * as engine from '../../../lib/budget/budgetEngine'
   import {
     sideOf,
-    type ReserveDefinition,
     type VaultEntry,
     type VaultCategory,
     type VaultData,
@@ -289,28 +288,6 @@
     version++
   }
 
-  function applyReserve(entryId: string, reserve: ReserveDefinition | undefined) {
-    const entry = findEntry(entryId)
-    if (!entry) return
-
-    const previous = entry.reserve
-    if (reserve === undefined) delete entry.reserve
-    else entry.reserve = reserve
-
-    // `reserve` implies expense with a non-null sink. The set-aside gate makes
-    // that structural; this catches any other route in.
-    if (!isLegalEntryRouting(entry)) {
-      if (previous === undefined) delete entry.reserve
-      else entry.reserve = previous
-      error = t('alloc.mustSetAside', { entry: entry.name })
-      return
-    }
-
-    error = null
-    markDirty()
-    version++
-  }
-
 </script>
 
 {#snippet categoryBlock(type: 'income' | 'expense', category: RowCategory, withHeader: boolean)}
@@ -343,7 +320,6 @@
             {currentMonth}
             sinkAvailable={row.sinkAvailable}
             onroutingchange={(routing) => applyRouting(row.entry.id, routing)}
-            onreservechange={(reserve) => applyReserve(row.entry.id, reserve)}
           />
         {/each}
       </div>

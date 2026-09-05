@@ -2,12 +2,28 @@
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
-  import { sideOf, type EntryType, type VaultData } from '../../lib/crypto/vault'
+  import {
+    savesTowardsTarget,
+    type EntryType,
+    type VaultData,
+  } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
   import { formatAmount, parseAmount } from '../../lib/util/money'
+  import { monthNames } from '../../lib/util/months'
 
+  /**
+   * Adding or editing one budget line.
+   *
+   * There is no "what kind is this?" question: the type comes from the button
+   * that opened the dialog, the way income and expense always did. Each type
+   * asks for what it needs and nothing else, which is the whole reason the type
+   * exists — a bill knows it recurs, a purchase knows it wears out, and neither
+   * has to be assembled from a generic entry plus a second screen.
+   *
+   * The type cannot be changed here. Turning a bill into a purchase is a
+   * different line with a different meaning; delete and add.
+   */
   interface Props {
-    /** The side the "+" was pressed on, and the type the dialog opens with. */
     type: EntryType
     categories: { name: string; id: string }[]
     editEntry?: { id: string; name: string; categoryName: string; plannedAmount?: string } | null
@@ -28,30 +44,9 @@
   let { type, categories, editEntry = null, presetCategoryName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
 
   let isEdit = $derived(editEntry != null)
+  /** Bill and purchase save towards a figure; the other three do not. */
+  let targeted = $derived(savesTowardsTarget(type))
 
-  /**
-   * What kind of line this is — chosen here, not on a later screen.
-   *
-   * Before v7 there were two types and the interesting distinctions lived
-   * elsewhere: setting up a tax bill meant creating an expense, going to
-   * Allocations, attaching a reserve and raising its duration past twelve
-   * months. One question, asked once, replaces all of that.
-   */
-  let selectedType = $state<EntryType>(untrack(() => type))
-
-  const TYPES_FOR_SIDE: Record<'income' | 'expense', EntryType[]> = {
-    income: ['income'],
-    expense: ['expense', 'savings', 'bill', 'purchase'],
-  }
-
-  let typeChoices = $derived(TYPES_FOR_SIDE[sideOf(selectedType)])
-
-  // 'YYYY-MM'. A bill or a purchase anchors its cycle here; the engine takes it
-  // as an argument rather than reading a clock of its own.
-  const currentMonth = (() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })()
   // Seeded once: the modal is created fresh each time it opens, so every read of
   // `editEntry` below is deliberately an initial value rather than a reactive
   // one. `untrack` says so out loud, to Svelte and to the next reader.
@@ -63,6 +58,60 @@
   let useNewCategory = $state(false)
   let error = $state<string | null>(null)
 
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  /**
+   * How often a bill comes round, in months.
+   *
+   * Divisors of twelve, and not one: a bill that arrives every month is just an
+   * expense, with nothing to save up for. Every real Swiss billing cycle is on
+   * this list — quarterly insurance, half-yearly tax instalments, an annual
+   * subscription — and constraining it to divisors is what lets the due date be
+   * a month with no year attached: shifting the anchor by a whole year cannot
+   * change a series whose period divides twelve.
+   */
+  const BILL_PERIODS = [2, 3, 4, 6, 12]
+  const DEFAULT_BILL_PERIOD = 12
+  const DEFAULT_PURCHASE_YEARS = 2
+
+  /** The reserve as stored: the plan view does not carry one. */
+  function storedReserve() {
+    return editEntry ? vault.budget.entries.find(e => e.id === editEntry.id)?.reserve : undefined
+  }
+
+  let totalValue = $state(
+    untrack(() => {
+      const reserve = storedReserve()
+      return reserve ? formatAmount(reserve.targetAmount) : ''
+    }),
+  )
+
+  let periodMonths = $state(
+    untrack(() => {
+      const reserve = storedReserve()
+      if (reserve) return reserve.periodMonths
+      return type === 'bill' ? DEFAULT_BILL_PERIOD : DEFAULT_PURCHASE_YEARS * 12
+    }),
+  )
+
+  let anchorMonthNumber = $state(
+    untrack(() => {
+      const reserve = storedReserve()
+      return (reserve?.anchorMonth ?? currentMonth).slice(5, 7)
+    }),
+  )
+
+  let anchorYear = $state(
+    untrack(() => {
+      const reserve = storedReserve()
+      return (reserve?.anchorMonth ?? currentMonth).slice(0, 4)
+    }),
+  )
+
+  let periodYears = $derived(Math.floor(periodMonths / 12))
+  let periodRemainderMonths = $derived(periodMonths % 12)
+
   let plannedMoValue = $state(
     untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount)) : '')),
   )
@@ -70,6 +119,56 @@
     untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount) * 12) : '')),
   )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
+
+  // --- the three-way relation --------------------------------------------
+  //
+  // total = monthly x period. State two of them and the third follows, which is
+  // what makes a bill or a purchase describable in the terms people actually
+  // hold them in: "2000 francs, and it lasts seven years" or "fifteen a month,
+  // and let us see when that gets me there".
+  //
+  // For a bill only the first form is offered — the period is a fixed set of
+  // billing cycles, so deriving it from an amount would produce cycles that do
+  // not exist.
+
+  function centsOf(value: string): number {
+    const parsed = parseAmount(value)
+    return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0
+  }
+
+  function monthlyFromTotal(): string {
+    const total = centsOf(totalValue)
+    if (total <= 0 || periodMonths <= 0) return ''
+    return formatAmount(Math.round(total / periodMonths) / 100)
+  }
+
+  let derivedMonthly = $derived(targeted ? monthlyFromTotal() : '')
+
+  function changeTotal(raw: string) {
+    totalValue = raw
+  }
+
+  function changeBillPeriod(raw: string) {
+    const months = Number(raw)
+    if (BILL_PERIODS.includes(months)) periodMonths = months
+  }
+
+  function changePurchasePeriod(years: string, months: string) {
+    const total = Math.max(1, Number(years || 0) * 12 + Number(months || 0))
+    if (Number.isFinite(total)) periodMonths = total
+  }
+
+  /**
+   * The other direction: say what you are willing to put aside and find out how
+   * long it takes. Rounded up, because arriving a month early is not a problem
+   * and arriving a month short is.
+   */
+  function changePurchaseMonthly(raw: string) {
+    const monthly = centsOf(raw)
+    const total = centsOf(totalValue)
+    if (monthly <= 0 || total <= 0) return
+    periodMonths = Math.max(1, Math.ceil(total / monthly))
+  }
 
   function handleValueFocus(field: 'planned_mo' | 'planned_yr', event: FocusEvent) {
     valueFocusedField = field
@@ -130,35 +229,62 @@
     }
   }
 
-  /** The monthly figure as it will be stored, or '' when the box is empty. */
+  /** The monthly figure as it will be stored, or '' when there is none. */
   function monthlyAmount(): string {
+    if (targeted) {
+      const total = centsOf(totalValue)
+      if (total <= 0 || periodMonths <= 0) return ''
+      return (Math.round(total / periodMonths) / 100).toFixed(2)
+    }
     const value = parseAmount(plannedMoValue)
     if (plannedMoValue.trim() === '' || isNaN(value) || !isFinite(value)) return ''
     return value.toFixed(2)
   }
 
+  let anchorMonth = $derived(
+    type === 'bill'
+      // The year is noise for a bill: the period divides twelve, so the series
+      // is the same whichever year the anchor names.
+      ? `${currentMonth.slice(0, 4)}-${anchorMonthNumber}`
+      : `${anchorYear.padStart(4, '0')}-${anchorMonthNumber}`,
+  )
+
   let resolvedCategoryName = $derived(useNewCategory ? newCategoryName.trim() : selectedCategory)
+
+  let canSave = $derived(
+    name.trim() !== '' &&
+      resolvedCategoryName !== '' &&
+      (!targeted || centsOf(totalValue) > 0),
+  )
 
   function save() {
     const trimmed = name.trim()
-    if (!trimmed) return
-    if (!isEdit && !resolvedCategoryName) return
+    if (!canSave) return
     error = null
 
     try {
       if (isEdit && editEntry) {
         engine.updateEntry(vault, editEntry.id, {
           name: trimmed,
-          type: selectedType,
           categoryName: resolvedCategoryName,
         })
+        if (targeted) {
+          engine.setReserve(vault, editEntry.id, {
+            targetAmount: (centsOf(totalValue) / 100).toFixed(2),
+            periodMonths,
+            anchorMonth,
+          })
+          onsave?.(editEntry.id, monthlyAmount())
+        }
       } else {
         engine.createEntry(vault, {
           name: trimmed,
-          type: selectedType,
+          type,
           categoryName: resolvedCategoryName,
           plannedAmount: monthlyAmount(),
-          anchorMonth: currentMonth,
+          anchorMonth,
+          targetAmount: targeted ? (centsOf(totalValue) / 100).toFixed(2) : undefined,
+          periodMonths: targeted ? periodMonths : undefined,
         })
       }
       oncreated()
@@ -181,18 +307,11 @@
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap>
-    <h3>{t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', { type: sideOf(selectedType) === 'income' ? t('category.typeIncome') : t('category.typeExpense') })}</h3>
-
-    {#if typeChoices.length > 1}
-      <label class="field">
-        <span class="label">{t('entry.kind')}</span>
-        <select bind:value={selectedType}>
-          {#each typeChoices as choice}
-            <option value={choice}>{t(`entryType.${choice}` as 'entryType.expense')}</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
+    <h3>
+      {t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', {
+        type: t(`entryType.${type}` as 'entryType.expense'),
+      })}
+    </h3>
 
     <label class="field">
       <span class="label">{t('entry.category')}</span>
@@ -204,7 +323,7 @@
             placeholder={t('entry.newCategoryPlaceholder')}
           />
           <button class="link-btn" onclick={() => { useNewCategory = false; newCategoryName = '' }}>
-            existing
+            {t('entry.useExistingCategory')}
           </button>
         </div>
       {:else}
@@ -215,7 +334,7 @@
             {/each}
           </select>
           <button class="link-btn" onclick={() => (useNewCategory = true)}>
-            + new
+            {t('entry.newCategory')}
           </button>
         </div>
       {/if}
@@ -231,7 +350,98 @@
       />
     </label>
 
-    <div class="values-section">
+    {#if targeted}
+      <label class="field">
+        <span class="label">
+          {type === 'bill' ? t('reserve.billAmount') : t('reserve.price')}
+        </span>
+        <input
+          type="text"
+          inputmode="decimal"
+          value={totalValue}
+          oninput={(e) => changeTotal(e.currentTarget.value)}
+        />
+      </label>
+
+      {#if type === 'bill'}
+        <label class="field">
+          <span class="label">{t('reserve.arrivesEvery')}</span>
+          <select value={String(periodMonths)} onchange={(e) => changeBillPeriod(e.currentTarget.value)}>
+            {#each BILL_PERIODS as months}
+              <option value={String(months)}>{t('reserve.everyMonths', { months: String(months) })}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="label">{t('reserve.dueMonth')}</span>
+          <select bind:value={anchorMonthNumber}>
+            {#each monthNames() as monthName, i}
+              <option value={String(i + 1).padStart(2, '0')}>{monthName}</option>
+            {/each}
+          </select>
+        </label>
+      {:else}
+        <div class="field">
+          <span class="label">{t('reserve.lasts')}</span>
+          <div class="split">
+            <label class="split-field">
+              <input
+                type="text"
+                inputmode="numeric"
+                value={String(periodYears)}
+                oninput={(e) => changePurchasePeriod(e.currentTarget.value, String(periodRemainderMonths))}
+              />
+              <span class="split-label">{t('time.years')}</span>
+            </label>
+            <label class="split-field">
+              <input
+                type="text"
+                inputmode="numeric"
+                value={String(periodRemainderMonths)}
+                oninput={(e) => changePurchasePeriod(String(periodYears), e.currentTarget.value)}
+              />
+              <span class="split-label">{t('time.monthsShort')}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="label">{t('reserve.acquired')}</span>
+          <div class="split">
+            <label class="split-field wide">
+              <select bind:value={anchorMonthNumber}>
+                {#each monthNames() as monthName, i}
+                  <option value={String(i + 1).padStart(2, '0')}>{monthName}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="split-field">
+              <input type="text" inputmode="numeric" maxlength="4" bind:value={anchorYear} />
+            </label>
+          </div>
+        </div>
+      {/if}
+
+      <label class="field">
+        <span class="label">{t('reserve.setAsideMonthly')}</span>
+        {#if type === 'bill'}
+          <!-- Derived, and only derived: the cycle is fixed, so the amount that
+               keeps up with it is arithmetic rather than a preference. -->
+          <input type="text" value={derivedMonthly} readonly />
+        {:else}
+          <!-- Editable, and it moves the period rather than fighting it: say
+               what you can put aside and find out when that gets you there. -->
+          <input
+            type="text"
+            inputmode="decimal"
+            value={derivedMonthly}
+            onchange={(e) => changePurchaseMonthly(e.currentTarget.value)}
+          />
+        {/if}
+      </label>
+    {:else}
+      <div class="values-section">
         <span class="label">{t('entry.values')}</span>
         <div class="values-grid">
           <label class="value-field">
@@ -262,6 +472,7 @@
           </label>
         </div>
       </div>
+    {/if}
 
     {#if error}
       <p class="error">{error}</p>
@@ -273,7 +484,7 @@
       {/if}
       <span class="spacer"></span>
       <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
-      <button class="btn save" onclick={save} disabled={!name.trim() || !resolvedCategoryName}>
+      <button class="btn save" onclick={save} disabled={!canSave}>
         {isEdit ? t('action.save') : t('entry.add')}
       </button>
     </div>
@@ -281,6 +492,35 @@
 </div>
 
 <style>
+  .split {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .split-field {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .split-field.wide {
+    flex: 2;
+  }
+  .split-field input,
+  .split-field select {
+    min-width: 0;
+    flex: 1;
+  }
+  .split-label {
+    font-size: 0.8rem;
+    color: #666;
+    white-space: nowrap;
+  }
+  input[readonly] {
+    background: #f5f5f7;
+    color: #555;
+  }
+
   .backdrop {
     position: fixed;
     inset: 0;
