@@ -21,7 +21,16 @@
   let { email, role, onlogout }: Props = $props()
 </script>
 
-<ScreenChrome title={t('nav.profile')} eye={false} />
+<ScreenChrome title={t('nav.profile')} eye={false}>
+  {#snippet children()}
+    <!--
+      Signing out acts on the whole app, not on anything in the list below it,
+      so it sits with the screen's controls rather than at the end of the
+      content — where reaching it meant scrolling past everything else.
+    -->
+    <button class="logout" onclick={onlogout}>{t('menu.logout')}</button>
+  {/snippet}
+</ScreenChrome>
 
 <div class="profile">
   <div class="identity">
@@ -47,7 +56,6 @@
     </li>
   </ul>
 
-  <button class="logout" onclick={onlogout}>{t('menu.logout')}</button>
 </div>
 
 <style>
@@ -134,11 +142,11 @@
   .logout {
     background: none;
     border: 1px solid #e0b4b4;
-    border-radius: 8px;
+    border-radius: 6px;
     color: #c0392b;
-    padding: 0.6rem 1rem;
-    width: 100%;
-    font-size: 0.95rem;
+    padding: 0.35rem 0.9rem;
+    min-height: 34px;
+    font-size: 0.85rem;
     cursor: pointer;
   }
 
@@ -161,9 +169,7 @@
     }
 
     .logout {
-      width: auto;
-      min-width: 12rem;
-      padding: 0.7rem 1.5rem;
+      padding: 0.4rem 1.1rem;
     }
   }
 </style>

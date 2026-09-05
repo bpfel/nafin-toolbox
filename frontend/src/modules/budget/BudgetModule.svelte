@@ -52,9 +52,13 @@
     dismissedSetup = true
   }
 
-  // Monthly or yearly. Owned here because two children answer to it: the
-  // table's own toolbar flips it, and the summary above has to move with it.
-  let viewMode = $state<'monthly' | 'yearly'>('monthly')
+  // Monthly or yearly, owned by the screen: the control that flips it sits in
+  // the action strip, and the summary and the table both answer to it.
+  interface Props {
+    viewMode?: 'monthly' | 'yearly'
+  }
+
+  let { viewMode = $bindable('monthly') }: Props = $props()
 
   let confirmingReset = $state(false)
 

@@ -322,16 +322,6 @@
 {/snippet}
 
 <div class="budget-table" class:view-yearly={viewMode === 'yearly'}>
-  <div class="table-toolbar">
-    <button
-      class="view-toggle"
-      aria-label={t('budget.viewToggle', { mode: viewMode === 'monthly' ? t('budget.monthly') : t('budget.yearly'), other: viewMode === 'monthly' ? t('budget.yearly') : t('budget.monthly') })}
-      onclick={() => viewMode = viewMode === 'monthly' ? 'yearly' : 'monthly'}
-    >
-      {viewMode === 'monthly' ? t('budget.month') : t('budget.year')}
-    </button>
-  </div>
-
   <!--
     One section per type, in the order money moves through them: what comes in,
     what is spent, and the three that keep it. A type with no entries and no
@@ -585,26 +575,7 @@
     opacity: 1;
   }
 
-  .table-toolbar {
-    display: none;
-  }
 
-  .view-toggle {
-    padding: 0.2rem 0.6rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background: #e9ecef;
-    color: #495057;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    cursor: pointer;
-    min-height: auto;
-    min-width: auto;
-  }
-  .view-toggle:hover {
-    background: #dee2e6;
-  }
 
   @media (hover: none) and (pointer: coarse) {
     .category-chevron {
@@ -626,23 +597,6 @@
     /* Sticks once scrolled past, so switching month/year does not mean
        scrolling back to the top of a long budget. `top: 0` is relative to the
        nearest scroll container, which here is the page. */
-    .table-toolbar {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 0.5rem;
-      position: sticky;
-      top: 0;
-      z-index: 3;
-      /* The toolbar is transparent, so without a backdrop the table scrolls
-         visibly underneath the button. */
-      background: linear-gradient(to bottom, #f8f9fa 70%, rgba(248, 249, 250, 0));
-      padding: 0.4rem 0 0.6rem;
-    }
-    .view-toggle {
-      min-height: 34px;
-      padding: 0.3rem 0.9rem;
-      font-size: 0.8rem;
-    }
     th {
       padding: 0.5rem;
       font-size: 0.8rem;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte'
   import { t } from '../i18n/index.svelte'
   import { isEditing, toggleEditing } from '../util/editMode.svelte'
   import { getVaultState } from '../crypto/vaultStore.svelte'
@@ -40,9 +41,16 @@
      * would offer to hide nothing.
      */
     eye?: boolean
+    /**
+     * Controls belonging to this screen alone — the budget's month/year switch,
+     * say. They sit beside the shared ones rather than inside the content,
+     * because a control that acts on the whole screen should be where the
+     * screen's other controls are and should not scroll away from them.
+     */
+    children?: Snippet
   }
 
-  let { title, editKey, eye = true }: Props = $props()
+  let { title, editKey, eye = true, children }: Props = $props()
 
   const vaultState = getVaultState()
 
@@ -89,7 +97,7 @@
   Nothing to do, nothing to show: an empty strip is a bar of chrome that earns
   none of the room it takes, and on a phone that room is the scarce thing.
 -->
-{#if eye || editKey || vaultState.saving || vaultState.dirty}
+{#if eye || editKey || children || vaultState.saving || vaultState.dirty}
   <div class="screen-actions">
     {#if vaultState.saving}
       <span class="save-indicator">{t('state.saving')}</span>
@@ -98,6 +106,10 @@
     {/if}
 
     <span class="spacer"></span>
+
+    {#if children}
+      {@render children()}
+    {/if}
 
     {#if editKey}
       <button
