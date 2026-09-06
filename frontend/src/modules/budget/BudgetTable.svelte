@@ -245,22 +245,31 @@
 </script>
 
 {#snippet typeSection(type: EntryType, sectionCategories: EntryCategory[])}
-  <table class="section-{type}" use:categorySortable>
-    <thead>
-      <tr>
-        <th class="col-name">
-        <span class="section-name">{t(`entryType.${type}` as 'entryType.expense')}</span>
-        <button
-          class="section-info"
-          aria-label={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
-          title={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
-          onclick={() => (guideType = type)}
-        ><span class="info-glyph" aria-hidden="true">i</span></button>
-      </th>
-        <th class="right col-amount col-planned-mo">{t('budget.plannedMo')}</th>
-        <th class="right col-amount col-planned-yr">{t('budget.plannedYr')}</th>
-      </tr>
-    </thead>
+  <!--
+    The title sits on the page rather than inside the table, because it heads a
+    region and not a column. As a `<th>` it read as one more row of table
+    furniture, and with five sections it was five of them.
+
+    The column labels are gone with it. "Planned /mo" and "Planned /yr" said the
+    same two things above every section — ten labels for two facts, and both are
+    plain from the figures underneath.
+  -->
+  <div class="section-head section-{type}">
+    <h2 class="section-name">{t(`entryType.${type}` as 'entryType.expense')}</h2>
+    <button
+      class="section-info"
+      aria-label={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
+      title={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
+      onclick={() => (guideType = type)}
+    ><span class="info-glyph" aria-hidden="true">i</span></button>
+  </div>
+
+  <table use:categorySortable>
+    <colgroup>
+      <col class="col-name" />
+      <col class="col-amount" />
+      <col class="col-amount" />
+    </colgroup>
     {#each sectionCategories as category (category.categoryId)}
       <tbody use:sortable data-category-id={category.categoryId}>
         {#if sectionCategories.length > 1 || editing}
@@ -419,11 +428,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 0.7rem;
-    height: 0.7rem;
+    width: 1.05rem;
+    height: 1.05rem;
     border-radius: 50%;
     border: 1px solid currentColor;
-    font-size: 0.5rem;
+    font-size: 0.72rem;
     font-weight: 700;
     font-style: normal;
     line-height: 1;
@@ -451,59 +460,60 @@
   .col-amount {
     width: 20%;
   }
-  th {
-    text-align: left;
-    /*
-     * The section is the level you look for first, so it is the level that
-     * looks like something. It used to be a small uppercase label on a grey
-     * fill — the same device as the category below it, three percent lighter,
-     * and *smaller* than the entries it contained. Three levels ranked by
-     * shades of one thing, with size pointing the wrong way.
-     *
-     * Type and space instead of fill and border. Space is the cheapest
-     * separator there is and the one this table spent nothing on.
-     */
-    padding: 1.75rem 0.75rem 0.5rem;
-    background: none;
-    border-bottom: 1px solid var(--rule);
-    font-size: 1.05rem;
+  /*
+   * On the page's own background, above the card. Three levels, three devices:
+   * the section is large and outside the box, the category is uppercase and
+   * carries the total, the entries are plain and are what add up to it.
+   */
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    margin: 1.75rem 0 0.5rem;
+    padding: 0 0.25rem;
+  }
+
+  .section-head:first-of-type {
+    margin-top: 0;
+  }
+
+  .section-name {
+    font-size: 1.2rem;
     font-weight: 600;
     letter-spacing: -0.01em;
-    text-transform: none;
     color: var(--ink);
   }
 
   /* The one place the direction colour is worth spending: once per section,
      rather than on every figure in every row beneath it. */
-  .section-income th { color: var(--money-in); }
-  .section-expense th { color: var(--ink); }
-  .section-savings th,
-  .section-bill th,
-  .section-purchase th { color: var(--money-held); }
-  th.right {
-    text-align: right;
-  }
+  .section-income .section-name { color: var(--money-in); }
+  .section-expense .section-name { color: var(--ink); }
+  .section-savings .section-name,
+  .section-bill .section-name,
+  .section-purchase .section-name { color: var(--money-held); }
   :global(.category-header) {
     cursor: pointer;
     user-select: none;
   }
   :global(.category-header) td {
-    /* A sub-heading inside a section you have already located, so the quietest
-       of the three rather than the middle one. No fill, no rule: told apart by
-       being small, faint and spaced out. */
-    padding: 0.9rem 0.75rem 0.3rem;
+    /* Capitalised and a shade larger than the entries beneath it, because it
+       carries their total — it is a summary line, not a label. */
+    padding: 0.85rem 0.75rem 0.35rem;
     background: none;
     font-weight: 600;
-    font-size: 0.72rem;
+    font-size: 1rem;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ink-faint);
-    border-bottom: none;
+    letter-spacing: 0.03em;
+    color: var(--ink);
+    border-bottom: 1px solid var(--rule);
   }
   :global(.category-header.collapsed) td {
     border-bottom: 1px solid var(--rule);
   }
   :global(.category-header) .subtotal {
+    /* The only bold figure in the section: a total, against entries that are
+       not. Weight is what says "this one is the sum of those". */
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
@@ -618,12 +628,8 @@
   }
 
   @media (max-width: 768px) {
-    /* Sticks once scrolled past, so switching month/year does not mean
-       scrolling back to the top of a long budget. `top: 0` is relative to the
-       nearest scroll container, which here is the page. */
-    th {
-      padding: 0.5rem;
-      font-size: 0.8rem;
+    .section-name {
+      font-size: 1.1rem;
     }
     /* Only one amount column survives on a narrow screen — the view toggle
        swaps which of the two it is — so the name takes the rest. */

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
-  import { sideOf, type EntryType } from '../../lib/crypto/vault'
+  import type { EntryType } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
   import Money from '../../lib/util/Money.svelte'
 
@@ -34,7 +34,6 @@
 
 <tr
   class="entry-row"
-  class:income={sideOf(entry.entryType) === 'income'}
   data-entry-id={entry.entryId}
 >
   <td class="name-cell">
@@ -77,9 +76,9 @@
   .entry-row td {
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid #eee;
-  }
-  .entry-row.income td {
-    background: #f0fdf4;
+    /* Smaller than the category line above, which carries their total. The
+       entries are what add up; the line above is the sum. */
+    font-size: 0.92rem;
   }
   .name-cell {
     overflow: hidden;
@@ -109,7 +108,9 @@
     cursor: grabbing;
   }
   .name-text {
-    font-weight: 500;
+    /* Not bold. The only bold thing in a section is the total, so that weight
+       means "this is the sum of the lines under it" and nothing else. */
+    font-weight: 400;
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
