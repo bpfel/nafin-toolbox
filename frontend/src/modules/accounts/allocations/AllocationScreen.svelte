@@ -354,7 +354,10 @@
   .allocation-screen {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    /* Nothing uniform: a title belongs to the box under it, so it sits closer
+       to that than to the section it follows. A gap here would be added to both
+       margins equally and the title would float between the two. */
+    gap: 0;
   }
   .flow-section {
     background: white;
@@ -454,8 +457,10 @@
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
+  /* The container spaces nothing, so anything that is not a section says how
+     much room it wants. */
   .error {
-    margin: 0;
+    margin: 0 0 1rem;
     padding: 0.6rem 0.9rem;
     font-size: 0.85rem;
     color: #c0392b;
