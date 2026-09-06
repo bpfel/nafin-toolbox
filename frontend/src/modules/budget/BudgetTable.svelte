@@ -267,8 +267,8 @@
   <table use:categorySortable>
     <colgroup>
       <col class="col-name" />
-      <col class="col-amount" />
-      <col class="col-amount" />
+      <col class="col-amount col-planned-mo" />
+      <col class="col-amount col-planned-yr" />
     </colgroup>
     {#each sectionCategories as category (category.categoryId)}
       <tbody use:sortable data-category-id={category.categoryId}>
@@ -443,7 +443,9 @@
   .budget-table {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    /* Nothing uniform: a title belongs to the box under it, so it sits closer
+       to that than to the section it follows. The margins below say which. */
+    gap: 0;
   }
   table {
     width: 100%;
@@ -469,7 +471,10 @@
     display: flex;
     align-items: center;
     gap: 0.1rem;
-    margin: 1.75rem 0 0.5rem;
+    /* Above: the gap between one section and the next. Below: the gap between a
+       title and the thing it titles, which is smaller so the two read as one
+       block rather than as two loose rows. */
+    margin: 1.25rem 0 0.35rem;
     padding: 0 0.25rem;
   }
 
@@ -496,13 +501,15 @@
     user-select: none;
   }
   :global(.category-header) td {
-    /* Capitalised and a shade larger than the entries beneath it, because it
-       carries their total — it is a summary line, not a label. */
+    /* Small caps and a shade larger than the entries beneath it, because it
+       carries their total — a summary line, not a label. Small caps rather than
+       uppercase: it keeps the word's own shape, which is what makes a proper
+       noun still read as one. */
     padding: 0.85rem 0.75rem 0.35rem;
     background: none;
     font-weight: 600;
     font-size: 1rem;
-    text-transform: uppercase;
+    font-variant-caps: all-small-caps;
     letter-spacing: 0.03em;
     color: var(--ink);
     border-bottom: 1px solid var(--rule);
@@ -631,12 +638,30 @@
     .section-name {
       font-size: 1.1rem;
     }
-    /* Only one amount column survives on a narrow screen — the view toggle
-       swaps which of the two it is — so the name takes the rest. */
+    /*
+     * Only one amount column survives on a narrow screen — the view toggle
+     * swaps which of the two it is — so the name takes the rest.
+     *
+     * The width has to be taken off the hidden column explicitly. `display:
+     * none` hides a *cell*; a `<col>` ignores it and goes on reserving its
+     * share, so with three columns declaring 60 + 40 + 40 the visible amount
+     * stopped short of the right edge and the figures no longer lined up with
+     * it. That was invisible while the widths lived on `<th>`s, which the same
+     * rule really did hide.
+     */
     .col-name {
       width: 60%;
     }
-    .col-amount {
+    .col-planned-mo {
+      width: 40%;
+    }
+    .col-planned-yr {
+      width: 0;
+    }
+    :global(.view-yearly) .col-planned-mo {
+      width: 0;
+    }
+    :global(.view-yearly) .col-planned-yr {
       width: 40%;
     }
     .col-planned-yr {
