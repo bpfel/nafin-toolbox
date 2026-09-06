@@ -1,3 +1,22 @@
+/*
+ * Self-hosted, both under the SIL Open Font License — no licence to buy, no
+ * third-party request at runtime, and nothing that stops working if a font CDN
+ * does. They ship with the build, which for a self-hosted app is the point.
+ *
+ * JetBrains Mono for everything. A monospace in a finance app is not only a
+ * look: every digit is the same width by construction, so columns of francs
+ * line up without `tabular-nums` being asked for, and a mistyped figure is
+ * visible as a wrong length.
+ *
+ * Alegreya Sans SC for the category headings. Small caps are its *design*
+ * rather than an OpenType feature it may or may not carry — the lower case
+ * simply is small capitals — so nothing is left to a browser's willingness to
+ * synthesise them, which is what made them look heavy before.
+ */
+@import '@fontsource-variable/jetbrains-mono/wght.css';
+@import '@fontsource/alegreya-sans-sc/latin-500.css';
+@import '@fontsource/alegreya-sans-sc/latin-ext-500.css';
+
 :root {
   /*
    * How much room the bottom navigation bar takes.
@@ -72,7 +91,12 @@
   --accent-dark: #245a42;
   --accent-soft: #eaf1ee;
 
-  font-family: system-ui, -apple-system, sans-serif;
+  /* The system stack stays as the fallback: it is what renders while the woff2
+     is still on the wire, and what renders if it never arrives. */
+  --font-ui: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-smallcaps: 'Alegreya Sans SC', var(--font-ui);
+
+  font-family: var(--font-ui);
   line-height: 1.5;
   color: var(--ink);
   background-color: var(--ground);

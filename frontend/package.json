@@ -28,6 +28,8 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource/alegreya-sans-sc": "^5.3.0",
     "qr": "^0.6.0",
     "sortablejs": "^1.15.6"
   }

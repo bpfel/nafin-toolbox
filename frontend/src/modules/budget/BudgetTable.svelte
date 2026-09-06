@@ -255,11 +255,11 @@
     plain from the figures underneath.
   -->
   <div class="section-head section-{type}">
-    <h2 class="section-name">{t(`entryType.${type}` as 'entryType.expense')}</h2>
+    <h2 class="section-name">{t(`section.${type}` as 'section.expense')}</h2>
     <button
       class="section-info"
-      aria-label={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
-      title={t('guide.explain', { type: t(`entryType.${type}` as 'entryType.expense') })}
+      aria-label={t('guide.explain', { type: t(`section.${type}` as 'section.expense') })}
+      title={t('guide.explain', { type: t(`section.${type}` as 'section.expense') })}
       onclick={() => (guideType = type)}
     ><span class="info-glyph" aria-hidden="true">i</span></button>
   </div>
@@ -507,10 +507,12 @@
        noun still read as one. */
     padding: 0.85rem 0.75rem 0.35rem;
     background: none;
-    font-weight: 600;
-    font-size: 1rem;
-    font-variant-caps: all-small-caps;
-    letter-spacing: 0.03em;
+    font-family: var(--font-smallcaps);
+    font-weight: 500;
+    /* Small caps sit lower than capitals, so the same nominal size reads
+       smaller. Up a little to keep it above the entries. */
+    font-size: 1.15rem;
+    letter-spacing: 0.02em;
     color: var(--ink);
     border-bottom: 1px solid var(--rule);
   }
