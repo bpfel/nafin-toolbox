@@ -3,6 +3,7 @@
   import { getRoute, navigate } from '../lib/nav/router.svelte'
   import { swipeHorizontal } from '../lib/util/swipe'
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
+  import ActionButton from '../lib/nav/ActionButton.svelte'
   import AccountManagement from '../modules/accounts/management/AccountManagement.svelte'
   import AllocationScreen from '../modules/accounts/allocations/AllocationScreen.svelte'
 
@@ -27,9 +28,38 @@
   // single standing plan, so the only month there is to show is this one.
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  /**
+   * The accounts panel, so the strip's "+" can open its create form.
+   *
+   * Adding an account is not a structural rearrangement — it is the ordinary
+   * thing a person comes to this screen to do, and it was behind edit mode,
+   * which is a mode you have to know exists. It sits with the screen's other
+   * controls now and is always there.
+   */
+  let accounts = $state<{ openCreateAccount: () => void } | null>(null)
 </script>
 
-<ScreenChrome title={t('nav.accounts')} editKey="accounts" />
+<ScreenChrome title={t('nav.accounts')} editKey="accounts">
+  {#snippet children()}
+    {#if !onAllocations}
+      <ActionButton label={t('accounts.addOne')} onclick={() => accounts?.openCreateAccount()}>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </ActionButton>
+    {/if}
+  {/snippet}
+</ScreenChrome>
 
 <nav class="view-tabs" aria-label={t('accounts.viewsLabel')}>
   <a
@@ -68,7 +98,7 @@
   }}
 >
   <div hidden={onAllocations}>
-    <AccountManagement {currentMonth} />
+    <AccountManagement bind:this={accounts} {currentMonth} />
   </div>
   <div hidden={!onAllocations}>
     <AllocationScreen {currentMonth} />

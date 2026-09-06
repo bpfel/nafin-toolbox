@@ -158,13 +158,17 @@ describe('AccountManagement reorder affordance', () => {
 describe('AccountManagement edit mode', () => {
   // The module is read-only by default: you can read your figures and keep them
   // truthful, but you cannot restructure anything until you ask to.
+  //
+  // Adding an account is not among them any more: it is the ordinary thing a
+  // person comes to this screen to do, and it was behind a mode you had to know
+  // existed. It lives in the screen's action strip now, always visible, which is
+  // why neither of these looks for it.
   test('the structural affordances are absent by default', () => {
     store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
 
     const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
     expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
-    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Edit Main' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Delete Main' })).toBeNull()
   })
@@ -176,7 +180,6 @@ describe('AccountManagement edit mode', () => {
     const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
     expect(container.querySelectorAll('.drag-handle')).toHaveLength(2)
-    expect(screen.getByRole('button', { name: 'Add' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Main' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Delete Main' })).toBeTruthy()
   })

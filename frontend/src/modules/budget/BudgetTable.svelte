@@ -8,7 +8,9 @@
   import Money from '../../lib/util/Money.svelte'
   import BudgetEntryRow from './BudgetEntryRow.svelte'
   import AddEntryRow from './AddEntryRow.svelte'
-  import TypeGuideModal from './TypeGuideModal.svelte'
+  import InfoButton from '../../lib/nav/InfoButton.svelte'
+  import InfoModal from '../../lib/nav/InfoModal.svelte'
+  import { TYPE_GUIDES } from '../../lib/budget/typeGuide'
   import AddEntryModal from './AddEntryModal.svelte'
   import DeleteEntryModal from './DeleteEntryModal.svelte'
   import EditCategoryModal from './EditCategoryModal.svelte'
@@ -256,12 +258,10 @@
   -->
   <div class="section-head section-{type}">
     <h2 class="section-name">{t(`section.${type}` as 'section.expense')}</h2>
-    <button
-      class="section-info"
-      aria-label={t('guide.explain', { type: t(`section.${type}` as 'section.expense') })}
-      title={t('guide.explain', { type: t(`section.${type}` as 'section.expense') })}
+    <InfoButton
+      label={t('guide.explain', { type: t(`section.${type}` as 'section.expense') })}
       onclick={() => (guideType = type)}
-    ><span class="info-glyph" aria-hidden="true">i</span></button>
+    />
   </div>
 
   <table use:categorySortable>
@@ -345,7 +345,7 @@
 </div>
 
 {#if guideType}
-  <TypeGuideModal type={guideType} onclose={() => (guideType = null)} />
+  <InfoModal {...TYPE_GUIDES[guideType]} onclose={() => (guideType = null)} />
 {/if}
 
 {#if addModalContext}
@@ -395,50 +395,10 @@
    * class for the background property — without this the mark filled with dark
    * green when pointed at.
    */
-  .section-info {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 0.35rem;
-    width: 1.25rem;
-    height: 1.25rem;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--ink-faint);
-    cursor: pointer;
-    vertical-align: middle;
-  }
-  .section-info:hover {
-    background: none;
-    color: #2d6a4f;
-  }
   /* Its own rule, not grouped with :hover — a :focus-visible block that sets
      only colours is how a focus ring goes missing, which is what the guard in
      HoverControls.test.ts is watching for. */
-  .section-info:focus-visible {
-    background: none;
-    color: #2d6a4f;
-    outline: 2px solid #2d6a4f;
-    outline-offset: 1px;
-    border-radius: 50%;
-  }
 
-  .info-glyph {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.05rem;
-    height: 1.05rem;
-    border-radius: 50%;
-    border: 1px solid currentColor;
-    font-size: 0.72rem;
-    font-weight: 700;
-    font-style: normal;
-    line-height: 1;
-    /* The 'i' sits left of centre in most faces; a hair of padding evens it. */
-    padding-left: 0.03em;
-  }
 
   .budget-table {
     display: flex;

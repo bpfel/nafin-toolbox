@@ -99,7 +99,10 @@
   }
 </script>
 
-<article class="card account-card" data-account-id={account.id}>
+<div class="card account-card" data-account-id={account.id}>
+  <!-- The name sits on the page above its card, as a section title does in the
+       budget. A heading inside the thing it heads competes with the contents
+       for the same rectangle. -->
   <header class="card-head">
     {#if canReorder && editing}
       <!-- The sole drag affordance: `handle: '.drag-handle'` confines dragging
@@ -116,20 +119,24 @@
     </div>
   </header>
 
-  <dl class="figures">
-    <div class="figure">
-      <dt>{t('accounts.projected')}</dt>
-      <dd class="amount"><Money value={projected} /></dd>
-    </div>
-    <div class="figure">
-      <dt>{t('accounts.required')}</dt>
-      <dd class="amount muted"><Money value={required} /></dd>
-    </div>
-    <div class="figure">
-      <dt>{t('accounts.available')}</dt>
-      <dd class="amount" class:negative={Number(available) < 0}><Money value={available} /></dd>
-    </div>
-  </dl>
+  <article class="card-body">
+    <!-- A small table rather than a row of three: the labels line up on the
+         left, the figures on the right, and comparing one account to the next
+         is reading down a column instead of across a wrap. -->
+    <dl class="figures">
+      <div class="figure">
+        <dt>{t('accounts.balanceFigure')}</dt>
+        <dd class="amount"><Money value={projected} /></dd>
+      </div>
+      <div class="figure">
+        <dt>{t('accounts.allocated')}</dt>
+        <dd class="amount muted"><Money value={required} /></dd>
+      </div>
+      <div class="figure">
+        <dt>{t('accounts.free')}</dt>
+        <dd class="amount" class:negative={Number(available) < 0}><Money value={available} /></dd>
+      </div>
+    </dl>
 
   <p class="anchor" class:stale class:amount-hidden={amountsHidden()}>
     {t('accounts.correctedOn', {
@@ -201,9 +208,22 @@
     </div>
   {/if}
 </article>
+</div>
 
 <style>
-  .card {
+  /* The card is the column: a name on the page, and the box under it. */
+  .account-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* Outside the box, so the box holds only figures and controls. */
+  .card-head {
+    padding: 0 0.25rem 0.35rem;
+  }
+
+  .card-body {
     background: white;
     border-radius: 10px;
     padding: 1rem 1.1rem 1.1rem;
@@ -260,16 +280,26 @@
     font-size: 0.8rem;
     color: var(--ink-faint);
   }
+
+  /* A table, not a row of three. Three columns meant three narrow figures that
+     wrapped on a phone; stacked, the labels line up on the left and the amounts
+     on the right, so comparing two accounts is reading down rather than across.
+     It is also what makes the card taller, which it wanted to be. */
   .figures {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
     margin: 0;
   }
   .figure {
     display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3rem 0;
+  }
+  .figure + .figure {
+    border-top: 1px solid #f2f3f5;
   }
   dt {
     font-size: 0.72rem;
