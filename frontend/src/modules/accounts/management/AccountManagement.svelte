@@ -245,7 +245,7 @@
   {:else}
     <!-- A row that scrolls sideways rather than a grid that grows downwards.
          Only this element scrolls; the page itself never moves sideways. -->
-    <div class="cards" use:sortable>
+    <div class="cards" data-hscroll use:sortable>
       {#each rows as row (row.account.id)}
         <AccountCard
           account={row.account}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../lib/i18n/index.svelte'
   import { getRoute, navigate } from '../lib/nav/router.svelte'
+  import { swipeHorizontal } from '../lib/util/swipe'
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
   import AccountManagement from '../modules/accounts/management/AccountManagement.svelte'
   import AllocationScreen from '../modules/accounts/allocations/AllocationScreen.svelte'
@@ -55,15 +56,33 @@
   Hidden, not removed. `{#if}` here would throw away the other view's state on
   every switch: a half-typed balance correction, which entry groups were open,
   an in-flight dialog. None of that is in the vault, so none of it would return.
+
+  It is also what makes the swipe cheap — both views are already laid out, so
+  changing between them costs a class rather than a render.
 -->
-<div hidden={onAllocations}>
-  <AccountManagement {currentMonth} />
-</div>
-<div hidden={!onAllocations}>
-  <AllocationScreen {currentMonth} />
+<div
+  class="views"
+  use:swipeHorizontal={{
+    onnext: () => navigate('/accounts/allocations'),
+    onprevious: () => navigate('/accounts'),
+  }}
+>
+  <div hidden={onAllocations}>
+    <AccountManagement {currentMonth} />
+  </div>
+  <div hidden={!onAllocations}>
+    <AllocationScreen {currentMonth} />
+  </div>
 </div>
 
 <style>
+  .views {
+    /* Vertical panning is the page's; a horizontal drag is ours to consider.
+       Without this the browser claims the gesture before the handler sees a
+       second point and can decide which way it went. */
+    touch-action: pan-y;
+  }
+
   .view-tabs {
     display: flex;
     gap: 0.25rem;
