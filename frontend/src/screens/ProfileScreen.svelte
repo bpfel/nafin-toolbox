@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../lib/i18n/index.svelte'
-  import { navigate } from '../lib/nav/router.svelte'
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
+  import SecuritySettings from '../lib/auth/SecuritySettings.svelte'
   import LanguagePicker from '../lib/nav/LanguagePicker.svelte'
   import ActionButton from '../lib/nav/ActionButton.svelte'
 
@@ -12,6 +12,11 @@
    * used to sit in the app's title bar beside it — an e-mail, a role badge, an
    * admin button. Two navigation surfaces became one place, which is the clearest
    * win in the redesign: the menu component is gone rather than moved.
+   *
+   * Security used to be a third: a row here that navigated to /profile/security,
+   * a screen holding one panel, and a Back button to undo it. The panel is on
+   * this page now. It is the only thing that was ever behind that address, so
+   * the address bought nothing and cost a tap.
    */
   interface Props {
     email: string
@@ -54,12 +59,6 @@
   </div>
 
   <ul class="rows">
-    <li>
-      <button class="row" onclick={() => navigate('/profile/security')}>
-        <span>{t('menu.security')}</span>
-        <span class="chevron" aria-hidden="true">›</span>
-      </button>
-    </li>
     <li class="row static">
       <span>{t('menu.language')}</span>
       <!--
@@ -71,6 +70,7 @@
     </li>
   </ul>
 
+  <SecuritySettings />
 </div>
 
 <style>
@@ -121,10 +121,6 @@
     overflow: hidden;
   }
 
-  .rows li + li {
-    border-top: 1px solid var(--rule);
-  }
-
   .row {
     display: flex;
     align-items: center;
@@ -139,19 +135,6 @@
     font: inherit;
     color: inherit;
     text-align: left;
-    cursor: pointer;
-  }
-
-  .row.static {
-    cursor: default;
-  }
-
-  button.row:hover {
-    background: #f7f7f7;
-  }
-
-  .chevron {
-    color: var(--ink-faint);
   }
 
 

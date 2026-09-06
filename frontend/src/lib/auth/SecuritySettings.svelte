@@ -6,7 +6,6 @@
   import ChangePasswordForm from './ChangePasswordForm.svelte'
   import { createCopier } from '../util/copier.svelte'
 
-  let { onDone }: { onDone?: () => void } = $props()
 
   const authState = getAuthState()
 
@@ -76,10 +75,12 @@
 </script>
 
 <div class="security-settings">
-  <div class="settings-header">
-    <h2>{t('security.title')}</h2>
-    <button class="btn-secondary" onclick={() => onDone?.()}>{t('action.back')}</button>
-  </div>
+  <!--
+    A heading, not a header. There is no Back button because there is nowhere
+    to go back to: this sits on the profile page rather than being a screen of
+    its own.
+  -->
+  <h2>{t('security.title')}</h2>
 
   <!--
     These two used to replace the panel's whole body in place: no address, no
@@ -205,14 +206,11 @@
     box-shadow: var(--shadow-card);
   }
 
-  .settings-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-  }
-
-  h2 { margin: 0; font-size: 1.2rem; }
+  /* The 1.5rem below used to belong to the flex header that held this heading
+     beside a Back button. The button is gone; the space it set is not, so it
+     moves onto the heading. Shorthand rather than a following `margin-bottom`,
+     which a later `margin: 0` would silently cancel. */
+  h2 { margin: 0 0 1.5rem; font-size: 1.2rem; }
   h3 { margin: 0 0 0.5rem; font-size: 1rem; }
 
   .section {

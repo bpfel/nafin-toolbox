@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { getRoute, navigate, replace } from './router.svelte'
+  import { getRoute, replace } from './router.svelte'
   import { destinationsFor, landingPathFor } from './destinations'
   import AppNav from './AppNav.svelte'
   import BudgetScreen from '../../screens/BudgetScreen.svelte'
   import AccountsScreen from '../../screens/AccountsScreen.svelte'
   import ProfileScreen from '../../screens/ProfileScreen.svelte'
-  import SecuritySettings from '../auth/SecuritySettings.svelte'
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
 
@@ -43,8 +42,6 @@
       replace(landingPathFor(role))
     }
   })
-
-  let onSecurity = $derived(route.screen === 'profile' && route.tab === 'security')
 </script>
 
 <div class="shell">
@@ -56,8 +53,6 @@
         <InvitePanel />
       {:else if route.screen === 'audit'}
         <AuditLogViewer />
-      {:else if onSecurity}
-        <SecuritySettings onDone={() => navigate('/profile')} />
       {:else if route.screen === 'profile'}
         <ProfileScreen {email} {role} {onlogout} />
       {/if}
@@ -80,9 +75,7 @@
         <AccountsScreen />
       </div>
 
-      {#if onSecurity}
-        <SecuritySettings onDone={() => navigate('/profile')} />
-      {:else if route.screen === 'profile'}
+      {#if route.screen === 'profile'}
         <ProfileScreen {email} {role} {onlogout} />
       {/if}
     {/if}
