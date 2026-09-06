@@ -286,7 +286,7 @@
 </script>
 
 {#snippet categoryBlock(type: EntryType, category: RowCategory, withHeader: boolean)}
-  <div class="category">
+  <div class="category" class:has-category-header={withHeader}>
     {#if withHeader}
       <button
         type="button"
@@ -392,6 +392,23 @@
   .section-bill .section-name,
   .section-purchase .section-name { color: var(--money-held); }
 
+  .category {
+    /*
+     * How far the category name sits from the edge of its header: the chevron
+     * plus the flex gap after it. The allocation rows borrow it so their names
+     * begin on the same vertical line, leaving the chevron alone in a gutter.
+     *
+     * The same value and the same reasoning as the budget's, which is the
+     * point — these two screens have identical nesting and had been drawing it
+     * two different ways. Derived from the chevron rather than typed, and zero
+     * unless a header is drawn: `withHeader` is false where a section has one
+     * category, and indenting rows under nothing would read as a mistake.
+     */
+    --category-gutter: 0rem;
+  }
+  .category.has-category-header {
+    --category-gutter: calc(12px + 0.35rem);
+  }
   .rows {
     display: flex;
     flex-direction: column;

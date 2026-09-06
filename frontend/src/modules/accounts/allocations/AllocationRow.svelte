@@ -275,7 +275,17 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 0.9rem 1rem;
+    /*
+     * Left padding rather than a margin, and on the row rather than the `.rows`
+     * wrapper around it: the border below and the unrouted background both
+     * belong to this element, and insetting the box would have pulled them off
+     * the card's left edge. Padding sits inside the border box, so the rule
+     * still spans the full width and only the content moves.
+     *
+     * The gutter is declared by the category above and inherits down; it is
+     * zero when that category draws no header.
+     */
+    padding: 0.9rem 1rem 0.9rem calc(1rem + var(--category-gutter, 0rem));
     /* Each entry can be four lines tall, and a hairline between them was too
        faint to tell one entry's detail from the next entry's summary. A heavier
        rule plus more breathing room reads as a boundary rather than a ruling. */
