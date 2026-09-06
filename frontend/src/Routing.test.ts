@@ -29,6 +29,12 @@ vi.mock('./lib/auth/authStore.svelte', () => ({
   // Reached only once the invite panel mounts.
   inviteUser: vi.fn(),
   listUsers: vi.fn(async () => []),
+  // And this one only once the audit screen does. A factory mock replaces the
+  // whole module, so anything the mounted tree reaches for and this list omits
+  // is `undefined` — which Vitest turns into a throw from inside an effect,
+  // where no `await` in a test can catch it. It surfaces as an unhandled error
+  // that leaves every assertion passing and the run exiting non-zero.
+  fetchAuditLogs: vi.fn(async () => ({ entries: [], total: 0 })),
   deleteUser: vi.fn(),
   resendVerification: vi.fn(),
   adminResetPassword: vi.fn(),
