@@ -75,7 +75,7 @@
 <style>
   .entry-row td {
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--rule);
     /* Smaller than the category line above, which carries their total. The
        entries are what add up; the line above is the sum. */
     font-size: 0.92rem;

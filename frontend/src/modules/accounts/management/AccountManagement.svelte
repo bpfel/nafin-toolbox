@@ -377,7 +377,7 @@
 
   .totals-title {
     font-size: 1.2rem;
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: -0.01em;
     color: var(--ink);
   }
@@ -391,7 +391,7 @@
     background: white;
     border-radius: 10px;
     padding: 0.85rem 1.1rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
   /* Deliberately the card's own figure typography, so the three sums read as
      the same three figures one row further down. */

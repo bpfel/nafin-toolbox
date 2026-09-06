@@ -77,7 +77,7 @@
        whether the last row is on screen. */
     max-height: 88dvh;
     overflow-y: auto;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-modal);
   }
   h3 {
     margin: 0 0 0.75rem;

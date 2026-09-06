@@ -243,7 +243,7 @@
     text-align: left;
     padding: 0.5rem 0.5rem;
     border-bottom: 2px solid #ddd;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.8rem;
     color: #666;
     white-space: nowrap;
@@ -251,7 +251,7 @@
 
   td {
     padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--rule);
     vertical-align: top;
   }
 

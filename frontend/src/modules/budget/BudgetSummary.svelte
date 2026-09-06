@@ -68,7 +68,7 @@
     padding: 1rem 1.25rem;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
 
   /* One row of four figures. With the actual column gone there is only one
@@ -95,7 +95,7 @@
 
   .value {
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 
@@ -141,7 +141,7 @@
     .yearly {
       display: none;
       font-size: 0.9rem;
-      font-weight: 600;
+      font-weight: 500;
       opacity: 1;
     }
 

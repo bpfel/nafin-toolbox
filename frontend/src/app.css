@@ -79,12 +79,27 @@
 
   --ink: #1a1a2e;         /* 17.1:1 — body text, and money going out */
   --ink-muted: #5c6068;   /*  6.3:1 — secondary text */
-  --ink-faint: #6e737b;   /*  4.8:1 — labels and hints; replaces var(--ink-faint) and var(--ink-faint) */
+  --ink-faint: #6e737b;   /*  4.8:1 — labels and hints */
 
   --surface: #ffffff;
   --ground: #f5f5f7;
   --sunken: #f1f3f5;
+  /* Two weights, two jobs. The hairline divides peers — one budget entry from
+     the next — and the strong one divides a summary from the detail under it.
+     Until now a single weight drew both, so only boldness said "this is the
+     total" and the line said nothing. Two, not three: ranking three levels by
+     three shades of grey was tried here before and read as noise. */
   --rule: #e0e2e6;
+  --rule-strong: #c9ccd2;
+
+  /* Two layers, because that is how a shadow actually falls: a tight contact
+     shadow where the card meets the page, and a wide ambient one further out.
+     A single hard layer is what makes a box look stuck on rather than resting.
+     Tinted toward the ink rather than pure black — black over a warm white
+     reads grey and dead. */
+  --shadow-card: 0 1px 2px rgba(26, 26, 46, 0.05), 0 8px 24px rgba(26, 26, 46, 0.05);
+  --shadow-raised: 0 2px 6px rgba(26, 26, 46, 0.06), 0 12px 32px rgba(26, 26, 46, 0.1);
+  --shadow-modal: 0 4px 12px rgba(26, 26, 46, 0.1), 0 24px 60px rgba(26, 26, 46, 0.18);
 
   /* Where the money goes. Out is the ordinary ink: it is the routine. */
   --money-in: #2d6a4f;    /*  6.4:1 */
@@ -112,7 +127,10 @@
   --font-smallcaps: 'Alegreya Sans SC', var(--font-ui);
 
   font-family: var(--font-ui);
-  line-height: 1.5;
+  /* 1.6 rather than 1.5. Rows of figures are scanned down a column, and the
+     leading is what the eye uses to keep its place between one row and the
+     next. */
+  line-height: 1.6;
   color: var(--ink);
   background-color: var(--ground);
 }
@@ -152,8 +170,17 @@ main {
   padding: 2rem;
 }
 
+/* Tracking is drawn for text sizes: the same relative gap between letters
+   reads looser the larger the type gets. Tightened once here rather than at
+   each of the twelve headings that set their own size. */
 h1 {
   margin-bottom: 2rem;
+  letter-spacing: -0.02em;
+}
+
+h2,
+h3 {
+  letter-spacing: -0.012em;
 }
 
 .empty-state {
@@ -185,7 +212,7 @@ h1 {
   padding: 1.5rem;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-card);
 }
 
 .module-card h2 {

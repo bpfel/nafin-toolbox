@@ -35,7 +35,7 @@ type SeedNames = Record<SeedKey, string>
 const en: SeedNames = {
   'cat.employment': 'Employment',
   'cat.housing': 'Housing',
-  'cat.insuranceTaxes': 'Insurance & Taxes',
+  'cat.insuranceTaxes': 'Insurance and Taxes',
   'cat.living': 'Living',
   'cat.lifestyle': 'Lifestyle',
   'cat.savings': 'Savings',
@@ -58,7 +58,7 @@ const en: SeedNames = {
 const de: SeedNames = {
   'cat.employment': 'Erwerbstätigkeit',
   'cat.housing': 'Wohnen',
-  'cat.insuranceTaxes': 'Versicherungen & Steuern',
+  'cat.insuranceTaxes': 'Versicherungen und Steuern',
   'cat.living': 'Lebenshaltung',
   'cat.lifestyle': 'Freizeit',
   'cat.savings': 'Sparen',
@@ -81,7 +81,7 @@ const de: SeedNames = {
 const fr: SeedNames = {
   'cat.employment': 'Activité lucrative',
   'cat.housing': 'Logement',
-  'cat.insuranceTaxes': 'Assurances & impôts',
+  'cat.insuranceTaxes': 'Assurances et impôts',
   'cat.living': 'Vie courante',
   'cat.lifestyle': 'Loisirs',
   'cat.savings': 'Épargne',

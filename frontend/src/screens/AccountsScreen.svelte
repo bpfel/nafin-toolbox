@@ -136,6 +136,6 @@
   .tab.active {
     border-bottom-color: currentColor;
     opacity: 1;
-    font-weight: 600;
+    font-weight: 500;
   }
 </style>

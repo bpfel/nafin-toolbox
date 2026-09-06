@@ -209,13 +209,13 @@
   .line-category td {
     padding: 0.35rem 0.5rem;
     background: #f1f3f5;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.8rem;
     color: #495057;
   }
   .line-row td {
     padding: 0.2rem 0.5rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--rule);
   }
   .line-row.income td {
     background: #f0fdf4;
@@ -239,7 +239,7 @@
     text-align: right;
   }
   .total {
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
   .income-total { color: #2d6a4f; }

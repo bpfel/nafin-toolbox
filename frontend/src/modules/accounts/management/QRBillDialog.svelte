@@ -339,7 +339,7 @@
     max-width: 460px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-modal);
   }
   h3 {
     margin: 0 0 0.25rem;
@@ -415,7 +415,7 @@
     padding: 0.6rem 0.75rem 0.6rem 1.6rem;
   }
   .advanced {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
     padding-top: 0.75rem;
     margin-bottom: 1rem;
   }
@@ -440,7 +440,7 @@
     align-items: center;
     gap: 0.5rem;
     background: white;
-    border: 1px solid #eee;
+    border: 1px solid var(--rule);
     border-radius: 8px;
     padding: 1rem;
   }

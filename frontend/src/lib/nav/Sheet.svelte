@@ -188,7 +188,7 @@
       border-radius: 12px;
       padding: 1.5rem;
       max-height: 88vh;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      box-shadow: var(--shadow-modal);
     }
 
     .surface.wide {

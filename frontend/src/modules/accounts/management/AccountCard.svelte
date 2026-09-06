@@ -227,7 +227,7 @@
     background: white;
     border-radius: 10px;
     padding: 1rem 1.1rem 1.1rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -336,7 +336,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
     padding-top: 0.75rem;
   }
   .correction-hint {

@@ -128,7 +128,7 @@
     background: white;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-raised);
     padding: 0.35rem;
   }
 

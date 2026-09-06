@@ -300,14 +300,14 @@
     min-width: 0;
   }
   .name {
-    font-weight: 600;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .kind {
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0.1rem 0.4rem;
@@ -338,7 +338,7 @@
   }
   .planned {
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
   }
   .toggle {

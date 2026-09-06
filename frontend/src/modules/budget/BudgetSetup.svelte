@@ -27,7 +27,7 @@
     padding: 3rem 2rem;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
   h3 {
     margin-bottom: 0.75rem;

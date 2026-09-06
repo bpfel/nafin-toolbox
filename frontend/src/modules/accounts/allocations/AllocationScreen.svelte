@@ -362,7 +362,7 @@
   .flow-section {
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     overflow: hidden;
   }
 
@@ -381,7 +381,7 @@
 
   .section-name {
     font-size: 1.2rem;
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: -0.01em;
     color: var(--ink);
   }
@@ -404,16 +404,14 @@
     padding: 0.5rem 1rem;
     background: #f1f3f5;
     border: none;
-    border-bottom: 1px solid #dee2e6;
+    /* Same boundary as the budget's category header, same weight. */
+    border-bottom: 1px solid var(--rule-strong);
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 500;
     color: #495057;
     text-align: left;
     cursor: pointer;
     user-select: none;
-  }
-  .category-header.collapsed {
-    border-bottom: 2px solid #ced4da;
   }
   .category-header:hover {
     background: #e9ecef;
@@ -455,7 +453,7 @@
     color: var(--ink-faint);
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
   /* The container spaces nothing, so anything that is not a section says how
      much room it wants. */

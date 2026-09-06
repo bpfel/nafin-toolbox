@@ -105,7 +105,7 @@
     padding: 0.1rem 0.45rem;
     border-radius: 4px;
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 500;
     text-transform: uppercase;
     background: #d4edda;
     color: #155724;
@@ -122,7 +122,7 @@
   }
 
   .rows li + li {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
   }
 
   .row {

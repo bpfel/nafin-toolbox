@@ -132,7 +132,7 @@
   }
   .control-label {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     color: #666;
     text-transform: uppercase;
     letter-spacing: 0.05em;

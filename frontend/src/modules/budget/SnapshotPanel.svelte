@@ -176,7 +176,7 @@
   .snapshots {
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     overflow: hidden;
   }
   .panel-toggle {
@@ -188,7 +188,7 @@
     background: none;
     border: none;
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #495057;
@@ -200,7 +200,7 @@
   }
   .count {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     color: #868e96;
     background: #f1f3f5;
     border-radius: 10px;
@@ -297,7 +297,7 @@
     flex-direction: column;
   }
   .snapshot-item {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
     padding: 0.25rem 0;
   }
   .snapshot-head {

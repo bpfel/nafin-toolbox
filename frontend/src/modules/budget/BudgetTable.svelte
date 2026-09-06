@@ -414,7 +414,7 @@
     background: white;
     border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
   .col-name {
     width: 60%;
@@ -444,7 +444,7 @@
 
   .section-name {
     font-size: 1.2rem;
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: -0.01em;
     color: var(--ink);
   }
@@ -481,10 +481,11 @@
        squeezed ones do. */
     letter-spacing: 0.02em;
     color: var(--ink);
-    border-bottom: 1px solid var(--rule);
-  }
-  :global(.category-header.collapsed) td {
-    border-bottom: 1px solid var(--rule);
+    /* The strong weight: this line divides a summary from the entries that add
+       up to it, which is a different kind of boundary than one entry from the
+       next. The `.collapsed` rule that used to follow set the identical
+       declaration and is gone. */
+    border-bottom: 1px solid var(--rule-strong);
   }
   :global(.category-header) .subtotal {
     /* The only bold figure in the section: a total, against entries that are

@@ -85,7 +85,7 @@
 
   .item.active {
     color: #2d6a4f;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .item:focus-visible {
