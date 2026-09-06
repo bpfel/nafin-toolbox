@@ -423,9 +423,15 @@
     width: 20%;
   }
   /*
-   * On the page's own background, above the card. Three levels, three devices:
-   * the section is large and outside the box, the category is uppercase and
-   * carries the total, the entries are plain and are what add up to it.
+   * On the page's own background, above the card. Three levels, ranked by size
+   * and position: the section is largest and sits outside the box, the category
+   * is a step down and sits on the card carrying the total, the entries are
+   * smallest and are what add up to it.
+   *
+   * Note the entries are *not* indented under their category, and the category
+   * name is pushed right by a chevron that is invisible until hover. So the
+   * indentation currently says the opposite of the nesting. Untouched here
+   * because it is a layout question, not a typographic one.
    */
   .section-head {
     display: flex;
@@ -461,25 +467,21 @@
     user-select: none;
   }
   :global(.category-header) td {
-    /* Small caps and a shade larger than the entries beneath it, because it
-       carries their total — a summary line, not a label. Small caps rather than
-       uppercase: it keeps the word's own shape, which is what makes a proper
-       noun still read as one. */
+    /* A shade larger than the entries beneath it, because it carries their
+       total — a summary line, not a label.
+
+       The small-capitals face that used to set this line is gone, and so are
+       the two numbers that existed only to compensate for it: 1.15rem, which
+       was inflated because small caps sit lower than capitals and read smaller
+       at the same nominal size, and 0.02em of tracking, which small capitals
+       want and lower case does not. Without them the honest size is one step
+       down the scale — 1.2rem outside the box, 1.05rem here, 0.92rem for the
+       entries — and 1.15rem would have sat a hair under the section title it
+       has to rank below. */
     padding: 0.85rem 0.75rem 0.35rem;
     background: none;
-    /* The family is the small capitals — Spectral SC's lower case is drawn as
-       them — so no `font-variant-caps` here. Asking for one on top would have
-       the browser synthesise from glyphs that are already small, shrinking
-       them twice. Its upper case stays upper case, which is what keeps a
-       leading capital on a proper noun. */
-    font-family: var(--font-smallcaps);
     font-weight: 500;
-    /* Small caps sit lower than capitals, so the same nominal size reads
-       smaller. Up a little to keep it above the entries. */
-    font-size: 1.15rem;
-    /* Drawn small capitals need only a little air, not the extra that
-       squeezed ones do. */
-    letter-spacing: 0.02em;
+    font-size: 1.05rem;
     color: var(--ink);
     /* The strong weight: this line divides a summary from the entries that add
        up to it, which is a different kind of boundary than one entry from the
@@ -605,9 +607,15 @@
   }
 
   @media (max-width: 768px) {
-    .section-name {
-      font-size: 1.1rem;
-    }
+    /*
+     * The section name used to drop to 1.1rem here, which put it 0.05rem above
+     * the category heading below it — close enough to read as an accident
+     * rather than a rank, once the small capitals that used to tell them apart
+     * were gone. It was never buying width it needed: the longest section name
+     * in any language is "Anschaffungen", about 110px at this size, on its own
+     * row. So the scale is 1.2 / 1.05 / 0.92 at every width now, and this rule
+     * is one fewer thing that can drift.
+     */
     /*
      * Only one amount column survives on a narrow screen — the view toggle
      * swaps which of the two it is — so the name takes the rest.

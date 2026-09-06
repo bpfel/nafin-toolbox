@@ -1,33 +1,27 @@
 /*
- * Two self-hosted faces, both under the SIL Open Font License.
+ * One self-hosted face, under the SIL Open Font License: Source Sans 3, for
+ * everything.
  *
- * Source Sans 3 for the interface. Adobe drew it for user interfaces, and it
- * behaves like it: quiet enough to disappear into a row of a table, narrow
- * enough that Hausratversicherung fits a phone, and unbothered at the 0.92rem
- * the budget entries are set in. A body face in a table has no business having
- * opinions.
+ * Adobe drew it for user interfaces and it behaves like it: quiet enough to
+ * disappear into a row of a table, narrow enough that Hausratversicherung fits
+ * a phone, and unbothered at the 0.92rem the budget entries are set in. A body
+ * face in a table has no business having opinions.
  *
- * Spectral SC for the budget category headings, and nothing else. Small
- * capitals are its *design* rather than an OpenType feature it may or may not
- * carry — its lower case simply is small capitals — so nothing is left to a
- * browser's willingness to synthesise them, which is what makes them look
- * bolded. Its upper case stays upper case, so a leading capital survives and a
- * proper noun still reads as one.
+ * There was a second face here — a small-capitals serif for the budget's
+ * category headings — and it earned its place in exactly one CSS rule while
+ * every other heading in the app, including the structurally identical one on
+ * the allocations screen, used this one. A family justified by a single
+ * selector is not justified. The three levels of the budget table are ranked by
+ * size and position instead, which is what was doing most of the work anyway.
  *
- * A serif against a sans, deliberately: the heading reads as a different level
- * rather than a louder one, which is the job weight was doing badly.
- *
- * The variable cut of Source Sans, so the whole 200-900 range arrives in one
- * file and the three weights the interface asks for — 400, 500, 700 — cost
- * nothing extra. It has no per-subset entry point, so the package's cyrillic,
- * greek and vietnamese are bundled; `unicode-range` means nobody fetches them.
- * German, French and Italian accents all live in the latin subset, so a reader
- * here pulls 29 KB for the interface and 29 KB for the headings, and latin-ext
- * is insurance.
+ * The variable cut, so the whole 200-900 range arrives in one file and the
+ * three weights the interface asks for — 400, 500, 700 — cost nothing extra.
+ * There is no per-subset entry point, so the package's cyrillic, greek and
+ * vietnamese are bundled; `unicode-range` means nobody fetches them. German,
+ * French and Italian accents all live in the latin subset, so a reader here
+ * pulls 29 KB and latin-ext is insurance.
  */
 @import '@fontsource-variable/source-sans-3/wght.css';
-@import '@fontsource/spectral-sc/latin-500.css';
-@import '@fontsource/spectral-sc/latin-ext-500.css';
 
 :root {
   /*
@@ -119,11 +113,8 @@
   --accent-soft: #eaf1ee;
 
   /* The fallbacks matter for the moment before the file lands, and for anyone
-     blocking web fonts. The small-caps face falls back to the interface one
-     rather than to a generic serif: losing the small capitals is better than
-     keeping them in whatever the platform calls Georgia. */
+     blocking web fonts. One family, so there is no second token. */
   --font-ui: 'Source Sans 3 Variable', system-ui, -apple-system, sans-serif;
-  --font-smallcaps: 'Spectral SC', var(--font-ui);
 
   font-family: var(--font-ui);
   /* 1.6 rather than 1.5. Rows of figures are scanned down a column, and the
