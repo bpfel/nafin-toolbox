@@ -271,7 +271,11 @@
       <col class="col-amount col-planned-yr" />
     </colgroup>
     {#each sectionCategories as category (category.categoryId)}
-      <tbody use:sortable data-category-id={category.categoryId}>
+      <tbody
+        use:sortable
+        data-category-id={category.categoryId}
+        class:has-category-header={sectionCategories.length > 1 || editing}
+      >
         {#if sectionCategories.length > 1 || editing}
           <tr class="category-header" class:editing class:collapsed={isCollapsed(type, category.categoryName)} onclick={() => toggleCategory(type, category.categoryName)}>
             <td>
@@ -408,6 +412,19 @@
     gap: 0;
   }
   table {
+    /*
+     * How far the category name sits from the edge of its cell: the chevron
+     * plus its margin. The entries below borrow it so their names begin on the
+     * same vertical line, leaving the chevron alone in a gutter to its left.
+     *
+     * Derived rather than typed, because a 1.1rem written into BudgetEntryRow
+     * would go quietly wrong the day the chevron changes size. Zero by default
+     * and set only where a header is actually drawn — a section with one
+     * category renders no header, and indenting entries under nothing would
+     * read as a mistake.
+     */
+    --category-gutter: 0rem;
+
     width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
@@ -415,6 +432,9 @@
     border-radius: 8px;
     overflow: hidden;
     box-shadow: var(--shadow-card);
+  }
+  tbody.has-category-header {
+    --category-gutter: calc(12px + 0.35rem);
   }
   .col-name {
     width: 60%;
@@ -569,31 +589,23 @@
     align-items: center;
     gap: 0.1rem;
   }
+  /* Always drawn. It used to fade in on hover, which cost twice: a control that
+     collapses a category was invisible until found by accident, and it went on
+     reserving its width while hidden — so the category name sat indented past
+     its own entries, pushed right by something nobody could see. Now it holds
+     the gutter that the entries align to, and the indentation says what the
+     nesting says. */
   .category-chevron {
     display: inline-flex;
     align-items: center;
     margin-right: 0.35rem;
-    opacity: 0;
-    transition: opacity 0.15s;
     vertical-align: middle;
     color: #868e96;
-  }
-  /* The chevron is not an edit-mode control — it collapses the category in either
-     mode — so outside edit mode it keeps the hover-reveal and relies on the
-     coarse-pointer rule below. Inside edit mode it sits between two now-permanent
-     controls, and a gap that fills in on hover would only look like a glitch. */
-  :global(.category-header:hover) .category-chevron,
-  :global(.category-header.editing) .category-chevron,
-  :global(.category-header.collapsed) .category-chevron {
-    opacity: 1;
   }
 
 
 
   @media (hover: none) and (pointer: coarse) {
-    .category-chevron {
-      opacity: 1;
-    }
     /* Both glyphs are about 14px across — visible, but a fingertip needs more
        than that. Widen the hit area, not the glyph. Keyed on the pointer rather
        than the viewport: a wide touchscreen has the same fingers. */

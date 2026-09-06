@@ -88,6 +88,18 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
+    /*
+     * Aligned with the category name above, not with the chevron beside it.
+     * The gutter is declared by the table in BudgetTable and inherits down
+     * here, so it stays correct at the narrow breakpoint where the cell padding
+     * shrinks, and stays zero in a section whose single category draws no
+     * header to align to.
+     *
+     * Inside the cell rather than on the `td`, because the td's padding is a
+     * shorthand set at two breakpoints and this would have had to be restated
+     * at both, with a specificity high enough to beat them.
+     */
+    padding-left: var(--category-gutter, 0rem);
   }
   .drag-handle {
     cursor: grab;
