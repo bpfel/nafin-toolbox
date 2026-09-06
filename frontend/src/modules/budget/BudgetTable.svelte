@@ -467,7 +467,7 @@
        noun still read as one. */
     padding: 0.85rem 0.75rem 0.35rem;
     background: none;
-    /* The family is the small capitals — this cut's lower case is drawn as
+    /* The family is the small capitals — Spectral SC's lower case is drawn as
        them — so no `font-variant-caps` here. Asking for one on top would have
        the browser synthesise from glyphs that are already small, shrinking
        them twice. Its upper case stays upper case, which is what keeps a
