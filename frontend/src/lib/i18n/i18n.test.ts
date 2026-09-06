@@ -1,4 +1,27 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
+import { en } from './locales/en'
+import { de } from './locales/de'
+import { rm } from './locales/rm'
+
+/**
+ * The slug these tests reach for whenever they need "some entry in the
+ * catalogue", named once instead of typed into five assertions.
+ *
+ * They also compare against the catalogues rather than against literal copy.
+ * What is under test is the machinery — that `t` picks the catalogue for the
+ * active locale, falls back where a partial one is missing an entry, survives a
+ * storage that throws — and none of that has an opinion about the words. Spelt
+ * out as literals, a copy edit failed five tests that were not about copy.
+ *
+ * This sat on `menu.security` until the profile screen stopped rendering it. At
+ * that point nothing in the app used the slug and only this file kept it alive:
+ * a suite holding a product string in place so its own fixtures would not move.
+ * `menu.logout` is about as permanent as a slug gets — it labels the sign-out
+ * control — but the test below checks the properties relied on here rather than
+ * trusting that, so the day it stops qualifying, one named test fails instead of
+ * five confusing ones.
+ */
+const ANY_SLUG = 'menu.logout'
 
 type I18n = typeof import('./index.svelte')
 
@@ -20,6 +43,22 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear()
+})
+
+describe('the fixture the rest of these tests lean on', () => {
+  // Four properties, each relied on by a test below. Asserted here so that a
+  // slug which stops qualifying fails once, by name, rather than scattering
+  // failures across the file with no hint at the cause.
+  test('is in every catalogue these tests read, carries no placeholder, and differs by locale', () => {
+    expect(en[ANY_SLUG], `${ANY_SLUG} is missing from en`).toBeTruthy()
+    expect(de[ANY_SLUG], `${ANY_SLUG} is missing from de`).toBeTruthy()
+    // Rumantsch is deliberately partial; this slug has to be one it has, or the
+    // "shows what it has" test would be testing the fallback instead.
+    expect(rm[ANY_SLUG], `${ANY_SLUG} is missing from rm`).toBeTruthy()
+
+    expect(en[ANY_SLUG]).not.toContain('{')
+    expect(de[ANY_SLUG]).not.toBe(en[ANY_SLUG])
+  })
 })
 
 describe('the locale list', () => {
@@ -45,9 +84,9 @@ describe('translating', () => {
   test('returns the string for the active locale', async () => {
     const { t, setLocale } = await load()
 
-    expect(t('menu.security')).toBe('Security')
+    expect(t(ANY_SLUG)).toBe(en[ANY_SLUG])
     setLocale('de')
-    expect(t('menu.security')).toBe('Sicherheit')
+    expect(t(ANY_SLUG)).toBe(de[ANY_SLUG])
   })
 
   test('fills placeholders', async () => {
@@ -160,7 +199,7 @@ describe('when localStorage throws', () => {
     const { getLocale, t } = await load()
 
     expect(getLocale()).toBe('en')
-    expect(t('menu.security')).toBe('Security')
+    expect(t(ANY_SLUG)).toBe(en[ANY_SLUG])
     spy.mockRestore()
   })
 
@@ -185,8 +224,8 @@ describe('a partial locale', () => {
     setLocale('rm')
 
     expect(getLocale()).toBe('rm')
-    expect(t('menu.security')).toBe('Segirezza')
-    expect(t('action.save')).toBe('Memorisar')
+    expect(t(ANY_SLUG)).toBe(rm[ANY_SLUG])
+    expect(t('action.save')).toBe(rm['action.save'])
   })
 
   // The alternative is a blank or a raw slug, either of which makes the app
@@ -196,7 +235,7 @@ describe('a partial locale', () => {
 
     setLocale('rm')
 
-    expect(t('menu.modules')).toBe('Modules')
+    expect(t('nav.accounts')).toBe('Accounts')
     expect(t('state.loading')).toBe('Loading...')
     expect(tn('entries.count', 2)).toBe('2 entries')
   })
@@ -233,9 +272,9 @@ describe('splitting a sentence around a slot', () => {
   test('a sentence without that placeholder comes back whole', async () => {
     const { tAround } = await load()
 
-    const [before, after] = tAround('menu.security', 'name')
+    const [before, after] = tAround(ANY_SLUG, 'name')
 
-    expect(before).toBe('Security')
+    expect(before).toBe(en[ANY_SLUG])
     expect(after).toBe('')
   })
 })

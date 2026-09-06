@@ -93,12 +93,12 @@ export function nextDue(anchorMonth: string, periodMonths: number, currentMonth:
 // cycle rolls — the shared formula in the design doc is off by one month for
 // amortizations, which would demand the full target in the month of purchase.
 //
-//   Obligation   — the anchor is a *due* month, recurring forever in both
+//   Bill         — the anchor is a *due* month, recurring forever in both
 //                  directions. k counts months into the cycle that ends at the
 //                  next due month, so k = periodMonths when the bill is due now
 //                  and k = 1 the month after it rolls.
 //
-//   Amortization — the anchor is the *start* of the current cycle, i.e. the
+//   Purchase     — the anchor is the *start* of the current cycle, i.e. the
 //                  month of the last purchase. k counts months elapsed since
 //                  then, so k = 0 in the purchase month and nothing is owed.
 //                  Past the full period the requirement stays at the target
@@ -114,26 +114,37 @@ export function nextDue(anchorMonth: string, periodMonths: number, currentMonth:
  * target/(period - 1) rather than the schedule simply shifting and leaving a
  * permanent shortfall.
  */
-const OBLIGATION_LEAD_MONTHS = 1
+const BILL_LEAD_MONTHS = 1
 
-export function requiredForItem(reserve: ReserveDefinition, currentMonth: string): string {
-  const { kind, targetAmount, periodMonths, anchorMonth } = reserve
+/**
+ * How much of the target should already be aside this month.
+ *
+ * Takes the entry's type rather than reading a `kind` off the reserve: since v7
+ * the type *is* the schedule, and the two were previously recorded separately
+ * for no reason other than that an entry could only be income or expense.
+ */
+export function requiredForItem(
+  type: 'bill' | 'purchase',
+  reserve: ReserveDefinition,
+  currentMonth: string,
+): string {
+  const { targetAmount, periodMonths, anchorMonth } = reserve
   assertPeriod(periodMonths)
 
   const target = toCents(targetAmount)
 
-  if (kind === 'amortization') {
+  if (type === 'purchase') {
     // No lead: nothing arrives on a date. The purchase happens when the money is
     // there, so being ready "early" is not a distinct state.
     const elapsed = clamp(monthsBetween(anchorMonth, currentMonth), 0, periodMonths)
     return fromCents(roundHalfAwayFromZero((target * elapsed) / periodMonths))
   }
 
-  // Obligation. The saving window is the cycle minus the lead, so the full target
-  // lands `OBLIGATION_LEAD_MONTHS` before the bill. A period short enough that the
+  // A bill. The saving window is the cycle minus the lead, so the full target
+  // lands `BILL_LEAD_MONTHS` before it falls due. A period short enough that the
   // lead would consume it entirely (a monthly bill) keeps a one-month window
   // rather than dividing by zero.
-  const savingMonths = Math.max(1, periodMonths - OBLIGATION_LEAD_MONTHS)
+  const savingMonths = Math.max(1, periodMonths - BILL_LEAD_MONTHS)
   const monthsUntilDue = monthsBetween(currentMonth, nextDue(anchorMonth, periodMonths, currentMonth))
   const elapsed = clamp(periodMonths - monthsUntilDue, 0, savingMonths)
 

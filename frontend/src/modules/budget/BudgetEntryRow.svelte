@@ -1,12 +1,20 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
+  import type { EntryType } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
+  import Money from '../../lib/util/Money.svelte'
 
   interface Props {
     entry: PlanEntryView
     viewMode?: 'monthly' | 'yearly'
-    onedit: (entryId: string, entryName: string, entryType: 'income' | 'expense', categoryName: string, plannedAmount: string) => void
+    onedit: (
+      entryId: string,
+      entryName: string,
+      entryType: EntryType,
+      categoryName: string,
+      plannedAmount: string,
+    ) => void
   }
 
   let { entry, viewMode = 'monthly', onedit }: Props = $props()
@@ -22,15 +30,10 @@
     onedit(entry.entryId, entry.entryName, entry.entryType, entry.categoryName, entry.plannedAmount)
   }
 
-  function fmt(val: number): string {
-    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-
 </script>
 
 <tr
   class="entry-row"
-  class:income={entry.entryType === 'income'}
   data-entry-id={entry.entryId}
 >
   <td class="name-cell">
@@ -52,19 +55,19 @@
   <td class="amount-cell planned-mo-cell">
     {#if editing}
       <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedMo', { entry: entry.entryName })}>
-        {fmt(planned)}
+        <Money value={planned} />
       </button>
     {:else}
-      <span class="cell-value">{fmt(planned)}</span>
+      <span class="cell-value"><Money value={planned} /></span>
     {/if}
   </td>
   <td class="amount-cell yearly planned-yr-cell">
     {#if editing}
       <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedYr', { entry: entry.entryName })}>
-        {fmt(planned * 12)}
+        <Money value={planned * 12} />
       </button>
     {:else}
-      <span class="cell-value">{fmt(planned * 12)}</span>
+      <span class="cell-value"><Money value={planned * 12} /></span>
     {/if}
   </td>
 </tr>
@@ -72,10 +75,10 @@
 <style>
   .entry-row td {
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid #eee;
-  }
-  .entry-row.income td {
-    background: #f0fdf4;
+    border-bottom: 1px solid var(--rule);
+    /* Smaller than the category line above, which carries their total. The
+       entries are what add up; the line above is the sum. */
+    font-size: 0.92rem;
   }
   .name-cell {
     overflow: hidden;
@@ -85,6 +88,18 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
+    /*
+     * Aligned with the category name above, not with the chevron beside it.
+     * The gutter is declared by the table in BudgetTable and inherits down
+     * here, so it stays correct at the narrow breakpoint where the cell padding
+     * shrinks, and stays zero in a section whose single category draws no
+     * header to align to.
+     *
+     * Inside the cell rather than on the `td`, because the td's padding is a
+     * shorthand set at two breakpoints and this would have had to be restated
+     * at both, with a specificity high enough to beat them.
+     */
+    padding-left: var(--category-gutter, 0rem);
   }
   .drag-handle {
     cursor: grab;
@@ -105,7 +120,9 @@
     cursor: grabbing;
   }
   .name-text {
-    font-weight: 500;
+    /* Not bold. The only bold thing in a section is the total, so that weight
+       means "this is the sum of the lines under it" and nothing else. */
+    font-weight: 400;
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
@@ -139,7 +156,7 @@
     padding: 0.25rem 0.35rem;
   }
   .amount-cell.yearly .cell-value {
-    color: #888;
+    color: var(--ink-faint);
   }
   .cell-value {
     display: block;

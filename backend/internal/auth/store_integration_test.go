@@ -40,7 +40,7 @@ func truncateTables(t *testing.T) {
 	t.Helper()
 	tables := []string{
 		"audit_log", "recovery_codes", "totp_secrets", "mfa_challenges",
-		"verification_tokens", "app_settings", "sessions", "modules", "users",
+		"verification_tokens", "app_settings", "sessions", "users",
 	}
 	for _, table := range tables {
 		if _, err := testDB.Exec("TRUNCATE " + table + " RESTART IDENTITY CASCADE"); err != nil {
@@ -837,41 +837,6 @@ func TestAuditLog_PreservedOnUserDelete(t *testing.T) {
 		string(AuditLoginSuccess)).Scan(&count)
 	if count != 1 {
 		t.Errorf("expected audit entry preserved with null user_id, got count=%d", count)
-	}
-}
-
-// --- User-scoped module isolation ---
-
-func TestModuleIsolationBetweenUsers(t *testing.T) {
-	truncateTables(t)
-	ctx := context.Background()
-	store := NewStore(testDB)
-
-	hash, _ := HashPassword("test1234")
-	user1, _ := store.CreateUser(ctx, "user1@test.com", hash, RoleUser, false)
-	user2, _ := store.CreateUser(ctx, "user2@test.com", hash, RoleUser, false)
-
-	testDB.ExecContext(ctx,
-		"INSERT INTO modules (user_id, id, name) VALUES ($1, 'budget', 'Budget')",
-		user1.ID,
-	)
-	testDB.ExecContext(ctx,
-		"INSERT INTO modules (user_id, id, name) VALUES ($1, 'accounts', 'Accounts')",
-		user2.ID,
-	)
-
-	rows, _ := testDB.QueryContext(ctx,
-		"SELECT id FROM modules WHERE user_id = $1", user1.ID)
-	defer rows.Close()
-
-	var ids []string
-	for rows.Next() {
-		var id string
-		rows.Scan(&id)
-		ids = append(ids, id)
-	}
-	if len(ids) != 1 || ids[0] != "budget" {
-		t.Errorf("user1 modules = %v, want [budget]", ids)
 	}
 }
 

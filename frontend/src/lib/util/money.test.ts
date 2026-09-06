@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { normalizeAmount, parseAmount } from './money'
+import { formatAmount, normalizeAmount, parseAmount } from './money'
 
 describe('normalizeAmount — the 0.00 prefill problem', () => {
   // The field is seeded with a stored '0.00'. Without select-on-focus, typing
@@ -45,5 +45,43 @@ describe('parseAmount — reading back what we printed', () => {
 
   test('genuine nonsense is NaN, so callers can reject it', () => {
     expect(parseAmount('abc')).toBeNaN()
+  })
+})
+
+describe('formatAmount — one formatter instead of twelve', () => {
+  test('always two decimals, because a franc is never written 12', () => {
+    expect(formatAmount('12')).toBe('12.00')
+    expect(formatAmount(12)).toBe('12.00')
+    expect(formatAmount('12.5')).toBe('12.50')
+  })
+
+  test('its own output reads back through parseAmount', () => {
+    // The invariant that matters. A formatted amount is put straight back into
+    // an input field when an entry is edited, so a separator our parser cannot
+    // read would lose the value silently — which it once did, above 999.
+    const shown = formatAmount('1234.50')
+    expect(shown).not.toBe('1234.50')
+    expect(parseAmount(shown)).toBe(1234.5)
+  })
+
+  test('reads centimes where the caller does exact arithmetic', () => {
+    // The accounts totals are summed in integers to avoid float drift and only
+    // become francs at the point of display.
+    expect(formatAmount(123456, { cents: true })).toBe(formatAmount('1234.56'))
+    expect(formatAmount(-500, { cents: true })).toBe(formatAmount('-5'))
+  })
+
+  test('drops the sign where the sentence already carries it', () => {
+    // "CHF 380.00 short of the tax bill" — the shortfall reads as a magnitude,
+    // and "-380.00 short" would say the opposite of what is meant.
+    expect(formatAmount('-380', { abs: true })).toBe('380.00')
+    expect(formatAmount('380', { abs: true })).toBe('380.00')
+  })
+
+  test('a value that is not a number comes back as itself, not as NaN', () => {
+    // Only the account card used to guard this; the other eleven copies rendered
+    // 'NaN' at the user. Showing the stored string back is what makes a corrupt
+    // amount recognisable instead of merely broken.
+    expect(formatAmount('not an amount')).toBe('not an amount')
   })
 })

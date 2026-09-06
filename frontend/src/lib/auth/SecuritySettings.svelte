@@ -2,11 +2,10 @@
   import { t } from '../i18n/index.svelte'
   import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount } from './authStore.svelte'
   import TwoFactorSetup from './TwoFactorSetup.svelte'
+  import Sheet from '../nav/Sheet.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
-  import AuditLogViewer from './AuditLogViewer.svelte'
   import { createCopier } from '../util/copier.svelte'
 
-  let { onDone }: { onDone?: () => void } = $props()
 
   const authState = getAuthState()
 
@@ -75,151 +74,139 @@
   }
 </script>
 
+<!--
+  Not a panel. Three boxes, contributed to the profile page's stack as siblings
+  of the two it draws itself — see the `display: contents` below. There is no
+  heading over them: a second factor and a password are settings like a language
+  is, and grouping them under a title claimed a hierarchy that is not there.
+-->
 <div class="security-settings">
-  <div class="settings-header">
-    <h2>{t('security.title')}</h2>
-    <button class="btn-secondary" onclick={() => onDone?.()}>{t('action.back')}</button>
-  </div>
+  <!--
+    These two used to replace the panel's whole body in place: no address, no
+    history entry, and the browser's back button left the screen rather than the
+    step. A third navigation model, and the only one with no way out. They are
+    sheets now, which is what they always were — a task over the screen you came
+    from, dismissed rather than navigated away from.
+  -->
+  <!-- 2FA Section -->
+  <div class="settings-card">
+    <h3>{t('security.twofaTitle')}</h3>
+    {#if authState.currentUser?.totp_enabled}
+      <p class="status enabled">{t('security.twofaEnabled')}</p>
 
-  {#if showSetup2FA}
-    <TwoFactorSetup onDone={() => { showSetup2FA = false; window.location.reload() }} />
-
-  {:else if showChangePassword}
-    <ChangePasswordForm onDone={() => { showChangePassword = false }} />
-
-  {:else}
-    <!-- 2FA Section -->
-    <div class="section">
-      <h3>{t('security.twofaTitle')}</h3>
-      {#if authState.currentUser?.totp_enabled}
-        <p class="status enabled">{t('security.twofaEnabled')}</p>
-
-        {#if showDisable}
-          <div class="confirm-box">
-            <p>{t('security.disablePrompt')}</p>
-            <input type="password" bind:value={password} placeholder={t('security.currentPasswordPlaceholder')} disabled={loading} />
-            {#if error}
-              <p class="error">{error}</p>
-            {/if}
-            <div class="btn-row">
-              <button class="btn-danger" onclick={handleDisable2FA} disabled={loading || !password}>
-                {loading ? t('security.disabling') : t('security.confirmDisable')}
-              </button>
-              <button class="btn-secondary" onclick={() => { showDisable = false; error = null; password = '' }}>{t('action.cancel')}</button>
-            </div>
-          </div>
-        {:else if showRegenCodes}
-          <div class="confirm-box">
-            {#if recoveryCodes}
-              <p class="info warning">{t('security.newCodesWarning')}</p>
-              <div class="codes-grid">
-                {#each recoveryCodes as code}
-                  <code class="recovery-code">{code}</code>
-                {/each}
-              </div>
-              <button class="btn-secondary" onclick={copyRecoveryCodes}>
-                {copier.copied ? t('action.copied') : t('twofa.copyAll')}
-              </button>
-              <p class="copy-status" class:failed={copier.failed} aria-live="polite">
-                {#if copier.failed}
-                  {t('twofa.codesCopyFailedPlain')}
-                {:else if copier.copied}
-                  {t('twofa.codesCopied')}
-                {/if}
-              </p>
-              <button onclick={() => { showRegenCodes = false; recoveryCodes = null; password = '' }}>{t('action.done')}</button>
-            {:else}
-              <p>{t('security.regeneratePrompt')}</p>
-              <input type="password" bind:value={password} placeholder={t('security.currentPasswordPlaceholder')} disabled={loading} />
-              {#if error}
-                <p class="error">{error}</p>
-              {/if}
-              <div class="btn-row">
-                <button onclick={handleRegenCodes} disabled={loading || !password}>
-                  {loading ? t('security.regenerating') : t('security.regenerate')}
-                </button>
-                <button class="btn-secondary" onclick={() => { showRegenCodes = false; error = null; password = '' }}>{t('action.cancel')}</button>
-              </div>
-            {/if}
-          </div>
-        {:else}
-          <div class="btn-row">
-            <button class="btn-secondary" onclick={() => showRegenCodes = true}>{t('security.regenerateCodes')}</button>
-            <button class="btn-danger-outline" onclick={() => showDisable = true}>{t('security.disable2fa')}</button>
-          </div>
-        {/if}
-      {:else}
-        <p class="status">{t('security.twofaNotEnabled')}</p>
-        <button onclick={() => showSetup2FA = true}>{t('security.enable2fa')}</button>
-      {/if}
-    </div>
-
-    <!-- Password Section -->
-    <div class="section">
-      <h3>{t('security.passwordTitle')}</h3>
-      <button class="btn-secondary" onclick={() => showChangePassword = true}>{t('password.changeTitle')}</button>
-    </div>
-
-    <!-- Audit Log (admin only) -->
-    {#if authState.currentUser?.role === 'admin'}
-      <div class="section">
-        <AuditLogViewer />
-      </div>
-    {/if}
-
-    <!-- Delete Account Section -->
-    <div class="section danger-zone">
-      <h3>{t('security.deleteAccountTitle')}</h3>
-      <p class="info">{t('security.deleteAccountHint')}</p>
-
-      {#if showDeleteAccount}
+      {#if showDisable}
         <div class="confirm-box">
-          <p>{t('security.deletePrompt')}</p>
+          <p>{t('security.disablePrompt')}</p>
           <input type="password" bind:value={password} placeholder={t('security.currentPasswordPlaceholder')} disabled={loading} />
           {#if error}
             <p class="error">{error}</p>
           {/if}
           <div class="btn-row">
-            <button class="btn-danger" onclick={handleDeleteAccount} disabled={loading || !password}>
-              {loading ? t('security.deleting') : t('security.deleteMyAccount')}
+            <button class="btn-danger" onclick={handleDisable2FA} disabled={loading || !password}>
+              {loading ? t('security.disabling') : t('security.confirmDisable')}
             </button>
-            <button class="btn-secondary" onclick={() => { showDeleteAccount = false; error = null; password = '' }}>{t('action.cancel')}</button>
+            <button class="btn-secondary" onclick={() => { showDisable = false; error = null; password = '' }}>{t('action.cancel')}</button>
           </div>
         </div>
+      {:else if showRegenCodes}
+        <div class="confirm-box">
+          {#if recoveryCodes}
+            <p class="info warning">{t('security.newCodesWarning')}</p>
+            <div class="codes-grid">
+              {#each recoveryCodes as code}
+                <code class="recovery-code">{code}</code>
+              {/each}
+            </div>
+            <button class="btn-secondary" onclick={copyRecoveryCodes}>
+              {copier.copied ? t('action.copied') : t('twofa.copyAll')}
+            </button>
+            <p class="copy-status" class:failed={copier.failed} aria-live="polite">
+              {#if copier.failed}
+                {t('twofa.codesCopyFailedPlain')}
+              {:else if copier.copied}
+                {t('twofa.codesCopied')}
+              {/if}
+            </p>
+            <button onclick={() => { showRegenCodes = false; recoveryCodes = null; password = '' }}>{t('action.done')}</button>
+          {:else}
+            <p>{t('security.regeneratePrompt')}</p>
+            <input type="password" bind:value={password} placeholder={t('security.currentPasswordPlaceholder')} disabled={loading} />
+            {#if error}
+              <p class="error">{error}</p>
+            {/if}
+            <div class="btn-row">
+              <button onclick={handleRegenCodes} disabled={loading || !password}>
+                {loading ? t('security.regenerating') : t('security.regenerate')}
+              </button>
+              <button class="btn-secondary" onclick={() => { showRegenCodes = false; error = null; password = '' }}>{t('action.cancel')}</button>
+            </div>
+          {/if}
+        </div>
       {:else}
-        <button class="btn-danger-outline" onclick={() => showDeleteAccount = true}>{t('security.deleteAccountTitle')}</button>
+        <div class="btn-row">
+          <button class="btn-secondary" onclick={() => showRegenCodes = true}>{t('security.regenerateCodes')}</button>
+          <button class="btn-danger-outline" onclick={() => showDisable = true}>{t('security.disable2fa')}</button>
+        </div>
       {/if}
-    </div>
-  {/if}
+    {:else}
+      <p class="status">{t('security.twofaNotEnabled')}</p>
+      <button onclick={() => showSetup2FA = true}>{t('security.enable2fa')}</button>
+    {/if}
+  </div>
+
+  <!-- Password Section -->
+  <div class="settings-card">
+    <h3>{t('security.passwordTitle')}</h3>
+    <button class="btn-secondary" onclick={() => showChangePassword = true}>{t('password.changeTitle')}</button>
+  </div>
+
+  <!-- Delete Account Section -->
+  <div class="settings-card">
+    <h3>{t('security.deleteAccountTitle')}</h3>
+    <p class="info">{t('security.deleteAccountHint')}</p>
+
+    {#if showDeleteAccount}
+      <div class="confirm-box">
+        <p>{t('security.deletePrompt')}</p>
+        <input type="password" bind:value={password} placeholder={t('security.currentPasswordPlaceholder')} disabled={loading} />
+        {#if error}
+          <p class="error">{error}</p>
+        {/if}
+        <div class="btn-row">
+          <button class="btn-danger" onclick={handleDeleteAccount} disabled={loading || !password}>
+            {loading ? t('security.deleting') : t('security.deleteMyAccount')}
+          </button>
+          <button class="btn-secondary" onclick={() => { showDeleteAccount = false; error = null; password = '' }}>{t('action.cancel')}</button>
+        </div>
+      </div>
+    {:else}
+      <button class="btn-danger-outline" onclick={() => showDeleteAccount = true}>{t('security.deleteAccountTitle')}</button>
+    {/if}
+  </div>
 </div>
 
+{#if showSetup2FA}
+  <Sheet label={t('security.twofaTitle')} onclose={() => (showSetup2FA = false)}>
+    <TwoFactorSetup onDone={() => { showSetup2FA = false; window.location.reload() }} />
+  </Sheet>
+{/if}
+
+{#if showChangePassword}
+  <Sheet label={t('password.changeTitle')} onclose={() => (showChangePassword = false)}>
+    <ChangePasswordForm onDone={() => (showChangePassword = false)} />
+  </Sheet>
+{/if}
+
 <style>
+  /* Generates no box of its own, so the three cards inside are laid out by the
+     profile page's flex column and pick up its gap. The alternative — a wrapper
+     with its own spacing — means one number for the gap between these three and
+     another for the gap to the boxes above, kept equal by hand. */
   .security-settings {
-    background: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: contents;
   }
 
-  .settings-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-  }
-
-  h2 { margin: 0; font-size: 1.2rem; }
   h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-
-  .section {
-    padding: 1.25rem 0;
-    border-bottom: 1px solid #eee;
-  }
-
-  .section:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
 
   .status {
     font-size: 0.9rem;
@@ -304,10 +291,6 @@
     font-size: 0.85rem;
   }
   .btn-danger-outline:hover { background: #fdecea; }
-
-  .danger-zone {
-    border-bottom: none;
-  }
 
   .codes-grid {
     display: grid;

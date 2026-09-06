@@ -1,0 +1,16 @@
+-- Modules are no longer something a user switches on.
+--
+-- The app used to start with every domain hidden behind a picker, and this
+-- table remembered which ones each user had enabled. That picker could not do
+-- the job asked of it: a name and one line of description is not enough to
+-- decide whether a feature is worth an evening, so the domain most in need of
+-- explaining was the one nobody could see.
+--
+-- Every screen is present from the first sign-in now, and an empty one is its
+-- own front door. Nothing reads this table.
+--
+-- Dropped rather than left in place: rows recording preferences no code
+-- consults are a trap for whoever next reads the schema looking for how
+-- features are gated. The data is not recoverable and does not need to be —
+-- it held no figures, only which of five names a user had ticked.
+DROP TABLE IF EXISTS modules;

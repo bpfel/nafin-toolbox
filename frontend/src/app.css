@@ -1,8 +1,154 @@
+/*
+ * One self-hosted face, under the SIL Open Font License: Source Sans 3, for
+ * everything.
+ *
+ * Adobe drew it for user interfaces and it behaves like it: quiet enough to
+ * disappear into a row of a table, narrow enough that Hausratversicherung fits
+ * a phone, and unbothered at the 0.92rem the budget entries are set in. A body
+ * face in a table has no business having opinions.
+ *
+ * There was a second face here — a small-capitals serif for the budget's
+ * category headings — and it earned its place in exactly one CSS rule while
+ * every other heading in the app, including the structurally identical one on
+ * the allocations screen, used this one. A family justified by a single
+ * selector is not justified. The three levels of the budget table are ranked by
+ * size and position instead, which is what was doing most of the work anyway.
+ *
+ * The variable cut, so the whole 200-900 range arrives in one file and the
+ * three weights the interface asks for — 400, 500, 700 — cost nothing extra.
+ * There is no per-subset entry point, so the package's cyrillic, greek and
+ * vietnamese are bundled; `unicode-range` means nobody fetches them. German,
+ * French and Italian accents all live in the latin subset, so a reader here
+ * pulls 29 KB and latin-ext is insurance.
+ */
+@import '@fontsource-variable/source-sans-3/wght.css';
+
 :root {
-  font-family: system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
-  color: #1a1a2e;
-  background-color: #f5f5f7;
+  /*
+   * How much room the bottom navigation bar takes.
+   *
+   * Anything else anchored to the bottom of the viewport — the unsaved-changes
+   * banner, the stale-build prompt — sits clear of it by this much. They carry
+   * a far higher z-index than the bar, so without the offset they would cover
+   * the navigation rather than sit above it, and an unsaved banner that hides
+   * every tab strands the user on one screen until they save.
+   *
+   * Zero from 768px up, where the navigation is a rail in the flow and nothing
+   * is over the bottom edge at all.
+   */
+  --app-nav-height: 60px;
+
+  /*
+   * Width of the left rail, and zero below 768px where navigation is a bar
+   * along the bottom instead. The shell reserves this much room on the left.
+   */
+  --app-rail-width: 0px;
+
+  /* ---------------------------------------------------------------------
+   * Colour
+   *
+   * There were seventy-seven distinct hex values in the components and not one
+   * name, so the same idea was spelled differently in different files and three
+   * of them were unreadable — var(--ink-faint) at 3.54:1 and var(--ink-faint) at 2.85:1 against white,
+   * both short of the 4.5:1 that small text needs.
+   *
+   * What colour encodes is *where the money goes*, in three values, not which
+   * of the five types a line is. Five hues is past what anyone separates
+   * reliably — savings and bill were four percent apart in hue — and the type
+   * is already written beside the figure. Colour is good at coarse and instant,
+   * so it answers the coarse and instant question: arriving, leaving, or
+   * staying? Which is `sideOf()` and `holdsMoney()`, so the palette falls out
+   * of the model rather than being decided over it.
+   *
+   * And it marks the exception, not the routine. Expenses used to be red —
+   * every one of them, always — so a budget in good order rendered as a wall of
+   * red and the one row that was genuinely a problem had nowhere left to shout
+   * from. Spending money is what a budget is for; it is not a warning.
+   *
+   * Never the only carrier: a negative figure has a minus sign, a type has a
+   * label, an error has a sentence. Roughly one man in twelve cannot separate
+   * the red from the green.
+   * ------------------------------------------------------------------- */
+
+  --ink: #1a1a2e;         /* 17.1:1 — body text, and money going out */
+  --ink-muted: #5c6068;   /*  6.3:1 — secondary text */
+  --ink-faint: #6e737b;   /*  4.8:1 — labels and hints */
+
+  --surface: #ffffff;
+  --ground: #f5f5f7;
+  --sunken: #f1f3f5;
+  /* Two weights, two jobs. The hairline divides peers — one budget entry from
+     the next — and the strong one divides a summary from the detail under it.
+     Until now a single weight drew both, so only boldness said "this is the
+     total" and the line said nothing. Two, not three: ranking three levels by
+     three shades of grey was tried here before and read as noise. */
+  --rule: #e0e2e6;
+  --rule-strong: #c9ccd2;
+
+  /* Two layers, because that is how a shadow actually falls: a tight contact
+     shadow where the card meets the page, and a wide ambient one further out.
+     A single hard layer is what makes a box look stuck on rather than resting.
+     Tinted toward the ink rather than pure black — black over a warm white
+     reads grey and dead. */
+  --shadow-card: 0 1px 2px rgba(26, 26, 46, 0.05), 0 8px 24px rgba(26, 26, 46, 0.05);
+  --shadow-raised: 0 2px 6px rgba(26, 26, 46, 0.06), 0 12px 32px rgba(26, 26, 46, 0.1);
+  --shadow-modal: 0 4px 12px rgba(26, 26, 46, 0.1), 0 24px 60px rgba(26, 26, 46, 0.18);
+
+  /* Where the money goes. Out is the ordinary ink: it is the routine. */
+  --money-in: #2d6a4f;    /*  6.4:1 */
+  --money-out: var(--ink);
+  --money-held: #1d4e89;  /*  8.4:1 — savings, bill and purchase alike */
+
+  /* The exceptions, which is why these are the loud ones. */
+  --alarm: #c0392b;       /*  5.4:1 — overspent, under-funded, errors, delete */
+  --alarm-soft: #fdecea;
+  --warn: #8f4f13;        /*  6.4:1 — unsaved, provisional, a date that will not settle */
+  --warn-soft: #fdf3e0;
+
+  /* The app's own green. Shares a value with money-in, which is tolerable:
+     a filled green button is obviously a button, and a figure is obviously a
+     figure. Named separately so one can move without dragging the other. */
+  --accent: #2d6a4f;
+  --accent-dark: #245a42;
+  --accent-soft: #eaf1ee;
+
+  /* The fallbacks matter for the moment before the file lands, and for anyone
+     blocking web fonts. One family, so there is no second token. */
+  --font-ui: 'Source Sans 3 Variable', system-ui, -apple-system, sans-serif;
+
+  /* Every franc amount in the app, at one size. See Money.svelte for why. */
+  --figure-size: 1rem;
+
+  font-family: var(--font-ui);
+  /* 1.6 rather than 1.5. Rows of figures are scanned down a column, and the
+     leading is what the eye uses to keep its place between one row and the
+     next. */
+  line-height: 1.6;
+  color: var(--ink);
+  background-color: var(--ground);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-nav-height: 0px;
+    --app-rail-width: 190px;
+  }
+}
+
+/*
+ * A figure the user has asked not to be readable over their shoulder.
+ *
+ * Global rather than scoped to <Money>, because an amount interpolated into a
+ * sentence — "CHF 380.00 short of the tax bill" — cannot be a component, so the
+ * element holding the sentence wears this instead. Both need one definition.
+ *
+ * Blur, not dots: nothing reflows, so switching it off does not move the page
+ * out from under whoever was reading it. `user-select` stops a blurred figure
+ * being dragged out as text, which is the one trivial way round it.
+ */
+.amount-hidden {
+  filter: blur(0.35em);
+  user-select: none;
 }
 
 * {
@@ -17,8 +163,17 @@ main {
   padding: 2rem;
 }
 
+/* Tracking is drawn for text sizes: the same relative gap between letters
+   reads looser the larger the type gets. Tightened once here rather than at
+   each of the twelve headings that set their own size. */
 h1 {
   margin-bottom: 2rem;
+  letter-spacing: -0.02em;
+}
+
+h2,
+h3 {
+  letter-spacing: -0.012em;
 }
 
 .empty-state {
@@ -46,11 +201,37 @@ h1 {
   gap: 1rem;
 }
 
+/*
+ * One box on the profile page, and every setting gets its own.
+ *
+ * They all look alike because none of them outranks another: an e-mail
+ * address, a language, a second factor and a delete button are four unrelated
+ * things rather than a tree. The security settings used to be one card with
+ * three ruled-off sections and a title above them, which drew a hierarchy that
+ * was not there.
+ *
+ * Global rather than scoped because it is shared between a screen and a
+ * component, which Svelte would otherwise keep from styling one another —
+ * and restating the declarations in both is how the two drift apart.
+ */
+.settings-card {
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+}
+
+@media (min-width: 768px) {
+  .settings-card {
+    padding: 1.1rem 1.25rem;
+  }
+}
+
 .module-card {
   padding: 1.5rem;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-card);
 }
 
 .module-card h2 {
@@ -60,7 +241,7 @@ h1 {
 
 .module-id {
   font-size: 0.8rem;
-  color: #888;
+  color: var(--ink-faint);
 }
 
 button {

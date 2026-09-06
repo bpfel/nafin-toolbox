@@ -21,7 +21,7 @@
   .update-banner {
     position: fixed;
     left: 50%;
-    bottom: 1rem;
+    bottom: calc(1rem + var(--app-nav-height, 0px) + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     z-index: 200;
     display: flex;
@@ -32,7 +32,7 @@
     border-radius: 10px;
     background: #1f2d28;
     color: #f1f3f5;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-raised);
     font-size: 0.9rem;
   }
 

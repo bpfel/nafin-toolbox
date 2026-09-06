@@ -1,4 +1,39 @@
-// Money input behaviour, shared by every amount field in the app.
+// Money, in and out — every amount field and every rendered figure in the app.
+
+/**
+ * Renders an amount the way Swiss money is written: a U+2019 thousands
+ * separator, a '.' decimal point, always two decimal places.
+ *
+ * **Always de-CH, whatever the interface language is.** Someone reading the app
+ * in French is still holding Swiss francs and still writing them 1’234.50; the
+ * figures on their bank statement do not change language. Following `getLocale()`
+ * here would render 1 234,50 to a French reader and silently disagree with every
+ * other number they saw that day.
+ *
+ * A value that is not a number comes back untouched rather than as 'NaN', so a
+ * corrupt stored amount shows as itself and can be recognised. An actual NaN
+ * still renders 'NaN' — that one is a bug and should look like one.
+ *
+ * Every figure in the interface goes through here, and nearly all of them via
+ * `<Money>` rather than by calling this directly. Reach for the function only
+ * where the formatted text has to be interpolated into a sentence — a `t()`
+ * placeholder — because a component cannot be passed as a string.
+ */
+export function formatAmount(
+  value: string | number,
+  options: { cents?: boolean; abs?: boolean } = {},
+): string {
+  const raw = typeof value === 'number' ? value : parseAmount(value)
+  if (!Number.isFinite(raw)) return String(value)
+
+  const amount = options.cents ? raw / 100 : raw
+  const signed = options.abs ? Math.abs(amount) : amount
+
+  return signed.toLocaleString('de-CH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
 
 /**
  * Normalises a typed amount into the exact form the Swiss QR bill standard

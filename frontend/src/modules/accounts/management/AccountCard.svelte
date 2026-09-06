@@ -1,7 +1,9 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
   import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
-  import { moneyInput } from '../../../lib/util/money'
+  import { formatAmount, moneyInput } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
+  import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
 
   interface Props {
@@ -51,12 +53,6 @@
   let dateInput = $state('')
   let correctionError = $state<string | null>(null)
 
-  function fmt(value: string): string {
-    const n = Number(value)
-    if (!isFinite(n)) return value
-    return n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-
   function todayISO(): string {
     return new Date().toISOString().slice(0, 10)
   }
@@ -103,7 +99,10 @@
   }
 </script>
 
-<article class="card account-card" data-account-id={account.id}>
+<div class="card account-card" data-account-id={account.id}>
+  <!-- The name sits on the page above its card, as a section title does in the
+       budget. A heading inside the thing it heads competes with the contents
+       for the same rectangle. -->
   <header class="card-head">
     {#if canReorder && editing}
       <!-- The sole drag affordance: `handle: '.drag-handle'` confines dragging
@@ -120,25 +119,29 @@
     </div>
   </header>
 
-  <dl class="figures">
-    <div class="figure">
-      <dt>{t('accounts.projected')}</dt>
-      <dd class="amount">{fmt(projected)}</dd>
-    </div>
-    <div class="figure">
-      <dt>{t('accounts.required')}</dt>
-      <dd class="amount muted">{fmt(required)}</dd>
-    </div>
-    <div class="figure">
-      <dt>{t('accounts.available')}</dt>
-      <dd class="amount" class:negative={Number(available) < 0}>{fmt(available)}</dd>
-    </div>
-  </dl>
+  <article class="card-body">
+    <!-- A small table rather than a row of three: the labels line up on the
+         left, the figures on the right, and comparing one account to the next
+         is reading down a column instead of across a wrap. -->
+    <dl class="figures">
+      <div class="figure">
+        <dt>{t('accounts.balanceFigure')}</dt>
+        <dd class="amount"><Money value={projected} /></dd>
+      </div>
+      <div class="figure">
+        <dt>{t('accounts.allocated')}</dt>
+        <dd class="amount muted"><Money value={required} /></dd>
+      </div>
+      <div class="figure">
+        <dt>{t('accounts.free')}</dt>
+        <dd class="amount" class:negative={Number(available) < 0}><Money value={available} /></dd>
+      </div>
+    </dl>
 
-  <p class="anchor" class:stale>
+  <p class="anchor" class:stale class:amount-hidden={amountsHidden()}>
     {t('accounts.correctedOn', {
       date: formatDate(account.lastCorrectedAt),
-      amount: fmt(account.currentAmount),
+      amount: formatAmount(account.currentAmount),
     })}
     {#if stale}<span class="stale-note">{t('accounts.projectedSince')}</span>{/if}
   </p>
@@ -205,13 +208,26 @@
     </div>
   {/if}
 </article>
+</div>
 
 <style>
-  .card {
+  /* The card is the column: a name on the page, and the box under it. */
+  .account-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* Outside the box, so the box holds only figures and controls. */
+  .card-head {
+    padding: 0 0.25rem 0.35rem;
+  }
+
+  .card-body {
     background: white;
     border-radius: 10px;
     padding: 1rem 1.1rem 1.1rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -231,7 +247,7 @@
     flex-shrink: 0;
   }
   .drag-handle:hover {
-    color: #888;
+    color: var(--ink-faint);
   }
   .drag-handle:active {
     cursor: grabbing;
@@ -241,7 +257,7 @@
      as a control rather than as decoration. */
   @media (hover: none) {
     .drag-handle {
-      color: #888;
+      color: var(--ink-faint);
     }
   }
   /* Scoped to this card so it cannot collide with another module's ghost. */
@@ -262,22 +278,32 @@
   .meta {
     margin: 0.15rem 0 0;
     font-size: 0.8rem;
-    color: #888;
+    color: var(--ink-faint);
   }
+
+  /* A table, not a row of three. Three columns meant three narrow figures that
+     wrapped on a phone; stacked, the labels line up on the left and the amounts
+     on the right, so comparing two accounts is reading down rather than across.
+     It is also what makes the card taller, which it wanted to be. */
   .figures {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
     margin: 0;
   }
   .figure {
     display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3rem 0;
+  }
+  .figure + .figure {
+    border-top: 1px solid #f2f3f5;
   }
   dt {
     font-size: 0.72rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
@@ -298,7 +324,7 @@
   .anchor {
     margin: 0;
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
   }
   .anchor.stale {
     color: #b26a00;
@@ -310,13 +336,13 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
     padding-top: 0.75rem;
   }
   .correction-hint {
     margin: 0;
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
   }
   .correction-fields {
     display: grid;

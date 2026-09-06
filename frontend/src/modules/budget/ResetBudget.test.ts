@@ -36,12 +36,12 @@ function load(snapshots: VaultData['budget']['snapshots'] = []) {
 
 function makeVault(snapshots: VaultData['budget']['snapshots'] = []): VaultData {
   return {
-    version: 6,
+    version: 7,
     accounts: [],
     budget: {
       categories: [
-        { id: 'g-income', name: 'Employment', type: 'income', sortOrder: 10 },
-        { id: 'g-housing', name: 'Housing', type: 'expense', sortOrder: 20 },
+        { id: 'g-income', name: 'Employment', side: 'income', sortOrder: 10 },
+        { id: 'g-housing', name: 'Housing', side: 'expense', sortOrder: 20 },
       ],
       entries: [
         { id: 'salary', name: 'Salary', type: 'income', sortOrder: 10, archived: false, categoryId: 'g-income', sourceAccountId: null, sinkAccountId: null },

@@ -1,9 +1,13 @@
-import type {
-  VaultData,
-  VaultCategory,
-  VaultEntry,
-  VaultSnapshot,
-  VaultSnapshotLine,
+import {
+  holdsMoney,
+  savesTowardsTarget,
+  sideOf,
+  type EntryType,
+  type VaultData,
+  type VaultCategory,
+  type VaultEntry,
+  type VaultSnapshot,
+  type VaultSnapshotLine,
 } from '../crypto/vault'
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
 import { seedNamesFor, type SeedKey } from './seedNames'
@@ -18,7 +22,7 @@ export function listCategories(vault: VaultData): VaultCategory[] {
 export function createCategory(
   vault: VaultData,
   name: string,
-  type: 'income' | 'expense',
+  side: 'income' | 'expense',
   sortOrder?: number,
 ): VaultCategory {
   const categories = vault.budget.categories
@@ -26,7 +30,7 @@ export function createCategory(
   const category: VaultCategory = {
     id: crypto.randomUUID(),
     name,
-    type,
+    side,
     sortOrder: order,
   }
   categories.push(category)
@@ -36,13 +40,13 @@ export function createCategory(
 export function getOrCreateCategory(
   vault: VaultData,
   name: string,
-  type: 'income' | 'expense',
+  side: 'income' | 'expense',
 ): VaultCategory {
   const existing = vault.budget.categories.find(
-    g => g.name === name && g.type === type,
+    g => g.name === name && g.side === side,
   )
   if (existing) return existing
-  return createCategory(vault, name, type)
+  return createCategory(vault, name, side)
 }
 
 /**
@@ -88,12 +92,12 @@ export function findCategoryConflict(
   vault: VaultData,
   categoryId: string,
   name: string,
-  type: 'income' | 'expense',
+  side: 'income' | 'expense',
 ): VaultCategory | null {
   const trimmed = name.trim()
   return (
     vault.budget.categories.find(
-      g => g.id !== categoryId && g.type === type && g.name === trimmed,
+      g => g.id !== categoryId && g.side === side && g.name === trimmed,
     ) ?? null
   )
 }
@@ -113,7 +117,7 @@ export function findCategoryConflict(
 export function updateCategory(
   vault: VaultData,
   categoryId: string,
-  update: { name?: string; type?: 'income' | 'expense' },
+  update: { name?: string; side?: 'income' | 'expense' },
 ): void {
   const category = vault.budget.categories.find(g => g.id === categoryId)
   if (!category) return
@@ -123,16 +127,20 @@ export function updateCategory(
     throw new Error('a category needs a name')
   }
 
-  const type = update.type ?? category.type
-  if (findCategoryConflict(vault, categoryId, name, type)) {
-    throw new Error(`a ${type} category called "${name}" already exists`)
+  const side = update.side ?? category.side
+  if (findCategoryConflict(vault, categoryId, name, side)) {
+    throw new Error(`a ${side} category called "${name}" already exists`)
   }
 
-  if (type !== category.type) {
+  if (side !== category.side) {
+    // Every entry follows the heading across. Landing on the expense side they
+    // become plain `expense` rather than whatever they were: a bill or a
+    // purchase that has been through income has lost its target on the way, and
+    // guessing which of the three it used to be would be inventing data.
     for (const cat of entriesInCategory(vault, categoryId)) {
-      updateEntry(vault, cat.id, { type })
+      updateEntry(vault, cat.id, { type: side })
     }
-    category.type = type
+    category.side = side
   }
   category.name = name
 }
@@ -152,7 +160,7 @@ export function mergeCategory(vault: VaultData, fromId: string, intoId: string):
   if (!from || !into) return
 
   for (const cat of entriesInCategory(vault, fromId)) {
-    if (cat.type !== into.type) updateEntry(vault, cat.id, { type: into.type })
+    if (sideOf(cat.type) !== into.side) updateEntry(vault, cat.id, { type: into.side })
     cat.categoryId = into.id
   }
   vault.budget.categories = vault.budget.categories.filter(g => g.id !== fromId)
@@ -165,16 +173,37 @@ export function listEntries(vault: VaultData, includeArchived = false): VaultEnt
   return cats.sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
+/** A year, the period every ordinary Swiss bill and most replacements run on. */
+const DEFAULT_RESERVE_PERIOD_MONTHS = 12
+
 export function createEntry(
   vault: VaultData,
   opts: {
     name: string
-    type: 'income' | 'expense'
+    type: EntryType
     categoryName: string
     sortOrder?: number
+    /**
+     * What to plan for it, straight away.
+     *
+     * Optional only because the caller may not have asked. It used to be
+     * impossible: an entry was created with nothing planned and the amount was
+     * a second visit to the same dialog, which is a strange thing to insist on
+     * — the amount is usually the reason someone is adding the line at all.
+     */
+    plannedAmount?: string
+    /**
+     * The month a `bill` or `purchase` reserve is anchored to. The caller knows
+     * what month it is; the engine deliberately does not read a clock.
+     */
+    anchorMonth?: string
+    /** What a `bill` or `purchase` is saving towards. */
+    targetAmount?: string
+    /** How long it has to get there — the billing cycle, or the item's life. */
+    periodMonths?: number
   },
 ): VaultEntry {
-  const category = getOrCreateCategory(vault, opts.categoryName, opts.type)
+  const category = getOrCreateCategory(vault, opts.categoryName, sideOf(opts.type))
   const cats = vault.budget.entries
   const order = opts.sortOrder ?? (cats.length > 0 ? Math.max(...cats.map(c => c.sortOrder)) + 10 : 10)
   // Entries are born routed: the default is legal for both types, so no
@@ -190,8 +219,50 @@ export function createEntry(
     sourceAccountId: routing.sourceAccountId,
     sinkAccountId: routing.sinkAccountId,
   }
+
+  // A bill or a purchase is a target with a deadline, so it is born with one
+  // rather than being a type that means nothing until a second screen is
+  // visited. The target is proposed from what is being planned monthly — for
+  // the default yearly period that is exactly the annual figure — and is the
+  // first thing the user overwrites if they know the real one.
+  if (savesTowardsTarget(opts.type) && opts.anchorMonth) {
+    cat.reserve = {
+      // The target is what the caller states; the monthly figure is what
+      // follows from it. That is the way round people hold these — "two
+      // thousand francs, and it lasts seven years" — and the reverse, deriving
+      // a target from a monthly amount, is how an entry ended up with a rate
+      // that could never meet its own schedule.
+      targetAmount: opts.targetAmount ?? '0.00',
+      periodMonths: opts.periodMonths ?? DEFAULT_RESERVE_PERIOD_MONTHS,
+      anchorMonth: opts.anchorMonth,
+    }
+  }
   cats.push(cat)
+  if (opts.plannedAmount !== undefined && opts.plannedAmount !== '') {
+    setPlanned(vault, cat.id, opts.plannedAmount)
+  }
   return cat
+}
+
+/**
+ * Replaces what a bill or purchase is saving towards.
+ *
+ * Refused on the three types that have no target: carrying one without being
+ * either a bill or a purchase is the contradiction `isLegalEntryRouting`
+ * exists to reject, and it is cheaper to refuse here than to write it and
+ * find out on the next save.
+ */
+export function setReserve(
+  vault: VaultData,
+  entryId: string,
+  reserve: { targetAmount: string; periodMonths: number; anchorMonth: string },
+): void {
+  const entry = vault.budget.entries.find(e => e.id === entryId)
+  if (!entry) return
+  if (!savesTowardsTarget(entry.type)) {
+    throw new Error(`a ${entry.type} entry has no target to save towards`)
+  }
+  entry.reserve = { ...reserve }
 }
 
 export function updateEntry(
@@ -214,13 +285,13 @@ export function updateEntry(
     const routing = defaultRouting(cat.type, primaryAccountId(vault))
     cat.sourceAccountId = routing.sourceAccountId
     cat.sinkAccountId = routing.sinkAccountId
-    if (cat.type === 'income') delete cat.reserve
+    if (!savesTowardsTarget(cat.type)) delete cat.reserve
   }
 
   if (update.sortOrder !== undefined) cat.sortOrder = update.sortOrder
   if (update.archived !== undefined) cat.archived = update.archived
   if (update.categoryName !== undefined) {
-    const category = getOrCreateCategory(vault, update.categoryName, cat.type)
+    const category = getOrCreateCategory(vault, update.categoryName, sideOf(cat.type))
     cat.categoryId = category.id
     // Moving the last entry out empties the category it came from.
     pruneEmptyCategories(vault)
@@ -291,7 +362,7 @@ export function setPlanned(vault: VaultData, entryId: string, amount: string): v
 export interface PlanEntryView {
   entryId: string
   entryName: string
-  entryType: 'income' | 'expense'
+  entryType: EntryType
   categoryId: string
   categoryName: string
   plannedAmount: string
@@ -300,7 +371,10 @@ export interface PlanEntryView {
 export interface PlanSummary {
   entries: PlanEntryView[]
   totalPlannedIncome: string
+  /** Consumed and gone. Since v7 this excludes what is only being held. */
   totalPlannedExpenses: string
+  /** Savings, bills and purchases: out of the account, still in the net worth. */
+  totalPlannedSavings: string
   plannedBalance: string
 }
 
@@ -318,6 +392,7 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
 
   let totalPlannedIncome = 0
   let totalPlannedExpenses = 0
+  let totalPlannedSavings = 0
 
   const entries: PlanEntryView[] = []
 
@@ -337,6 +412,8 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
 
     if (cat.type === 'income') {
       totalPlannedIncome += planned
+    } else if (holdsMoney(cat.type)) {
+      totalPlannedSavings += planned
     } else {
       totalPlannedExpenses += planned
     }
@@ -346,7 +423,11 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
     entries,
     totalPlannedIncome: totalPlannedIncome.toFixed(2),
     totalPlannedExpenses: totalPlannedExpenses.toFixed(2),
-    plannedBalance: (totalPlannedIncome - totalPlannedExpenses).toFixed(2),
+    // Savings, bills and purchases: out of what is spendable, but still yours.
+    // Nothing could add this up before — the three were disguised as expenses,
+    // and the allocation screen inferred it from routing on every keystroke.
+    totalPlannedSavings: totalPlannedSavings.toFixed(2),
+    plannedBalance: (totalPlannedIncome - totalPlannedExpenses - totalPlannedSavings).toFixed(2),
   }
 }
 

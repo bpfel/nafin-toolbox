@@ -132,3 +132,112 @@ describe('Enter in an amount field', () => {
     expect(onclose).not.toHaveBeenCalled()
   })
 })
+
+describe('a bill states the bill, not the monthly amount', () => {
+  afterEach(cleanup)
+
+  function openBill() {
+    const vault = createEmptyVault()
+    engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+    const housing = engine.listCategories(vault)[0]
+    const oncreated = vi.fn()
+
+    render(AddEntryModal, {
+      props: {
+        type: 'bill' as const,
+        categories: [{ name: housing.name, id: housing.id }],
+        vault,
+        oncreated,
+        onclose: vi.fn(),
+      },
+    })
+    return { vault, oncreated }
+  }
+
+  test('there is no kind to choose — the button that opened this decided it', async () => {
+    openBill()
+
+    expect(screen.queryByLabelText('Kind')).toBeNull()
+  })
+
+  test('the monthly figure follows from the bill and its cycle, and cannot be typed', async () => {
+    // 2400 four times a year is 200 a month. Deriving it is the whole point: an
+    // amount typed independently of the cycle is how an entry ends up with a
+    // rate that can never meet its own schedule.
+    openBill()
+
+    await fireEvent.input(screen.getByLabelText('How much is the bill'), {
+      target: { value: '2400.00' },
+    })
+    await fireEvent.change(screen.getByLabelText('Arrives every'), { target: { value: '3' } })
+
+    const monthly = screen.getByLabelText('Set aside each month') as HTMLInputElement
+    expect(monthly.value).toBe('800.00')
+    expect(monthly.readOnly).toBe(true)
+  })
+
+  test('what is saved is the bill, the cycle, and the month it lands', async () => {
+    const { vault, oncreated } = openBill()
+
+    await fireEvent.input(screen.getByLabelText('How much is the bill'), {
+      target: { value: '1200.00' },
+    })
+    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Health insurance' } })
+    await fireEvent.change(screen.getByLabelText('Arrives every'), { target: { value: '6' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(oncreated).toHaveBeenCalled()
+    const bill = vault.budget.entries.find(e => e.name === 'Health insurance')!
+    expect(bill.type).toBe('bill')
+    expect(bill.reserve).toMatchObject({ targetAmount: '1200.00', periodMonths: 6 })
+    // 1200 twice a year is 200 a month, and that is what the budget diverts.
+    expect(vault.budget.plan.find(p => p.entryId === bill.id)?.plannedAmount).toBe('200.00')
+  })
+})
+
+describe('a purchase can be described from either end', () => {
+  afterEach(cleanup)
+
+  function openPurchase() {
+    const vault = createEmptyVault()
+    engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+    const housing = engine.listCategories(vault)[0]
+
+    render(AddEntryModal, {
+      props: {
+        type: 'purchase' as const,
+        categories: [{ name: housing.name, id: housing.id }],
+        vault,
+        oncreated: vi.fn(),
+        onclose: vi.fn(),
+      },
+    })
+    return { vault }
+  }
+
+  test('a price and a lifetime give the monthly amount', async () => {
+    openPurchase()
+
+    await fireEvent.input(screen.getByLabelText('What it costs'), { target: { value: '2400.00' } })
+
+    // Two years by default: 2400 over 24 months.
+    expect((screen.getByLabelText('Set aside each month') as HTMLInputElement).value).toBe('100.00')
+  })
+
+  test('a monthly amount gives the lifetime instead', async () => {
+    // "I am willing to put aside fifteen a month — where does that get me?"
+    // The period moves rather than the figure being argued with.
+    const { vault } = openPurchase()
+
+    await fireEvent.input(screen.getByLabelText('What it costs'), { target: { value: '1500.00' } })
+    await fireEvent.change(screen.getByLabelText('Set aside each month'), {
+      target: { value: '15.00' },
+    })
+    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Laptop' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    const laptop = vault.budget.entries.find(e => e.name === 'Laptop')!
+    // 1500 at 15 a month is 100 months — eight years and four months.
+    expect(laptop.reserve?.periodMonths).toBe(100)
+  })
+})

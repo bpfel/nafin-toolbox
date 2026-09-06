@@ -8,6 +8,8 @@
   import { normalizeAmount, moneyInput } from '../../../lib/util/money'
   import { renderQRSvg } from '../../../lib/qrbill/svg'
   import { focusTrap } from '../../../lib/util/focusTrap'
+  import InfoButton from '../../../lib/nav/InfoButton.svelte'
+  import InfoModal from '../../../lib/nav/InfoModal.svelte'
 
   interface Props {
     /** Always the creditor: the bill pays money into this account. */
@@ -163,16 +165,18 @@
   function handleBackdrop(e: MouseEvent) {
     if (e.target === e.currentTarget) onclose()
   }
+
+  let showDetails = $state(false)
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
   <div class="modal" role="dialog" aria-label={t('qrbill.dialogLabel')} use:focusTrap>
-    <h3>{t('qrbill.title', { account: account.name })}</h3>
-    <p class="sub">
-      {t('qrbill.payHint')}
-    </p>
+    <div class="title-row">
+      <h3>{t('qrbill.title', { account: account.name })}</h3>
+      <InfoButton label={t('qrbill.detailsTitle')} onclick={() => (showDetails = true)} />
+    </div>
 
     {#if creditorIncomplete}
       <p class="notice">
@@ -201,14 +205,6 @@
         {/each}
       </select>
     </label>
-    <p class="hint">
-      {#if account.ibanKind === 'qr-iban'}
-        {t('qrbill.qrIbanRule')}
-      {:else}
-        {t('qrbill.regularIbanRule')}
-      {/if}
-    </p>
-
     {#if referenceType !== 'NON'}
       <label class="field">
         <span class="label">{t('qrbill.reference')}</span>
@@ -310,7 +306,21 @@
   </div>
 </div>
 
+{#if showDetails}
+  <InfoModal
+    title="qrbill.detailsTitle"
+    body="qrbill.detailsBody"
+    onclose={() => (showDetails = false)}
+  />
+{/if}
+
 <style>
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+  }
+
   .backdrop {
     position: fixed;
     inset: 0;
@@ -329,17 +339,11 @@
     max-width: 460px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-modal);
   }
   h3 {
     margin: 0 0 0.25rem;
     font-size: 1.1rem;
-  }
-  .sub {
-    margin: 0 0 1rem;
-    font-size: 0.82rem;
-    color: #888;
-    line-height: 1.4;
   }
   .field {
     display: flex;
@@ -383,7 +387,7 @@
   }
   .hint {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
     margin: -0.25rem 0 1rem;
     line-height: 1.35;
   }
@@ -411,7 +415,7 @@
     padding: 0.6rem 0.75rem 0.6rem 1.6rem;
   }
   .advanced {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
     padding-top: 0.75rem;
     margin-bottom: 1rem;
   }
@@ -436,7 +440,7 @@
     align-items: center;
     gap: 0.5rem;
     background: white;
-    border: 1px solid #eee;
+    border: 1px solid var(--rule);
     border-radius: 8px;
     padding: 1rem;
   }
@@ -446,7 +450,7 @@
   }
   figcaption {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
     text-align: center;
   }
   .share {

@@ -39,7 +39,6 @@ function entry(id: string, overrides: Partial<VaultEntry> = {}): VaultEntry {
 
 function reserve(overrides: Partial<ReserveDefinition> = {}): ReserveDefinition {
   return {
-    kind: 'obligation',
     targetAmount: '1200.00',
     periodMonths: 12,
     anchorMonth: '2026-12',
@@ -53,7 +52,7 @@ function vaultWith(
   plan: VaultPlanEntry[] = [],
 ): VaultData {
   return {
-    version: 6,
+    version: 7,
     budget: { categories: [], entries, plan, snapshots: [] },
     accounts,
   }
@@ -68,17 +67,20 @@ describe('requiredForAccount', () => {
         // their cycle at 2027-01 → 100.00 + 300.00.
         entry('tax', {
           sourceAccountId: MAIN,
-          sinkAccountId: RESERVES,
+          type: 'bill',
+      sinkAccountId: RESERVES,
           reserve: reserve({ targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-12' }),
         }),
         entry('insurance', {
           sourceAccountId: MAIN,
-          sinkAccountId: RESERVES,
+          type: 'bill',
+      sinkAccountId: RESERVES,
           reserve: reserve({ targetAmount: '900.00', periodMonths: 3, anchorMonth: '2026-12' }),
         }),
         // Sinks somewhere else — must not count towards Reserves.
         entry('holiday', {
           sourceAccountId: RESERVES,
+          type: 'bill',
           sinkAccountId: MAIN,
           reserve: reserve({ targetAmount: '6000.00', periodMonths: 12, anchorMonth: '2026-12' }),
         }),
@@ -96,12 +98,14 @@ describe('requiredForAccount', () => {
   test('an archived entry with a reserve contributes nothing', () => {
     const live = entry('tax', {
       sourceAccountId: MAIN,
+      type: 'bill',
       sinkAccountId: RESERVES,
       reserve: reserve(),
     })
     const archived = entry('old-tax', {
       archived: true,
       sourceAccountId: MAIN,
+      type: 'bill',
       sinkAccountId: RESERVES,
       reserve: reserve({ targetAmount: '2400.00' }),
     })
@@ -126,7 +130,7 @@ describe('projectedBalance', () => {
   const entries = [
     entry('salary', { type: 'income', sourceAccountId: null, sinkAccountId: MAIN }),
     entry('rent', { sourceAccountId: MAIN, sinkAccountId: null }),
-    entry('tax-setaside', { sourceAccountId: MAIN, sinkAccountId: RESERVES }),
+    entry('tax-setaside', { type: 'savings', sourceAccountId: MAIN, sinkAccountId: RESERVES }),
   ]
 
   // The plan is a standing monthly flow: +6000 in, -1800 out, -200 set aside,
@@ -195,7 +199,7 @@ describe('projectedBalance', () => {
   test('a set-aside into its own account nets to nothing', () => {
     const vault = vaultWith(
       [account(MAIN, { currentAmount: '100.00', lastCorrectedAt: '2026-01-01' })],
-      [entry('circular', { sourceAccountId: MAIN, sinkAccountId: MAIN })],
+      [entry('circular', { type: 'savings', sourceAccountId: MAIN, sinkAccountId: MAIN })],
       [{ entryId: 'circular', plannedAmount: '75.00' }],
     )
 
@@ -258,7 +262,8 @@ describe('availableForAccount', () => {
       [
         entry('tax-setaside', {
           sourceAccountId: MAIN,
-          sinkAccountId: RESERVES,
+          type: 'bill',
+      sinkAccountId: RESERVES,
           reserve: reserve({ targetAmount: '1200.00', periodMonths: 12, anchorMonth: '2026-12' }),
         }),
       ],
@@ -279,6 +284,7 @@ describe('availableForAccount', () => {
       [account(RESERVES, { currentAmount: '100.00', lastCorrectedAt: '2026-12-01' })],
       [
         entry('tax-setaside', {
+          type: 'bill',
           sourceAccountId: MAIN,
           sinkAccountId: RESERVES,
           // Due now, so the full 1200.00 is required against a 100.00 balance.

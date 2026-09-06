@@ -20,7 +20,7 @@
     margin: 2rem 0 1rem;
     text-align: center;
     font-size: 0.75rem;
-    color: #999;
+    color: var(--ink-faint);
     user-select: text;
   }
   .mono {

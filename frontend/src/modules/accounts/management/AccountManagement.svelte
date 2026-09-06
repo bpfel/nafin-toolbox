@@ -8,10 +8,13 @@
     projectedBalance,
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
-  import { fromCents, toCents } from '../../../lib/accounts/reserveMath'
+  import { toCents } from '../../../lib/accounts/reserveMath'
   import type { VaultAccount } from '../../../lib/crypto/vault'
   import { isEditing } from '../../../lib/util/editMode.svelte'
+  import Money from '../../../lib/util/Money.svelte'
   import AccountCard from './AccountCard.svelte'
+  import InfoButton from '../../../lib/nav/InfoButton.svelte'
+  import InfoModal from '../../../lib/nav/InfoModal.svelte'
   import AccountFormModal from './AccountFormModal.svelte'
   import DeleteAccountModal from './DeleteAccountModal.svelte'
   import QRBillDialog from './QRBillDialog.svelte'
@@ -73,15 +76,6 @@
     return { projected, required, available }
   })
 
-  // Display only: the sum is already exact, this just categories the thousands the
-  // way the cards do.
-  function fmt(cents: number): string {
-    return Number(fromCents(cents)).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
-
   // The vault invariant guarantees at least one account, and `deleteAccount`
   // throws on the last one — so the card hides the action instead of offering
   // a button that can only fail.
@@ -94,6 +88,17 @@
   // Adding an account is structural, so it waits for edit mode. Everything the
   // cards show — and correcting a balance — stays available at all times.
   let editing = $derived(isEditing('accounts'))
+
+  let showGuide = $state(false)
+
+  /**
+   * Opens the create form. Called by the screen above, which owns the "+" in
+   * the action strip — the button belongs with the screen's other controls,
+   * and the form belongs with the vault it writes to.
+   */
+  export function openCreateAccount() {
+    openCreate()
+  }
 
   // `vault.accounts` carries no sortOrder — the array order is the display
   // order. So the new order is read straight back off the DOM after a drop and
@@ -234,16 +239,12 @@
 </script>
 
 <div class="account-management">
-  <header class="head">
-    <div>
-      <h2>{t('accounts.title')}</h2>
-      <p class="sub">{t('accounts.subtitle')}</p>
-    </div>
-    {#if editing}
-      <button class="btn add" onclick={openCreate}>{t('accounts.add')}</button>
-    {/if}
-  </header>
-
+  <!--
+    No screen title here: the tab above already says Accounts, and the bar below
+    says it again. No "balances are projected" note either — it explained a
+    detail of the arithmetic to somebody who had not yet asked, permanently, in
+    the place they read first. It is in the explanation behind the mark now.
+  -->
   {#if error}
     <p class="error" role="alert">{error}</p>
   {/if}
@@ -251,9 +252,45 @@
   {#if !vaultState.vault}
     <p class="loading">{t('state.loading')}</p>
   {:else}
+    <!--
+      The sum comes first. It is the only thing here that is read rather than
+      used — nothing in it can be pressed — and a figure you have to scroll past
+      a row of cards to reach is a figure that gets scrolled past.
+
+      Its title sits on the page rather than in the box, as the budget's do.
+    -->
+    {#if rows.length > 0}
+      <div class="totals-head">
+        <h3 class="totals-title">{t('accounts.all')}</h3>
+        <InfoButton label={t('accounts.guide.title')} onclick={() => (showGuide = true)} />
+      </div>
+      <div class="totals" data-testid="account-totals">
+        <dl class="figures">
+          <div class="figure">
+            <dt>{t('accounts.balanceFigure')}</dt>
+            <dd class="amount" data-testid="total-projected"><Money value={totals.projected} cents /></dd>
+          </div>
+          <div class="figure">
+            <dt>{t('accounts.allocated')}</dt>
+            <dd class="amount muted" data-testid="total-required"><Money value={totals.required} cents /></dd>
+          </div>
+          <div class="figure">
+            <dt>{t('accounts.free')}</dt>
+            <dd
+              class="amount"
+              class:negative={totals.available < 0}
+              data-testid="total-available"
+            >
+              <Money value={totals.available} cents />
+            </dd>
+          </div>
+        </dl>
+      </div>
+    {/if}
+
     <!-- A row that scrolls sideways rather than a grid that grows downwards.
          Only this element scrolls; the page itself never moves sideways. -->
-    <div class="cards" use:sortable>
+    <div class="cards" data-hscroll use:sortable>
       {#each rows as row (row.account.id)}
         <AccountCard
           account={row.account}
@@ -271,36 +308,16 @@
       {/each}
     </div>
 
-    <!-- Outside the scroller on purpose: a total you have to scroll to find is
-         not a total, and keeping the sortable container holding nothing but
-         cards means a drop can never land a card past the sum. -->
-    {#if rows.length > 0}
-      <div class="totals" data-testid="account-totals">
-        <span class="totals-label">{t('accounts.all')}</span>
-        <dl class="figures">
-          <div class="figure">
-            <dt>{t('accounts.projected')}</dt>
-            <dd class="amount" data-testid="total-projected">{fmt(totals.projected)}</dd>
-          </div>
-          <div class="figure">
-            <dt>{t('accounts.required')}</dt>
-            <dd class="amount muted" data-testid="total-required">{fmt(totals.required)}</dd>
-          </div>
-          <div class="figure">
-            <dt>{t('accounts.available')}</dt>
-            <dd
-              class="amount"
-              class:negative={totals.available < 0}
-              data-testid="total-available"
-            >
-              {fmt(totals.available)}
-            </dd>
-          </div>
-        </dl>
-      </div>
-    {/if}
   {/if}
 </div>
+
+{#if showGuide}
+  <InfoModal
+    title="accounts.guide.title"
+    body="accounts.guide.body"
+    onclose={() => (showGuide = false)}
+  />
+{/if}
 
 {#if formOpen}
   <AccountFormModal account={formAccount} onsave={saveAccount} onclose={closeForm} />
@@ -326,21 +343,6 @@
     flex-direction: column;
     gap: 1.25rem;
   }
-  .head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-  h2 {
-    margin: 0;
-    font-size: 1.25rem;
-  }
-  .sub {
-    margin: 0.2rem 0 0;
-    color: #888;
-    font-size: 0.85rem;
-  }
   /* The row scrolls, the page does not. `min-width: 0` is what stops a flex
      item from being sized by its content and pushing the document sideways. */
   .cards {
@@ -365,6 +367,21 @@
   .cards > :global(.account-card) {
     flex: 1 0 320px;
   }
+  .totals-head {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    margin: 0 0 0.35rem;
+    padding: 0 0.25rem;
+  }
+
+  .totals-title {
+    font-size: 1.2rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
   .totals {
     display: flex;
     align-items: center;
@@ -374,12 +391,7 @@
     background: white;
     border-radius: 10px;
     padding: 0.85rem 1.1rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  .totals-label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #444;
+    box-shadow: var(--shadow-card);
   }
   /* Deliberately the card's own figure typography, so the three sums read as
      the same three figures one row further down. */
@@ -397,7 +409,7 @@
   }
   dt {
     font-size: 0.72rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
@@ -415,21 +427,6 @@
   .amount.negative {
     color: #c0392b;
   }
-  .btn {
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .add {
-    background: #2d6a4f;
-    border: none;
-    color: white;
-  }
-  .add:hover {
-    background: #245a42;
-  }
   .error {
     color: #c0392b;
     font-size: 0.85rem;
@@ -439,7 +436,7 @@
     border-radius: 4px;
   }
   .loading {
-    color: #888;
+    color: var(--ink-faint);
     text-align: center;
     padding: 2rem;
   }

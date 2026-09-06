@@ -31,7 +31,7 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: calc(var(--app-nav-height, 0px) + env(safe-area-inset-bottom, 0px));
     z-index: 200;
     display: flex;
     align-items: center;

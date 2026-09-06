@@ -33,7 +33,7 @@ function snapshotAmount(entryName: string): string {
 
 function makeVault(): VaultData {
   return {
-    version: 6,
+    version: 7,
     accounts: [
       {
         id: 'main',
@@ -46,8 +46,8 @@ function makeVault(): VaultData {
     ],
     budget: {
       categories: [
-        { id: 'g-income', name: 'Employment', type: 'income', sortOrder: 10 },
-        { id: 'g-housing', name: 'Housing', type: 'expense', sortOrder: 20 },
+        { id: 'g-income', name: 'Employment', side: 'income', sortOrder: 10 },
+        { id: 'g-housing', name: 'Housing', side: 'expense', sortOrder: 20 },
       ],
       entries: [
         {

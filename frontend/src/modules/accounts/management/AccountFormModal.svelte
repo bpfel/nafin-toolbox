@@ -5,6 +5,8 @@
   import { isQRIban, ibanStatus } from '../../../lib/qrbill/validate'
   import { formatIBANForDisplay } from '../../../lib/qrbill/format'
   import { focusTrap } from '../../../lib/util/focusTrap'
+  import InfoButton from '../../../lib/nav/InfoButton.svelte'
+  import InfoModal from '../../../lib/nav/InfoModal.svelte'
 
   type AccountDetails = Pick<VaultAccount, 'name' | 'kind'> &
     Partial<Pick<VaultAccount, 'bankName' | 'iban' | 'ibanKind' | 'holder'>>
@@ -101,6 +103,8 @@
   function handleBackdrop(e: MouseEvent) {
     if (e.target === e.currentTarget) onclose()
   }
+
+  let showTypeGuide = $state(false)
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -120,7 +124,13 @@
     </label>
 
     <label class="field">
-      <span class="label">{t('accountForm.kind')}</span>
+      <span class="label">
+        {t('accountForm.type')}
+        <InfoButton
+          label={t('accountForm.typeGuide.title')}
+          onclick={() => (showTypeGuide = true)}
+        />
+      </span>
       <select bind:value={kind}>
         {#each KINDS as k}
           <option value={k.value}>{k.label()}</option>
@@ -221,6 +231,14 @@
   </div>
 </div>
 
+{#if showTypeGuide}
+  <InfoModal
+    title="accountForm.typeGuide.title"
+    body="accountForm.typeGuide.body"
+    onclose={() => (showTypeGuide = false)}
+  />
+{/if}
+
 <style>
   .backdrop {
     position: fixed;
@@ -240,7 +258,7 @@
     max-width: 440px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-modal);
   }
   h3 {
     margin: 0 0 1rem;
@@ -283,7 +301,7 @@
     flex: 1;
   }
   .advanced {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
     padding-top: 0.75rem;
     margin-bottom: 1rem;
   }
@@ -303,7 +321,7 @@
   }
   .hint {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--ink-faint);
     margin: 0 0 0.75rem;
   }
   .hint.bad {

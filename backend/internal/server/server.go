@@ -12,7 +12,6 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/email"
-	"github.com/bpfel/nafin-toolbox/internal/module"
 	"github.com/bpfel/nafin-toolbox/internal/vault"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -114,7 +113,6 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))
 
-			r.Route("/modules", module.Routes(s.db))
 			r.Route("/vault", vault.Routes(s.db))
 		})
 	})

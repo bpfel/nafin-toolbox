@@ -18,8 +18,6 @@ import type { Messages } from './en'
  */
 export const rm: Partial<Messages> = {
   // --- Settings menu ---
-  'menu.settings': 'Parameters',
-  'menu.security': 'Segirezza',
   'menu.language': 'Lingua',
   'menu.logout': 'Sortir',
   // menu.modules, menu.users and menu.close are left to English: the first two
@@ -39,18 +37,7 @@ export const rm: Partial<Messages> = {
   'action.cancel': 'Interrumper',
   'action.save': 'Memorisar',
   'action.delete': 'Stizzar',
-  'action.back': 'Turnar',
   'action.reload': 'Rechargiar',
-  'action.continue': 'Cuntinuar',
-
-  // Counted forms and the saving states are unsourced, and getting agreement
-  // wrong in a language we cannot check is worse than showing English.
-
-  // --- QR bill ---
-  //
-  // Unlike the rest of this file these are not provisional. They are quoted from
-  // SIX's Style Guide QR-bill, which prints the QR-bill headings in Romansh
-  // alongside the other four national languages and requires them verbatim.
   'qrbill.reference': 'Referenza',
   'qrbill.additionalInfo': 'Infurmaziuns supplementaras',
   'action.close': 'Serrar',

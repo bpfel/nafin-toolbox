@@ -241,7 +241,7 @@
     background: white;
     border-radius: 8px;
     padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
 
   .panel-header {
@@ -280,7 +280,7 @@
     text-align: left;
     padding: 0.5rem 0.75rem;
     border-bottom: 2px solid #eee;
-    font-weight: 600;
+    font-weight: 500;
     color: #555;
   }
 
@@ -361,7 +361,7 @@
 
   .confirm-label {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     color: #dc3545;
   }
 

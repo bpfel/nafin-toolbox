@@ -1,24 +1,20 @@
 <script lang="ts">
-  import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
+  import { setOnUnauthorized } from './lib/api/client'
   import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
   import { getVaultState } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
-  import InvitePanel from './lib/auth/InvitePanel.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
   import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
   import RecoveryKeyScreen from './lib/auth/RecoveryKeyScreen.svelte'
-  import SecuritySettings from './lib/auth/SecuritySettings.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
-  import BudgetModule from './modules/budget/BudgetModule.svelte'
-  import AccountsModule from './modules/accounts/AccountsModule.svelte'
-  import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
-  import { isExpanded, toggleExpanded } from './lib/util/collapse.svelte'
-  import { focusTrap } from './lib/util/focusTrap'
+  import { clearEditing } from './lib/util/editMode.svelte'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
-  import SettingsMenu from './lib/nav/SettingsMenu.svelte'
+  import AppShell from './lib/nav/AppShell.svelte'
+  import { getRoute, navigate, replace, startRouting, syncFromLocation } from './lib/nav/router.svelte'
+  import { gateFor } from './lib/nav/gate'
   import LanguagePicker from './lib/nav/LanguagePicker.svelte'
   import { t } from './lib/i18n/index.svelte'
 
@@ -29,14 +25,9 @@
     logout()
   })
 
-  let isVerifyPage = $state(window.location.pathname === '/verify')
+  const route = getRoute()
 
-  let modules = $state<ModuleInfo[]>([])
   let error = $state<string | null>(null)
-  let showConfig = $state(false)
-  let showUsers = $state(false)
-  let showSecurity = $state(false)
-  let toggling = $state<string | null>(null)
 
   let require2FA = $state(false)
   let show2FAEnforcement = $state(false)
@@ -54,73 +45,6 @@
   let recovering = $state(false)
   let recoveryError = $state<string | null>(null)
 
-  const isAdmin = $derived(authState.currentUser?.role === 'admin')
-
-  const availableModules = [
-    { id: 'budget', name: 'Budget', description: () => t('module.budget.description') },
-    // Allocations ships inside Accounts as a second view rather than as its own
-    // module: it is meaningless without accounts, and the flat module list has no
-    // way to express that dependency. The `allocations` registry id stays unused.
-    {
-      id: 'accounts',
-      name: 'Accounts',
-      description: () => t('module.accounts.description'),
-    },
-    { id: 'provision3a', name: 'Pillar 3a', description: () => t('module.provision3a.description') },
-    { id: 'investments', name: 'Investments', description: () => t('module.investments.description') },
-  ]
-
-  async function loadModules() {
-    try {
-      modules = await fetchModules()
-    } catch (e) {
-      error = e instanceof Error ? e.message : t('error.loadModules')
-    }
-  }
-
-  function isEnabled(id: string): boolean {
-    return modules.some(m => m.id === id)
-  }
-
-  async function toggleModule(id: string) {
-    toggling = id
-    try {
-      if (isEnabled(id)) {
-        await disableModule(id)
-      } else {
-        await enableModule(id)
-      }
-      await loadModules()
-    } catch (e) {
-      error = e instanceof Error ? e.message : t('error.updateModule')
-    } finally {
-      toggling = null
-    }
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (showConfig && e.key === 'Escape') showConfig = false
-  }
-
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) showConfig = false
-  }
-
-  function navigateTo(view: 'users' | 'security' | 'modules') {
-    if (view === 'users') {
-      showUsers = true; showSecurity = false; showConfig = false
-    } else if (view === 'security') {
-      showUsers = false; showSecurity = true; showConfig = false
-    } else if (view === 'modules') {
-      showUsers = false; showSecurity = false; showConfig = true
-    }
-  }
-
-  function navigateBack() {
-    showUsers = false
-    showSecurity = false
-  }
-
   $effect(() => {
     checkAuth()
   })
@@ -129,18 +53,19 @@
   // to the app. Drop the spent token from the URL and carry on, rather than
   // showing a set-up form the session has plainly outgrown.
   $effect(() => {
-    if (isVerifyPage && authState.currentUser) {
-      window.history.replaceState({}, '', '/')
-      isVerifyPage = false
+    if (route.screen === 'verify' && authState.currentUser) {
+      replace('/')
     }
   })
+
+  // Listen for the back and forward buttons.
+  $effect(() => startRouting())
 
   // Watch for deploys that leave this tab running chunks the server no longer has.
   $effect(() => startBuildVersionWatch())
 
   $effect(() => {
     if (authState.currentUser) {
-      loadModules()
       checkRequire2FA()
     }
   })
@@ -154,19 +79,15 @@
   }
 
   function handleLoginSuccess() {
-    loadModules()
     checkRequire2FA()
   }
 
   async function handleLogout() {
     await logout()
-    modules = []
     error = null
-    showUsers = false
-    showConfig = false
-    showSecurity = false
     show2FAEnforcement = false
     clearEditing()
+    navigate('/')
   }
 
   async function handleVaultSetup() {
@@ -216,29 +137,37 @@
       recovering = false
     }
   }
-  /**
-   * True on every screen that renders its own centred card instead of the app's
-   * top bar — loading, sign-up, login, and each enforcement gate.
-   *
-   * These are exactly the screens with nowhere to put the language picker in
-   * flow, so it floats there instead. The condition mirrors the branch chain
-   * below and has to move with it: a gate added there wants a term here too, or
-   * that screen silently loses the picker.
-   */
-  let chromeless = $derived(
-    authState.loading ||
-      isVerifyPage ||
-      !authState.currentUser ||
-      authState.currentUser.must_change_password ||
-      show2FAEnforcement ||
-      (!isAdmin &&
-        (authState.recoveryKeyToShow != null ||
-          vaultState.versionAhead ||
-          authState.vaultNeedsSetup ||
-          authState.vaultDecryptFailed ||
-          authState.vaultLocked ||
-          !vaultState.unlocked)),
+  /** Which enforcement screen stands in the way, if any. See lib/nav/gate.ts. */
+  let gate = $derived(
+    gateFor({
+      loading: authState.loading,
+      onVerifyPath: route.screen === 'verify',
+      user: authState.currentUser
+        ? {
+            role: authState.currentUser.role,
+            mustChangePassword: authState.currentUser.must_change_password,
+          }
+        : null,
+      enforce2FA: show2FAEnforcement,
+      recoveryKeyPending: authState.recoveryKeyToShow != null,
+      vaultVersionAhead: vaultState.versionAhead,
+      vaultNeedsSetup: authState.vaultNeedsSetup,
+      vaultDecryptFailed: authState.vaultDecryptFailed,
+      vaultLocked: authState.vaultLocked,
+      vaultUnlocked: vaultState.unlocked,
+    }),
   )
+
+  /**
+   * Every gate renders its own centred card instead of the app's top bar, which
+   * makes it exactly the set of screens with nowhere to put the language picker
+   * in flow — so it floats there instead.
+   *
+   * This was a twelve-term boolean restating the branch chain by hand, and a
+   * gate added to one and not the other lost the picker silently. There is one
+   * statement of it now, and this reads it.
+   */
+  let chromeless = $derived(gate !== null)
 </script>
 
 {#if chromeless}
@@ -248,25 +177,25 @@
 {/if}
 
 
-<svelte:window onkeydown={handleKeydown} />
-
-{#if authState.loading}
+{#if gate === 'loading'}
   <main>
     <p class="loading">{t('state.loading')}</p>
   </main>
-{:else if isVerifyPage}
+{:else if gate === 'verify'}
+  <!-- The page rewrites the address itself as it finishes, and neither
+       pushState nor replaceState raises an event, so it has to say so. -->
   <VerifyEmailPage
-    onVerified={() => { isVerifyPage = false }}
-    onLeave={() => { isVerifyPage = false }}
+    onVerified={syncFromLocation}
+    onLeave={syncFromLocation}
   />
-{:else if !authState.currentUser}
+{:else if gate === 'login' || !authState.currentUser}
   <LoginPage onSuccess={handleLoginSuccess} />
-{:else if authState.currentUser.must_change_password}
+{:else if gate === 'mustChangePassword'}
   <ChangePasswordForm
     message={t('password.mustChange')}
     showLogout={true}
   />
-{:else if show2FAEnforcement}
+{:else if gate === 'enforce2FA'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -276,12 +205,12 @@
       </div>
     </div>
   </main>
-{:else if authState.recoveryKeyToShow && !isAdmin}
+{:else if gate === 'recoveryKey' && authState.recoveryKeyToShow}
   <RecoveryKeyScreen
     recoveryKey={authState.recoveryKeyToShow}
     onconfirmed={handleRecoveryKeyDismiss}
   />
-{:else if vaultState.versionAhead && !isAdmin}
+{:else if gate === 'vaultAhead'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -298,7 +227,7 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultNeedsSetup && !isAdmin}
+{:else if gate === 'vaultSetup'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -315,7 +244,7 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultDecryptFailed && !isAdmin}
+{:else if gate === 'vaultDecryptFailed'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -348,7 +277,7 @@
       </div>
     </div>
   </main>
-{:else if (authState.vaultLocked || !vaultState.unlocked) && !isAdmin}
+{:else if gate === 'vaultLocked'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
@@ -380,155 +309,12 @@
       </div>
     </div>
   </main>
-{:else}
-
-  <main>
-    <div class="top-bar">
-      <h1>{t('app.title')}</h1>
-      <div class="user-info">
-        <span class="role-tag">{t(`role.${authState.currentUser.role}` as 'role.user')}</span>
-        <span class="user-email">{authState.currentUser.email}</span>
-        {#if !isAdmin}
-          {#if vaultState.saving}
-            <span class="save-indicator">{t('state.saving')}</span>
-          {:else if vaultState.dirty}
-            <span class="save-indicator unsaved">{t('state.unsaved')}</span>
-          {/if}
-        {/if}
-        {#if authState.currentUser.role === 'admin'}
-          <button class="btn-secondary" onclick={() => navigateTo('users')}>{t('menu.users')}</button>
-        {/if}
-      </div>
-      <!-- One menu at every width. The hamburger it replaces held the same items
-           and a copy of the role and email, which now live in the panel. -->
-      <div class="bar-controls">
-        <LanguagePicker />
-        <SettingsMenu
-          role={authState.currentUser.role}
-          email={authState.currentUser.email}
-          onnavigate={navigateTo}
-          onlogout={handleLogout}
-        />
-      </div>
-    </div>
-
-    {#if showSecurity}
-      <SecuritySettings onDone={navigateBack} />
-    {:else if showUsers}
-      <InvitePanel onDone={navigateBack} />
-    {:else if error}
-      <p class="error">{error}</p>
-    {:else if modules.length === 0}
-      <div class="empty-state">
-        <p>{t('modules.none')}</p>
-        <button onclick={() => (showConfig = true)}>{t('modules.configure')}</button>
-      </div>
-    {:else}
-      {#each modules as mod}
-        <section class="module-section" class:collapsed={!isExpanded(mod.id)}>
-          <div class="module-heading">
-            <h2>
-              <!--
-                The disclosure control carries the heading text and stretches
-                across the row, so nearly all of the heading is clickable — but
-                the Edit button sits beside it as a sibling, never inside it.
-                That keeps the two controls from fighting without needing
-                stopPropagation, and avoids nesting a button within a button.
-              -->
-              <button
-                class="collapse-toggle"
-                aria-expanded={isExpanded(mod.id)}
-                aria-controls="module-body-{mod.id}"
-                onclick={() => toggleExpanded(mod.id)}
-              >
-                <span class="chevron" aria-hidden="true">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                    {#if isExpanded(mod.id)}
-                      <path d="M2 4 L6 10 L10 4 Z" />
-                    {:else}
-                      <path d="M4 2 L10 6 L4 10 Z" />
-                    {/if}
-                  </svg>
-                </span>
-                {mod.name}
-              </button>
-            </h2>
-            <!--
-              Edit is hidden while the module is folded: a mode switch acting on
-              a body nobody can see is only a way to be surprised later. The
-              mode itself is untouched, so unfolding brings back "Done".
-            -->
-            {#if !isAdmin && isExpanded(mod.id) && (mod.id === 'budget' || mod.id === 'accounts')}
-              <button
-                class="edit-toggle"
-                class:active={isEditing(mod.id)}
-                aria-pressed={isEditing(mod.id)}
-                onclick={() => toggleEditing(mod.id)}
-              >
-                {isEditing(mod.id) ? t('action.done') : t('action.edit')}
-              </button>
-            {/if}
-          </div>
-          <!--
-            Hidden, not removed. `{#if}` here would destroy every module's
-            component state on each fold: a half-typed amount in a budget row,
-            the accounts/allocations tab the user was on, which entry categories
-            they had open, an in-flight modal. None of that is in the vault, so
-            none of it would come back. `hidden` takes the body out of the
-            accessibility tree and the tab order exactly as removal would, while
-            leaving the components mounted and their state intact.
-          -->
-          <div class="module-body" id="module-body-{mod.id}" hidden={!isExpanded(mod.id)}>
-            {#if isAdmin}
-              <div class="module-card admin-notice">
-                <p>{t('app.adminNoVault')}</p>
-              </div>
-            {:else if mod.id === 'budget'}
-              <BudgetModule />
-            {:else if mod.id === 'accounts'}
-              <AccountsModule />
-            {:else}
-              <div class="module-card">
-                <span class="module-id">{mod.id}</span>
-                <p>{t('modules.comingSoon')}</p>
-              </div>
-            {/if}
-          </div>
-        </section>
-      {/each}
-    {/if}
-
-    {#if showConfig}
-      <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-        <div class="modal" role="dialog" aria-label={t('modules.configure')} use:focusTrap>
-          <h3>{t('menu.modules')}</h3>
-          <p class="modal-hint">{t('modules.configureHint')}</p>
-          <div class="module-list">
-            {#each availableModules as mod}
-              <div class="module-row" class:enabled={isEnabled(mod.id)}>
-                <div class="module-info">
-                  <span class="module-name">{mod.name}</span>
-                  <span class="module-desc">{mod.description()}</span>
-                </div>
-                <button
-                  class="toggle"
-                  class:active={isEnabled(mod.id)}
-                  disabled={toggling === mod.id}
-                  onclick={() => toggleModule(mod.id)}
-                  aria-label="{isEnabled(mod.id) ? t('modules.disable') : t('modules.enable')} {mod.name}"
-                >
-                  <span class="toggle-track">
-                    <span class="toggle-thumb"></span>
-                  </span>
-                </button>
-              </div>
-            {/each}
-          </div>
-          <button class="close-btn" onclick={() => (showConfig = false)}>{t('action.done')}</button>
-        </div>
-      </div>
-    {/if}
-  </main>
+{:else if authState.currentUser}
+  <AppShell
+    email={authState.currentUser.email}
+    role={authState.currentUser.role}
+    onlogout={handleLogout}
+  />
 {/if}
 
 <!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
@@ -550,57 +336,6 @@
     top: 1rem;
     right: 1rem;
     z-index: 50;
-  }
-
-  .bar-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-  }
-  .top-bar h1 {
-    margin: 0;
-  }
-
-
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 0.9rem;
-    color: #666;
-  }
-
-  .user-email {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .save-indicator {
-    font-size: 0.75rem;
-    color: #2d6a4f;
-    font-weight: 500;
-  }
-  .save-indicator.unsaved {
-    color: #e67e22;
-  }
-
-  .btn-secondary {
-    background: #e0e0e0;
-    color: #333;
-    padding: 0.35rem 1rem;
-    font-size: 0.85rem;
-  }
-
-  .btn-secondary:hover {
-    background: #ccc;
   }
 
   .btn-primary {
@@ -660,18 +395,6 @@
   }
   .link-btn:hover { color: #245a42; }
 
-  .role-tag {
-    display: inline-block;
-    padding: 0.1rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background: #d4edda;
-    color: #155724;
-  }
-
-
   .error {
     color: #c0392b;
     font-size: 0.9rem;
@@ -681,117 +404,6 @@
     margin-top: 1rem;
   }
 
-  /* Mobile menu overlay */
-
-  @media (max-width: 768px) {
-    .top-bar h1 {
-      font-size: 1.2rem;
-    }
-    .user-info {
-      display: none;
-    }
-  }
-  .module-heading {
-    display: flex;
-    /* Centre, not baseline: the disclosure control is itself a flex box, and
-       its baseline is that of the chevron rather than the heading text. */
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-  .collapse-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    /* Fills the heading row so the click target is the whole line, stopping
-       short of the Edit button. */
-    flex: 1;
-    min-width: 0;
-    background: none;
-    border: none;
-    border-radius: 6px;
-    padding: 0.15rem 0.4rem;
-    margin-left: -0.4rem;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-  .collapse-toggle:hover {
-    background: #ececf0;
-  }
-  .collapse-toggle:focus-visible {
-    outline: 2px solid #2d6a4f;
-    outline-offset: 2px;
-  }
-  .chevron {
-    display: flex;
-    flex-shrink: 0;
-    color: #999;
-  }
-  .edit-toggle {
-    background: none;
-    border: 1px solid #d0d0d0;
-    border-radius: 6px;
-    padding: 0.2rem 0.7rem;
-    font-size: 0.82rem;
-    cursor: pointer;
-    color: #555;
-  }
-  .edit-toggle:hover {
-    border-color: #2d6a4f;
-    color: #2d6a4f;
-  }
-  .edit-toggle.active {
-    background: #2d6a4f;
-    border-color: #2d6a4f;
-    color: white;
-  }
-  /* A hairline and a generous gutter, not a card. The module bodies already
-     carry white surfaces of their own; boxing those inside a second box would
-     turn a page of modules into a dashboard of panels competing for the eye. */
-  .module-section {
-    padding-top: 1.75rem;
-    margin-bottom: 1.75rem;
-    border-top: 1px solid #e3e3e8;
-  }
-  .module-section:first-of-type {
-    padding-top: 0;
-    border-top: none;
-  }
-  /* Folded away, a section is a single line of text — the full gutter would
-     leave it adrift between its neighbours. */
-  .module-section.collapsed {
-    margin-bottom: 1.25rem;
-  }
-  .module-section h2 {
-    margin: 0;
-  }
-  .module-body {
-    margin-top: 1rem;
-  }
-  /* The UA stylesheet already does this; stating it keeps a future layout rule
-     on .module-body from quietly resurrecting a folded module. */
-  .module-body[hidden] {
-    display: none;
-  }
-  .module-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  .module-id {
-    color: #888;
-    font-size: 0.85rem;
-  }
-  .admin-notice {
-    color: #666;
-    font-style: italic;
-    text-align: center;
-  }
-
-  /* 2FA Enforcement */
   .enforcement-container {
     display: flex;
     align-items: center;
@@ -803,7 +415,7 @@
     background: white;
     border-radius: 12px;
     padding: 2.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     width: 100%;
     max-width: 500px;
     text-align: center;
@@ -820,130 +432,4 @@
     margin-bottom: 1.5rem;
   }
 
-  /* Modal */
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 1rem;
-  }
-  .modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 420px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-  }
-  .modal h3 {
-    margin: 0 0 0.25rem;
-    font-size: 1.1rem;
-  }
-  .modal-hint {
-    margin: 0 0 1.25rem;
-    font-size: 0.85rem;
-    color: #888;
-  }
-  .module-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-  }
-  .module-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.65rem 0.75rem;
-    border-radius: 8px;
-    background: #f8f9fa;
-    border: 1px solid #eee;
-  }
-  .module-row.enabled {
-    background: #f0fdf4;
-    border-color: #bbf7d0;
-  }
-  .module-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-  .module-name {
-    font-weight: 500;
-    font-size: 0.95rem;
-  }
-  .module-desc {
-    font-size: 0.8rem;
-    color: #888;
-  }
-
-  /* Toggle switch */
-  .toggle {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    flex-shrink: 0;
-  }
-  .toggle:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .toggle-track {
-    display: block;
-    width: 40px;
-    height: 22px;
-    background: #ccc;
-    border-radius: 11px;
-    position: relative;
-    transition: background 0.2s;
-  }
-  .toggle.active .toggle-track {
-    background: #2d6a4f;
-  }
-  .toggle-thumb {
-    display: block;
-    width: 18px;
-    height: 18px;
-    background: white;
-    border-radius: 50%;
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    transition: transform 0.2s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  }
-  .toggle.active .toggle-thumb {
-    transform: translateX(18px);
-  }
-
-  .close-btn {
-    width: 100%;
-    padding: 0.6rem;
-    background: #2d6a4f;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .close-btn:hover {
-    background: #245a42;
-  }
-
-  @media (max-width: 480px) {
-    .backdrop {
-      align-items: flex-end;
-      padding: 0;
-    }
-    .modal {
-      max-width: 100%;
-      border-radius: 16px 16px 0 0;
-      padding: 1.5rem 1.25rem 2rem;
-    }
-  }
 </style>

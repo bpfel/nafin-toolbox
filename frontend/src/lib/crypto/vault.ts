@@ -1,6 +1,6 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 6
+export const VAULT_VERSION = 7
 
 /**
  * A stored vault written by a build newer than this one.
@@ -19,7 +19,7 @@ export class VaultVersionAheadError extends Error {
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 6
+  version: 7
   budget: BudgetVaultData
   accounts: VaultAccount[]
 }
@@ -72,7 +72,7 @@ export interface VaultSnapshot {
 export interface VaultSnapshotLine {
   entryName: string
   categoryName: string
-  type: 'income' | 'expense'
+  type: EntryType
   plannedAmount: string
 }
 
@@ -106,8 +106,61 @@ export interface VaultAccount {
   holder?: QRAddress
 }
 
+/**
+ * What a budget line is.
+ *
+ * Five, not two, and not four-plus-a-schedule. Until v7 an entry was income or
+ * expense and a separate `reserve.kind` said whether it saved towards a
+ * recurring bill or a thing to be replaced — so the same fact lived in two
+ * places, and three of the five kinds were disguised as expenses.
+ *
+ *   income    money arriving
+ *   expense   money leaving and gone
+ *   savings   out of what is spendable, still yours, going nowhere in particular
+ *   bill      out of what is spendable, held for something that falls due again
+ *   purchase  out of what is spendable, held for something to be bought
+ *
+ * The last three all leave your account without leaving your net worth, which
+ * is the distinction the allocation screen used to narrate in a popover
+ * because nothing in the model said it.
+ *
+ * `bill` and `purchase` replace the words `obligation` and `amortization`,
+ * both of which were unusable in a Swiss app: *obligation* is the ordinary
+ * French and German word for a bond, and *Amortisation* is paying down
+ * mortgage principal. Their old explanatory strings — "a bill that will
+ * arrive", "something to replace" — were the names all along.
+ */
+export type EntryType = 'income' | 'expense' | 'savings' | 'bill' | 'purchase'
+
+/** Leaves the account but not the net worth. */
+export function holdsMoney(type: EntryType): boolean {
+  return type === 'savings' || type === 'bill' || type === 'purchase'
+}
+
+/**
+ * Which half of the budget a type belongs on.
+ *
+ * Everything that is not income sits on the expense side, including the three
+ * that only hold the money: they still come out of what is spendable, which is
+ * what the side is about.
+ */
+export function sideOf(type: EntryType): 'income' | 'expense' {
+  return type === 'income' ? 'income' : 'expense'
+}
+
+/** Saves towards a figure, and therefore carries a `reserve`. */
+export function savesTowardsTarget(type: EntryType): type is 'bill' | 'purchase' {
+  return type === 'bill' || type === 'purchase'
+}
+
+/**
+ * A target to reach, and how long there is to reach it.
+ *
+ * Carried only by `bill` and `purchase` entries. It used to carry a `kind`
+ * saying which of the two it was; the entry type says that now, so the
+ * schedule is recorded once. `reserveMath` reads the type directly.
+ */
 export interface ReserveDefinition {
-  kind: 'obligation' | 'amortization'
   targetAmount: string
   periodMonths: number
   anchorMonth: string            // 'YYYY-MM'
@@ -116,14 +169,19 @@ export interface ReserveDefinition {
 export interface VaultCategory {
   id: string
   name: string
-  type: 'income' | 'expense'
+  /**
+   * Which half of the budget this heading sits on. Called `type` before v7,
+   * which collided with an entry's own type once that grew past two values —
+   * a Housing heading has to be able to hold both Rent and a roof fund.
+   */
+  side: 'income' | 'expense'
   sortOrder: number
 }
 
 export interface VaultEntry {
   id: string
   name: string
-  type: 'income' | 'expense'
+  type: EntryType
   sortOrder: number
   archived: boolean
   categoryId: string
@@ -168,6 +226,20 @@ export function assertVaultShape(vault: VaultData): void {
   }
   if ('archives' in budget) {
     throw new VaultShapeError('budget still carries v5 archives')
+  }
+
+  // v6 named a category's half `type` and hid the schedule in `reserve.kind`.
+  // Either surviving means something stamped v7 without reshaping the data.
+  const categories = budget.categories
+  if (Array.isArray(categories) && categories.some(c => c != null && 'type' in c)) {
+    throw new VaultShapeError('a category still carries v6 type instead of side')
+  }
+  const entries = budget.entries
+  if (
+    Array.isArray(entries) &&
+    entries.some(e => e != null && e.reserve != null && 'kind' in e.reserve)
+  ) {
+    throw new VaultShapeError('an entry reserve still carries v6 kind')
   }
 
   for (const key of ['categories', 'entries', 'plan', 'snapshots'] as const) {
@@ -255,7 +327,7 @@ export function migrateVault(parsed: unknown): VaultData {
   const vault = parsed as {
     version?: unknown
     budget?: {
-      categories?: unknown
+      categories?: { type?: unknown; side?: unknown }[]
       entries?: unknown
       categoryGroups?: unknown
       archives?: unknown
@@ -281,21 +353,37 @@ export function migrateVault(parsed: unknown): VaultData {
     vault.budget.snapshots === undefined &&
     vault.budget.archives !== undefined
 
-  if (vault.version === VAULT_VERSION && !wearingV4Keys && !wearingV5Keys) {
+  // And again for v7, which renamed a category's `type` to `side`. A vault with
+  // categories still wearing `type` was not reshaped, whatever it claims.
+  //
+  // Read off the categories rather than the entries: an entry's type widened
+  // rather than being renamed, so 'income' and 'expense' are still perfectly
+  // legal v7 values and tell you nothing. Only the category gives an
+  // unambiguous answer. A vault with no categories at all has nothing to
+  // migrate either way, and `some` on an empty array is false.
+  const wearingV6Keys =
+    vault.budget != null &&
+    Array.isArray(vault.budget.categories) &&
+    vault.budget.categories.some(c => c != null && c.side === undefined && c.type !== undefined)
+
+  if (vault.version === VAULT_VERSION && !wearingV4Keys && !wearingV5Keys && !wearingV6Keys) {
     return vault as unknown as VaultData
   }
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
   // for being four steps behind.
   if (vault.version === 2) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault))))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault)))))
   }
   if (vault.version === 3) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape)))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape))))
   }
   if (vault.version === 4 || wearingV4Keys) {
-    return migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape)))
   }
-  if (vault.version === 5 || wearingV5Keys) return migrateV5ToV6(vault as unknown as V5Shape)
+  if (vault.version === 5 || wearingV5Keys) {
+    return migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape))
+  }
+  if (vault.version === 6 || wearingV6Keys) return migrateV6ToV7(vault as unknown as V6Shape)
 
   // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
   // the data. Refuse it so the app can say so, instead of handing back an empty
@@ -434,11 +522,11 @@ function migrateV4ToV5(vault: V4Shape): V5Shape {
   const migrated = vault as unknown as V5Shape
   migrated.version = 5
   migrated.budget = {
-    categories: (budget.categoryGroups ?? []) as unknown as VaultCategory[],
+    categories: (budget.categoryGroups ?? []) as unknown as V6Category[],
     entries: (budget.categories ?? []).map(({ groupId, ...rest }) => ({
       ...rest,
       categoryId: groupId,
-    })) as VaultEntry[],
+    })) as unknown as V6Entry[],
     plan: (budget.plan ?? []).map(e => ({
       entryId: e.categoryId,
       plannedAmount: e.plannedAmount,
@@ -459,15 +547,64 @@ function migrateV4ToV5(vault: V4Shape): V5Shape {
 }
 
 /**
+ * A category and an entry as v5 and v6 held them — the two versions differ only
+ * in what the snapshot list is called, so they share these.
+ *
+ * Spelled out rather than reusing `VaultCategory` and `VaultEntry`. Those
+ * describe what the app reads *now*, and pointing a historical shape at them
+ * means the next rename silently rewrites what a v6 vault is claimed to look
+ * like. That happened during the v5 rollout: a blanket rename walked through
+ * the old shapes and their fixtures together, every test still passed, and
+ * real vaults would have lost every snapshot on upgrade.
+ */
+interface V6Category {
+  id: string
+  name: string
+  type: 'income' | 'expense'
+  sortOrder: number
+}
+
+interface V6Reserve {
+  kind: 'obligation' | 'amortization'
+  targetAmount: string
+  periodMonths: number
+  anchorMonth: string
+}
+
+interface V6Entry {
+  id: string
+  name: string
+  type: 'income' | 'expense'
+  sortOrder: number
+  archived: boolean
+  categoryId: string
+  sourceAccountId: string | null
+  sinkAccountId: string | null
+  reserve?: V6Reserve
+}
+
+/**
  * The v5 shape: everything v6 has, under the name `archives`.
  */
 interface V5Shape {
   version: number
   budget?: {
-    categories?: VaultCategory[]
-    entries?: VaultEntry[]
+    categories?: V6Category[]
+    entries?: V6Entry[]
     plan?: VaultPlanEntry[]
     archives?: VaultSnapshot[]
+  }
+  accounts?: VaultAccount[]
+}
+
+/** The v6 shape: two entry types, a category `type`, and a reserve `kind`. */
+interface V6Shape {
+  version: number
+  budget?: {
+    categories?: V6Category[]
+    entries?: V6Entry[]
+    plan?: VaultPlanEntry[]
+    snapshots?: VaultSnapshot[]
   }
   accounts?: VaultAccount[]
 }
@@ -481,11 +618,11 @@ interface V5Shape {
  * a vault ends up stamped with a version its shape does not match, which is the
  * failure the v4 tell above exists to catch.
  */
-function migrateV5ToV6(vault: V5Shape): VaultData {
+function migrateV5ToV6(vault: V5Shape): V6Shape {
   const budget = vault.budget ?? {}
 
-  const migrated = vault as unknown as VaultData
-  migrated.version = VAULT_VERSION
+  const migrated = vault as unknown as V6Shape
+  migrated.version = 6
   migrated.budget = {
     categories: budget.categories ?? [],
     entries: budget.entries ?? [],
@@ -493,6 +630,72 @@ function migrateV5ToV6(vault: V5Shape): VaultData {
     snapshots: budget.archives ?? [],
   }
   return migrated
+}
+
+/**
+ * v6 -> v7: five entry types, and a category has a side.
+ *
+ * Everything this needs is already in the vault; none of it has to be guessed.
+ *
+ *   reserve.kind === 'obligation'    -> bill      a thing that falls due again
+ *   reserve.kind === 'amortization'  -> purchase  a thing to be bought again
+ *   an expense with a sink account   -> savings   held rather than spent
+ *   anything else                    -> unchanged
+ *
+ * The third line is the interesting one. Until now "is this money set aside?"
+ * was answered at render time by looking at where the entry was routed — the
+ * allocation screen recomputed it on every keystroke and then wrote a sentence
+ * explaining the result, because nothing in the stored data said so. That
+ * inference happens once, here, and becomes a fact.
+ *
+ * Order matters: an entry with a reserve also has a sink, so the reserve has to
+ * be read first or every bill and purchase would arrive as plain savings.
+ *
+ * `kind` is deleted rather than left alongside. Leaving both is how a vault
+ * ends up stamped with a version its shape does not match — which is the exact
+ * failure the tells in `assertVaultShape` exist to catch.
+ */
+function migrateV6ToV7(vault: V6Shape): VaultData {
+  const budget = vault.budget ?? {}
+
+  const migrated = vault as unknown as VaultData
+  migrated.version = VAULT_VERSION
+  migrated.budget = {
+    categories: (budget.categories ?? []).map(({ type, ...rest }) => ({
+      ...rest,
+      side: type,
+    })),
+    entries: (budget.entries ?? []).map(entry => {
+      const { reserve, ...rest } = entry
+      return {
+        ...rest,
+        type: typeOfV6Entry(entry),
+        ...(reserve
+          ? {
+              reserve: {
+                targetAmount: reserve.targetAmount,
+                periodMonths: reserve.periodMonths,
+                anchorMonth: reserve.anchorMonth,
+              },
+            }
+          : {}),
+      }
+    }),
+    plan: budget.plan ?? [],
+    snapshots: budget.snapshots ?? [],
+  }
+  return migrated
+}
+
+function typeOfV6Entry(entry: V6Entry): EntryType {
+  if (entry.type === 'income') return 'income'
+  if (entry.reserve?.kind === 'obligation') return 'bill'
+  if (entry.reserve?.kind === 'amortization') return 'purchase'
+  // `!= null`, not `!== null`. Entries carried up from v2 and v3 predate
+  // accounts entirely and have no routing keys at all, so a strict comparison
+  // reads `undefined` as "has a sink" and turns every one of them into savings.
+  if (entry.sinkAccountId != null) return 'savings'
+  return 'expense'
 }
 
 /**

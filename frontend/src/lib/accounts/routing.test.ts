@@ -1,6 +1,5 @@
 import { describe, test, expect } from 'vitest'
 import {
-  flowKindOf,
   isLegalRouting,
   isLegalEntryRouting,
   defaultRouting,
@@ -37,7 +36,6 @@ function account(id: string, name: string): VaultAccount {
 }
 
 const reserve: ReserveDefinition = {
-  kind: 'obligation',
   targetAmount: '1200.00',
   periodMonths: 12,
   anchorMonth: '2026-01',
@@ -68,12 +66,25 @@ describe('isLegalRouting — the validity matrix', () => {
     expect(isLegalRouting('expense', A, null)).toBe(true)
   })
 
-  test('expense + (A, B) is legal — set-aside into another account', () => {
-    expect(isLegalRouting('expense', A, B)).toBe(true)
+  test('expense + (A, B) is illegal — money that stays is not an expense', () => {
+    // This was legal until v7, and was how a set-aside was expressed: an expense
+    // routed to an account rather than out of one. The three types that hold
+    // money say it directly now, so an expense with somewhere to land is a
+    // contradiction rather than a convention.
+    expect(isLegalRouting('expense', A, B)).toBe(false)
   })
 
-  test('expense + (A, A) is legal — set-aside within the same account', () => {
-    expect(isLegalRouting('expense', A, A)).toBe(true)
+  test('expense + (A, A) is illegal — nothing left, so nothing was spent', () => {
+    expect(isLegalRouting('expense', A, A)).toBe(false)
+  })
+
+  test('the three that hold money need somewhere to hold it', () => {
+    for (const type of ['savings', 'bill', 'purchase'] as const) {
+      expect(isLegalRouting(type, A, B)).toBe(true)
+      expect(isLegalRouting(type, A, A)).toBe(true)
+      expect(isLegalRouting(type, A, null)).toBe(false)
+      expect(isLegalRouting(type, null, A)).toBe(false)
+    }
   })
 
   test('(null, null) is illegal for both types — it cannot occur', () => {
@@ -82,28 +93,10 @@ describe('isLegalRouting — the validity matrix', () => {
   })
 })
 
-describe('flowKindOf', () => {
-  test('source non-null and sink null is spending', () => {
-    expect(flowKindOf(entry({ sourceAccountId: A, sinkAccountId: null }))).toBe('spending')
-  })
-
-  test('source null and sink non-null is income', () => {
-    expect(flowKindOf(entry({ type: 'income', sourceAccountId: null, sinkAccountId: A }))).toBe('income')
-  })
-
-  test('both non-null and distinct is setaside', () => {
-    expect(flowKindOf(entry({ sourceAccountId: A, sinkAccountId: B }))).toBe('setaside')
-  })
-
-  test('(A, A) classifies as setaside', () => {
-    expect(flowKindOf(entry({ sourceAccountId: A, sinkAccountId: A }))).toBe('setaside')
-  })
-
-  test('throws when both endpoints are null', () => {
-    expect(() => flowKindOf(entry({ sourceAccountId: null, sinkAccountId: null }))).toThrow()
-  })
-})
-
+// Since v7 this reads the type rather than inferring from the endpoints, which
+// is why there is nothing here about (null, null) any more: it used to be the
+// one case the inference could not classify, and the type has an answer for
+// every entry.
 describe('isLegalEntryRouting', () => {
   test('accepts a legal routing without a reserve', () => {
     expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: null }))).toBe(true)
@@ -113,20 +106,27 @@ describe('isLegalEntryRouting', () => {
     expect(isLegalEntryRouting(entry({ type: 'income', sourceAccountId: A, sinkAccountId: B }))).toBe(false)
   })
 
-  test('accepts a reserve on an expense with a non-null sink', () => {
-    expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: B, reserve }))).toBe(true)
+  test('accepts a reserve on a bill and on a purchase', () => {
+    for (const type of ['bill', 'purchase'] as const) {
+      expect(isLegalEntryRouting(entry({ type, sourceAccountId: A, sinkAccountId: B, reserve }))).toBe(true)
+    }
   })
 
-  test('accepts a reserve on an (A, A) set-aside', () => {
-    expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: A, reserve }))).toBe(true)
+  test('accepts a reserve held inside a single account', () => {
+    expect(isLegalEntryRouting(entry({ type: 'bill', sourceAccountId: A, sinkAccountId: A, reserve }))).toBe(true)
   })
 
-  test('rejects a reserve when the sink is null', () => {
-    expect(isLegalEntryRouting(entry({ sourceAccountId: A, sinkAccountId: null, reserve }))).toBe(false)
+  test('rejects a reserve on savings, which has no target to reach', () => {
+    // The difference between savings and the other two is exactly this: a
+    // target. Carrying one without being either is a contradiction.
+    expect(isLegalEntryRouting(entry({ type: 'savings', sourceAccountId: A, sinkAccountId: B, reserve }))).toBe(false)
+  })
+
+  test('rejects a reserve on an expense — it is gone, not being saved for', () => {
+    expect(isLegalEntryRouting(entry({ type: 'expense', sourceAccountId: A, sinkAccountId: null, reserve }))).toBe(false)
   })
 
   test('rejects a reserve on an income entry', () => {
-    // (null, A) is a legal income routing, but a reserve may never ride on income.
     expect(isLegalEntryRouting(entry({ type: 'income', sourceAccountId: null, sinkAccountId: A, reserve }))).toBe(false)
   })
 })
@@ -147,12 +147,13 @@ describe('defaultRouting', () => {
     }
   })
 
-  test('income defaults classify as income, expense defaults as spending', () => {
-    const income = defaultRouting('income', A)
-    const expense = defaultRouting('expense', A)
-
-    expect(flowKindOf(entry({ type: 'income', ...income }))).toBe('income')
-    expect(flowKindOf(entry({ type: 'expense', ...expense }))).toBe('spending')
+  test('the defaults are legal for the type that asked for them', () => {
+    // What `flowKindOf` used to assert, without the second vocabulary: the
+    // shape a type is born with is one its own rules accept.
+    for (const type of ['income', 'expense', 'savings', 'bill', 'purchase'] as const) {
+      const routing = defaultRouting(type, A)
+      expect(isLegalRouting(type, routing.sourceAccountId, routing.sinkAccountId)).toBe(true)
+    }
   })
 })
 

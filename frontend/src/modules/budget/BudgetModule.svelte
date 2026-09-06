@@ -52,6 +52,14 @@
     dismissedSetup = true
   }
 
+  // Monthly or yearly, owned by the screen: the control that flips it sits in
+  // the action strip, and the summary and the table both answer to it.
+  interface Props {
+    viewMode?: 'monthly' | 'yearly'
+  }
+
+  let { viewMode = $bindable('monthly') }: Props = $props()
+
   let confirmingReset = $state(false)
 
   function handleReset() {
@@ -77,9 +85,10 @@
       </div>
     {/if}
     {#if summary.entries.length > 0}
-      <BudgetSummary {summary} />
+      <BudgetSummary {summary} {viewMode} />
     {/if}
     <BudgetTable
+      bind:viewMode
       entries={summary.entries}
       vault={vaultState.vault}
       onsave={handleSave}
@@ -126,7 +135,7 @@
     background: #fdecea;
   }
   .loading {
-    color: #888;
+    color: var(--ink-faint);
     text-align: center;
     padding: 2rem;
   }

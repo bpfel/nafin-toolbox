@@ -1,5 +1,10 @@
-import type { VaultAccount, VaultEntry, VaultData } from '../crypto/vault'
-import { flowKindOf } from './routing'
+import {
+  holdsMoney,
+  savesTowardsTarget,
+  type VaultAccount,
+  type VaultEntry,
+  type VaultData,
+} from '../crypto/vault'
 import { fromCents, monthsBetween, requiredForItem, toCents } from './reserveMath'
 
 // Per-account figures, derived on every read. Nothing here writes to the vault:
@@ -34,8 +39,9 @@ export function requiredForAccount(
   for (const entry of vault.budget.entries) {
     if (entry.archived) continue
     if (!entry.reserve) continue
+    if (!savesTowardsTarget(entry.type)) continue
     if (entry.sinkAccountId !== accountId) continue
-    cents += toCents(requiredForItem(entry.reserve, currentMonth))
+    cents += toCents(requiredForItem(entry.type, entry.reserve, currentMonth))
   }
   return fromCents(cents)
 }
@@ -60,20 +66,21 @@ function netAllocationCents(
     if (entry.sourceAccountId !== accountId && entry.sinkAccountId !== accountId) continue
 
     const planned = toCents(line.plannedAmount)
-    switch (flowKindOf(entry)) {
-      // Money arrives from outside; the guard makes this account the sink.
-      case 'income':
-        cents += planned
-        break
-      // Money leaves for good; the guard makes this account the source.
-      case 'spending':
-        cents -= planned
-        break
-      // Money moves between accounts, possibly both of them this one.
-      case 'setaside':
-        if (entry.sinkAccountId === accountId) cents += planned
-        if (entry.sourceAccountId === accountId) cents -= planned
-        break
+
+    // Straight off the type. It used to go through a classifier that read the
+    // endpoints and answered in a vocabulary of its own — income, spending,
+    // set-aside — which existed only because two entry types could not tell
+    // spending from holding. Three words for what the type already says.
+    if (entry.type === 'income') {
+      // Arrives from outside; the guard above makes this account the sink.
+      cents += planned
+    } else if (!holdsMoney(entry.type)) {
+      // Leaves for good; the guard makes this account the source.
+      cents -= planned
+    } else {
+      // Moves between accounts, possibly both of them this one.
+      if (entry.sinkAccountId === accountId) cents += planned
+      if (entry.sourceAccountId === accountId) cents -= planned
     }
   }
   return cents

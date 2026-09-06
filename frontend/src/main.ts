@@ -48,6 +48,24 @@ window.addEventListener('unhandledrejection', e => {
   )
 })
 
+/**
+ * Preferences the app used to keep and no longer reads.
+ *
+ * `nafin.collapsedModules` remembered which modules a user had folded away on
+ * the single stacked page. There is no stacked page and there are no modules to
+ * fold, so the key is dead weight in every browser that ever ran the old build.
+ *
+ * Removed rather than left: it costs one line now and would otherwise be a
+ * puzzle for whoever next opens devtools on a production browser. Wrapped
+ * because storage access throws outright in a private window rather than
+ * merely being empty, and failing to tidy up is not worth a blank page.
+ */
+try {
+  localStorage.removeItem('nafin.collapsedModules')
+} catch {
+  // Nothing to do: the preference we wanted to drop is already unreachable.
+}
+
 const app = mount(App, {
   target: document.getElementById('app')!,
 })

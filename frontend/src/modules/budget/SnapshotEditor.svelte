@@ -2,6 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultSnapshot, VaultSnapshotLine } from '../../lib/crypto/vault'
+  import Money from '../../lib/util/Money.svelte'
 
   interface Props {
     snapshot: VaultSnapshot
@@ -78,10 +79,6 @@
       ;(e.target as HTMLInputElement).blur()
     }
   }
-
-  function fmt(val: number): string {
-    return val.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
 </script>
 
 <div class="editor">
@@ -117,7 +114,7 @@
           {#each category.rows as row (row.index)}
             <tr class="line-row" class:income={row.line.type === 'income'}>
               <td class="line-name">{row.line.entryName}</td>
-              <td class="line-amount">{fmt(Number(row.line.plannedAmount))}</td>
+              <td class="line-amount"><Money value={row.line.plannedAmount} /></td>
             </tr>
           {/each}
         </tbody>
@@ -125,16 +122,16 @@
       <tfoot>
         <tr>
           <td>{t('budget.income')}</td>
-          <td class="right total income-total">{fmt(incomeTotal)}</td>
+          <td class="right total income-total"><Money value={incomeTotal} /></td>
         </tr>
         <tr>
           <td>{t('budget.expenses')}</td>
-          <td class="right total expense-total">{fmt(expenseTotal)}</td>
+          <td class="right total expense-total"><Money value={expenseTotal} /></td>
         </tr>
         <tr>
           <td>{t('budget.savings')}</td>
           <td class="right total" class:income-total={balance >= 0} class:expense-total={balance < 0}>
-            {fmt(balance)}
+            <Money value={balance} />
           </td>
         </tr>
       </tfoot>
@@ -157,7 +154,7 @@
   }
   .rename-label {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -181,7 +178,7 @@
     border-radius: 4px;
   }
   .empty {
-    color: #888;
+    color: var(--ink-faint);
     font-size: 0.9rem;
     margin: 0;
   }
@@ -201,7 +198,7 @@
     text-align: left;
     padding: 0.4rem 0.5rem;
     font-size: 0.7rem;
-    color: #888;
+    color: var(--ink-faint);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 1px solid #dee2e6;
@@ -212,13 +209,13 @@
   .line-category td {
     padding: 0.35rem 0.5rem;
     background: #f1f3f5;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.8rem;
     color: #495057;
   }
   .line-row td {
     padding: 0.2rem 0.5rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--rule);
   }
   .line-row.income td {
     background: #f0fdf4;
@@ -242,7 +239,7 @@
     text-align: right;
   }
   .total {
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
   .income-total { color: #2d6a4f; }

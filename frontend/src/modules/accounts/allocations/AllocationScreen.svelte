@@ -2,11 +2,12 @@
   import { t } from '../../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/budget/budgetEngine'
-  import type {
-    ReserveDefinition,
-    VaultEntry,
-    VaultCategory,
-    VaultData,
+  import {
+    sideOf,
+    type EntryType,
+    type VaultEntry,
+    type VaultCategory,
+    type VaultData,
   } from '../../../lib/crypto/vault'
   import { isLegalEntryRouting, isLegalRouting } from '../../../lib/accounts/routing'
   import {
@@ -15,9 +16,10 @@
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
   import { fromCents, monthsBetween, nextDue, toCents } from '../../../lib/accounts/reserveMath'
+  import { formatAmount } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
+  import Money from '../../../lib/util/Money.svelte'
   import AllocationRow from './AllocationRow.svelte'
-  import AllocationSummary from './AllocationSummary.svelte'
-  import PurchaseDialog from './PurchaseDialog.svelte'
 
   // The monthly flow view: which budget lines move money from where to where,
   // and what accumulates this month.
@@ -69,14 +71,6 @@
   let version = $state(0)
 
   let error = $state<string | null>(null)
-  let purchaseEntryId = $state<string | null>(null)
-
-  function money(amount: string): string {
-    return Number(amount).toLocaleString('de-CH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
 
   function cents(amount: string): number {
     try {
@@ -121,8 +115,8 @@
     }))
   })
 
-  let incomeRows = $derived(rows.filter(r => r.entry.type === 'income'))
-  let expenseRows = $derived(rows.filter(r => r.entry.type === 'expense'))
+  let incomeRows = $derived(rows.filter(r => sideOf(r.entry.type) === 'income'))
+  let expenseRows = $derived(rows.filter(r => sideOf(r.entry.type) === 'expense'))
 
   // --- Grouping ----------------------------------------------------------
   // Same shape as the budget table: rows are grouped by their budget category and
@@ -165,15 +159,29 @@
       }))
   }
 
-  let incomeCategories = $derived(categoryRows(incomeRows))
-  let expenseCategories = $derived(categoryRows(expenseRows))
+  /**
+   * The same five sections the budget has, in the same order.
+   *
+   * It used to be two — money in, money out — grouped by side, which was the
+   * only distinction available when an entry could be one of two things. The
+   * budget is read in fives now, and a screen that shows the same lines under
+   * different headings makes the reader do the translating.
+   */
+  const SECTION_TYPES: EntryType[] = ['income', 'expense', 'savings', 'bill', 'purchase']
+
+  let sections = $derived(
+    SECTION_TYPES.map(type => ({
+      type,
+      categories: categoryRows(rows.filter(r => r.entry.type === type)),
+    })),
+  )
 
   // Collapse is a view preference of this screen alone: not persisted, not
   // shared with the budget table. Keyed by type so "Other" under income and
   // "Other" under expenses fold independently.
   let collapsedCategories = $state(new Set<string>())
 
-  function toggleCategory(type: 'income' | 'expense', categoryName: string) {
+  function toggleCategory(type: EntryType, categoryName: string) {
     const key = `${type}:${categoryName}`
     const next = new Set(collapsedCategories)
     if (next.has(key)) next.delete(key)
@@ -181,7 +189,7 @@
     collapsedCategories = next
   }
 
-  function isCollapsed(type: 'income' | 'expense', categoryName: string): boolean {
+  function isCollapsed(type: EntryType, categoryName: string): boolean {
     return collapsedCategories.has(`${type}:${categoryName}`)
   }
 
@@ -192,42 +200,13 @@
     return categories.length > 1
   }
 
-  // The two totals. They differ by exactly the set-asides: budgeted as
-  // expenses, but they never leave your net worth.
-  let totals = $derived.by(() => {
-    let income = 0
-    let expenses = 0
-    let outflow = 0
-    let setAside = 0
-
-    for (const entry of entries) {
-      const planned = cents(plannedFor(entry.id))
-      if (entry.type === 'income') {
-        income += planned
-        continue
-      }
-      expenses += planned
-      if (entry.sinkAccountId === null) outflow += planned
-      else setAside += planned
-    }
-
-    return {
-      income: fromCents(income),
-      expenses: fromCents(expenses),
-      outflow: fromCents(outflow),
-      setAside: fromCents(setAside),
-      unallocated: fromCents(income - expenses),
-      netChange: fromCents(income - outflow),
-    }
-  })
-
   // The soonest obligation sinking into an account gives its shortfall a
   // deadline. Amortizations are deliberately excluded — their date moves.
   function soonestObligation(vault: VaultData, accountId: string) {
     let best: { month: string; monthsAway: number } | null = null
     for (const entry of vault.budget.entries) {
       if (entry.archived) continue
-      if (entry.reserve?.kind !== 'obligation') continue
+      if (entry.type !== 'bill' || !entry.reserve) continue
       if (entry.sinkAccountId !== accountId) continue
       try {
         const due = nextDue(entry.reserve.anchorMonth, entry.reserve.periodMonths, currentMonth)
@@ -304,64 +283,10 @@
     version++
   }
 
-  function applyReserve(entryId: string, reserve: ReserveDefinition | undefined) {
-    const entry = findEntry(entryId)
-    if (!entry) return
-
-    const previous = entry.reserve
-    if (reserve === undefined) delete entry.reserve
-    else entry.reserve = reserve
-
-    // `reserve` implies expense with a non-null sink. The set-aside gate makes
-    // that structural; this catches any other route in.
-    if (!isLegalEntryRouting(entry)) {
-      if (previous === undefined) delete entry.reserve
-      else entry.reserve = previous
-      error = t('alloc.mustSetAside', { entry: entry.name })
-      return
-    }
-
-    error = null
-    markDirty()
-    version++
-  }
-
-  // The whole of the purchase: the real price becomes the next cycle's target,
-  // and the anchor moves to the month of purchase so the cycle restarts. No
-  // money moves, nothing else is touched.
-  function applyPurchase(entryId: string, pricePaid: string, purchaseMonth: string) {
-    const entry = findEntry(entryId)
-    if (!entry?.reserve) return
-
-    entry.reserve = {
-      ...entry.reserve,
-      targetAmount: pricePaid,
-      anchorMonth: purchaseMonth,
-    }
-
-    markDirty()
-    version++
-    purchaseEntryId = null
-  }
-
-  let purchaseContext = $derived.by(() => {
-    void version
-    if (purchaseEntryId === null) return null
-    const entry = findEntry(purchaseEntryId)
-    if (!entry?.reserve || entry.reserve.kind !== 'amortization') return null
-    const sink = entry.sinkAccountId
-    return {
-      entryId: entry.id,
-      entryName: entry.name,
-      reserve: entry.reserve,
-      accountName: accounts.find(a => a.id === sink)?.name ?? 'the account',
-      available: sinkAvailable(sink) ?? '0.00',
-    }
-  })
 </script>
 
-{#snippet categoryBlock(type: 'income' | 'expense', category: RowCategory, withHeader: boolean)}
-  <div class="category">
+{#snippet categoryBlock(type: EntryType, category: RowCategory, withHeader: boolean)}
+  <div class="category" class:has-category-header={withHeader}>
     {#if withHeader}
       <button
         type="button"
@@ -377,7 +302,7 @@
           </svg>
         </span>
         <span class="category-name">{category.categoryName || t('budget.uncategorised')}</span>
-        <span class="category-subtotal">{money(category.plannedTotal)}</span>
+        <span class="category-subtotal"><Money value={category.plannedTotal} /></span>
       </button>
     {/if}
     {#if !withHeader || !isCollapsed(type, category.categoryName)}
@@ -390,8 +315,6 @@
             {currentMonth}
             sinkAvailable={row.sinkAvailable}
             onroutingchange={(routing) => applyRouting(row.entry.id, routing)}
-            onreservechange={(reserve) => applyReserve(row.entry.id, reserve)}
-            onpurchase={() => (purchaseEntryId = row.entry.id)}
           />
         {/each}
       </div>
@@ -407,78 +330,84 @@
       {t('alloc.noEntries')}
     </p>
   {:else}
-    <AllocationSummary
-      plannedIncome={totals.income}
-      plannedExpenses={totals.expenses}
-      trueOutflow={totals.outflow}
-      setAside={totals.setAside}
-      unallocated={totals.unallocated}
-      netChange={totals.netChange}
-      accounts={accountStatuses}
-    />
-
     {#if error}
       <p class="error">{error}</p>
     {/if}
 
-    {#if incomeCategories.length > 0}
-      <section class="flow-section">
-        <h3>{t('alloc.moneyIn')}</h3>
-        {#each incomeCategories as category (category.categoryName)}
-          {@render categoryBlock('income', category, showsHeaders(incomeCategories))}
-        {/each}
-      </section>
-    {/if}
-
-    {#if expenseCategories.length > 0}
-      <section class="flow-section">
-        <h3>{t('alloc.moneyOut')}</h3>
-        {#each expenseCategories as category (category.categoryName)}
-          {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
-        {/each}
-        <p class="section-note">
-          {t('alloc.setAsideTotal', { amount: money(totals.setAside) })}
-        </p>
-      </section>
-    {/if}
+    {#each sections as section (section.type)}
+      {#if section.categories.length > 0}
+        <!-- The title on the page, the lines in the box, as the budget has it. -->
+        <div class="section-head section-{section.type}">
+          <h3 class="section-name">{t(`section.${section.type}` as 'section.expense')}</h3>
+        </div>
+        <section class="flow-section">
+          {#each section.categories as category (category.categoryName)}
+            {@render categoryBlock(section.type, category, showsHeaders(section.categories))}
+          {/each}
+        </section>
+      {/if}
+    {/each}
   {/if}
 </div>
-
-{#if purchaseContext}
-  <PurchaseDialog
-    entryName={purchaseContext.entryName}
-    reserve={purchaseContext.reserve}
-    accountName={purchaseContext.accountName}
-    available={purchaseContext.available}
-    {currentMonth}
-    onconfirm={(price, purchaseMonth) =>
-      applyPurchase(purchaseContext!.entryId, price, purchaseMonth)}
-    onclose={() => (purchaseEntryId = null)}
-  />
-{/if}
 
 <style>
   .allocation-screen {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    /* Nothing uniform: a title belongs to the box under it, so it sits closer
+       to that than to the section it follows. A gap here would be added to both
+       margins equally and the title would float between the two. */
+    gap: 0;
   }
   .flow-section {
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     overflow: hidden;
   }
-  h3 {
-    margin: 0;
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
+
+  /* Matches the budget exactly: 0.35rem below a title, 1.25rem above it, so a
+     title reads as belonging to the box under it rather than floating between. */
+  .section-head {
+    display: flex;
+    align-items: center;
+    margin: 1.25rem 0 0.35rem;
+    padding: 0 0.25rem;
+  }
+
+  .section-head:first-of-type {
+    margin-top: 0;
+  }
+
+  .section-name {
+    font-size: 1.2rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .section-income .section-name { color: var(--money-in); }
+  .section-expense .section-name { color: var(--ink); }
+  .section-savings .section-name,
+  .section-bill .section-name,
+  .section-purchase .section-name { color: var(--money-held); }
+
+  .category {
+    /*
+     * How far the category name sits from the edge of its header: the chevron
+     * plus the flex gap after it. The allocation rows borrow it so their names
+     * begin on the same vertical line, leaving the chevron alone in a gutter.
+     *
+     * The same value and the same reasoning as the budget's, which is the
+     * point — these two screens have identical nesting and had been drawing it
+     * two different ways. Derived from the chevron rather than typed, and zero
+     * unless a header is drawn: `withHeader` is false where a section has one
+     * category, and indenting rows under nothing would read as a mistake.
+     */
+    --category-gutter: 0rem;
+  }
+  .category.has-category-header {
+    --category-gutter: calc(12px + 0.35rem);
   }
   .rows {
     display: flex;
@@ -492,16 +421,14 @@
     padding: 0.5rem 1rem;
     background: #f1f3f5;
     border: none;
-    border-bottom: 1px solid #dee2e6;
+    /* Same boundary as the budget's category header, same weight. */
+    border-bottom: 1px solid var(--rule-strong);
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 500;
     color: #495057;
     text-align: left;
     cursor: pointer;
     user-select: none;
-  }
-  .category-header.collapsed {
-    border-bottom: 2px solid #ced4da;
   }
   .category-header:hover {
     background: #e9ecef;
@@ -537,23 +464,18 @@
   .category-header.collapsed .category-chevron {
     color: #495057;
   }
-  .section-note {
-    margin: 0;
-    padding: 0.6rem 1rem;
-    font-size: 0.8rem;
-    color: #888;
-    border-top: 1px solid #f1f3f5;
-  }
   .empty {
     padding: 2rem;
     text-align: center;
-    color: #888;
+    color: var(--ink-faint);
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
+  /* The container spaces nothing, so anything that is not a section says how
+     much room it wants. */
   .error {
-    margin: 0;
+    margin: 0 0 1rem;
     padding: 0.6rem 0.9rem;
     font-size: 0.85rem;
     color: #c0392b;

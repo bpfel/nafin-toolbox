@@ -179,7 +179,7 @@
     background: white;
     border-radius: 12px;
     padding: 2.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     width: 100%;
     max-width: 400px;
   }
@@ -252,7 +252,7 @@
   .link-btn:hover { color: #245a42; }
 
   .forgot-hint {
-    color: #999;
+    color: var(--ink-faint);
     font-size: 0.8rem;
     margin-top: 1.25rem;
     text-align: center;

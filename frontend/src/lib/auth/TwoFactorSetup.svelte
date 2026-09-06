@@ -173,7 +173,7 @@
     padding: 1rem;
     background: white;
     border-radius: 8px;
-    border: 1px solid #eee;
+    border: 1px solid var(--rule);
   }
 
   .manual-entry {
@@ -198,7 +198,7 @@
   }
 
   .verify-step {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--rule);
     padding-top: 1.25rem;
   }
 

@@ -102,7 +102,7 @@
     background: white;
     border-radius: 12px;
     padding: 2.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     width: 100%;
     max-width: 400px;
   }
@@ -168,7 +168,7 @@
   .btn-logout {
     margin-top: 1rem;
     background: transparent;
-    color: #888;
+    color: var(--ink-faint);
     border: 1px solid #ddd;
     font-size: 0.85rem;
     width: 100%;
