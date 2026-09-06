@@ -1,24 +1,29 @@
 /*
- * One self-hosted face, under the SIL Open Font License: Atkinson Hyperlegible
- * Next, for the whole interface.
+ * Two self-hosted faces, both under the SIL Open Font License.
  *
- * Chosen for a reason rather than a taste. The Braille Institute drew it so
- * that characters cannot be mistaken for one another — the slot in the zero,
- * the tail on the one, the open terminals on 5 and S. Nearly everything in this
- * app is a figure someone will act on, and a misread digit is a wrong decision,
- * not a typo. That argument does not apply to a system face, which is drawn to
- * look correct rather than to be unambiguous.
+ * Source Sans 3 for the interface. Adobe drew it for user interfaces, and it
+ * behaves like it: quiet enough to disappear into a row of a table, narrow
+ * enough that Hausratversicherung fits a phone, and unbothered at the 0.92rem
+ * the budget entries are set in. A body face in a table has no business having
+ * opinions.
  *
- * The variable cut, so the whole 200–800 range arrives in one file and the
- * four weights the interface uses cost nothing extra. Latin and latin-ext,
- * each behind a `unicode-range`, so a reader of German fetches only what German
- * needs. Roughly 56 KB in total.
+ * Spectral SC for the category headings, and nothing else. Small capitals are
+ * its *design* rather than an OpenType feature it may or may not carry — the
+ * lower case simply is small capitals — so nothing is left to a browser's
+ * willingness to synthesise them, which is what makes them look bolded. Being a
+ * serif against a sans is the point: the heading reads as a different level,
+ * not a louder one.
  *
- * It has no small-capitals sibling, so the category headings ask the browser to
- * synthesise them (see BudgetTable). That is a real cost, paid deliberately:
- * eight headings are worth less than every figure on every screen.
+ * The variable cut of Source Sans, so the whole 200-900 range arrives in one
+ * file and the four weights the interface uses cost nothing extra. It has no
+ * per-subset entry point, so the package's cyrillic and greek are bundled;
+ * `unicode-range` means nobody downloads them. German, French and Italian
+ * accents all live in the latin subset, so a reader here fetches 32 KB for the
+ * interface and 28 KB for the headings, and latin-ext is insurance.
  */
-@import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
+@import '@fontsource-variable/source-sans-3/wght.css';
+@import '@fontsource/spectral-sc/latin-500.css';
+@import '@fontsource/spectral-sc/latin-ext-500.css';
 
 :root {
   /*
@@ -95,9 +100,11 @@
   --accent-soft: #eaf1ee;
 
   /* The fallbacks matter for the moment before the file lands, and for anyone
-     blocking web fonts. Nothing else needs a second family: there is no
-     small-caps sibling to name, so the token that used to hold one is gone. */
-  --font-ui: 'Atkinson Hyperlegible Next Variable', system-ui, -apple-system, sans-serif;
+     blocking web fonts. The small-caps face falls back to the interface one
+     rather than to a generic serif: losing the small capitals is better than
+     keeping them in whatever the platform calls Georgia. */
+  --font-ui: 'Source Sans 3 Variable', system-ui, -apple-system, sans-serif;
+  --font-smallcaps: 'Spectral SC', var(--font-ui);
 
   font-family: var(--font-ui);
   line-height: 1.5;

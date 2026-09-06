@@ -467,23 +467,19 @@
        noun still read as one. */
     padding: 0.85rem 0.75rem 0.35rem;
     background: none;
-    /* `small-caps`, not `all-small-caps`: the leading capital stays a capital,
-       which is what keeps a proper noun reading as one. Synthesised, because
-       the interface face has no small-capitals sibling — the browser shrinks
-       the capitals and leaves the strokes at full width, so the line reads
-       heavier than its nominal weight. Both numbers below pay that back. */
-    font-variant-caps: small-caps;
-    /* 450 rather than 500. Still above the 400 of the entries beneath it, but
-       short of what would look bolded once the synthesis has thickened it.
-       A fractional weight is free here: the face is variable. */
-    font-weight: 450;
+    /* The family is the small capitals — Spectral SC's lower case is drawn as
+       them — so no `font-variant-caps` here. Asking for one on top would have
+       the browser synthesise from glyphs that are already small, shrinking
+       them twice. Its upper case stays upper case, which is what keeps a
+       leading capital on a proper noun. */
+    font-family: var(--font-smallcaps);
+    font-weight: 500;
     /* Small caps sit lower than capitals, so the same nominal size reads
        smaller. Up a little to keep it above the entries. */
     font-size: 1.15rem;
-    /* Small capitals want more air between them than lower case does, and
-       synthesised ones want more still, having been squeezed rather than
-       drawn. */
-    letter-spacing: 0.06em;
+    /* Drawn small capitals need only a little air, not the extra that
+       squeezed ones do. */
+    letter-spacing: 0.02em;
     color: var(--ink);
     border-bottom: 1px solid var(--rule);
   }
