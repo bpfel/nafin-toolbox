@@ -1,29 +1,34 @@
 /*
- * Two self-hosted faces, both under the SIL Open Font License.
+ * Two self-hosted faces, both under the SIL Open Font License, and both cuts of
+ * one design: Alegreya Sans for the interface, Alegreya Sans SC for the budget
+ * category headings.
  *
- * Source Sans 3 for the interface. Adobe drew it for user interfaces, and it
- * behaves like it: quiet enough to disappear into a row of a table, narrow
- * enough that Hausratversicherung fits a phone, and unbothered at the 0.92rem
- * the budget entries are set in. A body face in a table has no business having
- * opinions.
+ * One design rather than two is the point. A serif heading over a sans table
+ * makes the heading a guest; a small-capitals sibling makes it the same voice
+ * speaking at a different level. Small capitals are that sibling's *design*
+ * rather than an OpenType feature it may or may not carry — its lower case
+ * simply is small capitals — so nothing is left to a browser's willingness to
+ * synthesise them, which is what makes them look bolded.
  *
- * Spectral SC for the category headings, and nothing else. Small capitals are
- * its *design* rather than an OpenType feature it may or may not carry — the
- * lower case simply is small capitals — so nothing is left to a browser's
- * willingness to synthesise them, which is what makes them look bolded. Being a
- * serif against a sans is the point: the heading reads as a different level,
- * not a louder one.
+ * Alegreya Sans is narrow and humanist, with calligraphic roots that show in
+ * the lower case. That helps here more than it would in an English app: long
+ * German compounds are told apart by their outline, and a geometric face
+ * flattens the outline.
  *
- * The variable cut of Source Sans, so the whole 200-900 range arrives in one
- * file and the four weights the interface uses cost nothing extra. It has no
- * per-subset entry point, so the package's cyrillic and greek are bundled;
- * `unicode-range` means nobody downloads them. German, French and Italian
- * accents all live in the latin subset, so a reader here fetches 32 KB for the
- * interface and 28 KB for the headings, and latin-ext is insurance.
+ * No variable cut exists for either, so the weights are enumerated. 400, 500
+ * and 700 are what the interface asks for; there is no 600 in the family, and
+ * the twenty rules that name one will be matched upward to 700. Latin and
+ * latin-ext, each behind a `unicode-range`: German, French and Italian accents
+ * all live in latin, so a reader here fetches only those.
  */
-@import '@fontsource-variable/source-sans-3/wght.css';
-@import '@fontsource/spectral-sc/latin-500.css';
-@import '@fontsource/spectral-sc/latin-ext-500.css';
+@import '@fontsource/alegreya-sans/latin-400.css';
+@import '@fontsource/alegreya-sans/latin-500.css';
+@import '@fontsource/alegreya-sans/latin-700.css';
+@import '@fontsource/alegreya-sans/latin-ext-400.css';
+@import '@fontsource/alegreya-sans/latin-ext-500.css';
+@import '@fontsource/alegreya-sans/latin-ext-700.css';
+@import '@fontsource/alegreya-sans-sc/latin-500.css';
+@import '@fontsource/alegreya-sans-sc/latin-ext-500.css';
 
 :root {
   /*
@@ -103,8 +108,8 @@
      blocking web fonts. The small-caps face falls back to the interface one
      rather than to a generic serif: losing the small capitals is better than
      keeping them in whatever the platform calls Georgia. */
-  --font-ui: 'Source Sans 3 Variable', system-ui, -apple-system, sans-serif;
-  --font-smallcaps: 'Spectral SC', var(--font-ui);
+  --font-ui: 'Alegreya Sans', system-ui, -apple-system, sans-serif;
+  --font-smallcaps: 'Alegreya Sans SC', var(--font-ui);
 
   font-family: var(--font-ui);
   line-height: 1.5;
