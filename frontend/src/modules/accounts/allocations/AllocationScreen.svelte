@@ -4,6 +4,7 @@
   import * as engine from '../../../lib/budget/budgetEngine'
   import {
     sideOf,
+    type EntryType,
     type VaultEntry,
     type VaultCategory,
     type VaultData,
@@ -158,15 +159,29 @@
       }))
   }
 
-  let incomeCategories = $derived(categoryRows(incomeRows))
-  let expenseCategories = $derived(categoryRows(expenseRows))
+  /**
+   * The same five sections the budget has, in the same order.
+   *
+   * It used to be two — money in, money out — grouped by side, which was the
+   * only distinction available when an entry could be one of two things. The
+   * budget is read in fives now, and a screen that shows the same lines under
+   * different headings makes the reader do the translating.
+   */
+  const SECTION_TYPES: EntryType[] = ['income', 'expense', 'savings', 'bill', 'purchase']
+
+  let sections = $derived(
+    SECTION_TYPES.map(type => ({
+      type,
+      categories: categoryRows(rows.filter(r => r.entry.type === type)),
+    })),
+  )
 
   // Collapse is a view preference of this screen alone: not persisted, not
   // shared with the budget table. Keyed by type so "Other" under income and
   // "Other" under expenses fold independently.
   let collapsedCategories = $state(new Set<string>())
 
-  function toggleCategory(type: 'income' | 'expense', categoryName: string) {
+  function toggleCategory(type: EntryType, categoryName: string) {
     const key = `${type}:${categoryName}`
     const next = new Set(collapsedCategories)
     if (next.has(key)) next.delete(key)
@@ -174,7 +189,7 @@
     collapsedCategories = next
   }
 
-  function isCollapsed(type: 'income' | 'expense', categoryName: string): boolean {
+  function isCollapsed(type: EntryType, categoryName: string): boolean {
     return collapsedCategories.has(`${type}:${categoryName}`)
   }
 
@@ -184,26 +199,6 @@
   function showsHeaders(categories: RowCategory[]): boolean {
     return categories.length > 1
   }
-
-  /**
-   * What is set aside this month rather than spent.
-   *
-   * Inferred from where the money is routed, because there is no type that says
-   * so: an expense with a sink account keeps its place in the zero-based budget
-   * while never leaving your net worth. That inference is what a Set-aside type
-   * is meant to replace.
-   */
-  let totals = $derived.by(() => {
-    let setAside = 0
-
-    for (const entry of entries) {
-      if (entry.type === 'income') continue
-      if (entry.sinkAccountId === null) continue
-      setAside += cents(plannedFor(entry.id))
-    }
-
-    return { setAside: fromCents(setAside) }
-  })
 
   // The soonest obligation sinking into an account gives its shortfall a
   // deadline. Amortizations are deliberately excluded — their date moves.
@@ -290,7 +285,7 @@
 
 </script>
 
-{#snippet categoryBlock(type: 'income' | 'expense', category: RowCategory, withHeader: boolean)}
+{#snippet categoryBlock(type: EntryType, category: RowCategory, withHeader: boolean)}
   <div class="category">
     {#if withHeader}
       <button
@@ -339,26 +334,19 @@
       <p class="error">{error}</p>
     {/if}
 
-    {#if incomeCategories.length > 0}
-      <section class="flow-section">
-        <h3>{t('alloc.moneyIn')}</h3>
-        {#each incomeCategories as category (category.categoryName)}
-          {@render categoryBlock('income', category, showsHeaders(incomeCategories))}
-        {/each}
-      </section>
-    {/if}
-
-    {#if expenseCategories.length > 0}
-      <section class="flow-section">
-        <h3>{t('alloc.moneyOut')}</h3>
-        {#each expenseCategories as category (category.categoryName)}
-          {@render categoryBlock('expense', category, showsHeaders(expenseCategories))}
-        {/each}
-        <p class="section-note" class:amount-hidden={amountsHidden()}>
-          {t('alloc.setAsideTotal', { amount: formatAmount(totals.setAside) })}
-        </p>
-      </section>
-    {/if}
+    {#each sections as section (section.type)}
+      {#if section.categories.length > 0}
+        <!-- The title on the page, the lines in the box, as the budget has it. -->
+        <div class="section-head section-{section.type}">
+          <h3 class="section-name">{t(`section.${section.type}` as 'section.expense')}</h3>
+        </div>
+        <section class="flow-section">
+          {#each section.categories as category (category.categoryName)}
+            {@render categoryBlock(section.type, category, showsHeaders(section.categories))}
+          {/each}
+        </section>
+      {/if}
+    {/each}
   {/if}
 </div>
 
@@ -374,17 +362,33 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     overflow: hidden;
   }
-  h3 {
-    margin: 0;
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
+
+  /* Matches the budget exactly: 0.35rem below a title, 1.25rem above it, so a
+     title reads as belonging to the box under it rather than floating between. */
+  .section-head {
+    display: flex;
+    align-items: center;
+    margin: 1.25rem 0 0.35rem;
+    padding: 0 0.25rem;
   }
+
+  .section-head:first-of-type {
+    margin-top: 0;
+  }
+
+  .section-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .section-income .section-name { color: var(--money-in); }
+  .section-expense .section-name { color: var(--ink); }
+  .section-savings .section-name,
+  .section-bill .section-name,
+  .section-purchase .section-name { color: var(--money-held); }
+
   .rows {
     display: flex;
     flex-direction: column;
@@ -441,13 +445,6 @@
   .category-header:focus-visible .category-chevron,
   .category-header.collapsed .category-chevron {
     color: #495057;
-  }
-  .section-note {
-    margin: 0;
-    padding: 0.6rem 1rem;
-    font-size: 0.8rem;
-    color: var(--ink-faint);
-    border-top: 1px solid #f1f3f5;
   }
   .empty {
     padding: 2rem;

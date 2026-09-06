@@ -304,10 +304,19 @@ describe('AllocationScreen', () => {
 
       render(AllocationScreen)
 
-      // Income categories are listed inside "Money in", ahead of every expense
-      // category, rather than merged into the expense ordering.
-      expect(categoryNames()).toEqual(['Pay', 'Side work', 'Fun', 'Housing', 'Other'])
-      expect(screen.getByText('Money in')).toBeTruthy()
+      // Five sections, in the budget's order and under the budget's names. It
+      // used to be two — Money in and Money out — which was the only
+      // distinction available when an entry could be one of two things, and
+      // left the reader translating between two screens describing one plan.
+      // By role, not by text: "Income" is now also the badge on every income
+      // row, which is the point — one vocabulary — and makes a bare text query
+      // ambiguous.
+      expect(screen.getByRole('heading', { name: 'Income' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Expenses' })).toBeTruthy()
+
+      // Income's categories come first, grouped on their own rather than merged
+      // into the expense ordering.
+      expect(categoryNames().slice(0, 2)).toEqual(['Pay', 'Side work'])
     })
 
     test('a side with a single category renders no header for it', () => {

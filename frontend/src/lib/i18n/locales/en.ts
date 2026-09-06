@@ -274,13 +274,8 @@ export const en = {
   'snapshot.deleteExplain.other': 'Delete {name} and its {count} lines?',
 
   // --- Accounts ---
-  'accounts.title': 'Accounts',
-  'accounts.subtitle': 'Balances are projected from the last correction, not accumulated.',
   'accounts.add': 'Add',
   'accounts.all': 'All accounts',
-  'accounts.projected': 'Projected balance',
-  'accounts.required': 'Required',
-  'accounts.available': 'Available',
   'accounts.balanceFigure': 'Balance',
   'accounts.allocated': 'Allocated',
   'accounts.free': 'Free',
@@ -332,13 +327,11 @@ export const en = {
   // rather than standardised terms, so the German below is a reading of what
   // they mean here, not a dictionary equivalent. Worth a native check: these
   // words sit on the screen where people decide where money goes.
-  'alloc.moneyIn': 'Money in',
   'flow.fromOutside': 'From outside → {account}',
   'flow.leaves': '{account} → leaves your accounts',
   'flow.staysIn': 'Stays in {account}',
   'flow.between': '{source} → {sink}',
   'flow.unrouted': 'No routing — pick where this money comes from',
-  'alloc.moneyOut': 'Money out and money set aside',
   'alloc.editRouting': 'Edit routing',
   'routing.landsIn': 'Lands in',
   'routing.incomeHint': 'Income always arrives from outside your accounts.',
@@ -417,7 +410,6 @@ export const en = {
   'accountForm.holderHint': 'Only needed for QR bills.',
   'accountDelete.noneRouted': 'No entries are routed through it.',
   'accountDelete.confirm': 'Delete and reassign',
-  'qrbill.payHint': 'Pays into this account. The IBAN and address come from the account — only the amount and reference are set here.',
   'qrbill.noAddress': 'This account has no complete holder address. Add it under the account’s payment details — a QR bill needs it.',
   'qrbill.shareHint': 'Shares the picture to Files, Photos or a chat. Banking apps scan with the camera and will not read it from here.',
 
@@ -457,7 +449,6 @@ export const en = {
   'twofa.codesSaved': 'I’ve saved my codes',
   'twofa.qrAlt': 'QR code',
   'twofa.codesCopyFailedPlain': 'Could not reach the clipboard. Select the codes above and copy them by hand.',
-  'alloc.setAsideTotal': 'Set-asides total {amount} this month. They count as budgeted expenses but stay in your accounts.',
   'accounts.qrbill': 'QR bill',
   'accounts.lastCannotDelete': 'The last remaining account cannot be deleted',
   'accounts.errorAmount': 'Enter an amount like 1234.50',
@@ -467,8 +458,6 @@ export const en = {
   'accountDelete.routed.other': '{count} entries are routed through it and must move somewhere else.',
   'accountDelete.collapsing.one': '{count} entry currently moves money between {account} and {target}. After the move both ends are {target}, so it becomes money set aside within one account. That is allowed, but it no longer means the same thing.',
   'accountDelete.collapsing.other': '{count} entries currently move money between {account} and {target}. After the move both ends are {target}, so they become money set aside within one account. That is allowed, but it no longer means the same thing.',
-  'qrbill.qrIbanRule': 'A QR-IBAN accepts only a QR reference.',
-  'qrbill.regularIbanRule': 'A regular IBAN accepts no reference or a creditor reference — never a QR reference.',
   'error.saveCategory': 'could not save this category',
   'error.renameSnapshot': 'could not rename this snapshot',
   'error.takeSnapshot': 'could not take a snapshot',

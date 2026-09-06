@@ -258,13 +258,8 @@ export const de: Messages = {
   'snapshot.deleteExplain.other': '{name} und seine {count} Zeilen löschen?',
 
   // --- Accounts ---
-  'accounts.title': 'Konten',
-  'accounts.subtitle': 'Salden werden ab der letzten Korrektur hochgerechnet, nicht aufsummiert.',
   'accounts.add': 'Hinzufügen',
   'accounts.all': 'Alle Konten',
-  'accounts.projected': 'Hochgerechneter Saldo',
-  'accounts.required': 'Benötigt',
-  'accounts.available': 'Verfügbar',
   'accounts.balanceFigure': 'Saldo',
   'accounts.allocated': 'Zugewiesen',
   'accounts.free': 'Frei',
@@ -310,13 +305,11 @@ export const de: Messages = {
   'action.edit': 'Bearbeiten',
 
   // --- Allocations ---
-  'alloc.moneyIn': 'Geld herein',
   'flow.fromOutside': 'Von aussen → {account}',
   'flow.leaves': '{account} → verlässt Ihre Konten',
   'flow.staysIn': 'Bleibt auf {account}',
   'flow.between': '{source} → {sink}',
   'flow.unrouted': 'Keine Zuordnung — wählen Sie, woher dieses Geld kommt',
-  'alloc.moneyOut': 'Geld hinaus und Zurückgelegtes',
   'alloc.editRouting': 'Zuordnung bearbeiten',
   'routing.landsIn': 'Geht ein auf',
   'routing.incomeHint': 'Einnahmen kommen immer von ausserhalb Ihrer Konten.',
@@ -394,7 +387,6 @@ export const de: Messages = {
   'accountForm.holderHint': 'Nur für QR-Rechnungen nötig.',
   'accountDelete.noneRouted': 'Es sind keine Einträge darüber geführt.',
   'accountDelete.confirm': 'Löschen und neu zuordnen',
-  'qrbill.payHint': 'Zahlt auf dieses Konto ein. IBAN und Adresse stammen vom Konto — hier werden nur Betrag und Referenz gesetzt.',
   'qrbill.noAddress': 'Für dieses Konto fehlt eine vollständige Inhaberadresse. Ergänzen Sie sie unter den Zahlungsangaben des Kontos — eine QR-Rechnung braucht sie.',
   'qrbill.shareHint': 'Teilt das Bild an Dateien, Fotos oder einen Chat. Banking-Apps scannen mit der Kamera und lesen es nicht von hier.',
 
@@ -433,7 +425,6 @@ export const de: Messages = {
   'twofa.codesSaved': 'Ich habe meine Codes gesichert',
   'twofa.qrAlt': 'QR-Code',
   'twofa.codesCopyFailedPlain': 'Die Zwischenablage war nicht erreichbar. Markieren Sie die Codes oben und kopieren Sie sie von Hand.',
-  'alloc.setAsideTotal': 'Rückstellungen diesen Monat insgesamt {amount}. Sie zählen als budgetierte Ausgaben, bleiben aber auf Ihren Konten.',
   'accounts.qrbill': 'QR-Rechnung',
   'accounts.lastCannotDelete': 'Das letzte verbleibende Konto kann nicht gelöscht werden',
   'accounts.errorAmount': 'Geben Sie einen Betrag wie 1234.50 ein',
@@ -443,8 +434,6 @@ export const de: Messages = {
   'accountDelete.routed.other': '{count} Einträge laufen darüber und müssen anderswohin verschoben werden.',
   'accountDelete.collapsing.one': '{count} Eintrag verschiebt derzeit Geld zwischen {account} und {target}. Nach der Verschiebung sind beide Enden {target}, der Eintrag wird also zu einer Rückstellung innerhalb eines einzigen Kontos. Das ist zulässig, bedeutet aber nicht mehr dasselbe.',
   'accountDelete.collapsing.other': '{count} Einträge verschieben derzeit Geld zwischen {account} und {target}. Nach der Verschiebung sind beide Enden {target}, die Einträge werden also zu Rückstellungen innerhalb eines einzigen Kontos. Das ist zulässig, bedeutet aber nicht mehr dasselbe.',
-  'qrbill.qrIbanRule': 'Eine QR-IBAN akzeptiert ausschliesslich eine QR-Referenz.',
-  'qrbill.regularIbanRule': 'Eine normale IBAN akzeptiert keine Referenz oder eine Creditor Reference — niemals eine QR-Referenz.',
   'error.saveCategory': 'diese Kategorie konnte nicht gespeichert werden',
   'error.renameSnapshot': 'diese Momentaufnahme konnte nicht umbenannt werden',
   'error.takeSnapshot': 'es konnte keine Momentaufnahme erstellt werden',

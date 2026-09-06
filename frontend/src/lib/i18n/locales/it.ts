@@ -281,13 +281,8 @@ export const it: Messages = {
   'reset.noSnapshots': 'Non ci sono istantanee, quindi non resterà alcuna registrazione di questo piano. Annulla e scattane una prima, se vuoi conservarla.',
 
   // --- Accounts ---
-  'accounts.title': 'Conti',
-  'accounts.subtitle': 'I saldi sono proiettati dall’ultima correzione, non accumulati.',
   'accounts.add': 'Aggiungi',
   'accounts.all': 'Tutti i conti',
-  'accounts.projected': 'Saldo proiettato',
-  'accounts.required': 'Necessario',
-  'accounts.available': 'Disponibile',
   'accounts.balanceFigure': 'Saldo',
   'accounts.allocated': 'Assegnato',
   'accounts.free': 'Libero',
@@ -329,13 +324,11 @@ export const it: Messages = {
   'accountDelete.moveTo': 'Sposta le sue voci in',
 
   // --- Allocations ---
-  'alloc.moneyIn': 'Denaro in entrata',
   'flow.fromOutside': 'Dall’esterno → {account}',
   'flow.leaves': '{account} → lascia i tuoi conti',
   'flow.staysIn': 'Resta su {account}',
   'flow.between': '{source} → {sink}',
   'flow.unrouted': 'Nessun instradamento — indica da dove arriva questo denaro',
-  'alloc.moneyOut': 'Denaro in uscita e denaro messo da parte',
   'alloc.editRouting': 'Modifica l’assegnazione',
   'routing.landsIn': 'Arriva su',
   'routing.incomeHint': 'Le entrate provengono sempre dall’esterno dei tuoi conti.',
@@ -387,7 +380,6 @@ export const it: Messages = {
   'accountForm.holderHint': 'Serve solo per le QR-fatture.',
   'accountDelete.noneRouted': 'Nessuna voce passa da esso.',
   'accountDelete.confirm': 'Elimina e riassegna',
-  'qrbill.payHint': 'Versa su questo conto. L’IBAN e l’indirizzo provengono dal conto — qui si impostano solo importo e riferimento.',
   'qrbill.noAddress': 'Questo conto non ha un indirizzo del titolare completo. Aggiungilo nei dati di pagamento del conto — una QR-fattura ne ha bisogno.',
   'qrbill.shareHint': 'Condivide l’immagine su File, Foto o una chat. Le app bancarie scansionano con la fotocamera e non la leggeranno da qui.',
 
@@ -426,7 +418,6 @@ export const it: Messages = {
   'twofa.codesSaved': 'Ho salvato i miei codici',
   'twofa.qrAlt': 'Codice QR',
   'twofa.codesCopyFailedPlain': 'Non è stato possibile raggiungere gli appunti. Seleziona i codici qui sopra e copiali a mano.',
-  'alloc.setAsideTotal': 'Gli accantonamenti ammontano a {amount} questo mese. Contano come spese preventivate ma restano sui tuoi conti.',
   'accounts.qrbill': 'Polizza QR',
   'accounts.lastCannotDelete': 'L’ultimo conto rimasto non può essere eliminato',
   'accounts.errorAmount': 'Inserisci un importo come 1234.50',
@@ -436,8 +427,6 @@ export const it: Messages = {
   'accountDelete.routed.other': '{count} voci passano da questo conto e devono essere spostate altrove.',
   'accountDelete.collapsing.one': '{count} voce sposta attualmente denaro tra {account} e {target}. Dopo lo spostamento entrambe le estremità saranno {target}, quindi diventa denaro accantonato all’interno di un unico conto. È consentito, ma non significa più la stessa cosa.',
   'accountDelete.collapsing.other': '{count} voci spostano attualmente denaro tra {account} e {target}. Dopo lo spostamento entrambe le estremità saranno {target}, quindi diventano denaro accantonato all’interno di un unico conto. È consentito, ma non significa più la stessa cosa.',
-  'qrbill.qrIbanRule': 'Un QR-IBAN accetta soltanto un riferimento QR.',
-  'qrbill.regularIbanRule': 'Un IBAN ordinario non accetta alcun riferimento oppure un riferimento del creditore — mai un riferimento QR.',
   'error.saveCategory': 'non è stato possibile salvare questa categoria',
   'error.renameSnapshot': 'non è stato possibile rinominare questa istantanea',
   'error.takeSnapshot': 'non è stato possibile scattare un’istantanea',
