@@ -1,19 +1,18 @@
 /*
- * Self-hosted, both under the SIL Open Font License — no licence to buy, no
- * third-party request at runtime, and nothing that stops working if a font CDN
- * does. They ship with the build, which for a self-hosted app is the point.
+ * One self-hosted face, under the SIL Open Font License: Alegreya Sans SC, for
+ * the category headings and nothing else.
  *
- * JetBrains Mono for everything. A monospace in a finance app is not only a
- * look: every digit is the same width by construction, so columns of francs
- * line up without `tabular-nums` being asked for, and a mistyped figure is
- * visible as a wrong length.
+ * Small caps are its *design* rather than an OpenType feature it may or may not
+ * carry — the lower case simply is small capitals — so nothing is left to a
+ * browser's willingness to synthesise them, which is what made them look heavy.
+ * That is the whole reason to ship a font at all. The interface itself is
+ * better served by the reader's own system face: nothing to download, and the
+ * one they already read everything else in.
  *
- * Alegreya Sans SC for the category headings. Small caps are its *design*
- * rather than an OpenType feature it may or may not carry — the lower case
- * simply is small capitals — so nothing is left to a browser's willingness to
- * synthesise them, which is what made them look heavy before.
+ * Latin and latin-ext, weight 500 only, which is the one the headings use. Each
+ * subset carries a `unicode-range`, so a reader of German never fetches the
+ * Greek even though it is in the package.
  */
-@import '@fontsource-variable/jetbrains-mono/wght.css';
 @import '@fontsource/alegreya-sans-sc/latin-500.css';
 @import '@fontsource/alegreya-sans-sc/latin-ext-500.css';
 
@@ -91,9 +90,7 @@
   --accent-dark: #245a42;
   --accent-soft: #eaf1ee;
 
-  /* The system stack stays as the fallback: it is what renders while the woff2
-     is still on the wire, and what renders if it never arrives. */
-  --font-ui: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-ui: system-ui, -apple-system, sans-serif;
   --font-smallcaps: 'Alegreya Sans SC', var(--font-ui);
 
   font-family: var(--font-ui);
