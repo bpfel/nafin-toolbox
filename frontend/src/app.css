@@ -1,20 +1,24 @@
 /*
- * One self-hosted face, under the SIL Open Font License: Alegreya Sans SC, for
- * the category headings and nothing else.
+ * One self-hosted face, under the SIL Open Font License: Atkinson Hyperlegible
+ * Next, for the whole interface.
  *
- * Small caps are its *design* rather than an OpenType feature it may or may not
- * carry — the lower case simply is small capitals — so nothing is left to a
- * browser's willingness to synthesise them, which is what made them look heavy.
- * That is the whole reason to ship a font at all. The interface itself is
- * better served by the reader's own system face: nothing to download, and the
- * one they already read everything else in.
+ * Chosen for a reason rather than a taste. The Braille Institute drew it so
+ * that characters cannot be mistaken for one another — the slot in the zero,
+ * the tail on the one, the open terminals on 5 and S. Nearly everything in this
+ * app is a figure someone will act on, and a misread digit is a wrong decision,
+ * not a typo. That argument does not apply to a system face, which is drawn to
+ * look correct rather than to be unambiguous.
  *
- * Latin and latin-ext, weight 500 only, which is the one the headings use. Each
- * subset carries a `unicode-range`, so a reader of German never fetches the
- * Greek even though it is in the package.
+ * The variable cut, so the whole 200–800 range arrives in one file and the
+ * four weights the interface uses cost nothing extra. Latin and latin-ext,
+ * each behind a `unicode-range`, so a reader of German fetches only what German
+ * needs. Roughly 56 KB in total.
+ *
+ * It has no small-capitals sibling, so the category headings ask the browser to
+ * synthesise them (see BudgetTable). That is a real cost, paid deliberately:
+ * eight headings are worth less than every figure on every screen.
  */
-@import '@fontsource/alegreya-sans-sc/latin-500.css';
-@import '@fontsource/alegreya-sans-sc/latin-ext-500.css';
+@import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
 
 :root {
   /*
@@ -90,8 +94,10 @@
   --accent-dark: #245a42;
   --accent-soft: #eaf1ee;
 
-  --font-ui: system-ui, -apple-system, sans-serif;
-  --font-smallcaps: 'Alegreya Sans SC', var(--font-ui);
+  /* The fallbacks matter for the moment before the file lands, and for anyone
+     blocking web fonts. Nothing else needs a second family: there is no
+     small-caps sibling to name, so the token that used to hold one is gone. */
+  --font-ui: 'Atkinson Hyperlegible Next Variable', system-ui, -apple-system, sans-serif;
 
   font-family: var(--font-ui);
   line-height: 1.5;
