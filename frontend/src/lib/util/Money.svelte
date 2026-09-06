@@ -48,5 +48,25 @@
      rather than in the handful of tables that had thought to ask. */
   .money {
     font-variant-numeric: tabular-nums;
+
+    /*
+     * And one size, for the same reason. Twenty figures were rendering at six
+     * different sizes — 1.05, 1, 0.92, 0.9, 0.85, 0.8 — none of them chosen
+     * against the others. Two of those were actively backwards: the allocation
+     * category's subtotal was smaller than the rows it sums, and the snapshot
+     * editor's footer totals were smaller than the lines they total. Size was
+     * not ranking figures, it was drifting.
+     *
+     * Rank is carried by weight and colour, which say it without making the
+     * same number look like a different kind of thing on two screens — and the
+     * budget's entry amount and the allocation screen's planned amount are
+     * literally the same number.
+     *
+     * Here rather than in a stylesheet because every figure already comes
+     * through this component and a test keeps it that way, so this cannot
+     * drift back. A figure that genuinely needs another size can still say so
+     * with a more specific selector; nothing needs to today.
+     */
+    font-size: var(--figure-size, 1rem);
   }
 </style>

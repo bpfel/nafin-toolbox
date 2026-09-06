@@ -116,6 +116,9 @@
      blocking web fonts. One family, so there is no second token. */
   --font-ui: 'Source Sans 3 Variable', system-ui, -apple-system, sans-serif;
 
+  /* Every franc amount in the app, at one size. See Money.svelte for why. */
+  --figure-size: 1rem;
+
   font-family: var(--font-ui);
   /* 1.6 rather than 1.5. Rows of figures are scanned down a column, and the
      leading is what the eye uses to keep its place between one row and the
