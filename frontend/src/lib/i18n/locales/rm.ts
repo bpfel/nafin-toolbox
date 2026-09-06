@@ -18,7 +18,6 @@ import type { Messages } from './en'
  */
 export const rm: Partial<Messages> = {
   // --- Settings menu ---
-  'menu.security': 'Segirezza',
   'menu.language': 'Lingua',
   'menu.logout': 'Sortir',
   // menu.modules, menu.users and menu.close are left to English: the first two
@@ -38,7 +37,6 @@ export const rm: Partial<Messages> = {
   'action.cancel': 'Interrumper',
   'action.save': 'Memorisar',
   'action.delete': 'Stizzar',
-  'action.back': 'Turnar',
   'action.reload': 'Rechargiar',
   'qrbill.reference': 'Referenza',
   'qrbill.additionalInfo': 'Infurmaziuns supplementaras',

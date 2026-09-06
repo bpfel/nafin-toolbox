@@ -74,14 +74,13 @@
   }
 </script>
 
+<!--
+  Not a panel. Three boxes, contributed to the profile page's stack as siblings
+  of the two it draws itself — see the `display: contents` below. There is no
+  heading over them: a second factor and a password are settings like a language
+  is, and grouping them under a title claimed a hierarchy that is not there.
+-->
 <div class="security-settings">
-  <!--
-    A heading, not a header. There is no Back button because there is nowhere
-    to go back to: this sits on the profile page rather than being a screen of
-    its own.
-  -->
-  <h2>{t('security.title')}</h2>
-
   <!--
     These two used to replace the panel's whole body in place: no address, no
     history entry, and the browser's back button left the screen rather than the
@@ -90,7 +89,7 @@
     from, dismissed rather than navigated away from.
   -->
   <!-- 2FA Section -->
-  <div class="section">
+  <div class="settings-card">
     <h3>{t('security.twofaTitle')}</h3>
     {#if authState.currentUser?.totp_enabled}
       <p class="status enabled">{t('security.twofaEnabled')}</p>
@@ -156,13 +155,13 @@
   </div>
 
   <!-- Password Section -->
-  <div class="section">
+  <div class="settings-card">
     <h3>{t('security.passwordTitle')}</h3>
     <button class="btn-secondary" onclick={() => showChangePassword = true}>{t('password.changeTitle')}</button>
   </div>
 
   <!-- Delete Account Section -->
-  <div class="section danger-zone">
+  <div class="settings-card">
     <h3>{t('security.deleteAccountTitle')}</h3>
     <p class="info">{t('security.deleteAccountHint')}</p>
 
@@ -199,29 +198,15 @@
 {/if}
 
 <style>
+  /* Generates no box of its own, so the three cards inside are laid out by the
+     profile page's flex column and pick up its gap. The alternative — a wrapper
+     with its own spacing — means one number for the gap between these three and
+     another for the gap to the boxes above, kept equal by hand. */
   .security-settings {
-    background: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: var(--shadow-card);
+    display: contents;
   }
 
-  /* The 1.5rem below used to belong to the flex header that held this heading
-     beside a Back button. The button is gone; the space it set is not, so it
-     moves onto the heading. Shorthand rather than a following `margin-bottom`,
-     which a later `margin: 0` would silently cancel. */
-  h2 { margin: 0 0 1.5rem; font-size: 1.2rem; }
   h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-
-  .section {
-    padding: 1.25rem 0;
-    border-bottom: 1px solid var(--rule);
-  }
-
-  .section:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
 
   .status {
     font-size: 0.9rem;
@@ -306,10 +291,6 @@
     font-size: 0.85rem;
   }
   .btn-danger-outline:hover { background: #fdecea; }
-
-  .danger-zone {
-    border-bottom: none;
-  }
 
   .codes-grid {
     display: grid;

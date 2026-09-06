@@ -6,7 +6,7 @@
  * An unknown extra slug fails too, which catches a key renamed in one file and
  * not the others.
  *
- * Keys are flat and dotted rather than nested: `t('menu.security')` greps
+ * Keys are flat and dotted rather than nested: `t('menu.logout')` greps
  * straight back to its definition, and the type trick above needs no recursion.
  *
  * Placeholders are `{name}`. Anything that varies by count has `.one` and
@@ -21,7 +21,6 @@ export const en = {
   'nav.label': 'Sections',
   'privacy.hide': 'Hide amounts',
   'privacy.show': 'Show amounts',
-  'menu.security': 'Security',
   'menu.language': 'Language',
   'menu.logout': 'Log out',
   'menu.users': 'Users',
@@ -36,7 +35,6 @@ export const en = {
   'action.cancel': 'Cancel',
   'action.save': 'Save',
   'action.delete': 'Delete',
-  'action.back': 'Back',
   'action.reload': 'Reload',
   'entries.count.one': '{count} entry',
   'entries.count.other': '{count} entries',
@@ -134,7 +132,6 @@ export const en = {
   'action.close': 'Close',
 
   // --- Security settings ---
-  'security.title': 'Security Settings',
   'security.twofaTitle': 'Two-Factor Authentication',
   'security.currentPasswordPlaceholder': 'Current password',
   'security.disablePrompt': 'Enter your password to disable 2FA:',

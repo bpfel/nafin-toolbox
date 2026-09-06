@@ -201,6 +201,32 @@ h3 {
   gap: 1rem;
 }
 
+/*
+ * One box on the profile page, and every setting gets its own.
+ *
+ * They all look alike because none of them outranks another: an e-mail
+ * address, a language, a second factor and a delete button are four unrelated
+ * things rather than a tree. The security settings used to be one card with
+ * three ruled-off sections and a title above them, which drew a hierarchy that
+ * was not there.
+ *
+ * Global rather than scoped because it is shared between a screen and a
+ * component, which Svelte would otherwise keep from styling one another —
+ * and restating the declarations in both is how the two drift apart.
+ */
+.settings-card {
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+}
+
+@media (min-width: 768px) {
+  .settings-card {
+    padding: 1.1rem 1.25rem;
+  }
+}
+
 .module-card {
   padding: 1.5rem;
   background: white;

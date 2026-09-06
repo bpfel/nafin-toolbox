@@ -17,7 +17,6 @@ export const fr: Messages = {
   'nav.label': 'Sections',
   'privacy.hide': 'Masquer les montants',
   'privacy.show': 'Afficher les montants',
-  'menu.security': 'Sécurité',
   'menu.language': 'Langue',
   'menu.logout': 'Se déconnecter',
   'menu.users': 'Utilisateurs',
@@ -35,7 +34,6 @@ export const fr: Messages = {
   'action.cancel': 'Annuler',
   'action.save': 'Enregistrer',
   'action.delete': 'Supprimer',
-  'action.back': 'Retour',
   'action.reload': 'Recharger',
   'action.done': 'Terminé',
   'action.close': 'Fermer',
@@ -132,7 +130,6 @@ export const fr: Messages = {
   'address.country': 'Pays',
 
   // --- Security settings ---
-  'security.title': 'Paramètres de sécurité',
   'security.twofaTitle': 'Authentification à deux facteurs',
   'security.currentPasswordPlaceholder': 'Mot de passe actuel',
   'security.disablePrompt': 'Saisissez votre mot de passe pour désactiver la 2FA:',

@@ -17,7 +17,6 @@ export const it: Messages = {
   'nav.label': 'Sezioni',
   'privacy.hide': 'Nascondi importi',
   'privacy.show': 'Mostra importi',
-  'menu.security': 'Sicurezza',
   'menu.language': 'Lingua',
   'menu.logout': 'Esci',
   'menu.users': 'Utenti',
@@ -35,7 +34,6 @@ export const it: Messages = {
   'action.cancel': 'Annulla',
   'action.save': 'Salva',
   'action.delete': 'Elimina',
-  'action.back': 'Indietro',
   'action.reload': 'Ricarica',
   'action.done': 'Fatto',
   'action.close': 'Chiudi',
@@ -132,7 +130,6 @@ export const it: Messages = {
   'address.country': 'Paese',
 
   // --- Security settings ---
-  'security.title': 'Impostazioni di sicurezza',
   'security.twofaTitle': 'Autenticazione a due fattori',
   'security.currentPasswordPlaceholder': 'Password attuale',
   'security.disablePrompt': 'Inserisci la password per disattivare la 2FA:',

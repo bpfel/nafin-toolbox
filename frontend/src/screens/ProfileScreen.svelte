@@ -53,44 +53,49 @@
 </ScreenChrome>
 
 <div class="profile">
-  <div class="identity">
+  <div class="settings-card line">
     <span class="email">{email}</span>
     <span class="role-tag">{t(`role.${role}` as 'role.user')}</span>
   </div>
 
-  <ul class="rows">
-    <li class="row static">
-      <span>{t('menu.language')}</span>
-      <!--
-        The picker itself, not a link to it. It also floats over the signed-out
-        screens, where there is no bar to sit in and no profile to reach — that
-        is why it exists, and it keeps that second home.
-      -->
-      <LanguagePicker />
-    </li>
-  </ul>
+  <div class="settings-card line">
+    <span>{t('menu.language')}</span>
+    <!--
+      The picker itself, not a link to it. It also floats over the signed-out
+      screens, where there is no bar to sit in and no profile to reach — that
+      is why it exists, and it keeps that second home.
+    -->
+    <LanguagePicker />
+  </div>
 
+  <!-- Three more boxes, siblings of these two rather than a panel of their own. -->
   <SecuritySettings />
 </div>
 
 <style>
   /* A settings page, not a data screen. Left at the full 960px the content
-     column allows, four short rows read as a handful of things adrift in a
-     field of white — the layout says "sparse" where it should say "settled". */
+     column allows, a handful of short boxes read as things adrift in a field of
+     white — the layout says "sparse" where it should say "settled".
+
+     The gap is declared once here and every box on the page takes it, including
+     the three the security component contributes: that component is
+     `display: contents`, so its boxes are children of this flex column rather
+     than of a wrapper with spacing of its own. */
   .profile {
     max-width: 34rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
 
-  .identity {
+  /* A label on the left, the thing it names on the right. */
+  .line {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.9rem 1rem;
-    background: #fff;
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    margin-bottom: 1.25rem;
+    /* 44px, like the bar: these are thumb targets too. */
+    min-height: 44px;
   }
 
   .email {
@@ -111,47 +116,12 @@
     color: #155724;
   }
 
-  .rows {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1.5rem;
-    background: #fff;
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    width: 100%;
-    /* 44px, like the bar: these are thumb targets too. */
-    min-height: 44px;
-    padding: 0.6rem 1rem;
-    background: none;
-    border: none;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-  }
-
-
-
   @media (min-width: 768px) {
     /* Pointer targets can be smaller than a thumb's, but the type should not
        shrink with them — this is the screen people read rather than scan. */
-    .identity {
-      padding: 1.1rem 1.25rem;
+    .line {
+      min-height: 52px;
       font-size: 1.05rem;
     }
-
-    .row {
-      min-height: 52px;
-      padding: 0.8rem 1.25rem;
-      font-size: 1rem;
-    }
-
   }
 </style>
