@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { VaultAccount } from '../../../lib/crypto/vault'
+import type { AllocationPart } from '../../../lib/accounts/accountMath'
 
 // The dialog lazy-loads the encoder; stub it so the tests never pull in the QR
 // library. None of these tests generate a code.
@@ -9,6 +10,10 @@ vi.mock('../../../lib/qrbill/encode', () => ({
 }))
 
 import QRBillDialog from './QRBillDialog.svelte'
+import {
+  resetHidingAmounts,
+  toggleHidingAmounts,
+} from '../../../lib/util/privacy.svelte'
 
 function account(overrides: Partial<VaultAccount> = {}): VaultAccount {
   return {
@@ -30,6 +35,97 @@ function referenceTypeOptions(): string[] {
   const select = screen.getByLabelText('Reference type') as HTMLSelectElement
   return Array.from(select.options).map(o => o.value)
 }
+
+function part(overrides: Partial<AllocationPart> = {}): AllocationPart {
+  return {
+    entryId: 'e1',
+    entryName: 'Cantonal tax',
+    categoryName: 'Taxes',
+    type: 'bill',
+    required: '545.45',
+    targetAmount: '6000.00',
+    nextDueMonth: '2027-12',
+    ...overrides,
+  }
+}
+
+function openWith(parts: AllocationPart[]) {
+  return render(QRBillDialog, {
+    props: {
+      account: account({ iban: 'CH9300762011623852957', ibanKind: 'iban' }),
+      parts,
+      onclose: () => {},
+    },
+  })
+}
+
+describe('filling a QR bill from one of the account\'s allocations', () => {
+  test('is not offered when nothing saves into the account', () => {
+    openWith([])
+    expect(screen.queryByLabelText('Fill from an allocation')).toBeNull()
+  })
+
+  test('offers each allocation with the figure it is saving towards', () => {
+    openWith([
+      part(),
+      part({ entryId: 'e2', entryName: 'New car', targetAmount: '12000.00' }),
+    ])
+
+    const select = screen.getByLabelText('Fill from an allocation') as HTMLSelectElement
+    const labels = Array.from(select.options).map(o => (o.textContent ?? '').trim())
+
+    expect(labels[0]).toBe('Choose one…')
+    // The figure is shown so the amount is not a surprise once it lands.
+    expect(labels[1]).toContain('Cantonal tax')
+    expect(labels[1]).toMatch(/6.000\.00|6’000\.00|6'000\.00/)
+    expect(labels[2]).toContain('New car')
+  })
+
+  test('choosing one fills the amount and names it in the message', async () => {
+    openWith([part()])
+
+    const select = screen.getByLabelText('Fill from an allocation') as HTMLSelectElement
+    await fireEvent.change(select, { target: { value: 'e1' } })
+
+    expect((screen.getByLabelText(/Amount/) as HTMLInputElement).value).toBe('6000.00')
+    expect((screen.getByLabelText('Additional information') as HTMLInputElement).value).toBe(
+      'Cantonal tax',
+    )
+  })
+
+  test('drops the figure from the label while amounts are hidden', () => {
+    toggleHidingAmounts()
+    try {
+      openWith([part()])
+
+      const select = screen.getByLabelText('Fill from an allocation') as HTMLSelectElement
+      const label = (select.options[1].textContent ?? '').trim()
+
+      // Every other figure blurs in place. A native `<option>` refuses the
+      // styling that would blur it, so this one is omitted instead — a sharp
+      // figure among hidden ones is the failure the toggle exists to prevent.
+      expect(label).toBe('Cantonal tax')
+      expect(label).not.toMatch(/\d/)
+    } finally {
+      resetHidingAmounts()
+    }
+  })
+
+  test('lets go of the fields again, so they stay editable', async () => {
+    openWith([part()])
+
+    const select = screen.getByLabelText('Fill from an allocation') as HTMLSelectElement
+    await fireEvent.change(select, { target: { value: 'e1' } })
+
+    // The select resets rather than holding a selection, because it is a
+    // shortcut for filling two fields and not a state the bill is in.
+    expect(select.value).toBe('')
+
+    const amount = screen.getByLabelText(/Amount/) as HTMLInputElement
+    await fireEvent.input(amount, { target: { value: '250.00' } })
+    expect(amount.value).toBe('250.00')
+  })
+})
 
 describe('QRBillDialog reference type is constrained by the IBAN kind', () => {
   // Banks reject a bill whose reference type does not match the IBAN it is

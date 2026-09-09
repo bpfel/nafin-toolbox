@@ -335,9 +335,15 @@
 </div>
 
 {#if showGuide}
+  <!-- One mark, two paragraphs: what the figures mean, then what the controls
+       do. A second info mark beside the first would make the reader choose
+       between two things neither of which announces which question it answers,
+       and the controls became worth explaining the moment they lost their
+       words. -->
   <InfoModal
     title="accounts.guide.title"
     body="accounts.guide.body"
+    note="accounts.guide.controls"
     onclose={() => (showGuide = false)}
   />
 {/if}
@@ -357,7 +363,13 @@
 {/if}
 
 {#if qrTarget}
-  <QRBillDialog account={qrTarget} onclose={() => (qrTarget = null)} />
+  <!-- The bill pays into this account, so what it is saving towards is what
+       you would be paying in for. Taken off the same row the card reads. -->
+  <QRBillDialog
+    account={qrTarget}
+    parts={rows.find(r => r.account.id === qrTarget?.id)?.parts ?? []}
+    onclose={() => (qrTarget = null)}
+  />
 {/if}
 
 {#if allocatedRow}
