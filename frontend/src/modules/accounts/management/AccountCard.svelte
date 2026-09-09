@@ -6,6 +6,7 @@
   import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
   import { autofocus } from '../../../lib/util/autofocus'
+  import ActionButton from '../../../lib/nav/ActionButton.svelte'
 
   interface Props {
     account: VaultAccount
@@ -22,10 +23,12 @@
     onedit: () => void
     ondelete: () => void
     onqrbill: () => void
+    /** Opens the dialog that says what `required` is made of. */
+    onallocated: () => void
     oncorrect: (amount: string, atDate: string) => void
   }
 
-  let { account, projected, required, available, currentMonth, canDelete, canReorder, onedit, ondelete, onqrbill, oncorrect }: Props = $props()
+  let { account, projected, required, available, currentMonth, canDelete, canReorder, onedit, ondelete, onqrbill, onallocated, oncorrect }: Props = $props()
 
   const KIND_LABELS: Record<AccountKind, string> = {
     transactional: 'Transactional',
@@ -186,29 +189,119 @@
       </div>
     </div>
   {:else}
+    <!--
+      Squares, not text pills, and for the same reasons the screen's own strip
+      gave up on words: four labels of four widths read as four unrelated
+      things, and in German *Saldo korrigieren* and *QR-Rechnung* are wide
+      enough to wrap a card that is already in a fixed-width scrolling row.
+      `ActionButton` puts every label on `aria-label` and `title`, so nothing
+      that was said in words is lost — it is said on hover and to a reader.
+    -->
     <div class="actions">
-      <!-- Never gated: the anchor going stale is the failure the anchor pair
-           exists to avoid, so correcting it must always be one click away. -->
-      <button class="btn ghost" onclick={startCorrection}>{t('accounts.correct')}</button>
-      {#if editing}
-        <button class="btn ghost" onclick={onedit} aria-label={t('accounts.edit', { account: account.name })}>{t('action.edit')}</button>
-      {/if}
+      <!-- Reading what the figure above is made of. Never gated: it changes
+           nothing, and the figure is not much use unguarded by its parts. -->
+      <ActionButton label={t('accounts.allocatedFor', { account: account.name })} onclick={onallocated}>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+      </ActionButton>
+
+      <!-- Never gated either: the anchor going stale is the failure the anchor
+           pair exists to avoid, so correcting it must always be one click away.
+
+           Sliders rather than a pencil, which the screen's edit toggle above
+           already uses, and rather than a bill or a receipt — since v7 a *bill*
+           is one of the five entry types, and the dialog next door lists actual
+           ones. Borrowing the app's own noun to mean something else here would
+           be worse than a shape nobody has a name for. -->
+      <ActionButton label={t('accounts.correctFor', { account: account.name })} onclick={startCorrection}>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="3" y1="8" x2="21" y2="8" />
+          <line x1="3" y1="16" x2="21" y2="16" />
+          <circle cx="9" cy="8" r="2.5" />
+          <circle cx="15" cy="16" r="2.5" />
+        </svg>
+      </ActionButton>
+
       <!-- Generating a bill reads the account; it changes nothing. -->
       {#if qrCapable}
-        <button class="btn ghost" onclick={onqrbill} aria-label={t('accounts.qrbillFor', { account: account.name })}>
-          {t('accounts.qrbill')}
-        </button>
+        <ActionButton label={t('accounts.qrbillFor', { account: account.name })} onclick={onqrbill}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <!-- The three finder squares are what makes a QR code read as one
+                 at a glance; two modules are enough to suggest the rest. -->
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <path d="M14 14h3v3h-3z" fill="currentColor" />
+            <path d="M18 18h3v3h-3z" fill="currentColor" />
+          </svg>
+        </ActionButton>
       {/if}
+
       {#if editing}
-        <button
-          class="btn danger-ghost"
-          onclick={ondelete}
+        <!-- A pencil, which is free: the screen's edit control above has become
+             a tick by the time these appear, so the two are never both on
+             screen wearing the same shape. -->
+        <ActionButton label={t('accounts.edit', { account: account.name })} onclick={onedit}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+        </ActionButton>
+
+        <ActionButton
+          danger
           disabled={!canDelete}
-          aria-label={t('accounts.deleteOne', { account: account.name })}
-          title={canDelete ? undefined : t('accounts.lastCannotDelete')}
+          label={t('accounts.deleteOne', { account: account.name })}
+          hint={canDelete ? undefined : t('accounts.lastCannotDelete')}
+          onclick={ondelete}
         >
-          {t('action.delete')}
-        </button>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </ActionButton>
       {/if}
     </div>
   {/if}
@@ -381,11 +474,15 @@
     color: #c0392b;
     font-size: 0.8rem;
   }
+  /* The correction form's own Cancel/Save keep their words — they are a
+     decision to confirm, not a strip of tools — so this stays a flex row that
+     serves both those pills and the squares. */
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.25rem;
     justify-content: flex-end;
+    align-items: center;
   }
   .btn {
     padding: 0.4rem 0.8rem;
@@ -396,22 +493,6 @@
   .btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-  }
-  .ghost {
-    background: #f1f3f5;
-    border: 1px solid #dee2e6;
-    color: #333;
-  }
-  .ghost:hover:not(:disabled) {
-    background: #e9ecef;
-  }
-  .danger-ghost {
-    background: none;
-    border: 1px solid #f0c9c3;
-    color: #c0392b;
-  }
-  .danger-ghost:hover:not(:disabled) {
-    background: #fdecea;
   }
   .cancel {
     background: #f1f3f5;

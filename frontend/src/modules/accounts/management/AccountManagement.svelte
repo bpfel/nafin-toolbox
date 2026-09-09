@@ -4,6 +4,7 @@
   import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/accounts/accountsEngine'
   import {
+    allocationBreakdown,
     availableForAccount,
     projectedBalance,
     requiredForAccount,
@@ -18,6 +19,7 @@
   import AccountFormModal from './AccountFormModal.svelte'
   import DeleteAccountModal from './DeleteAccountModal.svelte'
   import QRBillDialog from './QRBillDialog.svelte'
+  import AllocatedDialog from './AllocatedDialog.svelte'
 
   // Everything the account form can set. Deliberately not id / currency /
   // currentAmount / lastCorrectedAt: the anchor pair moves only through
@@ -47,6 +49,10 @@
   let formAccount = $state<VaultAccount | null>(null)
   let deleteTarget = $state<VaultAccount | null>(null)
   let qrTarget = $state<VaultAccount | null>(null)
+  // Which account's Allocated figure is being read. The parts come off its row
+  // rather than being recomputed here, so the dialog cannot show a total that
+  // disagrees with the card behind it.
+  let allocatedTarget = $state<string | null>(null)
   let error = $state<string | null>(null)
 
   // The three figures are derived on every read — nothing here is stored.
@@ -58,8 +64,24 @@
       projected: projectedBalance(vault, account.id, currentMonth),
       required: requiredForAccount(vault, account.id, currentMonth),
       available: availableForAccount(vault, account.id, currentMonth),
+      // What that `required` is made of. `requiredForAccount` is defined as the
+      // sum of exactly this, so the dialog is showing the calculation rather
+      // than a second opinion about it.
+      parts: allocationBreakdown(vault, account.id, currentMonth),
     }))
   })
+
+  /**
+   * The row the Allocated dialog is reading, or null when it is closed.
+   *
+   * Held as an id and looked up rather than captured as an object: correcting a
+   * balance rebuilds `rows`, and a captured row would go on showing the figures
+   * as they were when the dialog opened. An account deleted underneath it
+   * closes the dialog instead of leaving it stale.
+   */
+  let allocatedRow = $derived(
+    allocatedTarget === null ? null : (rows.find(r => r.account.id === allocatedTarget) ?? null),
+  )
 
   // The row across the bottom. Summed in integer cents — adding the decimal
   // strings as floats would drift, and 0.10 + 0.20 landing on 0.30000000000004
@@ -303,6 +325,7 @@
           onedit={() => openEdit(row.account)}
           ondelete={() => (deleteTarget = row.account)}
           onqrbill={() => (qrTarget = row.account)}
+          onallocated={() => (allocatedTarget = row.account.id)}
           oncorrect={(amount, atDate) => correct(row.account.id, amount, atDate)}
         />
       {/each}
@@ -335,6 +358,15 @@
 
 {#if qrTarget}
   <QRBillDialog account={qrTarget} onclose={() => (qrTarget = null)} />
+{/if}
+
+{#if allocatedRow}
+  <AllocatedDialog
+    accountName={allocatedRow.account.name}
+    parts={allocatedRow.parts}
+    total={allocatedRow.required}
+    onclose={() => (allocatedTarget = null)}
+  />
 {/if}
 
 <style>

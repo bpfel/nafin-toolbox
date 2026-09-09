@@ -5,7 +5,7 @@ import {
   type VaultEntry,
   type VaultData,
 } from '../crypto/vault'
-import { fromCents, monthsBetween, requiredForItem, toCents } from './reserveMath'
+import { fromCents, monthsBetween, nextDue, requiredForItem, toCents } from './reserveMath'
 
 // Per-account figures, derived on every read. Nothing here writes to the vault:
 // the account holds an anchor pair (`currentAmount` as at `lastCorrectedAt`) and
@@ -22,26 +22,83 @@ function findAccount(vault: VaultData, accountId: string): VaultAccount {
 
 // --- Required ---------------------------------------------------------------
 
-// A shortfall is a property of the account, not of any one item, so individual
-// obligations and amortizations are never tracked separately against a balance —
-// they sum into a single figure for whichever account they sink into.
+/** One line of what an account's required amount is made of. */
+export interface AllocationPart {
+  entryId: string
+  entryName: string
+  /** The budget heading the entry sits under, for context in a long list. */
+  categoryName: string
+  type: 'bill' | 'purchase'
+  /** What should already be aside this month. These sum to the account total. */
+  required: string
+  /** The whole figure being saved towards, so a part reads as progress. */
+  targetAmount: string
+  /**
+   * The month the bill falls due. Null for a purchase, which has no date: its
+   * anchor is the start of the cycle, not a deadline, and past the full period
+   * the requirement simply stays at the target until the user buys the thing.
+   */
+  nextDueMonth: string | null
+}
+
+// What the account's required amount is made of, biggest part first.
+//
+// This is the definition; `requiredForAccount` is its sum. Written the other way
+// round the two could disagree — a filter tightened in one and not the other —
+// and a total that does not match the list under it is worse than no list.
 //
 // Archived entries are excluded: archiving a reserve is how the user says the
-// obligation is gone, and it must lower the account's required amount.
-export function requiredForAccount(
+// bill is gone, and it must lower the account's required amount.
+export function allocationBreakdown(
   vault: VaultData,
   accountId: string,
   currentMonth: string,
-): string {
+): AllocationPart[] {
   findAccount(vault, accountId)
 
-  let cents = 0
+  const categoryNames = new Map(vault.budget.categories.map(c => [c.id, c.name]))
+
+  const parts: AllocationPart[] = []
   for (const entry of vault.budget.entries) {
     if (entry.archived) continue
     if (!entry.reserve) continue
     if (!savesTowardsTarget(entry.type)) continue
     if (entry.sinkAccountId !== accountId) continue
-    cents += toCents(requiredForItem(entry.type, entry.reserve, currentMonth))
+
+    parts.push({
+      entryId: entry.id,
+      entryName: entry.name,
+      categoryName: categoryNames.get(entry.categoryId) ?? '',
+      type: entry.type,
+      required: requiredForItem(entry.type, entry.reserve, currentMonth),
+      targetAmount: entry.reserve.targetAmount,
+      nextDueMonth:
+        entry.type === 'bill'
+          ? nextDue(entry.reserve.anchorMonth, entry.reserve.periodMonths, currentMonth)
+          : null,
+    })
+  }
+
+  // Biggest first: the question the list answers is "what is most of this?".
+  // Name breaks ties so the order is stable rather than however the entries
+  // happen to sit in the vault.
+  return parts.sort(
+    (a, b) =>
+      toCents(b.required) - toCents(a.required) || a.entryName.localeCompare(b.entryName),
+  )
+}
+
+// A shortfall is a property of the account, not of any one item, so individual
+// bills and purchases are never tracked separately against a balance — they sum
+// into a single figure for whichever account they sink into.
+export function requiredForAccount(
+  vault: VaultData,
+  accountId: string,
+  currentMonth: string,
+): string {
+  let cents = 0
+  for (const part of allocationBreakdown(vault, accountId, currentMonth)) {
+    cents += toCents(part.required)
   }
   return fromCents(cents)
 }

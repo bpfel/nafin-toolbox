@@ -1,5 +1,10 @@
 import { describe, test, expect } from 'vitest'
-import { requiredForAccount, projectedBalance, availableForAccount } from './accountMath'
+import {
+  allocationBreakdown,
+  requiredForAccount,
+  projectedBalance,
+  availableForAccount,
+} from './accountMath'
 import type {
   ReserveDefinition,
   VaultAccount,
@@ -123,6 +128,119 @@ describe('requiredForAccount', () => {
   test('rejects an unknown account', () => {
     const vault = vaultWith([account(MAIN)], [])
     expect(() => requiredForAccount(vault, 'nope', '2027-01')).toThrow(/unknown account/)
+  })
+})
+
+describe('allocationBreakdown', () => {
+  // Three reserves into Reserves, deliberately out of size order in the vault.
+  function vault() {
+    return {
+      version: 7 as const,
+      budget: {
+        categories: [
+          { id: 'cat-tax', name: 'Taxes', side: 'expense' as const, sortOrder: 10 },
+          { id: 'cat-car', name: 'Transport', side: 'expense' as const, sortOrder: 20 },
+        ],
+        entries: [
+          entry('small', {
+            name: 'Radio licence',
+            type: 'bill',
+            categoryId: 'cat-tax',
+            sinkAccountId: RESERVES,
+            reserve: reserve({ targetAmount: '360.00', periodMonths: 12, anchorMonth: '2026-12' }),
+          }),
+          entry('big', {
+            name: 'Cantonal tax',
+            type: 'bill',
+            categoryId: 'cat-tax',
+            sinkAccountId: RESERVES,
+            reserve: reserve({ targetAmount: '6000.00', periodMonths: 12, anchorMonth: '2026-12' }),
+          }),
+          entry('car', {
+            name: 'New car',
+            type: 'purchase',
+            categoryId: 'cat-car',
+            sinkAccountId: RESERVES,
+            reserve: reserve({ targetAmount: '12000.00', periodMonths: 24, anchorMonth: '2026-12' }),
+          }),
+        ],
+        plan: [],
+        snapshots: [],
+      },
+      accounts: [account(MAIN), account(RESERVES)],
+    }
+  }
+
+  test('names every part, biggest first', () => {
+    const parts = allocationBreakdown(vault(), RESERVES, '2027-01')
+
+    expect(parts.map(p => p.entryName)).toEqual(['Cantonal tax', 'New car', 'Radio licence'])
+    expect(parts.map(p => p.required)).toEqual(['545.45', '500.00', '32.73'])
+  })
+
+  test('carries the heading each entry sits under', () => {
+    const parts = allocationBreakdown(vault(), RESERVES, '2027-01')
+    expect(parts.map(p => p.categoryName)).toEqual(['Taxes', 'Transport', 'Taxes'])
+  })
+
+  test('carries the target, so a part reads as progress rather than a bare figure', () => {
+    const [biggest] = allocationBreakdown(vault(), RESERVES, '2027-01')
+    expect(biggest.targetAmount).toBe('6000.00')
+    expect(biggest.required).toBe('545.45')
+  })
+
+  test('dates a bill and refuses to date a purchase', () => {
+    const parts = allocationBreakdown(vault(), RESERVES, '2027-01')
+    const byName = new Map(parts.map(p => [p.entryName, p]))
+
+    expect(byName.get('Cantonal tax')?.nextDueMonth).toBe('2027-12')
+    // A purchase anchors the start of its cycle, not a deadline.
+    expect(byName.get('New car')?.nextDueMonth).toBeNull()
+  })
+
+  test('always sums to the figure on the card', () => {
+    const v = vault()
+    for (const month of ['2026-12', '2027-01', '2027-06', '2028-03']) {
+      const summed = allocationBreakdown(v, RESERVES, month).reduce(
+        (total, part) => total + Math.round(Number(part.required) * 100),
+        0,
+      )
+      const shown = Math.round(Number(requiredForAccount(v, RESERVES, month)) * 100)
+      // The total is defined as this sum, so the two cannot drift apart. This
+      // is the invariant that lets the modal claim it shows the calculation.
+      expect(summed).toBe(shown)
+    }
+  })
+
+  test('leaves out the archived, the unreserved, and another account\'s', () => {
+    const v = vault()
+    v.budget.entries.push(
+      entry('gone', {
+        name: 'Old tax',
+        type: 'bill',
+        archived: true,
+        sinkAccountId: RESERVES,
+        reserve: reserve(),
+      }),
+      entry('groceries', { name: 'Groceries', sinkAccountId: null }),
+      entry('elsewhere', {
+        name: 'Holiday',
+        type: 'bill',
+        sinkAccountId: MAIN,
+        reserve: reserve(),
+      }),
+    )
+
+    const names = allocationBreakdown(v, RESERVES, '2027-01').map(p => p.entryName)
+    expect(names).toEqual(['Cantonal tax', 'New car', 'Radio licence'])
+  })
+
+  test('is empty for an account nothing saves into', () => {
+    expect(allocationBreakdown(vault(), MAIN, '2027-01')).toEqual([])
+  })
+
+  test('rejects an unknown account', () => {
+    expect(() => allocationBreakdown(vault(), 'nope', '2027-01')).toThrow(/unknown account/)
   })
 })
 

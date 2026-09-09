@@ -78,6 +78,62 @@ beforeEach(() => {
 // registers and rendered screens would otherwise stack up in one document.
 afterEach(cleanup)
 
+describe('reading what Allocated is made of', () => {
+  function vaultWithReserves(): VaultData {
+    const v = vault(account('main', 'Main'), account('res', 'Reserves'))
+    v.budget.categories = [{ id: 'g1', name: 'Taxes', side: 'expense', sortOrder: 0 }]
+    v.budget.entries = [
+      dueReserve('tax', 'res', '3000.00'),
+      dueReserve('radio', 'res', '360.00'),
+      // Sinks elsewhere, so it must not appear under Reserves.
+      dueReserve('holiday', 'main', '900.00'),
+    ]
+    return v
+  }
+
+  test('the control is there without edit mode — reading changes nothing', () => {
+    store.vault = vaultWithReserves()
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    expect(screen.getByRole('button', { name: 'What is allocated on Reserves' })).toBeTruthy()
+  })
+
+  test('opens a dialog naming only the parts that sink into that account', async () => {
+    store.vault = vaultWithReserves()
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    screen.getByRole('button', { name: 'What is allocated on Reserves' }).click()
+    await tick()
+
+    expect(screen.getByRole('dialog', { name: 'Allocated on Reserves' })).toBeTruthy()
+    expect(screen.getByText('tax reserve')).toBeTruthy()
+    expect(screen.getByText('radio reserve')).toBeTruthy()
+    expect(screen.queryByText('holiday reserve')).toBeNull()
+  })
+
+  test("the dialog's total is the figure on the card behind it", async () => {
+    store.vault = vaultWithReserves()
+    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    screen.getByRole('button', { name: 'What is allocated on Reserves' }).click()
+    await tick()
+
+    // Both bills are due this month, so the whole of each target is required.
+    const total = container.querySelector('.total-figure .money')
+    expect((total?.textContent ?? '').replace(/[^\d.-]/g, '')).toBe('3360.00')
+  })
+
+  test('an account nothing saves into still opens, and says so', async () => {
+    store.vault = vault(account('main', 'Main'))
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    screen.getByRole('button', { name: 'What is allocated on Main' }).click()
+    await tick()
+
+    expect(screen.getByText(/Nothing saves into this account/)).toBeTruthy()
+  })
+})
+
 describe('AccountManagement delete affordance', () => {
   // `deleteAccount` throws on the last remaining account — the vault invariant
   // is that at least one always exists. The UI must not offer an action whose
@@ -191,13 +247,13 @@ describe('AccountManagement edit mode', () => {
     store.vault = vault(account('a', 'Main'))
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
-    expect(screen.getAllByRole('button', { name: 'Correct balance' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Correct the balance of Main' })).toHaveLength(1)
 
     cleanup()
     editMode()
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
-    expect(screen.getAllByRole('button', { name: 'Correct balance' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Correct the balance of Main' })).toHaveLength(1)
   })
 
   test('toggling edit mode after render takes effect without a remount', async () => {
