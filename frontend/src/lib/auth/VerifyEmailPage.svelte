@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
   import { verifyEmail } from './authStore.svelte'
+  import { autofocus } from '../util/autofocus'
 
   interface Props {
     onVerified?: () => void
@@ -80,6 +81,7 @@
         <label>
           {t('field.password')}
           <input
+            use:autofocus
             type="password"
             bind:value={password}
             required

@@ -5,6 +5,7 @@
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
+  import { autofocus } from '../../../lib/util/autofocus'
 
   interface Props {
     account: VaultAccount
@@ -154,7 +155,11 @@
       <div class="correction-fields">
         <label class="field">
           <span class="label">{t('accounts.balance')}</span>
+          <!-- Opened by a button press, with the old balance already in it.
+               The caret lands after that figure rather than selecting it — see
+               `autofocus`. -->
           <input
+            use:autofocus
             type="text"
             inputmode="decimal"
             enterkeyhint="done"
