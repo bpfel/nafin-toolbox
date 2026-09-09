@@ -84,9 +84,12 @@
 
 <style>
   main {
-    /* Room at the foot for two fixed layers — the navigation and the action
-       strip above it — plus whatever the home indicator takes. */
-    padding: 1.5rem var(--app-gutter) calc(8rem + env(safe-area-inset-bottom, 0));
+    /* Room at the foot for the navigation and whatever the home indicator
+       takes. It used to reserve 8rem for two fixed layers; the action strip is
+       pinned to the top now, so the second one is gone and roughly fifty
+       pixels of every phone page came back. */
+    padding: 1.5rem var(--app-gutter)
+      calc(var(--app-nav-height) + 2rem + env(safe-area-inset-bottom, 0));
   }
 
   .screen[hidden] {

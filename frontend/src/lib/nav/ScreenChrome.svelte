@@ -190,23 +190,41 @@
     border: 0;
   }
 
+  /*
+   * One toolbar, pinned to the top, at every width.
+   *
+   * The phone strip used to be fixed just above the navigation, in the half of
+   * the screen a thumb covers — persistent, like this, but at the other edge.
+   * Two mechanisms for one property, and the two widths disagreed about which
+   * edge the screen's controls live on.
+   *
+   * The reach argument for the bottom was real and is what is being traded
+   * away: these controls are now at the far end of a one-handed stretch. What
+   * is bought is one bar in one place, and the foot of every phone page back —
+   * `main` no longer reserves room for a second fixed layer down there.
+   */
   .screen-actions {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 
-    /* Phone: fixed just above the navigation, in the half of the screen a thumb
-       actually covers. It never scrolls away, which is what the header was
-       chosen for — and unlike the header it can be reached one-handed. */
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(var(--app-nav-height) + env(safe-area-inset-bottom, 0px));
+    position: sticky;
+    top: 0;
     z-index: 39;
-    padding: 0.4rem 1rem;
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(6px);
-    border-top: 1px solid #ececec;
+
+    /* Content passes underneath, so the strip needs a ground of its own.
+       Opaque rather than the frosted panel the phone bar used to be: text
+       scrolling under a translucent bar moves behind the icons, and a control
+       has to stay legible while the page slides past it.
+
+       It bleeds out to the shell's gutter and pads itself back, because the
+       accounts row is deliberately a few pixels wider than the content box to
+       leave its cards room for their shadows — without this a card edge shows
+       alongside the toolbar as it passes under. */
+    background: var(--ground);
+    margin: 0 calc(-1 * var(--app-gutter)) 1rem;
+    padding: 0.5rem var(--app-gutter);
+    border-bottom: 1px solid #ececec;
   }
 
   .spacer {
@@ -223,49 +241,11 @@
     color: #e67e22;
   }
 
-
-
-
-
-
-
-
   @media (min-width: 768px) {
-    /*
-     * Wide: a toolbar at the top of the content, the same trade the navigation
-     * makes when it becomes a rail. Bottom-anchored controls solve a reach
-     * problem a mouse does not have.
-     *
-     * Sticky rather than static, though, because *reach* and *persistence* are
-     * two properties and only the first one is about the pointer. The phone
-     * strip is fixed so it never scrolls away; making it static up here dropped
-     * that as a side effect of dropping the anchoring, and inverted it — the
-     * platform where scrolling back for a control is easiest kept the control,
-     * and the one with the longest pages lost it.
-     */
+    /* Wider gutter, and room to breathe. Everything else is already shared. */
     .screen-actions {
-      position: sticky;
-      top: 0;
-      /* The phone rule pins all three other edges. Left to stand they would go
-         on constraining a sticky box, which honours them too — `bottom` alone
-         would have it cling to the foot of the screen as well. */
-      left: auto;
-      right: auto;
-      bottom: auto;
-
-      /* Content passes underneath now, so the strip needs a ground of its own
-         rather than the transparency a static toolbar could afford. It bleeds
-         into the shell's gutter and pads itself back: the accounts row is
-         deliberately a few pixels wider than the content box, to leave its
-         cards room for their shadows, and without the bleed a card edge would
-         show alongside the toolbar as it passed under. */
-      background: var(--ground);
-      margin: 0 calc(-1 * var(--app-gutter)) 1.25rem;
       padding: 0.75rem var(--app-gutter);
-      backdrop-filter: none;
-
-      border-top: none;
-      border-bottom: 1px solid #ececec;
+      margin-bottom: 1.25rem;
     }
   }
 </style>
