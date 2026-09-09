@@ -76,10 +76,9 @@ nafin-toolbox/
 │   │   ├── database/               # PostgreSQL connection (pgx) + migration runner
 │   │   ├── auth/                   # Authentication: handlers, store, middleware, TOTP, rate limiting, audit
 │   │   ├── email/                  # SMTP client + HTML email templates
-│   │   ├── module/                 # Module type + NetWorthContributor interface
+│   │   ├── apierror/               # Error codes the frontend translates
 │   │   └── vault/                  # E2EE vault storage: encrypted MEK + vault blobs
-│   └── migrations/
-│       └── 001_init.sql            # Full schema (users, sessions, audit_log, modules, vaults)
+│   └── migrations/                 # 001_init, then three that retire what the shell dropped
 ├── frontend/
 │   ├── Dockerfile
 │   ├── nginx.conf                  # Serves SPA + proxies /api/ to Go
@@ -96,22 +95,30 @@ nafin-toolbox/
 │       │   ├── api/client.ts       # Typed API client
 │       │   ├── auth/               # Auth UI components + authStore
 │       │   ├── crypto/             # E2EE: key derivation, vault encrypt/decrypt, vaultStore
-│       │   └── budget/             # Budget engine: categories, periods, entries, BFS defaults
+│       │   ├── budget/             # Budget engine: categories, entries, plan, snapshots
+│       │   ├── accounts/           # Account, reserve and routing math (all pure)
+│       │   ├── i18n/               # Five locales + the untranslated scan
+│       │   └── util/               # Money, privacy, edit mode, focus trap, swipe
 │       └── modules/
-│           └── budget/             # Budget module UI (table, summary, modals, setup)
+│           ├── budget/             # Budget UI (table, summary, modals, snapshots)
+│           └── accounts/           # management/ (cards, forms) + allocations/ (routing)
 ```
 
 ### How to add a new module (backend)
 1. Create `internal/<module>/` with `handler.go`, `model.go`, `store.go`
 2. Add a migration in `migrations/`
 3. Register routes in `server.go` under `/api/<module>`
-4. Optionally implement `NetWorthContributor` for net worth aggregation
+
+There is no module registry to enrol in — `internal/module/` and the `modules` table
+were both retired when the picker was. A backend package exists only if the module needs
+the server for something the vault cannot do.
 
 ### How to add a new module (frontend)
 1. Create `src/modules/<module>/` with Svelte components
 2. Add engine/logic to `src/lib/<module>/` if needed
 3. Add API functions to `lib/api/client.ts` for any backend endpoints
-4. Wire into App.svelte (or future router)
+4. Add a destination in `lib/nav/destinations.ts` and a screen in `src/screens/` — but only
+   once the feature behind it exists (see **Empty is not the same as unbuilt**)
 5. For E2EE modules: store data in the vault (`VaultData` in `lib/crypto/vault.ts`), not via backend API
 
 ## Investment Valuation Strategy
@@ -125,12 +132,11 @@ nafin-toolbox/
 - `users` — email, password_hash, role (admin/user), verification, TOTP secrets
 - `sessions` — hashed session tokens, expiry, user association
 - `audit_log` — security event log (user_id nullable for anonymization)
-- `modules` — enabled module registry per user
 - `user_vaults` — encrypted vault blobs (opaque to server)
 
-### Encrypted Vault (frontend, inside `VaultData`, currently v6)
+### Encrypted Vault (frontend, inside `VaultData`, currently v7)
 
-**Naming, since it changed twice and older commits will read differently.**
+**Naming, since it changed three times and older commits will read differently.**
 
 A **category** is a heading — Housing, Employment. An **entry** is a line under
 it — Rent, Salary. Before v5 these were called a *group* and a *category*, which
@@ -144,13 +150,32 @@ meant a packaged copy — and made "archive the plan" read as retiring it.
 Anything written before v6 means the old word. Note `entry.archived` is
 unrelated: that is the flag that hides a budget entry.
 
-- `VaultCategory` — name, type (income/expense), sort order
-- `VaultEntry` — name, type, sort order, archived flag, `categoryId`, routing
-  (`sourceAccountId` / `sinkAccountId`), optional reserve
+An entry has one of **five types**, not two. Before v7 it was income or expense
+and a separate `ReserveDefinition.kind` said which kind of saving it was;
+*obligation* and *amortization* were the two kinds, and both were unusable in a
+Swiss app — *obligation* is the ordinary French and German word for a bond, and
+*Amortisation* is paying down mortgage principal. They are **`bill`** ("a bill
+that will arrive") and **`purchase`** ("something to replace") now. Anything
+written before v7 means the old words, and means `category.type` where the field
+is `category.side`.
+
+- `EntryType` — `income | expense | savings | bill | purchase`. Three helpers in
+  `vault.ts` read it so nothing branches on the literals: `sideOf` (which half of
+  the budget), `holdsMoney` (leaves the account but not the net worth — savings,
+  bill, purchase), `savesTowardsTarget` (carries a `reserve` — bill, purchase)
+- `VaultCategory` — name, **`side`** (income/expense), sort order. A heading's
+  side and an entry's type could not both be called `type` once the second grew
+  past two values: a Housing heading holds Rent and a roof fund alike
+- `VaultEntry` — name, `type`, sort order, archived flag, `categoryId`, routing
+  (`sourceAccountId` / `sinkAccountId`), optional `reserve`
+- `ReserveDefinition` — `targetAmount`, `periodMonths`, `anchorMonth`. No `kind`:
+  the entry type is the discriminator, so the schedule is recorded once and
+  `reserveMath` branches on the type directly
 - `VaultPlanEntry` — `entryId`, planned amount. One standing plan, not per month
 - `VaultSnapshot` — a named copy of the plan; its lines are denormalised to
   `entryName` / `categoryName` so they survive a later rename or delete
-- `VaultAccount` — name, kind, currency, current amount, last corrected at
+- `VaultAccount` — name, kind, currency, `currentAmount` as at `lastCorrectedAt`
+  (an anchor pair, never a running total), optional bank/IBAN/holder for QR bills
 
 ### Future modules (not yet implemented)
 - `Account` — name, type (bank/savings/cash), currency, balance

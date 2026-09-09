@@ -4,7 +4,17 @@ Written 2026-08-16, revised the same day after review. Supersedes
 `gamification-achievements-plan.md` and the wizard on `feature/onboarding` (PR #8, closed),
 both of which predate the accounts module and the E2EE vault as it now stands.
 
-**Status: plan only. Nothing here is built.**
+**Status: not on `develop`. A first pass exists, unpushed and stale.**
+
+`feature/onboarding-progression` carries one commit from 2026-08-17 — the knowledge
+library, `ProgressionPanel`, `UnlockToast` and `ObligationSetup`, about 21,500 lines. It has
+never been pushed, and it was written against vault **v5** and the stacked-module `App.svelte`
+that the four-screen shell replaced.
+
+Do not rebase it. Everything it names has since been renamed out from under it: `ArchivePanel`
+and `ArchiveEditor` became snapshots in v6, `ObligationSetup` became a bill in v7, and its
++385 lines of `vault.ts` collide with two migrations written after it. Read it for what it
+decided; write the code again against what is on `develop` now.
 
 ---
 
