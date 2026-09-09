@@ -213,6 +213,8 @@ export const it: Messages = {
   'entry.addTypeTitle': 'Aggiungi una voce di {type}',
   'entry.add': 'Aggiungi',
   'entry.category': 'Categoria',
+  'entry.addOne': 'Aggiungi una voce',
+  'entry.chooseType': 'Che tipo di voce?',
   'entryType.income': 'Entrata',
   'entryType.expense': 'Uscita',
   'entryType.savings': 'Risparmio',

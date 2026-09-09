@@ -1,5 +1,7 @@
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/svelte'
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
+// Type-only, so it is erased and does not reach the mocked module below.
+import type { User } from './authStore.svelte'
 
 const target = {
   id: 7,
@@ -11,12 +13,12 @@ const target = {
   created_at: '2026-01-01T00:00:00Z',
 }
 
-function member(id: number, role: 'admin' | 'user'): typeof target {
+function member(id: number, role: User['role']): User {
   return { ...target, id, email: `user${id}@example.ch`, role }
 }
 
 // Read at call time by the mock below, so a test can set the roster it wants.
-let roster: (typeof target)[] = [target]
+let roster: User[] = [target]
 
 const deleteUser = vi.fn().mockResolvedValue(null)
 

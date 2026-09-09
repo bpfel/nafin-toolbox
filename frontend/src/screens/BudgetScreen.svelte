@@ -14,10 +14,36 @@
    * question does not arise and the control would toggle nothing visible.
    */
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
+
+  /**
+   * The budget module, so the strip's "+" can start a new line.
+   *
+   * The same arrangement the accounts screen has, and for the same reason:
+   * adding is the ordinary thing a person comes here to do, so it sits with the
+   * screen's other controls rather than only at the foot of one of five
+   * sections — which is where it was, and which meant scrolling to the right
+   * section before you could add to it.
+   */
+  let budget = $state<{ openAddEntry: () => void } | null>(null)
 </script>
 
 <ScreenChrome title={t('nav.budget')} editKey="budget">
   {#snippet children()}
+    <ActionButton label={t('entry.addOne')} onclick={() => budget?.openAddEntry()}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    </ActionButton>
+
     <!--
       The number of months it is showing: 1 or 12. A digit rather than a word,
       because there is no icon for "switch to yearly" and *Month* / *Year* is a
@@ -38,7 +64,7 @@
   {/snippet}
 </ScreenChrome>
 
-<BudgetModule bind:viewMode />
+<BudgetModule bind:this={budget} bind:viewMode />
 
 <style>
   .period {

@@ -197,6 +197,8 @@ export const de: Messages = {
   'entry.editTitle': 'Eintrag bearbeiten',
   'entry.addTitle': 'Eintrag hinzufügen',
   'entry.category': 'Kategorie',
+  'entry.addOne': 'Budgetzeile hinzufügen',
+  'entry.chooseType': 'Welche Art von Zeile?',
   'entryType.income': 'Einnahme',
   'entryType.expense': 'Ausgabe',
   'entryType.savings': 'Sparen',

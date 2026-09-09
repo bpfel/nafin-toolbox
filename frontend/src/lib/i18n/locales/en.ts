@@ -210,6 +210,8 @@ export const en = {
   'entry.editTitle': 'Edit entry',
   'entry.addTitle': 'Add entry',
   'entry.category': 'Category',
+  'entry.addOne': 'Add a budget line',
+  'entry.chooseType': 'What kind of line?',
   'entryType.income': 'Income',
   'entryType.expense': 'Expense',
   'entryType.savings': 'Savings',

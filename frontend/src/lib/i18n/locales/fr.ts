@@ -213,6 +213,8 @@ export const fr: Messages = {
   'entry.addTypeTitle': 'Ajouter une entrée de {type}',
   'entry.add': 'Ajouter',
   'entry.category': 'Catégorie',
+  'entry.addOne': 'Ajouter une ligne',
+  'entry.chooseType': 'Quel type de ligne ?',
   'entryType.income': 'Revenu',
   'entryType.expense': 'Dépense',
   'entryType.savings': 'Épargne',

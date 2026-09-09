@@ -12,6 +12,7 @@
   import InfoModal from '../../lib/nav/InfoModal.svelte'
   import { TYPE_GUIDES } from '../../lib/budget/typeGuide'
   import AddEntryModal from './AddEntryModal.svelte'
+  import AddEntryTypeSheet from './AddEntryTypeSheet.svelte'
   import DeleteEntryModal from './DeleteEntryModal.svelte'
   import EditCategoryModal from './EditCategoryModal.svelte'
 
@@ -140,6 +141,19 @@
   function categoriesForType(type: EntryType): { name: string; id: string }[] {
     const categories = sideOf(type) === 'income' ? incomeCategories : expenseCategories
     return categories.map(g => ({ name: g.categoryName, id: g.categoryId }))
+  }
+
+  /**
+   * Asks which kind of line, then opens the form for it.
+   *
+   * Called by the screen above, which owns the "+" in the action strip. The
+   * per-section "+" rows skip this: pressing one has already said which type,
+   * because of where it is.
+   */
+  let choosingType = $state(false)
+
+  export function openAddEntry() {
+    choosingType = true
   }
 
   function openAddModal(type: EntryType, presetCategoryName?: string) {
@@ -350,6 +364,16 @@
 
 {#if guideType}
   <InfoModal {...TYPE_GUIDES[guideType]} onclose={() => (guideType = null)} />
+{/if}
+
+{#if choosingType}
+  <AddEntryTypeSheet
+    onchoose={(type) => {
+      choosingType = false
+      openAddModal(type)
+    }}
+    onclose={() => (choosingType = false)}
+  />
 {/if}
 
 {#if addModalContext}
