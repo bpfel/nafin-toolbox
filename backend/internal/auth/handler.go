@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -787,12 +788,25 @@ func HandleDeleteAccount(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		deps.Store.LogAudit(r.Context(), &user.ID, AuditUserDeleted, r, map[string]any{"self": true})
-
-		if err := deps.Store.DeleteUser(r.Context(), user.ID); err != nil {
+		// Refused for the only remaining admin, password or no password. An app
+		// with no administrator cannot invite, administer or promote anybody,
+		// and no endpoint can put it right — see DeleteUserGuardingLastAdmin.
+		if err := deps.Store.DeleteUserGuardingLastAdmin(r.Context(), user.ID); err != nil {
+			if errors.Is(err, ErrLastAdmin) {
+				apierror.Write(w, apierror.Auth, http.StatusConflict, "cannot delete the last administrator")
+				return
+			}
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
+
+		// Logged after the fact, and anonymously. The audit row used to be
+		// written first and then have its user_id nulled by the foreign key's
+		// ON DELETE SET NULL; writing it afterwards with no user reaches the
+		// same row without claiming a deletion that had not happened yet. The
+		// id is deliberately not preserved in the metadata — nulling it is the
+		// anonymisation the column was made nullable for.
+		deps.Store.LogAudit(r.Context(), nil, AuditUserDeleted, r, map[string]any{"self": true})
 
 		http.SetCookie(w, &http.Cookie{
 			Name: "session", Value: "", Path: "/",
@@ -826,14 +840,23 @@ func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserDeleted, r, map[string]any{
-			"deleted_user_id": targetID,
-		})
-
-		if err := deps.Store.DeleteUser(r.Context(), targetID); err != nil {
+		// The caller cannot be the target here — that is refused above — so this
+		// only bites when the target is some *other* account that happens to be
+		// the last admin, which is possible whenever the caller is not one.
+		if err := deps.Store.DeleteUserGuardingLastAdmin(r.Context(), targetID); err != nil {
+			if errors.Is(err, ErrLastAdmin) {
+				apierror.Write(w, apierror.Auth, http.StatusConflict, "cannot delete the last administrator")
+				return
+			}
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
+
+		// After the fact: the caller survives their own request, so the audit
+		// row keeps them, and it no longer records a deletion that was refused.
+		deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserDeleted, r, map[string]any{
+			"deleted_user_id": targetID,
+		})
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})

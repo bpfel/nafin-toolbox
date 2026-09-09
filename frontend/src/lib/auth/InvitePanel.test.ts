@@ -11,11 +11,18 @@ const target = {
   created_at: '2026-01-01T00:00:00Z',
 }
 
+function member(id: number, role: 'admin' | 'user'): typeof target {
+  return { ...target, id, email: `user${id}@example.ch`, role }
+}
+
+// Read at call time by the mock below, so a test can set the roster it wants.
+let roster: (typeof target)[] = [target]
+
 const deleteUser = vi.fn().mockResolvedValue(null)
 
 vi.mock('./authStore.svelte', () => ({
   inviteUser: vi.fn(),
-  listUsers: vi.fn(async () => [target]),
+  listUsers: vi.fn(async () => roster),
   deleteUser: (id: number) => deleteUser(id),
   resendVerification: vi.fn(),
   adminResetPassword: vi.fn(),
@@ -30,6 +37,7 @@ describe('InvitePanel deletion safeguard', () => {
 
   beforeEach(() => {
     deleteUser.mockClear()
+    roster = [target]
   })
 
   test('the Delete button opens the safeguard instead of deleting', async () => {
@@ -54,5 +62,35 @@ describe('InvitePanel deletion safeguard', () => {
 
     await waitFor(() => expect(deleteUser).toHaveBeenCalledWith(target.id))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+})
+
+describe('InvitePanel will not offer to delete the last admin', () => {
+  afterEach(cleanup)
+
+  // The server refuses this regardless — see DeleteUserGuardingLastAdmin. An
+  // app with no admin has no invitations, no user administration and no way to
+  // promote anybody, because a role is fixed when the account is made.
+  test('the only admin has a disabled Delete, and says why', async () => {
+    roster = [member(2, 'admin'), member(7, 'user')]
+    render(InvitePanel, { props: {} })
+
+    const buttons = await screen.findAllByRole('button', { name: 'Delete' })
+    expect(buttons).toHaveLength(2)
+
+    expect((buttons[0] as HTMLButtonElement).disabled).toBe(true)
+    expect(buttons[0].getAttribute('title')).toBe('The last administrator cannot be deleted')
+
+    // The ordinary user beside them is unaffected: it is the admin roster that
+    // must not empty, not the users table.
+    expect((buttons[1] as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  test('with two admins, either may go', async () => {
+    roster = [member(2, 'admin'), member(3, 'admin')]
+    render(InvitePanel, { props: {} })
+
+    const buttons = await screen.findAllByRole('button', { name: 'Delete' })
+    expect(buttons.map(b => (b as HTMLButtonElement).disabled)).toEqual([false, false])
   })
 })
