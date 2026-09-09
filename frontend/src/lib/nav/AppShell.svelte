@@ -86,7 +86,7 @@
   main {
     /* Room at the foot for two fixed layers — the navigation and the action
        strip above it — plus whatever the home indicator takes. */
-    padding: 1.5rem 1rem calc(8rem + env(safe-area-inset-bottom, 0));
+    padding: 1.5rem var(--app-gutter) calc(8rem + env(safe-area-inset-bottom, 0));
   }
 
   .screen[hidden] {
@@ -102,7 +102,7 @@
 
     main {
       /* Nothing is over the bottom edge up here, so no room is kept for it. */
-      padding: 2rem;
+      padding: var(--app-gutter);
     }
   }
 </style>

@@ -231,17 +231,41 @@
 
 
   @media (min-width: 768px) {
-    /* Wide: an ordinary toolbar at the top of the content, the same trade the
-       navigation makes when it becomes a rail. Bottom-anchored controls solve a
-       reach problem a mouse does not have. */
+    /*
+     * Wide: a toolbar at the top of the content, the same trade the navigation
+     * makes when it becomes a rail. Bottom-anchored controls solve a reach
+     * problem a mouse does not have.
+     *
+     * Sticky rather than static, though, because *reach* and *persistence* are
+     * two properties and only the first one is about the pointer. The phone
+     * strip is fixed so it never scrolls away; making it static up here dropped
+     * that as a side effect of dropping the anchoring, and inverted it — the
+     * platform where scrolling back for a control is easiest kept the control,
+     * and the one with the longest pages lost it.
+     */
     .screen-actions {
-      position: static;
-      padding: 0 0 0.75rem;
-      background: none;
+      position: sticky;
+      top: 0;
+      /* The phone rule pins all three other edges. Left to stand they would go
+         on constraining a sticky box, which honours them too — `bottom` alone
+         would have it cling to the foot of the screen as well. */
+      left: auto;
+      right: auto;
+      bottom: auto;
+
+      /* Content passes underneath now, so the strip needs a ground of its own
+         rather than the transparency a static toolbar could afford. It bleeds
+         into the shell's gutter and pads itself back: the accounts row is
+         deliberately a few pixels wider than the content box, to leave its
+         cards room for their shadows, and without the bleed a card edge would
+         show alongside the toolbar as it passed under. */
+      background: var(--ground);
+      margin: 0 calc(-1 * var(--app-gutter)) 1.25rem;
+      padding: 0.75rem var(--app-gutter);
       backdrop-filter: none;
+
       border-top: none;
       border-bottom: 1px solid #ececec;
-      margin-bottom: 1.25rem;
     }
   }
 </style>
