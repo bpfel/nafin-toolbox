@@ -73,6 +73,8 @@ vi.mock('./lib/util/buildVersion.svelte', () => ({
 }))
 
 import App from './App.svelte'
+import { navigate } from './lib/nav/router.svelte'
+import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
 
 const admin = { id: 1, email: 'admin@example.ch', role: 'admin', must_change_password: false }
 const user = { id: 2, email: 'anna@example.ch', role: 'user', must_change_password: false }
@@ -158,5 +160,55 @@ describe('the shell', () => {
     window.dispatchEvent(new PopStateEvent('popstate'))
 
     await waitFor(() => expect(screen.queryByText('User Management')).toBeNull())
+  })
+})
+
+/**
+ * Edit mode is an unlock, not work in progress.
+ *
+ * The two money screens stay mounted behind `hidden` so a half-typed amount
+ * survives a tab switch — which meant an armed delete button survived it too,
+ * and was still armed on a later visit the user had no reason to connect to the
+ * one where they pressed Edit.
+ */
+describe('edit mode across a change of screen', () => {
+  beforeEach(() => at('/'))
+
+  afterEach(() => {
+    cleanup()
+    at('/')
+    currentUser = null
+    clearEditing()
+  })
+
+  test('leaving a screen puts it back into read-only', async () => {
+    currentUser = user
+    at('/budget')
+    render(App)
+    await waitFor(() => expect(window.location.pathname).toBe('/budget'))
+
+    toggleEditing('budget')
+    expect(isEditing('budget')).toBe(true)
+
+    navigate('/accounts')
+
+    await waitFor(() => expect(isEditing('budget')).toBe(false))
+  })
+
+  test('a sub-tab is the same screen, so edit mode survives it', async () => {
+    // Both tabs share the `accounts` key, so treating `/accounts` →
+    // `/accounts/allocations` as leaving would switch the screen off underneath
+    // someone who is still standing on it.
+    currentUser = user
+    at('/accounts')
+    render(App)
+    await waitFor(() => expect(window.location.pathname).toBe('/accounts'))
+
+    toggleEditing('accounts')
+
+    navigate('/accounts/allocations')
+    await waitFor(() => expect(window.location.pathname).toBe('/accounts/allocations'))
+
+    expect(isEditing('accounts')).toBe(true)
   })
 })
