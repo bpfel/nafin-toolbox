@@ -44,6 +44,14 @@
    */
   --app-rail-width: 0px;
 
+  /*
+   * The shell's side padding. Named because a second thing depends on it: the
+   * sticky action strip bleeds out to exactly this to lay its own ground under
+   * whatever scrolls beneath it, and a gutter changed in one place and not the
+   * other shows as a strip narrower than the page it covers.
+   */
+  --app-gutter: 1rem;
+
   /* ---------------------------------------------------------------------
    * Colour
    *
@@ -132,6 +140,7 @@
   :root {
     --app-nav-height: 0px;
     --app-rail-width: 190px;
+    --app-gutter: 2rem;
   }
 }
 

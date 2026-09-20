@@ -81,6 +81,7 @@ var codes = map[string]string{
 	// --- Administering other users ---
 	Auth + "|cannot delete yourself via admin endpoint":         "AUTH-040",
 	Auth + "|cannot reset your own password via admin endpoint": "AUTH-041",
+	Auth + "|cannot delete the last administrator":              "AUTH-042",
 
 	// --- Validation surfaced from the engine ---
 	Auth + "|validation": "AUTH-050",

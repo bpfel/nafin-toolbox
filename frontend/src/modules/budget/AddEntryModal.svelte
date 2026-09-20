@@ -8,6 +8,7 @@
     type VaultData,
   } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { autofocus } from '../../lib/util/autofocus'
   import { formatAmount, parseAmount } from '../../lib/util/money'
   import { monthNames } from '../../lib/util/months'
 
@@ -342,7 +343,10 @@
 
     <label class="field">
       <span class="label">{t('field.name')}</span>
+      <!-- Not the first control in the dialog — the category select above is,
+           and it already holds a sensible value. This is the empty one. -->
       <input
+        use:autofocus
         type="text"
         bind:value={name}
         placeholder={t('entry.namePlaceholder')}

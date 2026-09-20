@@ -8,6 +8,7 @@
   import RecoveryKeyScreen from './lib/auth/RecoveryKeyScreen.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
   import { clearEditing } from './lib/util/editMode.svelte'
+  import { autofocus } from './lib/util/autofocus'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
@@ -255,6 +256,7 @@
           <label>
             {t('vault.recoveryKeyLabel')}
             <input
+              use:autofocus
               type="text"
               bind:value={recoveryKey}
               placeholder="XXXX-XXXX-XXXX-..."
@@ -288,6 +290,7 @@
           <label>
             {t('field.password')}
             <input
+              use:autofocus
               type="password"
               bind:value={unlockPassword}
               disabled={unlocking}

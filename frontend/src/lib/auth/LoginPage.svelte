@@ -2,6 +2,7 @@
   import { t } from '../i18n/index.svelte'
   import { login, setup, verify2FA, getAuthState } from './authStore.svelte'
   import TOTPInput from './TOTPInput.svelte'
+  import { autofocus } from '../util/autofocus'
 
   let { onSuccess }: { onSuccess: () => void } = $props()
 
@@ -85,6 +86,7 @@
           <label>
             {t('field.recoveryCode')}
             <input
+              use:autofocus
               type="text"
               bind:value={recoveryCode}
               required
@@ -131,6 +133,7 @@
         <label>
           {t('field.email')}
           <input
+            use:autofocus
             type="email"
             bind:value={email}
             required

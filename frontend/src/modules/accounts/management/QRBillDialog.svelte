@@ -2,11 +2,15 @@
   import { t } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { QRAddress, VaultAccount } from '../../../lib/crypto/vault'
+  import type { AllocationPart } from '../../../lib/accounts/accountMath'
+  import { formatAmount } from '../../../lib/util/money'
+  import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import type { QRBillRequest, ReferenceType, ValidationError } from '../../../lib/qrbill/types'
   import { buildPayload } from '../../../lib/qrbill/payload'
   import { validate } from '../../../lib/qrbill/validate'
   import { normalizeAmount, moneyInput } from '../../../lib/util/money'
   import { renderQRSvg } from '../../../lib/qrbill/svg'
+  import { billMessage } from '../../../lib/qrbill/message'
   import { focusTrap } from '../../../lib/util/focusTrap'
   import InfoButton from '../../../lib/nav/InfoButton.svelte'
   import InfoModal from '../../../lib/nav/InfoModal.svelte'
@@ -14,10 +18,19 @@
   interface Props {
     /** Always the creditor: the bill pays money into this account. */
     account: VaultAccount
+    /**
+     * What this account is saving towards, biggest first.
+     *
+     * The bill pays *into* the account, so its allocations are the reason you
+     * would be paying in at all — and their targets are figures the user has
+     * already entered once, in the budget. Retyping one into a payment slip is
+     * how a digit gets dropped.
+     */
+    parts?: AllocationPart[]
     onclose: () => void
   }
 
-  let { account, onclose }: Props = $props()
+  let { account, parts = [], onclose }: Props = $props()
 
   // Lazy: the QR library is the heaviest thing in the module and is only worth
   // downloading for someone who actually opens this dialog. The dialog is
@@ -47,6 +60,27 @@
   )
   let reference = $state('')
   let additionalInfo = $state('')
+
+  /**
+   * Fills the amount and the message from one of the account's allocations.
+   *
+   * One month of it, not the whole target. A bill paid *into* a savings account
+   * is the month's contribution — the thing a person does twelve times a year,
+   * and the reason they wanted a slip rather than a calculator. The target is
+   * what the account is working towards over a period of months; putting that
+   * on a payment slip asks for the lot at once.
+   *
+   * It fills the fields and then lets go — the select resets, and both fields
+   * stay ordinary editable inputs. A control that kept ownership of them would
+   * have to decide what happens when you edit one afterwards, and every answer
+   * to that is worse than not asking.
+   */
+  function fillFromAllocation(entryId: string): void {
+    const part = parts.find(p => p.entryId === entryId)
+    if (!part) return
+    amount = part.monthlyAmount
+    additionalInfo = billMessage(part.entryName)
+  }
 
   let showDebtor = $state(false)
   let debtorName = $state('')
@@ -182,6 +216,45 @@
       <p class="notice">
         {t('qrbill.noAddress')}
       </p>
+    {/if}
+
+    {#if parts.length > 0}
+      <!--
+        Only when there is something to pick. An account nothing saves into gets
+        the plain amount field it always had, rather than an empty select
+        explaining that it is empty.
+
+        A select rather than a row of buttons: an account can be saving towards
+        a dozen things, and this is a shortcut for filling two fields, not a
+        decision the dialog is about.
+      -->
+      <label class="field">
+        <span class="label">{t('qrbill.fromAllocation')}</span>
+        <select
+          value=""
+          onchange={(e) => {
+            fillFromAllocation(e.currentTarget.value)
+            // Let go of the fields again — see fillFromAllocation.
+            e.currentTarget.value = ''
+          }}
+        >
+          <option value="">{t('qrbill.fromAllocationNone')}</option>
+          {#each parts as part (part.entryId)}
+            <!--
+              Omitted rather than blurred while amounts are hidden. Everywhere
+              else a figure carries `.amount-hidden` and blurs in place, but an
+              `<option>` renders as a native menu item that browsers refuse to
+              style — a blur would be ignored and the figure would sit sharp
+              among its hidden neighbours, which is the exact failure the
+              hide-amounts toggle exists to prevent. Where it cannot be
+              obscured, it is not printed.
+            -->
+            <option value={part.entryId}>
+              {part.entryName}{amountsHidden() ? '' : ` — ${formatAmount(part.monthlyAmount)}`}
+            </option>
+          {/each}
+        </select>
+      </label>
     {/if}
 
     <label class="field">

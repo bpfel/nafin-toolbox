@@ -359,7 +359,7 @@ describe('AllocationScreen edit mode', () => {
     expect(screen.getByText(/leaves your accounts/)).toBeTruthy()
   })
 
-  // The row splits into general information (name, kind, amount, flow) and
+  // The row splits into general information (name, amount, flow) and
   // detail (reserve status, timing, purchase). The rule between the two only
   // exists when there is a detail half to separate.
   test('only a row with a detail half gets the separator', async () => {

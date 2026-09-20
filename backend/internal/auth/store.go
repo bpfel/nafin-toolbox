@@ -136,9 +136,73 @@ func (s *Store) SetTOTPEnabled(ctx context.Context, userID int, enabled bool) er
 	return err
 }
 
+// DeleteUser removes a user with no checks at all.
+//
+// Nothing that serves a request may call this: it will happily delete the only
+// account able to administer the app. Handlers use
+// DeleteUserGuardingLastAdmin. This stays for test fixtures, which create and
+// tear down admins deliberately.
 func (s *Store) DeleteUser(ctx context.Context, userID int) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
 	return err
+}
+
+// ErrLastAdmin says the deletion was refused because it would leave the app
+// with nobody able to administer it.
+var ErrLastAdmin = fmt.Errorf("cannot delete the last administrator")
+
+// DeleteUserGuardingLastAdmin removes a user unless that would leave no admin.
+//
+// **There is no way back from a zero-admin app.** A role is fixed when the
+// account is created and no endpoint changes one, so an app whose last admin is
+// gone has no invitations, no user administration, no audit log and no way to
+// promote anybody — it can only be repaired by editing the database by hand.
+//
+// Counted and deleted under one advisory lock, the way CreateFirstUser guards
+// the first account. Row locks cannot do this job: two admins deleting each
+// other touch different rows, so nothing makes them wait for one another, and
+// both would read two admins, both proceed, and both succeed. The count and the
+// delete have to be a single decision.
+//
+// Deleting a user that is already gone is not an error, matching DeleteUser.
+func (s *Store) DeleteUserGuardingLastAdmin(ctx context.Context, userID int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// A different key from CreateFirstUser's: this serialises changes to the
+	// admin roster, which is a different question from whether setup has run.
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(3)`); err != nil {
+		return fmt.Errorf("advisory lock: %w", err)
+	}
+
+	var role string
+	err = tx.QueryRowContext(ctx, `SELECT role FROM users WHERE id = $1`, userID).Scan(&role)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("reading role: %w", err)
+	}
+
+	if role == RoleAdmin {
+		var admins int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM users WHERE role = $1`, RoleAdmin,
+		).Scan(&admins); err != nil {
+			return fmt.Errorf("counting admins: %w", err)
+		}
+		if admins <= 1 {
+			return ErrLastAdmin
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID); err != nil {
+		return fmt.Errorf("deleting user: %w", err)
+	}
+	return tx.Commit()
 }
 
 func (s *Store) UserCount(ctx context.Context) (int, error) {

@@ -7,6 +7,21 @@
   const authState = getAuthState()
 
   let users = $state<User[]>([])
+
+  /**
+   * The last admin cannot be deleted, and the server refuses it whatever this
+   * says — see DeleteUserGuardingLastAdmin. This only stops the button being
+   * offered for something that is going to be turned down.
+   *
+   * An app with no admin has no invitations, no user administration and no way
+   * to promote anybody, because a role is fixed when the account is made. It is
+   * repairable only in the database by hand.
+   */
+  let lastAdmin = $derived(
+    users.filter(u => u.role === 'admin').length <= 1
+      ? (users.find(u => u.role === 'admin')?.id ?? null)
+      : null,
+  )
   let email = $state('')
   let role = $state<'admin' | 'user'>('user')
   let error = $state<string | null>(null)
@@ -175,7 +190,10 @@
                   <button
                     class="btn-small btn-danger-small"
                     onclick={() => askDelete(u)}
-                    disabled={deleting === u.id}
+                    disabled={deleting === u.id || u.id === lastAdmin}
+                    title={u.id === lastAdmin
+                      ? 'The last administrator cannot be deleted'
+                      : undefined}
                   >
                     {deleting === u.id ? 'Deleting...' : 'Delete'}
                   </button>

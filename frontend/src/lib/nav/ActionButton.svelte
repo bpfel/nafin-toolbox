@@ -24,6 +24,23 @@
     pressed?: boolean
     /** Destructive or irreversible. Signing out, for now. */
     danger?: boolean
+    /**
+     * Present but not available, with `label` saying why.
+     *
+     * Kept rather than hidden where the control's absence would itself be
+     * confusing: the last remaining account cannot be deleted, and a delete
+     * button that vanishes on the second-to-last deletion reads as a bug.
+     */
+    disabled?: boolean
+    /**
+     * Why it is unavailable, shown on hover after the label.
+     *
+     * Separate from `label` so the accessible name still says what the control
+     * *is*. A disabled button renamed to its own excuse — "the last remaining
+     * account cannot be deleted" — leaves a screen reader user knowing the
+     * reason for something they can no longer identify.
+     */
+    hint?: string
     onclick: (event: MouseEvent) => void
     /** For the hold-to-peek eye; nothing else needs them. */
     onpointerdown?: () => void
@@ -37,6 +54,8 @@
     label,
     pressed,
     danger = false,
+    disabled = false,
+    hint,
     onclick,
     onpointerdown,
     onpointerup,
@@ -52,7 +71,8 @@
   class:danger
   aria-label={label}
   aria-pressed={pressed}
-  title={label}
+  title={hint ? `${label} — ${hint}` : label}
+  {disabled}
   {onclick}
   {onpointerdown}
   {onpointerup}
@@ -89,10 +109,15 @@
     -webkit-touch-callout: none;
   }
 
+  .action:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
   /* `background: none` again, not redundantly: app.css styles `button:hover`
      dark green, and an element-plus-pseudo-class outranks a plain class for
      that property. Without this every control in the strip fills in on hover. */
-  .action:hover {
+  .action:hover:not(:disabled) {
     background: #f1f3f5;
     color: #1a1a2e;
   }
@@ -103,7 +128,7 @@
     color: #2d6a4f;
   }
 
-  .action.danger:hover {
+  .action.danger:hover:not(:disabled) {
     background: #fdecea;
     color: #c0392b;
   }

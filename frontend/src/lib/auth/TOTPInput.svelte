@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
+  import { autofocus } from '../util/autofocus'
   let { value = $bindable(''), disabled = false, onSubmit }: {
     value: string
     disabled?: boolean
@@ -24,7 +25,10 @@
   }
 </script>
 
+<!-- The code is already on the phone in your hand. Nothing else on this
+     screen is worth focusing instead. -->
 <input
+  use:autofocus
   type="text"
   inputmode="numeric"
   autocomplete="one-time-code"

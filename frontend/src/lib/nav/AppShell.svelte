@@ -1,5 +1,7 @@
 <script lang="ts">
   import { getRoute, replace } from './router.svelte'
+  import type { Screen } from './router.svelte'
+  import { clearEditing } from '../util/editMode.svelte'
   import { destinationsFor, landingPathFor } from './destinations'
   import AppNav from './AppNav.svelte'
   import BudgetScreen from '../../screens/BudgetScreen.svelte'
@@ -41,6 +43,31 @@
     if (route.screen === 'home' || !reachable.has(route.screen)) {
       replace(landingPathFor(role))
     }
+  })
+
+  /**
+   * Leaving a screen puts it back into read-only.
+   *
+   * The money screens stay mounted rather than being destroyed (see the comment
+   * on the markup below), which is what keeps a half-typed amount and an open
+   * disclosure alive across a switch. Edit mode is the one part of that state
+   * which should not survive the trip: it is an unlock, not work in progress.
+   * Coming back to Accounts should not find its delete buttons still armed from
+   * a visit the user has since forgotten making.
+   *
+   * The comparison against the last screen is what makes this a change of
+   * *screen* rather than of address. Underneath the route is a single
+   * `pathname`, so `/accounts` → `/accounts/allocations` wakes this effect too
+   * — and a sub-tab is the same screen, which is why both tabs answer to the
+   * one `accounts` key. Deriving the screen is not on its own enough to stop
+   * that; the effect still runs, and only this guard makes it a no-op.
+   */
+  let screen = $derived(route.screen)
+  let lastScreen: Screen | null = null
+  $effect(() => {
+    if (screen === lastScreen) return
+    lastScreen = screen
+    clearEditing()
   })
 </script>
 
@@ -84,9 +111,12 @@
 
 <style>
   main {
-    /* Room at the foot for two fixed layers — the navigation and the action
-       strip above it — plus whatever the home indicator takes. */
-    padding: 1.5rem 1rem calc(8rem + env(safe-area-inset-bottom, 0));
+    /* Room at the foot for the navigation and whatever the home indicator
+       takes. It used to reserve 8rem for two fixed layers; the action strip is
+       pinned to the top now, so the second one is gone and roughly fifty
+       pixels of every phone page came back. */
+    padding: 1.5rem var(--app-gutter)
+      calc(var(--app-nav-height) + 2rem + env(safe-area-inset-bottom, 0));
   }
 
   .screen[hidden] {
@@ -102,7 +132,7 @@
 
     main {
       /* Nothing is over the bottom edge up here, so no room is kept for it. */
-      padding: 2rem;
+      padding: var(--app-gutter);
     }
   }
 </style>

@@ -60,6 +60,18 @@
 
   let { viewMode = $bindable('monthly') }: Props = $props()
 
+  /**
+   * Passed straight through from the screen's "+" to the table that owns the
+   * form. The module is in the middle of that chain and holds nothing of its
+   * own here — the button belongs with the screen's other controls, the form
+   * belongs with the vault it writes to.
+   */
+  let table = $state<{ openAddEntry: () => void } | null>(null)
+
+  export function openAddEntry() {
+    table?.openAddEntry()
+  }
+
   let confirmingReset = $state(false)
 
   function handleReset() {
@@ -88,6 +100,7 @@
       <BudgetSummary {summary} {viewMode} />
     {/if}
     <BudgetTable
+      bind:this={table}
       bind:viewMode
       entries={summary.entries}
       vault={vaultState.vault}

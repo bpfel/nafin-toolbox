@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
   import { createCopier } from '../util/copier.svelte'
+  import { autofocus } from '../util/autofocus'
 
   interface Props {
     recoveryKey: string
@@ -90,7 +91,11 @@
 
         <label class="field">
           <span class="label">{t('recoveryKey.label')}</span>
+          <!-- The step exists to be typed or pasted into, and it is reached by
+               pressing a button that then disappears — so nothing else on it
+               has any claim on the caret. -->
           <input
+            use:autofocus
             type="text"
             bind:value={typed}
             autocomplete="off"
