@@ -64,8 +64,11 @@
   /**
    * Fills the amount and the message from one of the account's allocations.
    *
-   * The target rather than what is aside so far: this is a slip for paying the
-   * thing, and the figure on it should be the figure being saved towards.
+   * One month of it, not the whole target. A bill paid *into* a savings account
+   * is the month's contribution — the thing a person does twelve times a year,
+   * and the reason they wanted a slip rather than a calculator. The target is
+   * what the account is working towards over a period of months; putting that
+   * on a payment slip asks for the lot at once.
    *
    * It fills the fields and then lets go — the select resets, and both fields
    * stay ordinary editable inputs. A control that kept ownership of them would
@@ -75,7 +78,7 @@
   function fillFromAllocation(entryId: string): void {
     const part = parts.find(p => p.entryId === entryId)
     if (!part) return
-    amount = part.targetAmount
+    amount = part.monthlyAmount
     additionalInfo = billMessage(part.entryName)
   }
 
@@ -247,7 +250,7 @@
               obscured, it is not printed.
             -->
             <option value={part.entryId}>
-              {part.entryName}{amountsHidden() ? '' : ` — ${formatAmount(part.targetAmount)}`}
+              {part.entryName}{amountsHidden() ? '' : ` — ${formatAmount(part.monthlyAmount)}`}
             </option>
           {/each}
         </select>

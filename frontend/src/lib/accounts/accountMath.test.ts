@@ -416,3 +416,55 @@ describe('availableForAccount', () => {
     expect(availableForAccount(vault, RESERVES, '2026-12')).toBe('-1100.00')
   })
 })
+
+describe('the monthly figure on a part', () => {
+  // A bill funds itself a month early, so it saves over one month fewer than
+  // its cycle and the monthly rate is target/(period - 1). A purchase has no
+  // date to be early for and divides by the whole period. The two diverge, and
+  // a caller dividing by `periodMonths` itself would be wrong for every bill.
+  function breakdownOf(e: VaultEntry) {
+    return allocationBreakdown(
+      vaultWith([account(MAIN), account(RESERVES, { kind: 'reserves' })], [e]),
+      RESERVES,
+      '2026-12',
+    )[0]
+  }
+
+  test('a bill divides by the months it actually saves over', () => {
+    const part = breakdownOf(
+      entry('tax', {
+        type: 'bill',
+        sinkAccountId: RESERVES,
+        reserve: reserve({ targetAmount: '6000.00', periodMonths: 12 }),
+      }),
+    )
+
+    // 6000 over 11 months, not 12.
+    expect(part.monthlyAmount).toBe('545.45')
+    expect(part.targetAmount).toBe('6000.00')
+  })
+
+  test('a purchase divides by the whole period', () => {
+    const part = breakdownOf(
+      entry('car', {
+        type: 'purchase',
+        sinkAccountId: RESERVES,
+        reserve: reserve({ targetAmount: '12000.00', periodMonths: 24 }),
+      }),
+    )
+
+    expect(part.monthlyAmount).toBe('500.00')
+  })
+
+  test('a monthly bill keeps a one-month window rather than dividing by zero', () => {
+    const part = breakdownOf(
+      entry('rent', {
+        type: 'bill',
+        sinkAccountId: RESERVES,
+        reserve: reserve({ targetAmount: '1350.00', periodMonths: 1 }),
+      }),
+    )
+
+    expect(part.monthlyAmount).toBe('1350.00')
+  })
+})

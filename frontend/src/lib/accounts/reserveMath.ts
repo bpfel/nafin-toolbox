@@ -117,6 +117,39 @@ export function nextDue(anchorMonth: string, periodMonths: number, currentMonth:
 const BILL_LEAD_MONTHS = 1
 
 /**
+ * The months a reserve actually has to save over.
+ *
+ * A bill funds itself `BILL_LEAD_MONTHS` early, so it saves over one month
+ * fewer than its cycle; a purchase has no date to be early for and saves over
+ * the whole of it. Shared by the running requirement and the monthly rate
+ * rather than restated in each, so the two cannot drift: the rate is the figure
+ * a user pays in every month to arrive exactly where `requiredForItem` says
+ * they should be.
+ */
+function savingMonthsFor(type: 'bill' | 'purchase', periodMonths: number): number {
+  return type === 'bill' ? Math.max(1, periodMonths - BILL_LEAD_MONTHS) : periodMonths
+}
+
+/**
+ * One month of this reserve — what to pay in, rather than what it all comes to.
+ *
+ * The target is the figure being saved towards over a period of months; this is
+ * that divided by the months there are to do it in. It is the figure a standing
+ * order would carry, which is why the QR bill fills with it.
+ */
+export function monthlyForItem(
+  type: 'bill' | 'purchase',
+  reserve: ReserveDefinition,
+): string {
+  assertPeriod(reserve.periodMonths)
+  return fromCents(
+    roundHalfAwayFromZero(
+      toCents(reserve.targetAmount) / savingMonthsFor(type, reserve.periodMonths),
+    ),
+  )
+}
+
+/**
  * How much of the target should already be aside this month.
  *
  * Takes the entry's type rather than reading a `kind` off the reserve: since v7
@@ -144,7 +177,7 @@ export function requiredForItem(
   // lands `BILL_LEAD_MONTHS` before it falls due. A period short enough that the
   // lead would consume it entirely (a monthly bill) keeps a one-month window
   // rather than dividing by zero.
-  const savingMonths = Math.max(1, periodMonths - BILL_LEAD_MONTHS)
+  const savingMonths = savingMonthsFor('bill', periodMonths)
   const monthsUntilDue = monthsBetween(currentMonth, nextDue(anchorMonth, periodMonths, currentMonth))
   const elapsed = clamp(periodMonths - monthsUntilDue, 0, savingMonths)
 

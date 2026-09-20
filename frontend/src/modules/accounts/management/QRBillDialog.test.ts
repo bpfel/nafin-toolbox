@@ -44,6 +44,7 @@ function part(overrides: Partial<AllocationPart> = {}): AllocationPart {
     type: 'bill',
     required: '545.45',
     targetAmount: '6000.00',
+    monthlyAmount: '545.45',
     nextDueMonth: '2027-12',
     ...overrides,
   }
@@ -65,29 +66,34 @@ describe('filling a QR bill from one of the account\'s allocations', () => {
     expect(screen.queryByLabelText('Fill from an allocation')).toBeNull()
   })
 
-  test('offers each allocation with the figure it is saving towards', () => {
+  test('offers each allocation with the month it would pay in', () => {
     openWith([
       part(),
-      part({ entryId: 'e2', entryName: 'New car', targetAmount: '12000.00' }),
+      part({ entryId: 'e2', entryName: 'New car', monthlyAmount: '1000.00' }),
     ])
 
     const select = screen.getByLabelText('Fill from an allocation') as HTMLSelectElement
     const labels = Array.from(select.options).map(o => (o.textContent ?? '').trim())
 
     expect(labels[0]).toBe('Choose one…')
-    // The figure is shown so the amount is not a surprise once it lands.
+    // The figure is shown so the amount is not a surprise once it lands — and
+    // it is the monthly one, so the label and the field it fills agree.
     expect(labels[1]).toContain('Cantonal tax')
-    expect(labels[1]).toMatch(/6.000\.00|6’000\.00|6'000\.00/)
+    expect(labels[1]).toContain('545.45')
+    expect(labels[1]).not.toMatch(/6.000\.00|6’000\.00|6'000\.00/)
     expect(labels[2]).toContain('New car')
   })
 
-  test('choosing one fills the amount and names it in the message', async () => {
+  test('choosing one fills one month of it, not the whole target', async () => {
+    // A slip paid into a savings account is this month's contribution. The
+    // target is what the account is working towards over a period of months;
+    // putting that on the slip asks for the lot at once.
     openWith([part()])
 
     const select = screen.getByLabelText('Fill from an allocation') as HTMLSelectElement
     await fireEvent.change(select, { target: { value: 'e1' } })
 
-    expect((screen.getByLabelText(/Amount/) as HTMLInputElement).value).toBe('6000.00')
+    expect((screen.getByLabelText(/Amount/) as HTMLInputElement).value).toBe('545.45')
     expect((screen.getByLabelText('Additional information') as HTMLInputElement).value).toBe(
       'Cantonal tax',
     )

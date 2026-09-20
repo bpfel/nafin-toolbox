@@ -19,6 +19,7 @@ function part(overrides: Partial<AllocationPart> = {}): AllocationPart {
     type: 'bill',
     required: '545.45',
     targetAmount: '6000.00',
+    monthlyAmount: '545.45',
     nextDueMonth: '2027-12',
     ...overrides,
   }

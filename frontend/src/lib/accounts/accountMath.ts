@@ -5,7 +5,7 @@ import {
   type VaultEntry,
   type VaultData,
 } from '../crypto/vault'
-import { fromCents, monthsBetween, nextDue, requiredForItem, toCents } from './reserveMath'
+import { fromCents, monthlyForItem, monthsBetween, nextDue, requiredForItem, toCents } from './reserveMath'
 
 // Per-account figures, derived on every read. Nothing here writes to the vault:
 // the account holds an anchor pair (`currentAmount` as at `lastCorrectedAt`) and
@@ -33,6 +33,15 @@ export interface AllocationPart {
   required: string
   /** The whole figure being saved towards, so a part reads as progress. */
   targetAmount: string
+  /**
+   * One month of it — what a standing order or a QR bill would carry.
+   *
+   * Kept beside the target rather than left to the caller to divide: the months
+   * to divide by are not `periodMonths` for a bill, which funds itself a month
+   * early, and a caller working that out for itself is a caller that will get
+   * it wrong. See `monthlyForItem`.
+   */
+  monthlyAmount: string
   /**
    * The month the bill falls due. Null for a purchase, which has no date: its
    * anchor is the start of the cycle, not a deadline, and past the full period
@@ -72,6 +81,7 @@ export function allocationBreakdown(
       type: entry.type,
       required: requiredForItem(entry.type, entry.reserve, currentMonth),
       targetAmount: entry.reserve.targetAmount,
+      monthlyAmount: monthlyForItem(entry.type, entry.reserve),
       nextDueMonth:
         entry.type === 'bill'
           ? nextDue(entry.reserve.anchorMonth, entry.reserve.periodMonths, currentMonth)
