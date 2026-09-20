@@ -3,7 +3,6 @@
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
   import SecuritySettings from '../lib/auth/SecuritySettings.svelte'
   import LanguagePicker from '../lib/nav/LanguagePicker.svelte'
-  import ActionButton from '../lib/nav/ActionButton.svelte'
 
   /**
    * Everything about the person rather than their money.
@@ -27,30 +26,7 @@
   let { email, role, onlogout }: Props = $props()
 </script>
 
-<ScreenChrome title={t('nav.profile')} eye={false}>
-  {#snippet children()}
-    <!--
-      Signing out acts on the whole app, not on anything in the list below it,
-      so it sits with the screen's controls rather than at the end of the
-      content — where reaching it meant scrolling past everything else.
-    -->
-    <ActionButton label={t('menu.logout')} danger onclick={onlogout}>
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-        <polyline points="16 17 21 12 16 7" />
-        <line x1="21" y1="12" x2="9" y2="12" />
-      </svg>
-    </ActionButton>
-  {/snippet}
-</ScreenChrome>
+<ScreenChrome title={t('nav.profile')} eye={false} />
 
 <div class="profile">
   <div class="settings-card line">
@@ -70,6 +46,24 @@
 
   <!-- Three more boxes, siblings of these two rather than a panel of their own. -->
   <SecuritySettings />
+
+  <!--
+    Last, and on the page rather than in the screen's controls.
+    
+    It was a button in the action strip, put there because it acts on the whole
+    app rather than on anything in the list below it. That reasoning held while
+    the strip was a row already on screen; it does not survive the dial, where
+    a screen with one action would be a dot in the corner hiding a single item,
+    and the only thing standing between a person and signing out would be a
+    guess about what the dot contains.
+    
+    It follows the delete-account box, which is the more destructive of the two
+    — but that one asks for a password before it does anything, and this one is
+    undone by signing back in.
+  -->
+  <div class="settings-card">
+    <button class="sign-out" onclick={onlogout}>{t('menu.logout')}</button>
+  </div>
 </div>
 
 <style>
@@ -103,6 +97,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Outlined rather than filled: the same weight the security boxes give their
+     destructive buttons, which is less than the page's green primary and more
+     than a plain link. */
+  .sign-out {
+    background: var(--surface);
+    color: var(--alarm);
+    border: 1px solid var(--alarm);
+    padding: 0.35rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .sign-out:hover {
+    background: var(--alarm-soft);
   }
 
   .role-tag {
