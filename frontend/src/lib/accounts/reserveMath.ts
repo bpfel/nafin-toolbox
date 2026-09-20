@@ -95,8 +95,9 @@ export function nextDue(anchorMonth: string, periodMonths: number, currentMonth:
 //
 //   Bill         — the anchor is a *due* month, recurring forever in both
 //                  directions. k counts months into the cycle that ends at the
-//                  next due month, so k = periodMonths when the bill is due now
-//                  and k = 1 the month after it rolls.
+//                  next due month, carrying the lead, so k = periodMonths both
+//                  in the due month and the month before it, and k = 2 — not
+//                  zero — the month after it rolls. See `BILL_LEAD_MONTHS`.
 //
 //   Purchase     — the anchor is the *start* of the current cycle, i.e. the
 //                  month of the last purchase. k counts months elapsed since
@@ -108,34 +109,30 @@ export function nextDue(anchorMonth: string, periodMonths: number, currentMonth:
  * How far ahead of the due month an obligation must be fully funded.
  *
  * A bill that falls due in March is often paid in February, and having the money
- * appear only in the month it leaves is too late to be useful. With a lead of 1
- * the full target is required a month early, which means the same amount is
- * saved over one fewer month — the monthly rate rises from target/period to
- * target/(period - 1) rather than the schedule simply shifting and leaving a
- * permanent shortfall.
+ * appear only in the month it leaves is too late to be useful.
+ *
+ * The lead shifts the schedule; it does not steepen it. A yearly bill is twelve
+ * monthly payments of target/12 — the division a person expects, and the one
+ * they can check — arranged so the reserve is full the month *before* the bill
+ * lands rather than the month it does. Saving the same target over eleven months
+ * instead would get there too, at target/11, but it makes the monthly figure an
+ * answer to a question nobody asked.
+ *
+ * What pays for the early arrival is a permanent float of one month's payment.
+ * Paying the bill does not empty the reserve: the contribution made in the due
+ * month stays behind, and eleven more on top of it reach the target again a
+ * month early. So the requirement troughs at two months' worth just after the
+ * bill is paid, never at zero. That float is real money standing still, and it
+ * is the whole cost of the arrangement.
  */
 const BILL_LEAD_MONTHS = 1
 
 /**
- * The months a reserve actually has to save over.
- *
- * A bill funds itself `BILL_LEAD_MONTHS` early, so it saves over one month
- * fewer than its cycle; a purchase has no date to be early for and saves over
- * the whole of it. Shared by the running requirement and the monthly rate
- * rather than restated in each, so the two cannot drift: the rate is the figure
- * a user pays in every month to arrive exactly where `requiredForItem` says
- * they should be.
- */
-function savingMonthsFor(type: 'bill' | 'purchase', periodMonths: number): number {
-  return type === 'bill' ? Math.max(1, periodMonths - BILL_LEAD_MONTHS) : periodMonths
-}
-
-/**
  * One month of this reserve — what to pay in, rather than what it all comes to.
  *
- * The target is the figure being saved towards over a period of months; this is
- * that divided by the months there are to do it in. It is the figure a standing
- * order would carry, which is why the QR bill fills with it.
+ * Both kinds divide by the whole period, because the lead moves *when* the ramp
+ * runs rather than how steep it is. It is the figure a standing order would
+ * carry, which is why the QR bill fills with it.
  */
 export function monthlyForItem(
   type: 'bill' | 'purchase',
@@ -143,9 +140,7 @@ export function monthlyForItem(
 ): string {
   assertPeriod(reserve.periodMonths)
   return fromCents(
-    roundHalfAwayFromZero(
-      toCents(reserve.targetAmount) / savingMonthsFor(type, reserve.periodMonths),
-    ),
+    roundHalfAwayFromZero(toCents(reserve.targetAmount) / reserve.periodMonths),
   )
 }
 
@@ -173,15 +168,18 @@ export function requiredForItem(
     return fromCents(roundHalfAwayFromZero((target * elapsed) / periodMonths))
   }
 
-  // A bill. The saving window is the cycle minus the lead, so the full target
-  // lands `BILL_LEAD_MONTHS` before it falls due. A period short enough that the
-  // lead would consume it entirely (a monthly bill) keeps a one-month window
-  // rather than dividing by zero.
-  const savingMonths = savingMonthsFor('bill', periodMonths)
+  // A bill. The ramp runs at target/period like everything else, shifted forward
+  // by the lead so it tops out the month before the bill falls due and holds
+  // there through the due month itself — the money has to still be sitting there
+  // when the bill is actually paid.
+  //
+  // The clamp at the top is what creates the float: `elapsed` would reach
+  // period + lead, and capping it at period leaves the reserve holding one
+  // month's payment the moment the bill clears.
   const monthsUntilDue = monthsBetween(currentMonth, nextDue(anchorMonth, periodMonths, currentMonth))
-  const elapsed = clamp(periodMonths - monthsUntilDue, 0, savingMonths)
+  const elapsed = clamp(periodMonths + BILL_LEAD_MONTHS - monthsUntilDue, 0, periodMonths)
 
-  return fromCents(roundHalfAwayFromZero((target * elapsed) / savingMonths))
+  return fromCents(roundHalfAwayFromZero((target * elapsed) / periodMonths))
 }
 
 function clamp(value: number, low: number, high: number): number {

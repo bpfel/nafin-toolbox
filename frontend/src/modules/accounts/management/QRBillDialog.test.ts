@@ -42,9 +42,9 @@ function part(overrides: Partial<AllocationPart> = {}): AllocationPart {
     entryName: 'Cantonal tax',
     categoryName: 'Taxes',
     type: 'bill',
-    required: '545.45',
+    required: '1000.00',
     targetAmount: '6000.00',
-    monthlyAmount: '545.45',
+    monthlyAmount: '500.00',
     nextDueMonth: '2027-12',
     ...overrides,
   }
@@ -79,7 +79,7 @@ describe('filling a QR bill from one of the account\'s allocations', () => {
     // The figure is shown so the amount is not a surprise once it lands — and
     // it is the monthly one, so the label and the field it fills agree.
     expect(labels[1]).toContain('Cantonal tax')
-    expect(labels[1]).toContain('545.45')
+    expect(labels[1]).toContain('500.00')
     expect(labels[1]).not.toMatch(/6.000\.00|6’000\.00|6'000\.00/)
     expect(labels[2]).toContain('New car')
   })
@@ -93,7 +93,7 @@ describe('filling a QR bill from one of the account\'s allocations', () => {
     const select = screen.getByLabelText('Fill from an allocation') as HTMLSelectElement
     await fireEvent.change(select, { target: { value: 'e1' } })
 
-    expect((screen.getByLabelText(/Amount/) as HTMLInputElement).value).toBe('545.45')
+    expect((screen.getByLabelText(/Amount/) as HTMLInputElement).value).toBe('500.00')
     expect((screen.getByLabelText('Additional information') as HTMLInputElement).value).toBe(
       'Cantonal tax',
     )

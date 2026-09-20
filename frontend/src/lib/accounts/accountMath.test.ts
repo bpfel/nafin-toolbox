@@ -94,10 +94,10 @@ describe('requiredForAccount', () => {
       ],
     )
 
-    // 1200/11 + 900/2 — the saving window is period - 1, because an obligation
-    // must be funded a month before it falls due.
-    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('559.09')
-    expect(requiredForAccount(vault, MAIN, '2027-01')).toBe('545.45') // 6000/11
+    // 2x1200/12 + 2x900/3 — one month after each rolls, so each holds the float
+    // its payment left behind plus January's own contribution.
+    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('800.00')
+    expect(requiredForAccount(vault, MAIN, '2027-01')).toBe('1000.00') // 2 x 6000/12
   })
 
   test('an archived entry with a reserve contributes nothing', () => {
@@ -117,7 +117,7 @@ describe('requiredForAccount', () => {
     const vault = vaultWith([account(MAIN), account(RESERVES)], [live, archived])
 
     // Only the live 1200/12 reserve counts; archiving lowers the requirement.
-    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('109.09')
+    expect(requiredForAccount(vault, RESERVES, '2027-01')).toBe('200.00')
   })
 
   test('is 0.00 for an account with no reserves', () => {
@@ -175,7 +175,7 @@ describe('allocationBreakdown', () => {
     const parts = allocationBreakdown(vault(), RESERVES, '2027-01')
 
     expect(parts.map(p => p.entryName)).toEqual(['Cantonal tax', 'New car', 'Radio licence'])
-    expect(parts.map(p => p.required)).toEqual(['545.45', '500.00', '32.73'])
+    expect(parts.map(p => p.required)).toEqual(['1000.00', '500.00', '60.00'])
   })
 
   test('carries the heading each entry sits under', () => {
@@ -186,7 +186,7 @@ describe('allocationBreakdown', () => {
   test('carries the target, so a part reads as progress rather than a bare figure', () => {
     const [biggest] = allocationBreakdown(vault(), RESERVES, '2027-01')
     expect(biggest.targetAmount).toBe('6000.00')
-    expect(biggest.required).toBe('545.45')
+    expect(biggest.required).toBe('1000.00')
   })
 
   test('dates a bill and refuses to date a purchase', () => {
@@ -391,8 +391,8 @@ describe('availableForAccount', () => {
     const projected = projectedBalance(vault, RESERVES, '2027-01')
     const required = requiredForAccount(vault, RESERVES, '2027-01')
     expect(projected).toBe('1100.00')
-    expect(required).toBe('109.09')
-    expect(availableForAccount(vault, RESERVES, '2027-01')).toBe('990.91')
+    expect(required).toBe('200.00')
+    expect(availableForAccount(vault, RESERVES, '2027-01')).toBe('900.00')
     expect(Number(availableForAccount(vault, RESERVES, '2027-01')))
       .toBeCloseTo(Number(projected) - Number(required), 2)
   })
@@ -418,10 +418,9 @@ describe('availableForAccount', () => {
 })
 
 describe('the monthly figure on a part', () => {
-  // A bill funds itself a month early, so it saves over one month fewer than
-  // its cycle and the monthly rate is target/(period - 1). A purchase has no
-  // date to be early for and divides by the whole period. The two diverge, and
-  // a caller dividing by `periodMonths` itself would be wrong for every bill.
+  // Both kinds divide by the whole period: the lead moves when a bill's ramp
+  // runs, not how steep it is. Kept on the part rather than left to the caller
+  // so the figure shown and the figure filled cannot disagree.
   function breakdownOf(e: VaultEntry) {
     return allocationBreakdown(
       vaultWith([account(MAIN), account(RESERVES, { kind: 'reserves' })], [e]),
@@ -430,7 +429,7 @@ describe('the monthly figure on a part', () => {
     )[0]
   }
 
-  test('a bill divides by the months it actually saves over', () => {
+  test('a bill divides by the whole period, like everything else', () => {
     const part = breakdownOf(
       entry('tax', {
         type: 'bill',
@@ -439,8 +438,9 @@ describe('the monthly figure on a part', () => {
       }),
     )
 
-    // 6000 over 11 months, not 12.
-    expect(part.monthlyAmount).toBe('545.45')
+    // 6000 over 12 months. The lead is paid for by a float, not by a steeper
+    // monthly figure.
+    expect(part.monthlyAmount).toBe('500.00')
     expect(part.targetAmount).toBe('6000.00')
   })
 
@@ -456,7 +456,7 @@ describe('the monthly figure on a part', () => {
     expect(part.monthlyAmount).toBe('500.00')
   })
 
-  test('a monthly bill keeps a one-month window rather than dividing by zero', () => {
+  test('a monthly bill is its own full target every month', () => {
     const part = breakdownOf(
       entry('rent', {
         type: 'bill',

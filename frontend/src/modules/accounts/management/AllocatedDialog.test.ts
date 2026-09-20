@@ -17,9 +17,9 @@ function part(overrides: Partial<AllocationPart> = {}): AllocationPart {
     entryName: 'Cantonal tax',
     categoryName: 'Taxes',
     type: 'bill',
-    required: '545.45',
+    required: '1000.00',
     targetAmount: '6000.00',
-    monthlyAmount: '545.45',
+    monthlyAmount: '500.00',
     nextDueMonth: '2027-12',
     ...overrides,
   }
@@ -38,7 +38,7 @@ function open(parts: AllocationPart[], total: string) {
 
 describe('AllocatedDialog', () => {
   test('names the account it is explaining', () => {
-    open([part()], '545.45')
+    open([part()], '1000.00')
     expect(screen.getByRole('dialog', { name: 'Allocated on Reserves' })).toBeTruthy()
   })
 
@@ -48,7 +48,7 @@ describe('AllocatedDialog', () => {
         part(),
         part({ entryId: 'e2', entryName: 'New car', categoryName: 'Transport', required: '500.00' }),
       ],
-      '1045.45',
+      '1500.00',
     )
 
     expect(screen.getByText('Cantonal tax')).toBeTruthy()
@@ -59,11 +59,11 @@ describe('AllocatedDialog', () => {
   })
 
   test('shows each part against the target it is saving towards', () => {
-    const { container } = open([part()], '545.45')
+    const { container } = open([part()], '1000.00')
     const amounts = [...container.querySelectorAll('.money')].map(n => digitsOf(n.textContent))
 
-    // 545.45 saved, 6000.00 to reach, 545.45 total.
-    expect(amounts).toContain('545.45')
+    // 1000.00 saved, 6000.00 to reach, 1000.00 total.
+    expect(amounts).toContain('1000.00')
     expect(amounts).toContain('6000.00')
   })
 
@@ -79,7 +79,7 @@ describe('AllocatedDialog', () => {
           required: '500.00',
         }),
       ],
-      '1045.45',
+      '1500.00',
     )
 
     expect(screen.getByText(/due December 2027/)).toBeTruthy()
@@ -91,14 +91,14 @@ describe('AllocatedDialog', () => {
   test('the total it prints is the one it was handed', () => {
     const { container } = open(
       [
-        part({ required: '545.45' }),
+        part({ required: '1000.00' }),
         part({ entryId: 'e2', entryName: 'New car', required: '500.00' }),
       ],
-      '1045.45',
+      '1500.00',
     )
 
     const total = container.querySelector('.total-figure .money')
-    expect(digitsOf(total?.textContent)).toBe('1045.45')
+    expect(digitsOf(total?.textContent)).toBe('1500.00')
   })
 
   test('an account nothing saves into says so instead of showing an empty list', () => {
@@ -114,7 +114,7 @@ describe('AllocatedDialog', () => {
   test('closes on Escape and on the backdrop', async () => {
     let closed = 0
     const { container } = render(AllocatedDialog, {
-      props: { accountName: 'Reserves', parts: [part()], total: '545.45', onclose: () => closed++ },
+      props: { accountName: 'Reserves', parts: [part()], total: '1000.00', onclose: () => closed++ },
     })
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
@@ -128,7 +128,7 @@ describe('AllocatedDialog', () => {
   test('a click inside the dialog does not close it', () => {
     let closed = 0
     const { container } = render(AllocatedDialog, {
-      props: { accountName: 'Reserves', parts: [part()], total: '545.45', onclose: () => closed++ },
+      props: { accountName: 'Reserves', parts: [part()], total: '1000.00', onclose: () => closed++ },
     })
 
     const modal = container.querySelector('.modal') as HTMLElement

@@ -102,10 +102,11 @@ describe('requiredForItem — bill, yearly', () => {
     expect(requiredForItem('bill', reserve, '2026-06')).toBe('1200.00')
   })
 
-  // The saving window is 11 months, not 12: the full target is required a month
-  // early so the bill can be paid before it lands.
-  test('requires one eleventh the month after the due month', () => {
-    expect(requiredForItem('bill', reserve, '2026-07')).toBe('109.09')
+  // Two months' worth, not one. Paying the bill does not empty the reserve —
+  // the contribution made in the due month stays behind as the float that buys
+  // the early arrival, and July adds a second on top of it. 1200/12 = 100.
+  test('holds two months\' worth the month after the due month', () => {
+    expect(requiredForItem('bill', reserve, '2026-07')).toBe('200.00')
   })
 
   test('requires the FULL target the month before the due month', () => {
@@ -118,7 +119,7 @@ describe('requiredForItem — bill, yearly', () => {
 
   test('is the full target again at the next occurrence a year later', () => {
     expect(requiredForItem('bill', reserve, '2027-06')).toBe('1200.00')
-    expect(requiredForItem('bill', reserve, '2027-07')).toBe('109.09')
+    expect(requiredForItem('bill', reserve, '2027-07')).toBe('200.00')
   })
 })
 
@@ -129,20 +130,21 @@ describe('requiredForItem — bill, quarterly Swiss tax across a year boundary',
     expect(requiredForItem('bill', reserve, '2026-12')).toBe('900.00')
   })
 
-  // A quarterly instalment saved over 2 months rather than 3, for the same reason.
-  test('rolls to a half in the January after a December due month', () => {
-    expect(requiredForItem('bill', reserve, '2027-01')).toBe('450.00')
+  // 900/3 = 300 a month, and January holds two of them: the float left behind
+  // by December's payment, plus January's own.
+  test('rolls to two thirds in the January after a December due month', () => {
+    expect(requiredForItem('bill', reserve, '2027-01')).toBe('600.00')
   })
 
   test('is fully funded the month before the instalment falls due', () => {
     expect(requiredForItem('bill', reserve, '2027-02')).toBe('900.00')
     expect(requiredForItem('bill', reserve, '2027-03')).toBe('900.00')
-    expect(requiredForItem('bill', reserve, '2027-04')).toBe('450.00')
+    expect(requiredForItem('bill', reserve, '2027-04')).toBe('600.00')
   })
 
   test('works for months before the anchor, on the same recurrence', () => {
     expect(requiredForItem('bill', reserve, '2026-09')).toBe('900.00')
-    expect(requiredForItem('bill', reserve, '2026-10')).toBe('450.00')
+    expect(requiredForItem('bill', reserve, '2026-10')).toBe('600.00')
   })
 })
 
@@ -194,12 +196,13 @@ describe('requiredForItem — no floating-point drift', () => {
   })
 
   test('every month is within a cent of the exact fraction', () => {
-    // 11 saving months, so the exact fraction is k/11 and month 11 (November,
-    // the month before the December due date) is the full target.
+    // Twelve saving months, so the exact fraction is k/12 — but the ramp carries
+    // the lead, so January already stands at k = 2 and November (the month
+    // before the December due date) reaches k = 12, the full target.
     const reserve = bill({ targetAmount: '1000.00', periodMonths: 12, anchorMonth: '2026-12' })
-    for (let k = 1; k <= 11; k++) {
-      const month = addMonths('2026-01', k - 1)
-      const exact = (100000 * k) / 11
+    for (let k = 2; k <= 12; k++) {
+      const month = addMonths('2026-01', k - 2)
+      const exact = (100000 * k) / 12
       expect(Math.abs(cents(requiredForItem('bill', reserve, month)) - exact)).toBeLessThanOrEqual(0.5)
     }
   })
@@ -217,8 +220,9 @@ describe('requiredForItem — no floating-point drift', () => {
 
 describe('requiredForItem — the one-month payment lead', () => {
   // A bill due in March is paid in February, so the money has to be there a month
-  // early. The saving window is period - 1, which raises the monthly rate rather
-  // than shifting the schedule and leaving a permanent shortfall.
+  // early. The schedule shifts to arrange that; the rate stays target/period.
+  // What pays for it is a permanent float of one month's payment, which never
+  // leaves the reserve.
   test('a yearly bill is fully funded one month before it falls due', () => {
     const reserve = bill({ targetAmount: '1100.00', periodMonths: 12, anchorMonth: '2026-03' })
 
@@ -226,12 +230,15 @@ describe('requiredForItem — the one-month payment lead', () => {
     expect(requiredForItem('bill', reserve, '2026-03')).toBe('1100.00')
   })
 
-  test('the monthly rate is target/(period-1), not target/period', () => {
+  test('the monthly rate is target/period, and the lead is a float on top', () => {
     const reserve = bill({ targetAmount: '1100.00', periodMonths: 12, anchorMonth: '2026-03' })
 
-    // One month into the cycle: 1100/11 = 100.00 exactly, where the old schedule
-    // would have required 1100/12 = 91.67.
-    expect(requiredForItem('bill', reserve, '2026-04')).toBe('100.00')
+    // 1100/12 = 91.67 a month. April — the month after March rolls — holds two
+    // of them: the float March left behind, plus April's own.
+    expect(requiredForItem('bill', reserve, '2026-04')).toBe('183.33')
+
+    // And it climbs by one month's payment from there.
+    expect(requiredForItem('bill', reserve, '2026-05')).toBe('275.00')
   })
 
   test('a monthly bill degrades to no lead rather than dividing by zero', () => {
