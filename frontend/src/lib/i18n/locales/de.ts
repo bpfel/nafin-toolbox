@@ -117,6 +117,7 @@ export const de: Messages = {
   'address.country': 'Land',
 
   'action.close': 'Schliessen',
+  'action.more': 'Aktionen',
 
   // --- Security settings ---
   'security.twofaTitle': 'Zwei-Faktor-Authentifizierung',

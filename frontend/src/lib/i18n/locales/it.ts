@@ -37,6 +37,7 @@ export const it: Messages = {
   'action.reload': 'Ricarica',
   'action.done': 'Fatto',
   'action.close': 'Chiudi',
+  'action.more': 'Azioni',
   'action.copied': 'Copiato',
   'action.download': 'Scarica',
 

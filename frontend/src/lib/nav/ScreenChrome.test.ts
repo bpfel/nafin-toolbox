@@ -91,22 +91,27 @@ describe('the hide-amounts eye', () => {
   })
 })
 
-describe('the strip is one row of one kind of control', () => {
+describe('the controls are one kind of control', () => {
   afterEach(cleanup)
 
   test('every control carries words for anything that cannot see the symbol', () => {
-    // Icon-only is what makes the row uniform and what stops it shifting
-    // sideways when Edit becomes Done, or when the language changes and both
-    // become longer. It also says nothing on its own, which is why the label is
-    // required rather than optional.
+    // The symbol says nothing on its own, which is why the label is required
+    // rather than optional. In the toolbar the words are in `title`, which a
+    // pointer can summon; in the dial they are also on the screen, because a
+    // phone has no hover and a glyph there explains itself to nobody.
     render(ScreenChrome, { title: 'Budget', editKey: 'budget' })
 
     const buttons = screen.getAllByRole('button')
     expect(buttons.length).toBeGreaterThan(0)
     for (const button of buttons) {
-      expect(button.getAttribute('aria-label')?.trim()).toBeTruthy()
+      const label = button.getAttribute('aria-label')?.trim()
+      expect(label).toBeTruthy()
       expect(button.getAttribute('title')?.trim()).toBeTruthy()
-      expect(button.textContent?.trim()).toBe('')
+
+      // Where a control does show its name, it is the same string the screen
+      // reader is given — one label, so the two cannot drift apart.
+      const shown = button.textContent?.trim()
+      if (shown) expect(shown).toBe(label)
     }
   })
 

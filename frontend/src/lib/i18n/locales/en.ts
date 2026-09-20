@@ -130,6 +130,9 @@ export const en = {
   'address.country': 'Country',
 
   'action.close': 'Close',
+  // The dial's dot, which opens the screen's controls. Never "menu": it holds
+  // what this screen can do, not somewhere else to go.
+  'action.more': 'Actions',
 
   // --- Security settings ---
   'security.twofaTitle': 'Two-Factor Authentication',

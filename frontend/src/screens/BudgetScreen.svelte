@@ -75,7 +75,16 @@
     letter-spacing: -0.02em;
   }
 
-
+  /*
+   * A wrapper that exists only to be switched off above 768px, so it must not
+   * also be a box. In the dial the controls are laid out in a column and hidden
+   * one by one; a span standing between the container and the button would take
+   * the button's place in that column and keep its share of the gap after the
+   * button inside it had gone.
+   */
+  .period-toggle {
+    display: contents;
+  }
 
   @media (min-width: 768px) {
     /* Both columns fit up here, so there is nothing to choose between. */

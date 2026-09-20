@@ -37,6 +37,7 @@ export const fr: Messages = {
   'action.reload': 'Recharger',
   'action.done': 'Terminé',
   'action.close': 'Fermer',
+  'action.more': 'Actions',
   'action.copied': 'Copié',
   'action.download': 'Télécharger',
 
