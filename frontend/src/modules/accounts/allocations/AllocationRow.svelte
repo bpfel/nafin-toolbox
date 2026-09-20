@@ -79,17 +79,6 @@
   let isSetAside = $derived(holdsMoney(entry.type))
 
   /**
-   * The row says what the budget says.
-   *
-   * There used to be a second vocabulary here — income, spending, set-aside,
-   * savings — inferred from the endpoints because two entry types could not
-   * distinguish spending from holding. A purchase was badged "set aside", which
-   * is true of three of the five types and says nothing about which. One set of
-   * words now, and it is the one the budget is written in.
-   */
-  let kindLabel = $derived(t(`entryType.${entry.type}` as 'entryType.expense'))
-
-  /**
    * An entry whose endpoints contradict its own type. Not reachable through
    * these controls; possible in data written before v7 knew the difference.
    */
@@ -183,7 +172,7 @@
     }
   })
 
-  // The row has two halves: what this line *is* (name, kind, amount, flow) and
+  // The row has two halves: what this line *is* (name, amount, flow) and
   // what it is *doing* (reserve status, timing). The hairline only
   // earns its place when there is a second half to separate — a plain spending
   // row with no reserve has nothing below it.
@@ -194,8 +183,14 @@
 <div class="allocation-row" class:unrouted>
   <div class="row-head">
     <div class="identity">
+      <!--
+        No type badge. The screen is already five sections deep in the entry's
+        own type — the row sits under a heading that names it — so a pill
+        repeating that word on every line said nothing the reader had not just
+        read. The amber background still marks an unrouted row, which is the one
+        thing the badge carried that the section heading cannot.
+      -->
       <span class="name">{entry.name}</span>
-      <span class="kind kind-{unrouted ? 'none' : entry.type}">{kindLabel}</span>
     </div>
     <span class="planned"><Money value={plannedAmount} /></span>
     {#if editing}
@@ -314,37 +309,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .kind {
-    font-size: 0.7rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 0.1rem 0.4rem;
-    border-radius: 999px;
-    white-space: nowrap;
-  }
-  /* Three colours for five types. The badge already says which type it is in
-     words; what the hue adds is the thing words are slow at — is this arriving,
-     leaving, or staying? Savings, bill and purchase share one, and were three
-     blues four percent apart when they did not. */
-  .kind-income {
-    background: var(--accent-soft);
-    color: var(--money-in);
-  }
-  .kind-expense {
-    background: var(--sunken);
-    color: var(--ink-muted);
-  }
-  .kind-savings,
-  .kind-bill,
-  .kind-purchase {
-    background: #eaf1f8;
-    color: var(--money-held);
-  }
-  .kind-none {
-    background: #fff3cd;
-    color: #8a6d3b;
   }
   .planned {
     font-variant-numeric: tabular-nums;
