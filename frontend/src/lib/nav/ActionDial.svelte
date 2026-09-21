@@ -83,6 +83,24 @@
     stack?.querySelector<HTMLElement>('button:not(:disabled)')?.focus()
   })
 
+  /**
+   * Using a control folds the dial away.
+   *
+   * Every one of them either opens something over the top of the page or
+   * changes the screen underneath it, and in both cases the stack is left
+   * standing over the result of a decision that has already been made. Edit is
+   * the plainest case: the mode is on, the page has visibly changed, and the
+   * dial is still there waiting to be dismissed.
+   *
+   * One rule on the container rather than a callback threaded through each
+   * control, because the controls arrive as a snippet the screens built and
+   * there is nothing to thread it through.
+   */
+  function controlUsed(event: MouseEvent) {
+    if (!expanded) return
+    if ((event.target as HTMLElement | null)?.closest('button')) expanded = false
+  }
+
   function onKeydown(event: KeyboardEvent) {
     if (event.key !== 'Escape' || !expanded) return
     expanded = false
@@ -95,7 +113,7 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div class="dial" class:expanded>
-  <div class="strip" bind:this={stack} id={stripId}>
+  <div class="strip" bind:this={stack} id={stripId} role="presentation" onclick={controlUsed}>
     <!--
       One element that changes its words rather than two that come and go. A
       live region is only announced while it is already in the document, so a
@@ -351,6 +369,24 @@
     }
 
     /*
+     * The dial is a column sized to its widest row, so every row shorter than
+     * that one — and every gap between them — leaves empty space inside the
+     * dial's own box. Without this, tapping that space hit the dial, which has
+     * nothing to do with a tap, and the menu sat there looking as though it had
+     * ignored you. Only the controls themselves take a pointer; everything else
+     * falls through to the layer below, which closes it.
+     */
+    .dial,
+    .strip {
+      pointer-events: none;
+    }
+
+    .dot,
+    .strip :global(.action) {
+      pointer-events: auto;
+    }
+
+    /*
      * Reaching into the controls themselves.
      *
      * They are handed over as a snippet the screens built, so there is no prop
@@ -388,6 +424,12 @@
 
     .dial.expanded .strip :global(.action .pill) {
       display: block;
+      /* A backstop, not the plan: the strings are written to fit. Whatever the
+         widest row is, it stops at the screen's edge rather than pushing the
+         column off it — and `aria-label` still carries the whole name. */
+      max-width: calc(100vw - 2 * var(--app-gutter) - 5rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 </style>

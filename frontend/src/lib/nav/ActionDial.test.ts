@@ -95,6 +95,21 @@ describe('folding it away again', () => {
     expect(container.querySelector('.dismiss')).toBeNull()
   })
 
+  test('so does using one of the controls', async () => {
+    // Every control either opens something over the page or changes the page,
+    // and in both cases the stack would be left standing over the result of a
+    // decision already made. It is also how a modal opened from the dial finds
+    // the dial already gone.
+    render(ActionDial, { children: controls })
+    await open()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(screen.getByRole('button', { name: 'Actions' }).getAttribute('aria-expanded')).toBe(
+      'false',
+    )
+  })
+
   test('so does arriving somewhere else', async () => {
     // Screens are not unmounted when the tab changes — they are hidden — so an
     // open dial would otherwise still be standing over a screen whose controls
