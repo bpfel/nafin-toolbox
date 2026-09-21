@@ -3,7 +3,7 @@
   import { t, getLocale } from '../i18n/index.svelte'
   import { getRoute, navigate } from '../nav/router.svelte'
   import { focusTrap } from '../util/focusTrap'
-  import { anchorElement, anchorRect, placeCard, phonePlacement } from './anchor'
+  import { anchorElement, anchorRect, placeCard, phonePlacement, scrollAdjustment } from './anchor'
   import { loadContent, type TourCopy } from '../knowledge/content'
   import { en } from '../knowledge/content/en'
   import { TYPE_GUIDES } from '../budget/typeGuide'
@@ -143,6 +143,31 @@
       await new Promise(requestAnimationFrame)
       if (cancelled) return
       rect = anchorRect(current.anchor)
+
+      // Centring is the wrong place for a long step: it splits the free space
+      // in two and leaves neither half big enough, so the card scrolls inside
+      // itself. Nudging the page instead puts the whole card on screen. Done
+      // here, once, inside the same effect — not in a reactive block, which
+      // would scroll, re-measure, and scroll again.
+      if (rect && !wide) {
+        const delta = scrollAdjustment({
+          rect,
+          cardHeight: card?.offsetHeight ?? 0,
+          viewportHeight: window.innerHeight,
+          navHeight: navHeight(),
+          gap: PHONE_GAP_PX,
+        })
+        // Clamped to what the document has left: near the top of a page there
+        // may be nothing to give, and then the card scrolls after all.
+        const limit = document.documentElement.scrollHeight - window.innerHeight
+        const wanted = Math.min(Math.max(window.scrollY + delta, 0), Math.max(limit, 0))
+        if (wanted !== window.scrollY) {
+          window.scrollTo({ top: wanted, behavior: 'auto' })
+          await new Promise(requestAnimationFrame)
+          if (cancelled) return
+          rect = anchorRect(current.anchor)
+        }
+      }
     })()
 
     return () => {
@@ -187,9 +212,17 @@
   $effect(() => {
     if (!tour.running) return
 
-    const swallow = (event: Event) => event.preventDefault()
+    // Inside the card is the one place scrolling is still the user's. The
+    // card is bounded to the gap beside the halo, so a long step scrolls
+    // within it — and a blocker that swallowed every wheel event made that
+    // impossible, which is how the backstop became a dead end.
+    const mine = (event: Event) => card?.contains(event.target as Node) ?? false
+
+    const swallow = (event: Event) => {
+      if (!mine(event)) event.preventDefault()
+    }
     const swallowKey = (event: KeyboardEvent) => {
-      if (SCROLL_KEYS.has(event.key)) event.preventDefault()
+      if (SCROLL_KEYS.has(event.key) && !mine(event)) event.preventDefault()
     }
 
     const options = { passive: false, capture: true } as const

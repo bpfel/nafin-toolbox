@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from 'vitest'
-import { anchorRect, anchorElement, placeCard, phonePlacement } from './anchor'
+import { anchorRect, anchorElement, placeCard, phonePlacement, scrollAdjustment } from './anchor'
 
 /**
  * Both halves of this file are regressions. Every case below was found by
@@ -229,5 +229,61 @@ describe('where the callout sits on a phone, and how big it may be', () => {
 
     expect(atTop).toBe(false)
     expect(maxHeight).toBe(556)
+  })
+})
+
+/**
+ * Moving the page so the callout fits beside the halo.
+ *
+ * Bounding the card to its gap stopped it overlapping the halo, but turned a
+ * long step into a card that scrolls inside itself — which hides half of what
+ * it says behind a gesture nobody thinks to make. Usually the page just needs
+ * to move a little.
+ */
+describe('nudging the page to make room', () => {
+  const PHONE = { viewportHeight: 640, navHeight: 60, gap: 12 }
+
+  test('does nothing when the card already fits', () => {
+    const halo = rectOf({ top: 420, bottom: 520, height: 100 })
+
+    expect(scrollAdjustment({ rect: halo, cardHeight: 200, ...PHONE })).toBe(0)
+  })
+
+  /**
+   * Step 5.4, the case that was reported: the bill guide is two paragraphs,
+   * the halo covers a heading and a row, and centring left 396px above for a
+   * card wanting 430.
+   */
+  test('scrolls up, moving the anchor down, when the card goes above', () => {
+    const halo = rectOf({ top: 420, bottom: 520, height: 100 })
+
+    const delta = scrollAdjustment({ rect: halo, cardHeight: 430, ...PHONE })
+
+    // Negative: the page scrolls up so the ringed thing sits lower.
+    expect(delta).toBeLessThan(0)
+    // And by exactly the shortfall, not a guess.
+    expect(delta).toBe(396 - 430)
+  })
+
+  test('scrolls down, moving the anchor up, when the card goes below', () => {
+    const halo = rectOf({ top: 40, bottom: 120, height: 80 })
+
+    const delta = scrollAdjustment({ rect: halo, cardHeight: 500, ...PHONE })
+
+    expect(delta).toBeGreaterThan(0)
+    expect(delta).toBe(500 - 436)
+  })
+
+  test('the nudge is exactly enough, so the card then fits', () => {
+    const halo = rectOf({ top: 420, bottom: 520, height: 100 })
+    const cardHeight = 430
+
+    const delta = scrollAdjustment({ rect: halo, cardHeight, ...PHONE })
+    // Scrolling by `delta` moves the anchor by `-delta`.
+    const moved = rectOf({ top: halo.top - delta, bottom: halo.bottom - delta, height: 100 })
+
+    const after = phonePlacement({ rect: moved, ...PHONE, minHeight: 140 })
+    expect(after.maxHeight).toBeGreaterThanOrEqual(cardHeight)
+    expect(scrollAdjustment({ rect: moved, cardHeight, ...PHONE })).toBe(0)
   })
 })

@@ -199,3 +199,41 @@ export function phonePlacement(input: {
 
   return { atTop, maxHeight: Math.max(minHeight, atTop ? above : below) }
 }
+
+/**
+ * How far to scroll so the callout fits beside the halo instead of scrolling
+ * inside itself.
+ *
+ * The card is bounded to the gap it sits in, so a long one scrolls — correct
+ * as a backstop, poor as the normal case: a card that scrolls hides half of
+ * what it is saying behind a gesture nobody thinks to make. Usually the page
+ * simply needs to move, so that the thing being ringed sits lower (or higher)
+ * and the gap grows to fit.
+ *
+ * Returns the page scroll delta: positive scrolls down, which moves the
+ * anchor *up* and enlarges the gap below it. Zero when the card already fits,
+ * which is the common case.
+ *
+ * The caller clamps to what the document actually allows — near the top of a
+ * page there may be nothing left to give, and then the card scrolls after
+ * all.
+ */
+export function scrollAdjustment(input: {
+  rect: DOMRect
+  cardHeight: number
+  viewportHeight: number
+  navHeight: number
+  gap: number
+}): number {
+  const { rect, cardHeight, viewportHeight, navHeight, gap } = input
+
+  const above = rect.top - gap * 2
+  const below = viewportHeight - navHeight - rect.bottom - gap * 2
+
+  const atTop = above > below
+  const deficit = cardHeight - (atTop ? above : below)
+  if (deficit <= 0) return 0
+
+  // Card above: the anchor has to come down, which means scrolling up.
+  return atTop ? -deficit : deficit
+}
