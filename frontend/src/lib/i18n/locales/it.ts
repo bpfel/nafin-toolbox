@@ -235,7 +235,7 @@ export const it: Messages = {
   'guide.expense.title': 'Denaro speso e finito',
   'guide.expense.body': 'Affitto, spesa, un abbonamento mensile. Lascia i tuoi conti e non torna.',
   'guide.savings.title': 'Denaro tenuto',
-  'guide.savings.body': 'Un fondo di emergenza, un contributo al pilastro 3a. Non è denaro che vuoi spendere liberamente, ma resta sui tuoi conti.',
+  'guide.savings.body': 'Un fondo di emergenza, un contributo al pilastro 3a. È denaro messo da parte, che resta sui tuoi conti.',
   'guide.bill.title': 'Una fattura che torna',
   'guide.bill.body': 'Cassa malati trimestrale, un acconto d’imposta semestrale, un abbonamento annuale. Indica l’importo e il periodo, il contributo mensile ne deriva.',
   'guide.bill.ready': 'L’app fa in modo che il denaro sia pronto un mese prima della scadenza.',

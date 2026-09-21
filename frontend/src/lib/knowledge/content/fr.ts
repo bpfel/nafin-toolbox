@@ -25,7 +25,7 @@ export const fr: PartialContent = {
     },
     places: {
       title: 'Les différents écrans',
-      body: 'Budget, c’est là que vous définissez vos flux mensuels. Comptes définit comment l’argent circule entre vos comptes bancaires. Savoir est le point de départ de cette visite et renvoie à des sources officielles sur les finances personnelles suisses. Profil contient vos réglages personnels.',
+      body: 'Budget, c’est là que vous planifiez vos flux mensuels. Comptes montre comment l’argent circule entre vos comptes. Savoir abrite cette visite et de courts textes sur les finances suisses. Profil vous concerne, vous, plutôt que votre argent.',
     },
     types: {
       title: 'Différentes entrées budgétaires',
@@ -34,6 +34,7 @@ export const fr: PartialContent = {
     budget: {
       title: 'Un plan permanent',
       body: 'Pas un journal mensuel. Vous décrivez une seule fois un mois type, et vous prenez un instantané nommé quand quelque chose change assez pour mériter d’être retenu.',
+      note: 'Nous utilisons des valeurs suisses par défaut à titre d’illustration.',
     },
     controls: {
       title: 'Les commandes',

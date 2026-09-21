@@ -22,7 +22,7 @@ export const en: Content = {
     },
     places: {
       title: 'The different screens',
-      body: 'Budget is where you define your monthly cash flows. Accounts defines how money moves between your bank accounts. Knowledge is the home of this tour and holds links to official sources on Swiss personal finance. Profile holds your personal settings.',
+      body: 'Budget is where you plan your monthly cash flows. Accounts tracks how money moves between the places you keep it. Knowledge holds this tour, along with short pieces on Swiss personal finance. Profile covers you rather than your money.',
     },
     types: {
       title: 'Different budget entries',
@@ -31,6 +31,7 @@ export const en: Content = {
     budget: {
       title: 'One standing plan',
       body: 'Not a ledger of months. You describe a typical month once, and take a named snapshot when something changes enough to be worth remembering.',
+      note: 'We’ll use some Swiss defaults for illustration.',
     },
     controls: {
       title: 'Controls',

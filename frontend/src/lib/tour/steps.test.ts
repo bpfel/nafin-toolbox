@@ -123,6 +123,15 @@ describe('anchors survive an empty app', () => {
     }
   })
 
+  /**
+   * A hole is cut from the halo's geometry, so a permeable step with nothing
+   * to point at would leave the blocker whole and the promise of hovering
+   * unkeepable — silently, since nothing fails.
+   */
+  test.each(TOUR_STEPS.filter(s => s.permeable))('$id has something to point at', ({ anchor }) => {
+    expect(anchor).toBeDefined()
+  })
+
   test('the tour ends where it can be restarted', () => {
     // The one step whose absence would be a real failure of the feature: a
     // tour nobody can find again is a tour that has to be right first time.

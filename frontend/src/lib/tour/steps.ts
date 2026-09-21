@@ -71,11 +71,26 @@ export interface TourStep {
   /**
    * Fill an empty budget with the Swiss defaults before showing this step.
    *
-   * Set on the one step that introduces the types, because the five steps
-   * after it point at real rows and an empty budget has none. It never
-   * overwrites a budget that already has entries.
+   * Set on the first step that wants a budget worth looking at, and it stays
+   * set for the rest of the tour — the five type steps after it point at real
+   * rows, and an empty budget has none. It never overwrites a budget that
+   * already has entries.
    */
   needsExampleBudget?: true
+  /**
+   * Let the pointer reach the thing being ringed.
+   *
+   * The blocker is otherwise a sheet over the whole page, so the mouse never
+   * arrives at the control underneath and a step that says "hover a symbol to
+   * see what it does" describes something the tour itself is preventing. Here
+   * the blocker is drawn as four panels around the halo instead, leaving the
+   * highlighted control exposed.
+   *
+   * Hover only: clicks are still refused, by a capture-phase handler rather
+   * than by geometry, so the tour cannot be pressed through even where it can
+   * be pointed at.
+   */
+  permeable?: true
 }
 
 export const TOUR_STEPS: TourStep[] = [
@@ -86,10 +101,10 @@ export const TOUR_STEPS: TourStep[] = [
   // Before the budget rather than after it: the controls are how you do
   // anything at all, and explaining the plan first means explaining it to
   // someone who is still looking for the edit button.
-  { id: 'controls', path: '/budget', anchor: 'dial' },
-  { id: 'budget', path: '/budget' },
+  { id: 'controls', path: '/budget', anchor: 'dial', permeable: true },
+  { id: 'budget', path: '/budget', needsExampleBudget: true },
 
-  { id: 'types', path: '/budget', needsExampleBudget: true },
+  { id: 'types', path: '/budget' },
   { id: 'typeIncome', path: '/budget', anchor: 'type-income', sub: true, guideType: 'income' },
   { id: 'typeExpense', path: '/budget', anchor: 'type-expense', sub: true, guideType: 'expense' },
   { id: 'typeSavings', path: '/budget', anchor: 'type-savings', sub: true, guideType: 'savings' },

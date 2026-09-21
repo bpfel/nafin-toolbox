@@ -24,7 +24,7 @@ export const it: PartialContent = {
     },
     places: {
       title: 'Le diverse schermate',
-      body: 'Budget è dove definisci i tuoi flussi mensili. Conti definisce come il denaro si muove tra i tuoi conti bancari. Sapere è la sede di questo tour e rimanda a fonti ufficiali sulle finanze personali svizzere. Profilo contiene le tue impostazioni personali.',
+      body: 'Budget è dove pianifichi i tuoi flussi mensili. Conti mostra come il denaro si sposta tra i tuoi conti. Sapere ospita questo tour e brevi testi sulle finanze svizzere. Profilo riguarda te, non il tuo denaro.',
     },
     types: {
       title: 'Diverse voci di budget',
@@ -33,6 +33,7 @@ export const it: PartialContent = {
     budget: {
       title: 'Un piano permanente',
       body: 'Non un registro mensile. Descrivi una volta sola un mese tipico e scatti un’istantanea con un nome quando qualcosa cambia abbastanza da valerne la pena.',
+      note: 'A titolo di esempio usiamo alcuni valori svizzeri predefiniti.',
     },
     controls: {
       title: 'I comandi',

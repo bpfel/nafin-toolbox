@@ -235,15 +235,30 @@
       if (SCROLL_KEYS.has(event.key) && !mine(event)) event.preventDefault()
     }
 
+    // Hover is allowed through the hole in the blocker; pressing is not. Held
+    // here rather than by geometry, so "you may point at this" and "you may
+    // not operate it" stay two separate statements.
+    const swallowPress = (event: Event) => {
+      if (mine(event)) return
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
     const options = { passive: false, capture: true } as const
     window.addEventListener('wheel', swallow, options)
     window.addEventListener('touchmove', swallow, options)
     window.addEventListener('keydown', swallowKey, options)
+    window.addEventListener('pointerdown', swallowPress, options)
+    window.addEventListener('mousedown', swallowPress, options)
+    window.addEventListener('click', swallowPress, options)
 
     return () => {
       window.removeEventListener('wheel', swallow, options)
       window.removeEventListener('touchmove', swallow, options)
       window.removeEventListener('keydown', swallowKey, options)
+      window.removeEventListener('pointerdown', swallowPress, options)
+      window.removeEventListener('mousedown', swallowPress, options)
+      window.removeEventListener('click', swallowPress, options)
     }
   })
 
@@ -354,8 +369,33 @@
     Takes every click so the app cannot be operated from underneath the tour.
     Not a `role="button"` and not dismiss-on-click: a stray tap should not end
     something the user chose to start, and Skip is right there.
+
+    On a permeable step it is drawn as four panels around the halo instead, so
+    the pointer reaches the control being described and its tooltip appears.
+    Clicks are refused by the handler below rather than by this geometry —
+    otherwise the step that tells you to hover a symbol would be the one thing
+    stopping you.
   -->
-  <div class="blocker"></div>
+  {#if step.permeable && rect}
+    <div class="blocker" style:inset="0 0 auto 0" style:height="{Math.max(0, rect.top - HALO_PX)}px"></div>
+    <div class="blocker" style:inset="{rect.bottom + HALO_PX}px 0 0 0"></div>
+    <div
+      class="blocker"
+      style:top="{rect.top - HALO_PX}px"
+      style:height="{rect.height + HALO_PX * 2}px"
+      style:left="0"
+      style:width="{Math.max(0, rect.left - HALO_PX)}px"
+    ></div>
+    <div
+      class="blocker"
+      style:top="{rect.top - HALO_PX}px"
+      style:height="{rect.height + HALO_PX * 2}px"
+      style:left="{rect.right + HALO_PX}px"
+      style:right="0"
+    ></div>
+  {:else}
+    <div class="blocker"></div>
+  {/if}
 
   {#if rect}
     <div

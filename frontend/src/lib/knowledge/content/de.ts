@@ -24,15 +24,16 @@ export const de: PartialContent = {
     },
     places: {
       title: 'Die Bildschirme',
-      body: 'Budget ist, wo Sie Ihre monatlichen Geldflüsse festlegen. Konten legt fest, wie Geld zwischen Ihren Bankkonten fliesst. Wissen ist das Zuhause dieses Rundgangs und verweist auf offizielle Quellen zu Schweizer Finanzthemen. Profil enthält Ihre persönlichen Einstellungen.',
+      body: 'Budget ist, wo Sie Ihre monatlichen Geldflüsse planen. Konten zeigt, wie Geld zwischen Ihren Konten fliesst. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen. Profil betrifft Sie selbst, nicht Ihr Geld.',
     },
     types: {
       title: 'Verschiedene Budgeteinträge',
-      body: 'Das Budget kennt mehrere Arten, die gleich vorgestellt werden.',
+      body: 'Das Budget kennt mehrere Arten von Einträgen, die gleich vorgestellt werden.',
     },
     budget: {
       title: 'Ein stehender Plan',
-      body: 'Kein Monatsjournal. Sie beschreiben einmal einen typischen Monat und erstellen eine benannte Momentaufnahme, wenn sich etwas ändert, das es wert ist.',
+      body: 'Kein Monatsjournal. Sie beschreiben einmal einen typischen Monat und erstellen eine benannte Momentaufnahme, wenn sich etwas ändert, das festgehalten werden soll.',
+      note: 'Zur Veranschaulichung verwenden wir Schweizer Standardwerte.',
     },
     controls: {
       title: 'Bedienelemente',

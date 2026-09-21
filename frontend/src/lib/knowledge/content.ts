@@ -44,6 +44,12 @@ export interface TourCopy {
   title: string
   body: string
   /**
+   * A second paragraph, for a step that has one thing to say and then one
+   * aside. The type guides have had one all along; the written steps did not
+   * until a step needed to mention that the budget on screen is an example.
+   */
+  note?: string
+  /**
    * A sentence shown only at the wide layout.
    *
    * It exists for one thing — telling someone they can hover a control to

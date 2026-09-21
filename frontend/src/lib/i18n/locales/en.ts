@@ -234,7 +234,7 @@ export const en = {
   'guide.expense.title': 'Money spent and gone',
   'guide.expense.body': 'Rent, groceries, a monthly subscription. It leaves your accounts and does not come back.',
   'guide.savings.title': 'Money kept',
-  'guide.savings.body': 'An emergency fund, a pillar 3a contribution. It is not money you want to spend freely, but it stays in your accounts.',
+  'guide.savings.body': 'An emergency fund, a pillar 3a contribution. This is money that is set aside, which stays on your accounts.',
   'guide.bill.title': 'A bill that keeps coming back',
   'guide.bill.body': 'Quarterly health insurance, a half-yearly tax instalment, an annual subscription. Define the amount and the period, and the monthly contribution follows.',
   'guide.bill.ready': 'The app makes sure the money is ready one month before it is due.',

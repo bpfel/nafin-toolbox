@@ -235,7 +235,7 @@ export const fr: Messages = {
   'guide.expense.title': 'L’argent dépensé, et parti',
   'guide.expense.body': 'Loyer, courses, un abonnement mensuel. Il quitte vos comptes et ne revient pas.',
   'guide.savings.title': 'L’argent gardé',
-  'guide.savings.body': 'Une réserve d’urgence, une cotisation au pilier 3a. Ce n’est pas de l’argent que vous voulez dépenser librement, mais il reste sur vos comptes.',
+  'guide.savings.body': 'Une réserve d’urgence, une cotisation au pilier 3a. C’est de l’argent mis de côté, qui reste sur vos comptes.',
   'guide.bill.title': 'Une facture qui revient',
   'guide.bill.body': 'Assurance maladie trimestrielle, un acompte d’impôt semestriel, un abonnement annuel. Indiquez le montant et la périodicité, la contribution mensuelle en découle.',
   'guide.bill.ready': 'L’application fait en sorte que l’argent soit prêt un mois avant l’échéance.',
