@@ -206,3 +206,102 @@ describe('a step with nothing to point at', () => {
     expect(tour.running).toBe(false)
   })
 })
+
+/**
+ * The promise the tour makes about the user's data: it shows an example
+ * budget and gives nothing back.
+ *
+ * This replaced seeding for real. Seeding could not be made safe — the
+ * autosave persists within seconds, and a tour abandoned by closing the tab
+ * would strand the example in someone's vault — so the guarantee worth
+ * testing is not "it cleans up" but "it never wrote".
+ */
+describe('the example budget is only on loan', () => {
+  /** Walks forward until the step that asks for the example budget. */
+  function reachExample(): void {
+    startTour()
+    while (tour.running && !tour.step?.needsExampleBudget) moveTour(1)
+    expect(tour.step?.needsExampleBudget, 'no step asks for an example').toBe(true)
+  }
+
+  test('the example appears while the tour is on it', () => {
+    reachExample()
+
+    const shown = vaultState.vault!
+    expect(shown.budget.entries.length).toBeGreaterThan(0)
+    // All five, or the type steps after this one have nothing to ring.
+    expect(new Set(shown.budget.entries.map(e => e.type)).size).toBe(5)
+    expect(vaultState.previewing).toBe(true)
+  })
+
+  test('the real vault is untouched underneath it', () => {
+    const real = vaultState.vault!
+    reachExample()
+
+    expect(vaultState.vault).not.toBe(real)
+    expect(real.budget.entries).toHaveLength(0)
+  })
+
+  test('it is gone when the tour finishes', () => {
+    const real = vaultState.vault!
+    reachExample()
+    while (tour.running) moveTour(1)
+
+    expect(vaultState.vault).toBe(real)
+    expect(vaultState.vault!.budget.entries).toHaveLength(0)
+    expect(vaultState.previewing).toBe(false)
+  })
+
+  test('it is gone when the tour is abandoned halfway', () => {
+    const real = vaultState.vault!
+    reachExample()
+    abandonTour()
+
+    expect(vaultState.vault).toBe(real)
+    expect(vaultState.vault!.budget.entries).toHaveLength(0)
+  })
+
+  test('it is gone when the tour is simply forgotten', () => {
+    // Logging out goes through here, and must not leave the next session
+    // looking at the last one's example.
+    const real = vaultState.vault!
+    reachExample()
+    resetTour()
+
+    expect(vaultState.vault).toBe(real)
+  })
+
+  /**
+   * That the *tour* never asks for a save. Whether the store would refuse one
+   * anyway is its own question, tested against the real store in
+   * `crypto/vaultPreview.test.ts` — `markDirty` is stubbed in this file, so
+   * asserting the guard here would only be asserting the stub.
+   */
+  test('the tour never marks the vault as needing saving', () => {
+    reachExample()
+
+    expect(markDirty).not.toHaveBeenCalled()
+  })
+
+  /** Someone with a budget of their own is shown theirs, not an example. */
+  test('a budget that already has entries is never replaced', () => {
+    const vault = vaultState.vault!
+    vault.budget.categories.push({ id: 'c1', name: 'Housing', side: 'expense', sortOrder: 10 })
+    vault.budget.entries.push({
+      id: 'e1',
+      name: 'Rent',
+      type: 'expense',
+      sortOrder: 10,
+      archived: false,
+      categoryId: 'c1',
+      sourceAccountId: 'acc-main',
+      sinkAccountId: null,
+    })
+
+    reachExample()
+
+    expect(vaultState.previewing).toBe(false)
+    expect(vaultState.vault).toBe(vault)
+    expect(vaultState.vault!.budget.entries).toHaveLength(1)
+  })
+})

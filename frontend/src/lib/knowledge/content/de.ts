@@ -28,7 +28,7 @@ export const de: PartialContent = {
     },
     types: {
       title: 'Fünf Arten von Zeilen',
-      body: 'Eine Budgetzeile ist nicht nur ein Betrag — ihre Art sagt, was mit dem Geld geschieht. Wir haben ein Schweizer Beispielbudget eingesetzt, damit es etwas zu sehen gibt; Sie können es danach ändern oder zurücksetzen. Die nächsten fünf Schritte nehmen je eine Art.',
+      body: 'Eine Budgetzeile ist nicht nur ein Betrag — ihre Art sagt, was mit dem Geld geschieht. Das Schweizer Beispiel unten ist nur für den Rundgang geliehen und verschwindet mit ihm; Ihr eigenes Budget bleibt unberührt. Die nächsten fünf Schritte nehmen je eine Art.',
     },
     budget: {
       title: 'Ein stehender Plan',

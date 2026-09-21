@@ -31,6 +31,22 @@ let versionAhead = $state(false)
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+/**
+ * The real vault, parked while a throwaway copy is on screen.
+ *
+ * The guided tour wants to *show* an example budget without the user ending
+ * up with one. Seeding for real and undoing afterwards cannot be made safe —
+ * an interrupted tour leaves the data behind, and the autosave would have
+ * persisted it seconds earlier — so nothing is written at all: the store
+ * hands the screens a copy, and puts the original back when the tour ends.
+ *
+ * Non-null is the whole flag. While it is set the vault on screen is not the
+ * user's, and `saveVault` refuses on that basis — which is the one guard that
+ * matters, because every write in the app funnels through it: the debounced
+ * autosave, the flush on logout, and any direct call alike.
+ */
+let parked: VaultData | null = null
+
 const MEK_STORAGE_KEY = 'vault_mek'
 
 /** Export MEK to sessionStorage so it survives page refreshes. */
@@ -66,7 +82,37 @@ export function getVaultState() {
     get saving() { return saving },
     get lastSaved() { return lastSaved },
     get unlocked() { return unlocked },
+    /** True while the screens are showing a throwaway copy. See `parked`. */
+    get previewing() { return parked !== null },
   }
+}
+
+/**
+ * Shows a throwaway copy of the vault, built by `fill`, until `endPreview`.
+ *
+ * Any pending edit is flushed first, so nothing real is left unsaved behind
+ * the copy. Returns false if there is nothing to copy or a preview is already
+ * running, so a caller cannot nest one and lose the original.
+ */
+export function beginPreview(fill: (copy: VaultData) => void): boolean {
+  if (!vault || parked) return false
+
+  if (dirty) void saveVault()
+
+  parked = vault
+  // `$state.snapshot` rather than the proxy itself: the copy must be plain and
+  // deep, or editing it would reach through into the user's own vault.
+  const copy = $state.snapshot(vault) as VaultData
+  fill(copy)
+  vault = copy
+  return true
+}
+
+/** Puts the real vault back. Safe to call when no preview is running. */
+export function endPreview(): void {
+  if (!parked) return
+  vault = parked
+  parked = null
 }
 
 /**
@@ -173,6 +219,9 @@ export async function setupKeys(password: string, email: string): Promise<string
  */
 export async function saveVault(): Promise<void> {
   if (!vault || !mek) return
+  // The vault on screen is a throwaway copy, not the user's. Refused here
+  // rather than at each call site because this is where they all arrive.
+  if (parked) return
   // Once the server has told us we are stale, retrying can only fail again — and
   // the auto-save runs every couple of seconds, so retrying would hammer it.
   if (conflicted || shapeInvalid) return
@@ -218,6 +267,9 @@ export async function saveVault(): Promise<void> {
  * Mark vault as dirty — triggers debounced auto-save (2s).
  */
 export function markDirty(): void {
+  // Nothing in a preview is worth saving, and setting the flag would put an
+  // "unsaved" warning on the screen about edits that do not exist.
+  if (parked) return
   dirty = true
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
@@ -229,6 +281,9 @@ export function markDirty(): void {
  * Clear all crypto state on logout.
  */
 export function clearVault(): void {
+  // Before the flush below: that flush must see the real vault, and must not
+  // be refused for a preview nobody is looking at any more.
+  endPreview()
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null

@@ -26,7 +26,7 @@ export const en: Content = {
     },
     types: {
       title: 'Five kinds of line',
-      body: 'A budget line is not just an amount — its kind says what happens to the money. We have filled in an example Swiss budget so there is something to look at; edit or reset it afterwards. The next five steps take one kind each.',
+      body: 'A budget line is not just an amount — its kind says what happens to the money. The Swiss example below is on loan for the tour and disappears with it; your own budget is untouched. The next five steps take one kind each.',
     },
     budget: {
       title: 'One standing plan',

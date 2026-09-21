@@ -1,5 +1,5 @@
 import { TOUR_STEPS, numbering, type TourStep } from './steps'
-import { getVaultState, markDirty } from '../crypto/vaultStore.svelte'
+import { getVaultState, markDirty, beginPreview, endPreview } from '../crypto/vaultStore.svelte'
 import { recordCompleted, recordDismissed } from './tourState'
 import { seedDefaults } from '../budget/budgetEngine'
 import { getLocale } from '../i18n/index.svelte'
@@ -54,19 +54,22 @@ export function getTourState() {
 }
 
 /**
- * Fills an empty budget with the Swiss defaults, if this step needs rows.
+ * Shows an example budget for the steps that need rows to point at.
  *
- * The five type steps point at real sections of the budget table, and an
- * empty budget has none — so the tour puts something there rather than
- * highlighting nothing. The defaults are the same ones the empty budget
- * screen offers behind its own button, so this is the app doing what the user
- * could have done a moment earlier, not a second way of seeding.
+ * The five type steps ring real sections of the budget table, and an empty
+ * budget has none. So the tour puts the Swiss defaults on screen — but as a
+ * **preview**: the vault store hands the screens a throwaway copy and puts
+ * the original back when the tour ends. Nothing is written, nothing is
+ * saved, and a tour abandoned halfway leaves no trace.
  *
- * Two guards, both load-bearing. It never runs on a budget that already has
- * entries, so nobody's own figures are touched. And it is announced in the
- * step's own words rather than happening quietly, because writing to someone's
- * vault as a side effect of reading a tutorial is exactly the kind of thing
- * that should not be a surprise.
+ * Seeding for real and undoing afterwards was the first design and cannot be
+ * made safe: the autosave would have persisted it within seconds, and an
+ * interrupted tour — a closed tab, a reload — would strand the example in
+ * someone's vault. A tutorial should not be able to give you a budget you did
+ * not ask for.
+ *
+ * Only ever for an empty budget. A user who already has one sees their own
+ * figures, which is better teaching material anyway.
  */
 function prepare(step: TourStep): void {
   if (!step.needsExampleBudget) return
@@ -75,8 +78,7 @@ function prepare(step: TourStep): void {
 
   const now = new Date()
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  seedDefaults(vault, getLocale(), month)
-  markDirty()
+  beginPreview(copy => seedDefaults(copy, getLocale(), month))
 }
 
 export function startTour(): void {
@@ -124,6 +126,9 @@ export function skipUnshowableStep(): void {
 /** Reached the end. Records it, so the offer is not made again. */
 export function finishTour(): void {
   running = false
+  // Before the vault is read, so what gets stamped is the user's own vault
+  // and not the copy the tour was showing.
+  endPreview()
   const vault = getVaultState().vault
   if (vault) {
     recordCompleted(vault)
@@ -140,6 +145,9 @@ export function finishTour(): void {
  */
 export function abandonTour(): void {
   running = false
+  // Before the vault is read, so what gets stamped is the user's own vault
+  // and not the copy the tour was showing.
+  endPreview()
   const vault = getVaultState().vault
   if (vault) {
     recordDismissed(vault)
@@ -158,6 +166,7 @@ export function declineTour(): void {
 
 /** Test seam, and the logout path: forget where we were without recording it. */
 export function resetTour(): void {
+  endPreview()
   running = false
   index = 0
   direction = 1
