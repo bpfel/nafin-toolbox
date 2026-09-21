@@ -71,10 +71,10 @@
   <td class="amount-cell yearly planned-yr-cell">
     {#if editing}
       <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedYr', { entry: entry.entryName })}>
-        <Money value={planned * 12} />
+        <Money value={entry.yearlyAmount} />
       </button>
     {:else}
-      <span class="cell-value"><Money value={planned * 12} /></span>
+      <span class="cell-value"><Money value={entry.yearlyAmount} /></span>
     {/if}
   </td>
 </tr>

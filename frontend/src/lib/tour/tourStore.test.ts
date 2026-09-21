@@ -283,8 +283,17 @@ describe('the example budget is only on loan', () => {
     expect(markDirty).not.toHaveBeenCalled()
   })
 
-  /** Someone with a budget of their own is shown theirs, not an example. */
-  test('a budget that already has entries is never replaced', () => {
+  /**
+   * A budget of the user's own is shown the example too, and gets it back
+   * untouched afterwards.
+   *
+   * It used to be left alone, which read as the kinder choice and was not:
+   * the step says Swiss defaults are being used for illustration, and the
+   * five type steps ring one section each. A real budget rarely holds all
+   * five, so those steps quietly vanished — a different tour for everybody,
+   * and no way to tell that anything was missing.
+   */
+  test('a budget of the user’s own is replaced for the tour, and restored after', () => {
     const vault = vaultState.vault!
     vault.budget.categories.push({ id: 'c1', name: 'Housing', side: 'expense', sortOrder: 10 })
     vault.budget.entries.push({
@@ -300,8 +309,18 @@ describe('the example budget is only on loan', () => {
 
     reachExample()
 
-    expect(vaultState.previewing).toBe(false)
+    expect(vaultState.previewing).toBe(true)
+    expect(vaultState.vault).not.toBe(vault)
+    // All five, so no type step is skipped for want of a section.
+    expect(new Set(vaultState.vault!.budget.entries.map(e => e.type)).size).toBe(5)
+    // By id, not by name: the Swiss defaults have a Rent of their own, which
+    // is exactly the confusion this assertion is here to avoid.
+    expect(vaultState.vault!.budget.entries.find(e => e.id === 'e1')).toBeUndefined()
+
+    abandonTour()
+
     expect(vaultState.vault).toBe(vault)
     expect(vaultState.vault!.budget.entries).toHaveLength(1)
+    expect(vaultState.vault!.budget.entries[0].id).toBe('e1')
   })
 })

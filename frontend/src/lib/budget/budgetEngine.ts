@@ -12,6 +12,7 @@ import {
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
 import { seedNamesFor, type SeedKey } from './seedNames'
 import type { Locale } from '../i18n/index.svelte'
+import { fromCents, toCents } from '../accounts/reserveMath'
 
 // --- Entry Categories ---
 
@@ -366,10 +367,28 @@ export interface PlanEntryView {
   categoryId: string
   categoryName: string
   plannedAmount: string
+  /**
+   * What a year of this costs.
+   *
+   * Twelve monthlies for most entries, but *exact* for a bill or a purchase:
+   * those know their real total and the cycle it falls on, so a year of them
+   * is arithmetic rather than inference.
+   *
+   * It has to be, because the monthly figure is rounded to the rappen and
+   * multiplying it back up shows the rounding. A GA at 3'995 a year plans at
+   * 332.92 a month, and twelve of those is 3'995.04 — four rappen of nothing,
+   * on a line whose whole point is that the amount is known in advance.
+   */
+  yearlyAmount: string
 }
 
 export interface PlanSummary {
   entries: PlanEntryView[]
+  /** The three totals again, over a year, summed from the exact figures above. */
+  yearlyIncome: string
+  yearlyExpenses: string
+  yearlySavings: string
+  yearlyBalance: string
   totalPlannedIncome: string
   /** Consumed and gone. Since v7 this excludes what is only being held. */
   totalPlannedExpenses: string
@@ -394,12 +413,21 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
   let totalPlannedExpenses = 0
   let totalPlannedSavings = 0
 
+  // Accumulated separately rather than multiplied at the end: a year is the
+  // sum of exact yearly figures, not twelve times a sum of rounded monthly
+  // ones, and those differ by a rappen per reserve.
+  let yearlyIncome = 0
+  let yearlyExpenses = 0
+  let yearlySavings = 0
+
   const entries: PlanEntryView[] = []
 
   for (const cat of listEntries(vault)) {
     const category = categories.find(g => g.id === cat.categoryId)
     const plannedAmount = plannedFor(vault, cat.id)
     const planned = Number(plannedAmount)
+    const yearlyAmount = yearlyFor(cat, plannedAmount)
+    const yearly = Number(yearlyAmount)
 
     entries.push({
       entryId: cat.id,
@@ -408,14 +436,18 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
       categoryId: cat.categoryId,
       categoryName: category?.name ?? '',
       plannedAmount,
+      yearlyAmount,
     })
 
     if (cat.type === 'income') {
       totalPlannedIncome += planned
+      yearlyIncome += yearly
     } else if (holdsMoney(cat.type)) {
       totalPlannedSavings += planned
+      yearlySavings += yearly
     } else {
       totalPlannedExpenses += planned
+      yearlyExpenses += yearly
     }
   }
 
@@ -428,7 +460,28 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
     // and the allocation screen inferred it from routing on every keystroke.
     totalPlannedSavings: totalPlannedSavings.toFixed(2),
     plannedBalance: (totalPlannedIncome - totalPlannedExpenses - totalPlannedSavings).toFixed(2),
+    yearlyIncome: yearlyIncome.toFixed(2),
+    yearlyExpenses: yearlyExpenses.toFixed(2),
+    yearlySavings: yearlySavings.toFixed(2),
+    yearlyBalance: (yearlyIncome - yearlyExpenses - yearlySavings).toFixed(2),
   }
+}
+
+/**
+ * A year of one entry.
+ *
+ * A bill or a purchase states its real total and the cycle it falls on, so a
+ * year of it is `target x 12 / period` — exact, whatever the monthly rounds
+ * to. Everything else has no figure truer than twelve of its monthly.
+ *
+ * In centimes, because the whole point is the rappen.
+ */
+function yearlyFor(entry: VaultEntry, plannedAmount: string): string {
+  const reserve = entry.reserve
+  if (reserve && reserve.periodMonths > 0) {
+    return fromCents(Math.round((toCents(reserve.targetAmount) * 12) / reserve.periodMonths))
+  }
+  return fromCents(toCents(plannedAmount) * 12)
 }
 
 // --- Snapshots ---

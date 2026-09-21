@@ -1,7 +1,7 @@
 import { TOUR_STEPS, numbering, type TourStep } from './steps'
 import { getVaultState, markDirty, beginPreview, endPreview } from '../crypto/vaultStore.svelte'
 import { recordCompleted, recordDismissed } from './tourState'
-import { seedDefaults } from '../budget/budgetEngine'
+import { resetBudget, seedDefaults } from '../budget/budgetEngine'
 import { getLocale } from '../i18n/index.svelte'
 
 /**
@@ -54,13 +54,11 @@ export function getTourState() {
 }
 
 /**
- * Shows an example budget for the steps that need rows to point at.
+ * Shows the example budget the tour is written against.
  *
- * The five type steps ring real sections of the budget table, and an empty
- * budget has none. So the tour puts the Swiss defaults on screen — but as a
- * **preview**: the vault store hands the screens a throwaway copy and puts
- * the original back when the tour ends. Nothing is written, nothing is
- * saved, and a tour abandoned halfway leaves no trace.
+ * A **preview**: the vault store hands the screens a throwaway copy and puts
+ * the original back when the tour ends. Nothing is written, nothing is saved,
+ * and a tour abandoned halfway leaves no trace.
  *
  * Seeding for real and undoing afterwards was the first design and cannot be
  * made safe: the autosave would have persisted it within seconds, and an
@@ -68,17 +66,31 @@ export function getTourState() {
  * someone's vault. A tutorial should not be able to give you a budget you did
  * not ask for.
  *
- * Only ever for an empty budget. A user who already has one sees their own
- * figures, which is better teaching material anyway.
+ * It replaces whatever is there, rather than only filling an empty budget,
+ * and that is the second design. Only filling an empty one sounded kinder and
+ * was worse in two ways. The step says in as many words that Swiss defaults
+ * are being used for illustration, which was false for anyone who had a
+ * budget of their own. And the five type steps ring one section each: a real
+ * budget rarely holds all five, so those steps were skipped — not failing,
+ * not explaining themselves, simply absent, and differently absent for
+ * everybody.
+ *
+ * The copy is emptied before it is seeded because `seedDefaults` declines a
+ * budget that already has entries, which is right everywhere else and would
+ * here have left the user looking at their own figures under a caption saying
+ * otherwise.
  */
 function prepare(step: TourStep): void {
   if (!step.needsExampleBudget) return
   const vault = getVaultState().vault
-  if (!vault || vault.budget.entries.length > 0) return
+  if (!vault) return
 
   const now = new Date()
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  beginPreview(copy => seedDefaults(copy, getLocale(), month))
+  beginPreview(copy => {
+    resetBudget(copy)
+    seedDefaults(copy, getLocale(), month)
+  })
 }
 
 export function startTour(): void {

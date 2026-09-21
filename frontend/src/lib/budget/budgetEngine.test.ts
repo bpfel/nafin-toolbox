@@ -1150,6 +1150,59 @@ describe('seedDefaults', () => {
     expect(of('Transportation') + of('GA travelcard')).toBeCloseTo(400, 2)
   })
 
+  /**
+   * The reported defect: a GA priced at 3'995 a year showed 3'995.04, because
+   * the yearly column was twelve times a monthly rounded to the rappen. A bill
+   * knows its real total, so a year of it is arithmetic rather than inference.
+   */
+  test('a year of a bill is its real total, not twelve rounded monthlies', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const yearly = (name: string) => summary.entries.find(e => e.entryName === name)!.yearlyAmount
+
+    expect(yearly('GA travelcard')).toBe('3995.00')
+    expect(yearly('Serafe')).toBe('335.00')
+    // And the purchase, whose cycle is not a year: 1'512 over seven years is
+    // 216.00 of laptop per year.
+    expect(yearly('Laptop')).toBe('216.00')
+  })
+
+  test('an entry with no reserve is still twelve of its monthly', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const rent = summary.entries.find(e => e.entryName === 'Rent')!
+
+    expect(rent.yearlyAmount).toBe('16200.00')
+  })
+
+  /**
+   * The totals are summed from the exact figures rather than multiplied at the
+   * end, or the summary bar would disagree with the rows underneath it by a
+   * rappen per reserve.
+   */
+  test('the yearly totals agree with the rows they summarise', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const sum = (pick: (t: string) => boolean) =>
+      summary.entries
+        .filter(e => pick(e.entryType))
+        .reduce((total, e) => total + Number(e.yearlyAmount), 0)
+
+    expect(Number(summary.yearlyIncome)).toBeCloseTo(sum(t => t === 'income'), 2)
+    expect(Number(summary.yearlySavings)).toBeCloseTo(
+      sum(t => t === 'savings' || t === 'bill' || t === 'purchase'),
+      2,
+    )
+    // Twelve times the monthly total would be 4330.08 for the bills alone.
+    expect(summary.yearlySavings).not.toBe((Number(summary.totalPlannedSavings) * 12).toFixed(2))
+  })
+
   test('two bills are seeded, so the type does not read as a special case', () => {
     const vault = createEmptyVault()
 

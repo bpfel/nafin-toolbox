@@ -33,13 +33,29 @@
    * value rather than by what it is.
    */
   let figures = $derived([
-    { key: 'income', label: t('budget.income'), amount: summary.totalPlannedIncome },
-    { key: 'expense', label: t('budget.expenses'), amount: summary.totalPlannedExpenses },
-    { key: 'savings', label: t('budget.savings'), amount: summary.totalPlannedSavings },
+    {
+      key: 'income',
+      label: t('budget.income'),
+      amount: summary.totalPlannedIncome,
+      yearly: summary.yearlyIncome,
+    },
+    {
+      key: 'expense',
+      label: t('budget.expenses'),
+      amount: summary.totalPlannedExpenses,
+      yearly: summary.yearlyExpenses,
+    },
+    {
+      key: 'savings',
+      label: t('budget.savings'),
+      amount: summary.totalPlannedSavings,
+      yearly: summary.yearlySavings,
+    },
     {
       key: 'unallocated',
       label: t('budget.unallocated'),
       amount: summary.plannedBalance,
+      yearly: summary.yearlyBalance,
       signed: true,
     },
   ])
@@ -55,7 +71,7 @@
           <Money value={figure.amount} />
         </span>
         <span class="value yearly {figure.key}" class:short>
-          <Money value={Number(figure.amount) * 12} />
+          <Money value={figure.yearly} />
           <span class="per">{t('budget.perYear')}</span>
         </span>
       </div>

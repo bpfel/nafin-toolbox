@@ -129,6 +129,7 @@ describe('the controls are in the DOM the moment edit mode is on', () => {
       categoryId: categoryId,
       categoryName: categoryName,
       plannedAmount: '100.00',
+      yearlyAmount: '1200.00',
     }
   }
 
