@@ -134,19 +134,39 @@ describe('loading a locale', () => {
     }
   })
 
-  /**
-   * The half the fallback exists for. German has no articles yet, so the
-   * English ones must come through — and must be *reported* as untranslated,
-   * or the sheet would present English prose as though it were German.
-   */
-  test('German falls back to English articles, and says so', async () => {
-    const { content, translated } = await loadContent('de')
+  test('German serves German articles', async () => {
+    const { content } = await loadContent('de')
 
     for (const { id } of ARTICLES) {
-      expect(content.articles[id].title, id).toBe(en.articles[id].title)
-      expect(translated.has(id), id).toBe(false)
+      expect(content.articles[id].title, id).not.toBe(en.articles[id].title)
     }
   })
+
+  /**
+   * The invariant the sheet's "shown in English" notice rests on, stated so
+   * that it holds whether or not there are gaps left to demonstrate it.
+   *
+   * It replaces a test that asserted German had no articles — true when it was
+   * written, and quietly meaningless the moment the articles were translated.
+   * Claiming a fallback is a translation, or a translation a fallback, are
+   * both failures here.
+   */
+  test.each(['de', 'fr', 'it', 'rm'] as const)(
+    '%s reports exactly the articles it actually carries',
+    async locale => {
+      const { content, translated } = await loadContent(locale)
+      const own = MODULES[`./content/${locale}.ts`]?.default.articles ?? {}
+
+      for (const { id } of ARTICLES) {
+        const carried = own[id] !== undefined
+        expect(translated.has(id), `${locale}/${id}`).toBe(carried)
+        // And the merge itself: carried means its own words, otherwise
+        // English, never undefined.
+        expect(content.articles[id], `${locale}/${id}`).toBeDefined()
+        if (!carried) expect(content.articles[id].title).toBe(en.articles[id].title)
+      }
+    },
+  )
 
   test('a locale with no module at all is English throughout', async () => {
     // Rumantsch has a catalogue but no content module; nothing should throw
@@ -163,5 +183,57 @@ describe('loading a locale', () => {
     for (const step of WRITTEN_STEPS) {
       expect(content.tour[step.id]?.title, step.id).not.toBe(en.tour[step.id]?.title)
     }
+  })
+})
+
+/**
+ * The two rules that make a Swiss library safe to publish, applied to the
+ * translations rather than only to English.
+ *
+ * `registry.test.ts` checks the English set. It was the whole library when
+ * that test was written; it is now a quarter of it, and a figure or a
+ * marketing link is no less wrong for being in German.
+ */
+const OFFICIAL_HOSTS = [/(^|\.)admin\.ch$/, /(^|\.)ch\.ch$/, /(^|\.)paymentstandards\.ch$/]
+const AMOUNT = /\b(?:CHF|Fr\.?)\s?\d|\d[\d'’,.]*\s?(?:CHF|Fr\.|francs?|Franken|franchi)\b/i
+
+describe('translated articles keep the Swiss rules', () => {
+  const articles = translations().flatMap(([locale, content]) =>
+    Object.entries(content.articles ?? {}).map(([id, article]) => ({ locale, id, article })),
+  )
+
+  test('there are translated articles to check', () => {
+    expect(articles.length).toBeGreaterThan(0)
+  })
+
+  test.each(articles)('$locale/$id quotes no amount', ({ article }) => {
+    for (const paragraph of article!.body) {
+      expect(AMOUNT.test(paragraph), paragraph).toBe(false)
+    }
+  })
+
+  test.each(articles)('$locale/$id cites only official publishers', ({ article }) => {
+    for (const source of article!.sources ?? []) {
+      const parsed = new URL(source.url)
+      expect(parsed.protocol, source.url).toBe('https:')
+      expect(OFFICIAL_HOSTS.some(rx => rx.test(parsed.hostname)), source.url).toBe(true)
+    }
+  })
+
+  /**
+   * A translated article that still links the English page is a translation
+   * left half done — and it is invisible, because the link works.
+   */
+  test.each(articles)('$locale/$id links its own language', ({ locale, id, article }) => {
+    const english = en.articles[id as keyof typeof en.articles]?.sources ?? []
+    if (english.length === 0) return
+    const englishUrls = new Set(english.map(s => s.url))
+    const reused = (article!.sources ?? []).filter(s => englishUrls.has(s.url)).map(s => s.url)
+    expect(reused, `${locale}/${id} still points at the English page`).toEqual([])
+  })
+
+  test.each(articles)('$locale/$id keeps every source English had', ({ article, id }) => {
+    const english = en.articles[id as keyof typeof en.articles]?.sources ?? []
+    expect(article!.sources?.length ?? 0).toBe(english.length)
   })
 })

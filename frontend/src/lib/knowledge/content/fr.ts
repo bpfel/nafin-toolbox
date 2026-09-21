@@ -9,9 +9,13 @@ import type { PartialContent } from '../content'
  * Affectations, instantané, Savoir, Profil. Une visite qui nomme les choses
  * autrement que les écrans qu’elle explique n’explique rien.
  *
- * Les articles manquent encore. C’est permis : ce module est `Partial`,
- * l’anglais transparaît dans les trous, et la fiche le dit franchement plutôt
- * que de faire passer la langue de repli pour une traduction.
+ * Complet : la visite et les articles. Le module reste `Partial` — un article
+ * ajouté plus tard peut n’exister d’abord qu’en anglais, et la fiche le dira
+ * franchement plutôt que de faire passer la langue de repli pour une traduction.
+ *
+ * Les sources pointent vers les versions françaises des pages officielles.
+ * Renvoyer un lecteur francophone vers une page anglaise serait une traduction
+ * à moitié faite.
  */
 export const fr: PartialContent = {
   tour: {
@@ -47,6 +51,36 @@ export const fr: PartialContent = {
     knowledge: {
       title: 'Vous pouvez revenir',
       body: 'Cette visite se trouve ici, avec de courts textes sur l’usage de chaque vue et sur le fonctionnement des finances suisses. Rien de ce que vous venez de voir n’est à retenir.',
+    },
+  },
+  articles: {
+    'about-budget': {
+      title: 'À quoi sert le budget',
+      body: [
+        'Le budget décrit un mois type : ce qui entre, ce qui sort et ce qui est mis de côté. C’est un plan que vous tenez à jour, pas un relevé d’opérations — l’application ne voit jamais votre banque.',
+        'Les lignes sont regroupées sous des titres que vous choisissez. Chaque ligne a une sorte, et c’est elle qui compte : revenus et dépenses sont de l’argent qui arrive et de l’argent parti, tandis que l’épargne, les factures et les achats quittent votre compte sans quitter votre patrimoine.',
+        'Il y a un seul plan, pas un par mois. Quand quelque chose change assez pour mériter d’être retenu — une augmentation, un déménagement, une nouvelle assurance —, prenez un instantané nommé : le plan continue de vivre à côté.',
+      ],
+    },
+
+    'pillar-3a': {
+      title: 'Pilier 3a',
+      body: [
+        'Le pilier 3a est la part fiscalement privilégiée de la prévoyance privée. Ce que vous y versez dans l’année se déduit de votre revenu imposable de cette année-là, et c’est l’essentiel de sa raison d’être.',
+        'Il est plafonné. Un maximum légal s’applique chaque année, et il diffère selon que vous êtes déjà affilié à une caisse de pension ou non. Le montant est fixé par la Confédération et change de temps à autre : il n’est donc pas repris ici, l’administration fiscale publie celui qui est en vigueur.',
+        'L’argent est bloqué jusqu’à l’approche de l’âge de la retraite, avec une courte liste d’exceptions : acheter un logement que vous habitez, quitter définitivement la Suisse, ou vous mettre à votre compte.',
+        'Tout ce qui dépasse ce plafond, et tout ce que vous voulez pouvoir retirer, relève du pilier 3b : épargne et placements ordinaires, sans plafond et sans déduction.',
+      ],
+      sources: [
+        {
+          label: 'ch.ch — le 3e pilier',
+          url: 'https://www.ch.ch/fr/retraite/rente-de-vieillesse/le-3e-pilier/',
+        },
+        {
+          label: 'Administration fédérale des contributions — déductions maximales pilier 3a',
+          url: 'https://www.estv.admin.ch/fr/taux-interet-deductions-maximales-pilier-3a-impot-federal-direct',
+        },
+      ],
     },
   },
 }
