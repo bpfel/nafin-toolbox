@@ -25,8 +25,8 @@ export const en: Content = {
       body: 'Budget is where you define your monthly cash flows. Accounts defines how money moves between your bank accounts. Knowledge is the home of this tour and holds links to official sources on Swiss personal finance. Profile holds your personal settings.',
     },
     types: {
-      title: 'Five kinds of line',
-      body: 'A budget line is not just an amount — its kind says what happens to the money.',
+      title: 'Five types of budget entry',
+      body: 'A budget entry is not just an amount — its type says what happens to the money.',
     },
     budget: {
       title: 'One standing plan',
@@ -43,7 +43,7 @@ export const en: Content = {
     },
     allocations: {
       title: 'Two views here',
-      body: 'Accounts lists the balances. Allocations answers the harder question — which account each budget line comes out of, and which one it goes into.',
+      body: 'Accounts lists the balances. Allocations answers the harder question — which account each budget entry comes out of, and which one it goes into.',
     },
     knowledge: {
       title: 'You can come back',
@@ -56,7 +56,7 @@ export const en: Content = {
       title: 'What the budget is for',
       body: [
         'The budget is a description of a typical month: what comes in, what goes out, and what is held back. It is a plan you maintain, not a record of transactions — the app never sees your bank.',
-        'Lines are grouped under headings you choose. Each line has a type, and the type is the part worth getting right: income and expense are money arriving and money gone, while savings, bills and purchases all leave your account without leaving your net worth.',
+        'Entries are grouped under headings you choose. Each entry has a type, and the type is the part worth getting right: income and expense are money arriving and money gone, while savings, bills and purchases all leave your account without leaving your net worth.',
         'There is one plan, not one per month. When something changes enough to be worth remembering — a raise, a move, a new insurance — take a named snapshot, and the plan carries on live beside it.',
       ],
     },

@@ -28,8 +28,8 @@ export const fr: PartialContent = {
       body: 'Budget, c’est là que vous définissez vos flux mensuels. Comptes définit comment l’argent circule entre vos comptes bancaires. Savoir est le point de départ de cette visite et renvoie à des sources officielles sur les finances personnelles suisses. Profil contient vos réglages personnels.',
     },
     types: {
-      title: 'Cinq sortes de lignes',
-      body: 'Une ligne de budget n’est pas qu’un montant — sa sorte dit ce qu’il advient de l’argent.',
+      title: 'Cinq types d’entrées budgétaires',
+      body: 'Une entrée budgétaire n’est pas qu’un montant — son type dit ce qu’il advient de l’argent.',
     },
     budget: {
       title: 'Un plan permanent',
@@ -46,7 +46,7 @@ export const fr: PartialContent = {
     },
     allocations: {
       title: 'Deux vues ici',
-      body: 'Comptes liste les soldes. Affectations répond à la question plus difficile — de quel compte sort chaque ligne du budget, et sur lequel elle arrive.',
+      body: 'Comptes liste les soldes. Affectations répond à la question plus difficile — de quel compte sort chaque entrée du budget, et sur lequel elle arrive.',
     },
     knowledge: {
       title: 'Vous pouvez revenir',
@@ -58,7 +58,7 @@ export const fr: PartialContent = {
       title: 'À quoi sert le budget',
       body: [
         'Le budget décrit un mois type : ce qui entre, ce qui sort et ce qui est mis de côté. C’est un plan que vous tenez à jour, pas un relevé d’opérations — l’application ne voit jamais votre banque.',
-        'Les lignes sont regroupées sous des titres que vous choisissez. Chaque ligne a une sorte, et c’est elle qui compte : revenus et dépenses sont de l’argent qui arrive et de l’argent parti, tandis que l’épargne, les factures et les achats quittent votre compte sans quitter votre patrimoine.',
+        'Les entrées sont regroupées sous des titres que vous choisissez. Chaque entrée a un type, et c’est lui qui compte : revenus et dépenses sont de l’argent qui arrive et de l’argent parti, tandis que l’épargne, les factures et les achats quittent votre compte sans quitter votre patrimoine.',
         'Il y a un seul plan, pas un par mois. Quand quelque chose change assez pour mériter d’être retenu — une augmentation, un déménagement, une nouvelle assurance —, prenez un instantané nommé : le plan continue de vivre à côté.',
       ],
     },

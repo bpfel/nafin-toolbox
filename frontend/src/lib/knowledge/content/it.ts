@@ -27,8 +27,8 @@ export const it: PartialContent = {
       body: 'Budget è dove definisci i tuoi flussi mensili. Conti definisce come il denaro si muove tra i tuoi conti bancari. Sapere è la sede di questo tour e rimanda a fonti ufficiali sulle finanze personali svizzere. Profilo contiene le tue impostazioni personali.',
     },
     types: {
-      title: 'Cinque tipi di riga',
-      body: 'Una riga di budget non è solo un importo — il suo tipo dice che cosa succede al denaro.',
+      title: 'Cinque tipi di voci di budget',
+      body: 'Una voce di budget non è solo un importo — il suo tipo dice che cosa succede al denaro.',
     },
     budget: {
       title: 'Un piano permanente',
@@ -45,7 +45,7 @@ export const it: PartialContent = {
     },
     allocations: {
       title: 'Due viste qui',
-      body: 'Conti elenca i saldi. Assegnazioni risponde alla domanda più difficile — da quale conto esce ogni riga del budget e su quale entra.',
+      body: 'Conti elenca i saldi. Assegnazioni risponde alla domanda più difficile — da quale conto esce ogni voce del budget e su quale entra.',
     },
     knowledge: {
       title: 'Puoi tornare qui',
@@ -57,7 +57,7 @@ export const it: PartialContent = {
       title: 'A cosa serve il budget',
       body: [
         'Il budget descrive un mese tipico: che cosa entra, che cosa esce e che cosa viene tenuto da parte. È un piano che aggiorni tu, non un registro dei movimenti — l’app non vede mai la tua banca.',
-        'Le righe stanno sotto intestazioni che scegli tu. Ogni riga ha un tipo, ed è quello che conta: entrate e uscite sono denaro che arriva e denaro che se n’è andato, mentre risparmi, fatture e acquisti lasciano il tuo conto senza lasciare il tuo patrimonio.',
+        'Le voci stanno sotto intestazioni che scegli tu. Ogni voce ha un tipo, ed è quello che conta: entrate e uscite sono denaro che arriva e denaro che se n’è andato, mentre risparmi, fatture e acquisti lasciano il tuo conto senza lasciare il tuo patrimonio.',
         'C’è un solo piano, non uno al mese. Quando qualcosa cambia abbastanza da valere la pena di ricordarlo — un aumento, un trasloco, una nuova assicurazione — scatta un’istantanea con un nome: il piano continua a vivere accanto a essa.',
       ],
     },

@@ -27,8 +27,8 @@ export const de: PartialContent = {
       body: 'Budget ist, wo Sie Ihre monatlichen Geldflüsse festlegen. Konten legt fest, wie Geld zwischen Ihren Bankkonten fliesst. Wissen ist das Zuhause dieses Rundgangs und verweist auf offizielle Quellen zu Schweizer Finanzthemen. Profil enthält Ihre persönlichen Einstellungen.',
     },
     types: {
-      title: 'Fünf Arten von Zeilen',
-      body: 'Eine Budgetzeile ist nicht nur ein Betrag — ihre Art sagt, was mit dem Geld geschieht.',
+      title: 'Fünf Arten von Budgeteinträgen',
+      body: 'Ein Budgeteintrag ist nicht nur ein Betrag — seine Art sagt, was mit dem Geld geschieht.',
     },
     budget: {
       title: 'Ein stehender Plan',
@@ -45,7 +45,7 @@ export const de: PartialContent = {
     },
     allocations: {
       title: 'Zwei Ansichten',
-      body: 'Konten zeigt die Salden. Zuordnungen beantwortet die schwierigere Frage — von welchem Konto jede Budgetzeile abgeht und auf welches sie geht.',
+      body: 'Konten zeigt die Salden. Zuordnungen beantwortet die schwierigere Frage — von welchem Konto jeder Budgeteintrag abgeht und auf welches er geht.',
     },
     knowledge: {
       title: 'Sie können zurückkommen',
@@ -57,7 +57,7 @@ export const de: PartialContent = {
       title: 'Wozu das Budget da ist',
       body: [
         'Das Budget beschreibt einen typischen Monat: was hereinkommt, was hinausgeht und was zurückgehalten wird. Es ist ein Plan, den Sie pflegen, und keine Aufzeichnung von Transaktionen — die App sieht Ihre Bank nie.',
-        'Zeilen stehen unter Überschriften, die Sie selbst wählen. Jede Zeile hat eine Art, und auf die kommt es an: Einnahmen und Ausgaben sind Geld, das kommt, und Geld, das weg ist, während Sparen, Rechnungen und Anschaffungen zwar Ihr Konto verlassen, nicht aber Ihr Vermögen.',
+        'Einträge stehen unter Überschriften, die Sie selbst wählen. Jeder Eintrag hat eine Art, und auf die kommt es an: Einnahmen und Ausgaben sind Geld, das kommt, und Geld, das weg ist, während Sparen, Rechnungen und Anschaffungen zwar Ihr Konto verlassen, nicht aber Ihr Vermögen.',
         'Es gibt einen Plan, nicht einen pro Monat. Ändert sich etwas, das es zu behalten lohnt — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, erstellen Sie eine benannte Momentaufnahme, und der Plan läuft daneben weiter.',
       ],
     },

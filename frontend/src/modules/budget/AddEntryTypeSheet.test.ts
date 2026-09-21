@@ -4,7 +4,7 @@ import AddEntryTypeSheet from './AddEntryTypeSheet.svelte'
 import type { EntryType } from '../../lib/crypto/vault'
 
 /**
- * The sheet exists because a budget line is five things, not one. What matters
+ * The sheet exists because a budget entry is five things, not one. What matters
  * is that all five are reachable and that each says what it is — the screen's
  * "+" is the route in for someone who does not yet know which section they
  * want, so a list of five bare nouns would not have helped them.
