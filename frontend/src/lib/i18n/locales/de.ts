@@ -223,6 +223,7 @@ export const de: Messages = {
   'guide.bill.title': 'Eine Rechnung, die wiederkommt',
   'guide.bill.body': 'Vierteljährliche Krankenkasse, eine halbjährliche Steuerrate, ein Jahresabo. Legen Sie Betrag und Periode fest, der Monatsbeitrag ergibt sich daraus.',
   'guide.bill.ready': 'Die App sorgt dafür, dass das Geld einen Monat vor Fälligkeit bereit ist.',
+  'guide.bill.cycles': 'Zyklen teilen das Jahr: alle 2, 3, 4, 6 oder 12 Monate. Eine Rechnung, die jeden Monat kommt, ist schlicht eine Ausgabe — da gibt es nichts anzusparen.',
   'guide.purchase.title': 'Etwas, das sich abnutzt',
   'guide.purchase.body': 'Ein Laptop, ein Auto, eine grössere Anschaffung, die absehbar ist. Legen Sie die erwarteten Kosten und die Ziellebensdauer fest, der Monatsbetrag ergibt sich daraus — oder legen Sie den Monatsbetrag fest, dann ergibt sich die Lebensdauer.',
   'guide.purchase.reset': 'Sobald Sie kaufen, tragen Sie das Datum unter «Gekauft» ein, und die Uhr beginnt von vorn.',

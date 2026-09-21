@@ -29,7 +29,7 @@ export type SeedKey =
   | 'groceries' | 'transport' | 'telecoms'
   | 'clothing' | 'entertainment' | 'diningOut'
   | 'savings' | 'pillar3a'
-  | 'serafe' | 'laptop'
+  | 'serafe' | 'laptop' | 'travelPass'
 
 type SeedNames = Record<SeedKey, string>
 
@@ -53,6 +53,7 @@ const en: SeedNames = {
   entertainment: 'Entertainment & Recreation',
   diningOut: 'Dining Out',
   serafe: 'Serafe',
+  travelPass: 'GA travelcard',
   laptop: 'Laptop',
   savings: 'Savings',
   pillar3a: 'Pillar 3a',
@@ -78,6 +79,7 @@ const de: SeedNames = {
   entertainment: 'Unterhaltung & Freizeit',
   diningOut: 'Auswärts essen',
   serafe: 'Serafe',
+  travelPass: 'Generalabonnement',
   laptop: 'Laptop',
   savings: 'Sparen',
   pillar3a: 'Säule 3a',
@@ -103,6 +105,7 @@ const fr: SeedNames = {
   entertainment: 'Loisirs & culture',
   diningOut: 'Repas à l’extérieur',
   serafe: 'Serafe',
+  travelPass: 'Abonnement général',
   laptop: 'Ordinateur portable',
   savings: 'Épargne',
   pillar3a: 'Pilier 3a',
@@ -128,6 +131,7 @@ const it: SeedNames = {
   entertainment: 'Svago e cultura',
   diningOut: 'Pasti fuori casa',
   serafe: 'Serafe',
+  travelPass: 'Abbonamento generale',
   laptop: 'Computer portatile',
   savings: 'Risparmio',
   pillar3a: 'Pilastro 3a',

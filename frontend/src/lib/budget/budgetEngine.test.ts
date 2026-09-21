@@ -1130,8 +1130,24 @@ describe('seedDefaults', () => {
     // Out of the account, still in the net worth: savings, 3a, Serafe and the
     // laptop fund. This total could not be asserted before, because nothing in
     // the seeded data distinguished the four from an expense.
-    expect(summary.totalPlannedSavings).toBe('1133.92')
-    expect(summary.plannedBalance).toBe('394.41')
+    expect(summary.totalPlannedSavings).toBe('1466.84')
+    // Down from 394.41 when the GA was added: the seeded budget still carries
+    // HABE's full transport figure alongside it, so a household with a GA is
+    // shown paying for transport twice. Left that way deliberately — the
+    // survey figure is what the setup screen claims these are based on, and
+    // changing it would make that claim untrue.
+    expect(summary.plannedBalance).toBe('61.49')
+  })
+
+  test('two bills are seeded, so the type does not read as a special case', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const bills = vault.budget.entries.filter(e => e.type === 'bill')
+
+    expect(bills).toHaveLength(2)
+    // Serafe sorts first, and the allocations step names it by name.
+    expect(bills[0].name).toBe('Serafe')
   })
 
   test('the defaults exercise every entry type', () => {

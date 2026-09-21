@@ -239,6 +239,7 @@ export const fr: Messages = {
   'guide.bill.title': 'Une facture qui revient',
   'guide.bill.body': 'Assurance maladie trimestrielle, un acompte d’impôt semestriel, un abonnement annuel. Indiquez le montant et la périodicité, la contribution mensuelle en découle.',
   'guide.bill.ready': 'L’application fait en sorte que l’argent soit prêt un mois avant l’échéance.',
+  'guide.bill.cycles': 'Les cycles divisent l’année : tous les 2, 3, 4, 6 ou 12 mois. Une facture qui arrive chaque mois est simplement une dépense — il n’y a rien à provisionner.',
   'guide.purchase.title': 'Quelque chose qui s’use',
   'guide.purchase.body': 'Un ordinateur portable, une voiture, un achat important que vous voyez venir. Indiquez le coût prévu et la durée de vie visée, le montant mensuel en découle — ou indiquez le montant mensuel, et c’est la durée de vie qui en découle.',
   'guide.purchase.reset': 'Quand vous achetez, renseignez la date sous « Acheté » et le compteur repart.',

@@ -566,6 +566,14 @@ function bfsDefaults(): DefaultEntry[] {
     // than a bill that arrives. 1'512 over seven years is exactly 18.00 a
     // month, which is the point of the odd-looking price — a round monthly
     // figure reads as a decision, and 17.86 reads as arithmetic.
+    // A second bill, so the type does not read as "the radio levy and nothing
+    // else". The GA is the Swiss annual bill most households recognise, and
+    // unlike Serafe it is one you choose — which is the more common shape.
+    //
+    // 3'995 is the adult second-class fare. Like every figure here it is a
+    // starting point the user overwrites, and it moves; 332.92 a month is
+    // what follows from it.
+    { key: 'travelPass', type: 'bill', sortOrder: 50, categoryKey: 'cat.living', amount: '332.92', targetAmount: '3995.00', periodMonths: 12 },
     { key: 'laptop', type: 'purchase', sortOrder: 40, categoryKey: 'cat.living', amount: '18.00', targetAmount: '1512.00', periodMonths: 84 },
     // Savings, not expense. Until v7 there was no type that meant "leaves the
     // account without leaving your net worth", so these two were seeded as

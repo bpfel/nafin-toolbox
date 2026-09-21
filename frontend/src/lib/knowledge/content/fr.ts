@@ -42,7 +42,7 @@ export const fr: PartialContent = {
     },
     accounts: {
       title: 'Comptes',
-      body: 'Cet écran contient tous vos comptes bancaires. Si vous ajoutez l’IBAN et les informations qui vont avec, vous pourrez générer des QR-factures payables sur ce compte.',
+      body: 'Cet écran contient tous vos comptes. Si vous ajoutez l’IBAN et les informations qui vont avec, vous pourrez générer des QR-factures payables sur ce compte.',
     },
     allocations: {
       title: 'Affectations',

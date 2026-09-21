@@ -17,10 +17,16 @@
     body: MessageKey
     /** A second paragraph where the rule needs one. */
     note?: MessageKey
+    /**
+     * A third, for what only somebody who came here to read would want. The
+     * tour shares this content but renders `title`, `body` and `note` only —
+     * see `typeGuide.ts`.
+     */
+    detail?: MessageKey
     onclose: () => void
   }
 
-  let { title, body, note, onclose }: Props = $props()
+  let { title, body, note, detail, onclose }: Props = $props()
 </script>
 
 <Sheet label={t(title)} {onclose}>
@@ -28,6 +34,9 @@
   <p>{t(body)}</p>
   {#if note}
     <p class="note">{t(note)}</p>
+  {/if}
+  {#if detail}
+    <p class="note">{t(detail)}</p>
   {/if}
   <div class="actions">
     <button class="btn" onclick={onclose}>{t('action.done')}</button>

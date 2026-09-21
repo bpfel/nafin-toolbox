@@ -238,6 +238,7 @@ export const en = {
   'guide.bill.title': 'A bill that keeps coming back',
   'guide.bill.body': 'Quarterly health insurance, a half-yearly tax instalment, an annual subscription. Define the amount and the period, and the monthly contribution follows.',
   'guide.bill.ready': 'The app makes sure the money is ready one month before it is due.',
+  'guide.bill.cycles': 'Cycles divide the year: every 2, 3, 4, 6 or 12 months. A bill that arrives every month is simply an expense — there is nothing to save up for.',
   'guide.purchase.title': 'Something that wears out',
   'guide.purchase.body': 'A laptop, a car, a large purchase you can see coming. Set the expected cost and the target lifetime, and the monthly amount follows — or set the monthly amount, and the lifetime follows instead.',
   'guide.purchase.reset': 'When you buy it, set the Bought date on the entry and the clock starts again.',

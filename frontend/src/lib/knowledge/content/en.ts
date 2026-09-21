@@ -39,7 +39,7 @@ export const en: Content = {
     },
     accounts: {
       title: 'Accounts',
-      body: 'This screen contains all of your bank accounts. If you add the IBAN and the details that go with it, you can generate QR-bills payable to that account.',
+      body: 'This screen contains all of your accounts. If you add the IBAN and the details that go with it, you can generate QR-bills payable to that account.',
     },
     allocations: {
       title: 'Allocations',

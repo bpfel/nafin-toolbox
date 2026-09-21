@@ -41,7 +41,7 @@ export const it: PartialContent = {
     },
     accounts: {
       title: 'Conti',
-      body: 'Questa schermata contiene tutti i tuoi conti bancari. Se aggiungi l’IBAN e i dati che lo accompagnano, potrai generare QR-fatture pagabili su questo conto.',
+      body: 'Questa schermata contiene tutti i tuoi conti. Se aggiungi l’IBAN e i dati che lo accompagnano, potrai generare QR-fatture pagabili su questo conto.',
     },
     allocations: {
       title: 'Assegnazioni',

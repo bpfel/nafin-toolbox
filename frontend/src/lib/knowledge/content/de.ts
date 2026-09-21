@@ -41,7 +41,7 @@ export const de: PartialContent = {
     },
     accounts: {
       title: 'Konten',
-      body: 'Auf diesem Bildschirm stehen alle Ihre Bankkonten. Wenn Sie die IBAN und die übrigen Angaben erfassen, können Sie QR-Rechnungen erstellen, die auf dieses Konto lauten.',
+      body: 'Auf diesem Bildschirm stehen alle Ihre Konten. Wenn Sie die IBAN und die übrigen Angaben erfassen, können Sie QR-Rechnungen erstellen, die auf dieses Konto lauten.',
     },
     allocations: {
       title: 'Zuordnungen',

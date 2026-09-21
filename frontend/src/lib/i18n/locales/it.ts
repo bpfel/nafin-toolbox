@@ -239,6 +239,7 @@ export const it: Messages = {
   'guide.bill.title': 'Una fattura che torna',
   'guide.bill.body': 'Cassa malati trimestrale, un acconto d’imposta semestrale, un abbonamento annuale. Indica l’importo e il periodo, il contributo mensile ne deriva.',
   'guide.bill.ready': 'L’app fa in modo che il denaro sia pronto un mese prima della scadenza.',
+  'guide.bill.cycles': 'I cicli dividono l’anno: ogni 2, 3, 4, 6 o 12 mesi. Una fattura che arriva ogni mese è semplicemente una uscita — non c’è nulla da accantonare.',
   'guide.purchase.title': 'Qualcosa che si consuma',
   'guide.purchase.body': 'Un computer portatile, un’auto, un acquisto importante che sai già di dover fare. Indica il costo previsto e la durata prevista, l’importo mensile ne deriva — oppure indica l’importo mensile, e ne deriva la durata.',
   'guide.purchase.reset': 'Quando lo compri, inserisci la data sotto «Acquistato» e il conteggio riparte.',
