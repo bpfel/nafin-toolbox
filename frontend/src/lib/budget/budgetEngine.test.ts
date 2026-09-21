@@ -1126,17 +1126,28 @@ describe('seedDefaults', () => {
     // Consumed and gone. Lower than it once was by exactly the two set-asides
     // that used to be mis-typed as expenses: the defaults claimed a household
     // spent its own savings and its own 3a contributions.
-    expect(summary.totalPlannedExpenses).toBe('4471.67')
+    expect(summary.totalPlannedExpenses).toBe('4138.75')
     // Out of the account, still in the net worth: savings, 3a, Serafe and the
     // laptop fund. This total could not be asserted before, because nothing in
     // the seeded data distinguished the four from an expense.
     expect(summary.totalPlannedSavings).toBe('1466.84')
-    // Down from 394.41 when the GA was added: the seeded budget still carries
-    // HABE's full transport figure alongside it, so a household with a GA is
-    // shown paying for transport twice. Left that way deliberately — the
-    // survey figure is what the setup screen claims these are based on, and
-    // changing it would make that claim untrue.
-    expect(summary.plannedBalance).toBe('61.49')
+    expect(summary.plannedBalance).toBe('394.41')
+  })
+
+  /**
+   * The GA is carved out of HABE's transport figure rather than added on top
+   * of it, so the household is not shown paying for transport twice. Asserted
+   * as a sum, because the point is the total and either number may be
+   * restated without breaking it.
+   */
+  test('the travel pass and what is left of transport still make the survey figure', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const of = (name: string) =>
+      Number(plannedFor(vault, vault.budget.entries.find(e => e.name === name)!.id))
+
+    expect(of('Transportation') + of('GA travelcard')).toBeCloseTo(400, 2)
   })
 
   test('two bills are seeded, so the type does not read as a special case', () => {

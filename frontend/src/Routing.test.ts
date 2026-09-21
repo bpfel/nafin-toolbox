@@ -73,14 +73,28 @@ vi.mock('./lib/util/buildVersion.svelte', () => ({
 }))
 
 import App from './App.svelte'
-import { navigate } from './lib/nav/router.svelte'
+import { navigate, syncFromLocation } from './lib/nav/router.svelte'
 import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
 
 const admin = { id: 1, email: 'admin@example.ch', role: 'admin', must_change_password: false }
 const user = { id: 2, email: 'anna@example.ch', role: 'user', must_change_password: false }
 
+/**
+ * Puts the address bar *and* the router at `path`.
+ *
+ * `replaceState` alone was not enough. The router reads the address once, on
+ * mount, so a path set before render was only honoured if the shell did not
+ * redirect first — and it redirects anything that is not the role's landing
+ * screen. Every test in this file happened to name a landing screen, so they
+ * all passed either way and none of them proved what it looked like it
+ * proved.
+ *
+ * `syncFromLocation` is the seam the router already exposes for this, for the
+ * verification page, which rewrites the address itself.
+ */
 function at(path: string) {
   window.history.replaceState({}, '', path)
+  syncFromLocation()
 }
 
 describe('the shell', () => {
@@ -139,16 +153,8 @@ describe('the shell', () => {
    */
   test('the build is named on the profile page', async () => {
     currentUser = admin
+    at('/profile')
     const { container } = render(App)
-
-    // Reached by pressing the tab rather than by typing the address. `at()`
-    // sets the URL but the router only reads it once, on mount, so an address
-    // that is not the role's landing screen is redirected away before the
-    // shell sees it. Every other test here happens to name a landing screen,
-    // which is why nothing had noticed.
-    const nav = await screen.findByRole('navigation', { name: 'Sections' })
-    const profile = [...nav.querySelectorAll('a')].find(a => a.textContent?.trim() === 'Profile')!
-    profile.click()
 
     await waitFor(() => expect(container.textContent).toContain('nafin'))
   })

@@ -11,6 +11,7 @@
   import { autofocus } from './lib/util/autofocus'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
+  import VersionTag from './lib/util/VersionTag.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import TourOverlay from './lib/tour/TourOverlay.svelte'
   import { resetTour } from './lib/tour/tourStore.svelte'
@@ -324,8 +325,20 @@
   />
 {/if}
 
-<!-- Outside the branch chain: a stale tab is worth flagging on every screen.
-     The version tag is not here any more — it lives on the profile page. -->
+<!--
+  The build, on the screens that have no profile page to put it on.
+
+  `chromeless` is exactly the gate chain — signing in, unlocking, a vault the
+  build cannot read — and those are the screens someone is looking at when
+  they most need to say which build they are on, because they cannot get past
+  them to look anywhere else. Everywhere else it sits at the foot of the
+  profile page instead of under every screen.
+-->
+{#if chromeless}
+  <VersionTag />
+{/if}
+
+<!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
 <UpdateBanner />
 <UnsavedBanner />
 <!-- Here rather than inside a screen: the tour walks across screens, and a

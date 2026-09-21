@@ -547,7 +547,12 @@ function bfsDefaults(): DefaultEntry[] {
     { key: 'otherInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insuranceTaxes', amount: '166.67' },
     { key: 'taxes', type: 'expense', sortOrder: 30, categoryKey: 'cat.insuranceTaxes', amount: '833.33' },
     { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '500.00' },
-    { key: 'transport', type: 'expense', sortOrder: 20, categoryKey: 'cat.living', amount: '400.00' },
+    // 67.08, not 400: the GA below takes 332.92 of HABE's transport figure and
+    // this is the rest — the occasional taxi, a bike, a car shared for a
+    // weekend. Split rather than reduced, so the two together are still
+    // exactly the 400.00 the survey reports and the setup screen's claim
+    // about where these numbers come from stays true.
+    { key: 'transport', type: 'expense', sortOrder: 20, categoryKey: 'cat.living', amount: '67.08' },
     { key: 'telecoms', type: 'expense', sortOrder: 30, categoryKey: 'cat.living', amount: '80.00' },
     { key: 'clothing', type: 'expense', sortOrder: 10, categoryKey: 'cat.lifestyle', amount: '100.00' },
     { key: 'entertainment', type: 'expense', sortOrder: 20, categoryKey: 'cat.lifestyle', amount: '250.00' },
