@@ -16,28 +16,25 @@ import type { PartialContent } from '../content'
 export const de: PartialContent = {
   tour: {
     welcome: {
-      title: 'Ein Plan, keine Bank',
-      body: 'Nichts hier ist mit Ihren Bankkonten verbunden. Jede Zahl haben Sie selbst erfasst, und sie stimmt, solange Sie sie pflegen — genau darum kann sie auch sonst niemand lesen.',
+      title: 'Ein Planer',
+      body: 'Wir greifen nicht auf Ihre Bankkonten zu und sehen Ihre tatsächlichen Ausgaben nicht. Das Budget legt stattdessen fest, was bis Ende Monat übrig bleiben muss, damit künftige finanzielle Verpflichtungen immer gedeckt sind.',
     },
     places: {
-      title: 'Vier Orte',
-      body: 'Budget ist, was Sie planen. Konten ist, wo das Geld tatsächlich liegt. Wissen sind dieser Rundgang und eine kleine Bibliothek. Profil betrifft Sie selbst, nicht Ihr Geld.',
+      title: 'Die Bildschirme',
+      body: 'Budget ist, wo Sie Ihre monatlichen Geldflüsse festlegen. Konten legt fest, wie Geld zwischen Ihren Bankkonten fliesst. Wissen ist das Zuhause dieses Rundgangs und verweist auf offizielle Quellen zu Schweizer Finanzthemen. Profil enthält Ihre persönlichen Einstellungen.',
     },
     budget: {
       title: 'Ein stehender Plan',
       body: 'Kein Monatsjournal. Sie beschreiben einmal einen typischen Monat und erstellen eine benannte Momentaufnahme, wenn sich etwas ändert, das es wert ist.',
     },
     controls: {
-      title: 'Die Bedienelemente des Bildschirms',
-      body: 'Alles, was auf den ganzen Bildschirm wirkt, ist hier — den Aufbau bearbeiten, die Beträge verbergen. Auf dem Handy stapeln sie sich über diesem Punkt, dort, wo Ihr Daumen ohnehin liegt.',
-    },
-    privacy: {
-      title: 'Das Auge verbirgt die Beträge',
-      body: 'Es macht jede Zahl unkenntlich und lässt die Bezeichnungen lesbar — für den Zug oder den geteilten Schreibtisch. Gedrückt halten, um kurz hinzusehen. Das ist kosmetisch und nicht die Sperre Ihrer Daten.',
+      title: 'Bedienelemente',
+      body: 'Um auf dem aktuellen Bildschirm etwas zu tun, verwenden Sie diese Bedienelemente.',
+      hoverNote: 'Fahren Sie mit der Maus über ein Symbol, um zu sehen, was es tut.',
     },
     accounts: {
       title: 'Wo das Geld liegt',
-      body: 'Ein Konto ist ein realer Ort mit einem realen Saldo: Lohnkonto, Sparkonto, Bargeld in der Schublade. Sie sagen der App, was darauf liegt und wann Sie zuletzt nachgesehen haben.',
+      body: 'Ein Konto ist ein realer Ort mit einem realen Saldo: Lohnkonto, Sparkonto, Bargeld in der Schublade. Sie sagen der App, was darauf liegt und wann Sie zuletzt nachgesehen haben. Mit IBAN und den übrigen Angaben können Sie QR-Rechnungen erstellen, die auf dieses Konto lauten.',
     },
     allocations: {
       title: 'Zwei Ansichten',

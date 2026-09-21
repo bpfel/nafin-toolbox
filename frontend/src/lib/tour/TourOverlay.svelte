@@ -251,6 +251,11 @@
     <p class="progress">{t('tour.progress', { position: tour.position, total: tour.total })}</p>
     <h2>{text.title}</h2>
     <p class="body">{text.body}</p>
+    <!-- Advice a phone cannot act on: no hover, and the controls are behind
+         the dial's dot rather than laid out in a row. See `TourCopy`. -->
+    {#if wide && text.hoverNote}
+      <p class="body note">{text.hoverNote}</p>
+    {/if}
 
     <div class="controls">
       <button class="quiet" onclick={abandonTour}>{t('tour.skip')}</button>
@@ -375,6 +380,11 @@
     font-size: 0.92rem;
     line-height: 1.55;
     color: var(--ink-muted);
+  }
+
+  .note {
+    margin-top: 0.5rem;
+    color: var(--ink-faint);
   }
 
   .controls {

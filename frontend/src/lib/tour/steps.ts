@@ -23,7 +23,6 @@ export type TourStepId =
   | 'places'
   | 'budget'
   | 'controls'
-  | 'privacy'
   | 'accounts'
   | 'allocations'
   | 'knowledge'
@@ -52,13 +51,11 @@ export const TOUR_STEPS: TourStep[] = [
   { id: 'places', path: '/budget', anchor: 'nav' },
   { id: 'budget', path: '/budget' },
   { id: 'controls', path: '/budget', anchor: 'dial' },
-  // Unanchored on purpose, though the eye is a real element. Below 768px it is
-  // inside the dial, which is folded away — so the halo would ring a control
-  // the user cannot see, and opening the dial for them would mean the tour
-  // reaching into a component's private state to stage its own screenshot.
-  { id: 'privacy', path: '/budget' },
   { id: 'accounts', path: '/accounts' },
-  { id: 'allocations', path: '/accounts', anchor: 'accounts-tabs' },
+  // The second segment is the point: the step describes the allocations view,
+  // so it shows it rather than pointing at the tab that would reach it. A
+  // sub-tab is the one thing below a screen that is still a place.
+  { id: 'allocations', path: '/accounts/allocations', anchor: 'accounts-tabs' },
   // Ends where it can be started again, which is the one thing a tour must not
   // leave the user unable to find.
   { id: 'knowledge', path: '/knowledge', anchor: 'nav-knowledge' },

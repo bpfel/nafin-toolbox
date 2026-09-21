@@ -43,6 +43,20 @@ export interface Article {
 export interface TourCopy {
   title: string
   body: string
+  /**
+   * A sentence shown only at the wide layout.
+   *
+   * It exists for one thing — telling someone they can hover a control to
+   * find out what it does — which is advice a phone cannot act on: there is
+   * no hover, and the controls are behind the dial's dot rather than laid out
+   * in a row to point at.
+   *
+   * Keyed off the 768px layout rather than a `(hover: hover)` query, so it
+   * follows the breakpoint the rest of the shell already turns on. A touch
+   * laptop is therefore told about hovering, which is harmless; a phone is
+   * not, which is the case that matters.
+   */
+  hoverNote?: string
 }
 
 export interface Content {

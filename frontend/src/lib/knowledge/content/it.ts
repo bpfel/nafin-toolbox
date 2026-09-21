@@ -15,28 +15,25 @@ import type { PartialContent } from '../content'
 export const it: PartialContent = {
   tour: {
     welcome: {
-      title: 'Un piano, non una banca',
-      body: 'Qui non c’è alcun collegamento ai tuoi conti bancari. Ogni importo l’hai inserito tu, e resta corretto perché sei tu a tenerlo aggiornato — ed è anche per questo che nessun altro può leggerlo.',
+      title: 'Un pianificatore',
+      body: 'Non ci colleghiamo ai tuoi conti bancari e non guardiamo le tue spese effettive. Il budget stabilisce invece quanto deve restare alla fine del mese, in modo che gli impegni finanziari futuri siano sempre coperti.',
     },
     places: {
-      title: 'Quattro luoghi',
-      body: 'Budget è ciò che pianifichi. Conti è dove il denaro si trova davvero. Sapere è questo tour e una piccola biblioteca. Profilo riguarda te, non il tuo denaro.',
+      title: 'Le diverse schermate',
+      body: 'Budget è dove definisci i tuoi flussi mensili. Conti definisce come il denaro si muove tra i tuoi conti bancari. Sapere è la sede di questo tour e rimanda a fonti ufficiali sulle finanze personali svizzere. Profilo contiene le tue impostazioni personali.',
     },
     budget: {
       title: 'Un piano permanente',
       body: 'Non un registro mensile. Descrivi una volta sola un mese tipico e scatti un’istantanea con un nome quando qualcosa cambia abbastanza da valerne la pena.',
     },
     controls: {
-      title: 'I comandi della schermata',
-      body: 'Tutto ciò che agisce sull’intera schermata è qui — modificarne la struttura, nascondere gli importi. Sul telefono si impilano sopra questo punto, dove il pollice si trova già.',
-    },
-    privacy: {
-      title: 'L’occhio nasconde gli importi',
-      body: 'Sfoca ogni importo e lascia leggibili le etichette, per il treno o una scrivania condivisa. Tieni premuto per dare un’occhiata. È estetico — non è il blocco dei tuoi dati.',
+      title: 'I comandi',
+      body: 'Per agire sulla schermata corrente, usa questi comandi.',
+      hoverNote: 'Passa il puntatore su un simbolo per vedere che cosa fa.',
     },
     accounts: {
       title: 'Dove si trova il denaro',
-      body: 'Un conto è un luogo reale con un saldo reale: conto stipendio, conto di risparmio, contanti in un cassetto. Dici all’app quanto contiene e quando hai controllato l’ultima volta.',
+      body: 'Un conto è un luogo reale con un saldo reale: conto stipendio, conto di risparmio, contanti in un cassetto. Dici all’app quanto contiene e quando hai controllato l’ultima volta. Aggiungi un IBAN e i dati che lo accompagnano, e potrai generare QR-fatture pagabili su questo conto.',
     },
     allocations: {
       title: 'Due viste qui',

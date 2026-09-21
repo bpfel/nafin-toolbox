@@ -13,8 +13,24 @@ import { destinationsFor } from '../nav/destinations'
 describe('every step goes somewhere a user can be', () => {
   const userPaths = new Set(destinationsFor('user').map(d => d.path))
 
+  /**
+   * Two segments, like everywhere else: a screen, optionally a sub-tab. The
+   * allocations step names one, because it shows the view it is describing
+   * rather than pointing at the tab that would reach it.
+   */
+  function screenOf(path: string): string {
+    const [, screen = ''] = path.split('/')
+    return `/${screen}`
+  }
+
   test.each(TOUR_STEPS)('$id is on a real destination', ({ path }) => {
-    expect(userPaths.has(path)).toBe(true)
+    expect(userPaths.has(screenOf(path))).toBe(true)
+  })
+
+  test.each(TOUR_STEPS)('$id goes no deeper than a sub-tab', ({ path }) => {
+    // Three segments would be a place the router cannot name and the shell
+    // cannot render — the hard stop the whole app is built on.
+    expect(path.replace(/^\//, '').split('/').length).toBeLessThanOrEqual(2)
   })
 
   test('step ids are unique', () => {

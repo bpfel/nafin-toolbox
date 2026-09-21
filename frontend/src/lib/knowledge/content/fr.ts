@@ -16,28 +16,25 @@ import type { PartialContent } from '../content'
 export const fr: PartialContent = {
   tour: {
     welcome: {
-      title: 'Un plan, pas une banque',
-      body: 'Rien ici n’est relié à vos comptes bancaires. Chaque montant est un montant que vous avez saisi, et il reste juste parce que vous l’entretenez — c’est aussi pourquoi personne d’autre ne peut le lire.',
+      title: 'Un planificateur',
+      body: 'Nous ne nous connectons pas à vos comptes bancaires et nous ne consultons pas vos dépenses réelles. Le budget définit plutôt ce qui doit rester à la fin du mois, afin que vos engagements financiers à venir soient toujours couverts.',
     },
     places: {
-      title: 'Quatre endroits',
-      body: 'Budget, c’est ce que vous planifiez. Comptes, c’est là où l’argent se trouve vraiment. Savoir, c’est cette visite et une petite bibliothèque. Profil, c’est vous plutôt que votre argent.',
+      title: 'Les différents écrans',
+      body: 'Budget, c’est là que vous définissez vos flux mensuels. Comptes définit comment l’argent circule entre vos comptes bancaires. Savoir est le point de départ de cette visite et renvoie à des sources officielles sur les finances personnelles suisses. Profil contient vos réglages personnels.',
     },
     budget: {
       title: 'Un plan permanent',
       body: 'Pas un journal mensuel. Vous décrivez une seule fois un mois type, et vous prenez un instantané nommé quand quelque chose change assez pour mériter d’être retenu.',
     },
     controls: {
-      title: 'Les commandes de l’écran',
-      body: 'Tout ce qui agit sur l’écran entier est ici — modifier sa structure, masquer les montants. Sur un téléphone, elles s’empilent au-dessus de ce point, là où se trouve déjà votre pouce.',
-    },
-    privacy: {
-      title: 'L’œil masque les montants',
-      body: 'Il floute chaque montant et laisse les libellés lisibles, pour le train ou un bureau partagé. Maintenez appuyé pour jeter un coup d’œil. C’est cosmétique — ce n’est pas le verrou de vos données.',
+      title: 'Les commandes',
+      body: 'Pour agir sur l’écran en cours, utilisez ces commandes.',
+      hoverNote: 'Survolez un symbole pour voir ce qu’il fait.',
     },
     accounts: {
       title: 'Où se trouve l’argent',
-      body: 'Un compte est un endroit réel avec un solde réel : compte salaire, compte d’épargne, espèces dans un tiroir. Vous indiquez à l’application ce qu’il contient et quand vous avez vérifié pour la dernière fois.',
+      body: 'Un compte est un endroit réel avec un solde réel : compte salaire, compte d’épargne, espèces dans un tiroir. Vous indiquez à l’application ce qu’il contient et quand vous avez vérifié pour la dernière fois. Ajoutez un IBAN et les informations qui vont avec, et vous pourrez générer des QR-factures payables sur ce compte.',
     },
     allocations: {
       title: 'Deux vues ici',

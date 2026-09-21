@@ -17,28 +17,25 @@ import type { Content } from '../content'
 export const en: Content = {
   tour: {
     welcome: {
-      title: 'This is a plan, not a bank',
-      body: 'Nothing here is connected to your accounts. Every figure is one you typed, and stays right because you keep it right — which is also why nobody else can read it.',
+      title: 'This is a planner',
+      body: 'We do not interface with your bank accounts, and we do not review what you actually spend. Instead the budget defines what has to remain by the end of the month, so that future financial commitments are always covered.',
     },
     places: {
-      title: 'Four places',
-      body: 'Budget is what you plan. Accounts is where the money actually sits. Knowledge is this tour and a small library. Profile is everything about you rather than your money.',
+      title: 'The different screens',
+      body: 'Budget is where you define your monthly cash flows. Accounts defines how money moves between your bank accounts. Knowledge is the home of this tour and holds links to official sources on Swiss personal finance. Profile holds your personal settings.',
     },
     budget: {
       title: 'One standing plan',
       body: 'Not a ledger of months. You describe a typical month once, and take a named snapshot when something changes enough to be worth remembering.',
     },
     controls: {
-      title: 'The screen’s own controls',
-      body: 'Anything that acts on the whole screen is here — editing its structure, hiding the figures. On a phone they stack above this dot, where your thumb already is.',
-    },
-    privacy: {
-      title: 'The eye hides the amounts',
-      body: 'It blurs every figure and leaves the labels readable, for a train or a shared desk. Press and hold to peek without switching it back. It is cosmetic — it is not the lock on your data.',
+      title: 'Controls',
+      body: 'To act on the current screen, use these controls.',
+      hoverNote: 'Hover over a symbol to see what it does.',
     },
     accounts: {
       title: 'Where the money sits',
-      body: 'An account is a real place with a real balance: a salary account, a savings account, cash in a drawer. You tell the app what each one holds, and when you last checked.',
+      body: 'An account is a real place with a real balance: a salary account, a savings account, cash in a drawer. You tell the app what each one holds, and when you last checked. Add an IBAN and the details that go with it, and you can generate QR-bills payable to that account.',
     },
     allocations: {
       title: 'Two views here',
