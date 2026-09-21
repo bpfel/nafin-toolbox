@@ -20,37 +20,37 @@ export const it: PartialContent = {
   tour: {
     welcome: {
       title: 'Un pianificatore',
-      body: 'Non ci colleghiamo ai tuoi conti bancari e non guardiamo le tue spese effettive. Il budget stabilisce invece quanto deve restare alla fine del mese, in modo che gli impegni finanziari futuri siano sempre coperti.',
+      body: 'Questa app non ha alcun collegamento con la tua banca e non vede mai le tue spese reali. Il budget dice invece quanto deve restare alla fine del mese, perché gli impegni futuri siano sempre coperti.',
     },
     places: {
       title: 'Le diverse schermate',
-      body: 'Budget è dove pianifichi i tuoi flussi mensili. Conti mostra come il denaro si sposta tra i tuoi conti. Sapere ospita questo tour e brevi testi sulle finanze svizzere. Profilo riguarda te, non il tuo denaro.',
+      body: 'Budget è dove pianifichi un mese. Conti mostra i saldi reali corrispondenti. Sapere ospita questo tour e brevi testi sulle finanze svizzere. Profilo contiene lingua, password e impostazioni di sicurezza.',
     },
     types: {
       title: 'Diverse voci di budget',
-      body: 'Il budget contiene diversi tipi, presentati qui di seguito.',
+      body: 'Ne esistono vari tipi, presentati uno dopo l’altro.',
     },
     budget: {
       title: 'Un piano permanente',
-      body: 'Non un registro mensile. Descrivi una volta sola un mese tipico e scatti un’istantanea con un nome quando qualcosa cambia abbastanza da valerne la pena.',
+      body: 'Non un registro mensile. Descrivi un mese tipico una volta sola e scatti un’istantanea con un nome quando qualcosa cambia abbastanza da valerne la pena.',
       note: 'A titolo di esempio usiamo alcuni valori svizzeri predefiniti.',
     },
     controls: {
       title: 'I comandi',
-      body: 'Per agire sulla schermata corrente, usa questi comandi.',
+      body: 'Tutto ciò che agisce sull’intera schermata si trova qui.',
       hoverNote: 'Passa il puntatore su un simbolo per vedere che cosa fa.',
     },
     accounts: {
       title: 'Conti',
-      body: 'Questa schermata contiene tutti i tuoi conti. Se aggiungi l’IBAN e i dati che lo accompagnano, potrai generare QR-fatture pagabili su questo conto.',
+      body: 'Qui c’è tutto ciò che possiedi, in banca o altrove. Aggiungi l’IBAN e i dati che lo accompagnano, e potrai generare QR-fatture pagabili su di esso.',
     },
     allocations: {
       title: 'Assegnazioni',
-      body: 'Qui colleghi le tue voci di budget ai conti. Lo stipendio, per esempio, arriva sul conto principale. Per mettere da parte il computer portatile e accantonare la fattura Serafe, potresti trasferire quel denaro su un altro conto. Ne risultano un saldo per conto e una proiezione delle riserve necessarie.',
+      body: 'Qui colleghi ogni voce di budget alla provenienza e alla destinazione del suo denaro. Lo stipendio arriva sul conto principale; l’accantonamento per il computer portatile e la fattura Serafe vanno dove non verranno spesi. Ne risultano un saldo per ciascuno e una proiezione delle riserve necessarie.',
     },
     knowledge: {
       title: 'Puoi tornare qui',
-      body: 'Questo tour si trova qui, insieme a brevi testi su a cosa serve ogni vista e su come funzionano le finanze svizzere. Non devi ricordare nulla di ciò che hai appena visto.',
+      body: 'Il tour riparte da qui, accanto agli articoli su ogni vista e sul franco svizzero. Non devi ricordare nulla di ciò che hai appena visto.',
     },
   },
   articles: {

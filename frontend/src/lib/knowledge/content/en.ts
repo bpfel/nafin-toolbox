@@ -18,37 +18,37 @@ export const en: Content = {
   tour: {
     welcome: {
       title: 'This is a planner',
-      body: 'We do not interface with your bank accounts, and we do not review what you actually spend. Instead the budget defines what has to remain by the end of the month, so that future financial commitments are always covered.',
+      body: 'This app has no connection to your bank and never sees your actual spending. The budget instead says how much must remain by the end of the month, so the commitments ahead of you are always covered.',
     },
     places: {
       title: 'The different screens',
-      body: 'Budget is where you plan your monthly cash flows. Accounts tracks how money moves between the places you keep it. Knowledge holds this tour, along with short pieces on Swiss personal finance. Profile covers you rather than your money.',
+      body: 'Budget is where you plan a month. Accounts lists the real balances behind it. Knowledge holds this tour and short pieces on Swiss finance. Profile has your language, password and security settings.',
     },
     types: {
       title: 'Different budget entries',
-      body: 'The budget contains multiple types, which will be presented shortly.',
+      body: 'There are several types of entry, each presented in turn.',
     },
     budget: {
       title: 'One standing plan',
-      body: 'Not a ledger of months. You describe a typical month once, and take a named snapshot when something changes enough to be worth remembering.',
+      body: 'Not a record of every month. You describe a typical one once, and take a named snapshot when something changes enough to be worth keeping.',
       note: 'We’ll use some Swiss defaults for illustration.',
     },
     controls: {
       title: 'Controls',
-      body: 'To act on the current screen, use these controls.',
+      body: 'Everything that acts on the whole screen is here.',
       hoverNote: 'Hover over a symbol to see what it does.',
     },
     accounts: {
       title: 'Accounts',
-      body: 'This screen contains all of your accounts. If you add the IBAN and the details that go with it, you can generate QR-bills payable to that account.',
+      body: 'This screen lists everything you hold, at a bank or otherwise. Add an IBAN and the details that go with it, and you can generate QR-bills payable to it.',
     },
     allocations: {
       title: 'Allocations',
-      body: 'Here you can link your budget entries to accounts. Your salary, for example, arrives in your main account. To save up for the laptop and set aside money for the Serafe bill, you might transfer that money to another account. This gives you a balance per account and a projection of the reserves you need.',
+      body: 'Here you link every budget entry to where its money comes from and goes. Your salary arrives in the main account; the laptop fund and the Serafe bill move somewhere they will not be spent. What falls out is a balance for each one, and a projection of the reserves you need.',
     },
     knowledge: {
       title: 'You can come back',
-      body: 'This tour lives here, along with short pieces on what each view is for and on how Swiss money works. Nothing you have just seen has to be remembered.',
+      body: 'The tour starts again from here, beside articles on each view and on Swiss money. Nothing you have just seen has to be remembered.',
     },
   },
 

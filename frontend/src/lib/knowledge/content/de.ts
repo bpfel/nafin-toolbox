@@ -20,37 +20,37 @@ export const de: PartialContent = {
   tour: {
     welcome: {
       title: 'Ein Planer',
-      body: 'Wir greifen nicht auf Ihre Bankkonten zu und sehen Ihre tatsächlichen Ausgaben nicht. Das Budget legt stattdessen fest, was bis Ende Monat übrig bleiben muss, damit künftige finanzielle Verpflichtungen immer gedeckt sind.',
+      body: 'Diese App hat keine Verbindung zu Ihrer Bank und sieht Ihre tatsächlichen Ausgaben nie. Das Budget sagt stattdessen, wie viel bis Ende Monat übrig bleiben muss, damit die anstehenden Verpflichtungen immer gedeckt sind.',
     },
     places: {
       title: 'Die Bildschirme',
-      body: 'Budget ist, wo Sie Ihre monatlichen Geldflüsse planen. Konten zeigt, wie Geld zwischen Ihren Konten fliesst. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen. Profil betrifft Sie selbst, nicht Ihr Geld.',
+      body: 'Budget ist, wo Sie einen Monat planen. Konten zeigt die tatsächlichen Salden dahinter. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen. Profil enthält Sprache, Passwort und Sicherheitseinstellungen.',
     },
     types: {
       title: 'Verschiedene Budgeteinträge',
-      body: 'Das Budget kennt mehrere Arten von Einträgen, die gleich vorgestellt werden.',
+      body: 'Es gibt mehrere Arten von Einträgen, die nacheinander vorgestellt werden.',
     },
     budget: {
       title: 'Ein stehender Plan',
-      body: 'Kein Monatsjournal. Sie beschreiben einmal einen typischen Monat und erstellen eine benannte Momentaufnahme, wenn sich etwas ändert, das festgehalten werden soll.',
+      body: 'Kein monatliches Journal. Sie beschreiben einen typischen Monat einmal und erstellen eine benannte Momentaufnahme, wenn sich etwas ändert, das festgehalten werden soll.',
       note: 'Zur Veranschaulichung verwenden wir Schweizer Standardwerte.',
     },
     controls: {
       title: 'Bedienelemente',
-      body: 'Um auf dem aktuellen Bildschirm etwas zu tun, verwenden Sie diese Bedienelemente.',
+      body: 'Alles, was auf den ganzen Bildschirm wirkt, ist hier.',
       hoverNote: 'Fahren Sie mit der Maus über ein Symbol, um zu sehen, was es tut.',
     },
     accounts: {
       title: 'Konten',
-      body: 'Auf diesem Bildschirm stehen alle Ihre Konten. Wenn Sie die IBAN und die übrigen Angaben erfassen, können Sie QR-Rechnungen erstellen, die auf dieses Konto lauten.',
+      body: 'Hier steht alles, was Sie halten, bei einer Bank oder anderswo. Mit IBAN und den übrigen Angaben können Sie QR-Rechnungen darauf ausstellen.',
     },
     allocations: {
       title: 'Zuordnungen',
-      body: 'Hier verknüpfen Sie Ihre Budgeteinträge mit Konten. Ihr Lohn kommt zum Beispiel auf dem Hauptkonto an. Um auf den Laptop zu sparen und Geld für die Serafe-Rechnung zurückzulegen, können Sie es auf ein anderes Konto überweisen. Daraus ergeben sich ein Saldo je Konto und eine Vorschau der nötigen Reserven.',
+      body: 'Hier verknüpfen Sie jeden Budgeteintrag damit, woher sein Geld kommt und wohin es geht. Ihr Lohn landet auf dem Hauptkonto; der Laptop-Topf und die Serafe-Rechnung wandern dorthin, wo sie nicht ausgegeben werden. Daraus ergeben sich die Salden und eine Vorschau der nötigen Reserven.',
     },
     knowledge: {
       title: 'Sie können zurückkommen',
-      body: 'Dieser Rundgang liegt hier, zusammen mit kurzen Texten dazu, wofür jede Ansicht da ist und wie Schweizer Geldthemen funktionieren. Nichts davon müssen Sie sich jetzt merken.',
+      body: 'Von hier aus startet der Rundgang erneut, neben Texten zu jeder Ansicht und zu Schweizer Geldthemen. Nichts davon müssen Sie sich jetzt merken.',
     },
   },
   articles: {

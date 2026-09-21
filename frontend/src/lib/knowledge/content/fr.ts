@@ -21,37 +21,37 @@ export const fr: PartialContent = {
   tour: {
     welcome: {
       title: 'Un planificateur',
-      body: 'Nous ne nous connectons pas à vos comptes bancaires et nous ne consultons pas vos dépenses réelles. Le budget définit plutôt ce qui doit rester à la fin du mois, afin que vos engagements financiers à venir soient toujours couverts.',
+      body: 'Cette application n’a aucun lien avec votre banque et ne voit jamais vos dépenses réelles. Le budget dit plutôt combien doit rester à la fin du mois, pour que les engagements à venir soient toujours couverts.',
     },
     places: {
       title: 'Les différents écrans',
-      body: 'Budget, c’est là que vous planifiez vos flux mensuels. Comptes montre comment l’argent circule entre vos comptes. Savoir abrite cette visite et de courts textes sur les finances suisses. Profil vous concerne, vous, plutôt que votre argent.',
+      body: 'Budget, c’est là que vous planifiez un mois. Comptes montre les soldes réels correspondants. Savoir abrite cette visite et de courts textes sur les finances suisses. Profil contient la langue, le mot de passe et les réglages de sécurité.',
     },
     types: {
       title: 'Différentes entrées budgétaires',
-      body: 'Le budget comporte plusieurs types, qui sont présentés juste après.',
+      body: 'Il en existe plusieurs types, présentés l’un après l’autre.',
     },
     budget: {
       title: 'Un plan permanent',
-      body: 'Pas un journal mensuel. Vous décrivez une seule fois un mois type, et vous prenez un instantané nommé quand quelque chose change assez pour mériter d’être retenu.',
+      body: 'Pas un journal mensuel. Vous décrivez un mois type une seule fois, et vous prenez un instantané nommé quand quelque chose change assez pour mériter d’être gardé.',
       note: 'Nous utilisons des valeurs suisses par défaut à titre d’illustration.',
     },
     controls: {
       title: 'Les commandes',
-      body: 'Pour agir sur l’écran en cours, utilisez ces commandes.',
+      body: 'Tout ce qui agit sur l’écran entier se trouve ici.',
       hoverNote: 'Survolez un symbole pour voir ce qu’il fait.',
     },
     accounts: {
       title: 'Comptes',
-      body: 'Cet écran contient tous vos comptes. Si vous ajoutez l’IBAN et les informations qui vont avec, vous pourrez générer des QR-factures payables sur ce compte.',
+      body: 'Ici figure tout ce que vous détenez, en banque ou ailleurs. Ajoutez l’IBAN et les informations qui vont avec, et vous pourrez générer des QR-factures payables dessus.',
     },
     allocations: {
       title: 'Affectations',
-      body: 'Ici, vous reliez vos entrées budgétaires à des comptes. Votre salaire, par exemple, arrive sur votre compte principal. Pour épargner en vue de l’ordinateur portable et mettre de côté la facture Serafe, vous pourriez virer cet argent sur un autre compte. Vous obtenez ainsi un solde par compte et une projection des réserves nécessaires.',
+      body: 'Vous reliez ici chaque entrée budgétaire à la provenance et à la destination de son argent. Votre salaire arrive sur le compte principal ; la provision pour l’ordinateur portable et la facture Serafe partent là où elles ne seront pas dépensées. Il en ressort un solde pour chacun et une projection des réserves nécessaires.',
     },
     knowledge: {
       title: 'Vous pouvez revenir',
-      body: 'Cette visite se trouve ici, avec de courts textes sur l’usage de chaque vue et sur le fonctionnement des finances suisses. Rien de ce que vous venez de voir n’est à retenir.',
+      body: 'La visite repart d’ici, à côté des articles sur chaque vue et sur l’argent suisse. Rien de ce que vous venez de voir n’est à mémoriser.',
     },
   },
   articles: {
