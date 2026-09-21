@@ -3,7 +3,7 @@
   import { t, getLocale } from '../i18n/index.svelte'
   import { getRoute, navigate } from '../nav/router.svelte'
   import { focusTrap } from '../util/focusTrap'
-  import { anchorElement, anchorRect, placeCard, phoneCardAtTop } from './anchor'
+  import { anchorElement, anchorRect, placeCard, phonePlacement } from './anchor'
   import { loadContent, type TourCopy } from '../knowledge/content'
   import { en } from '../knowledge/content/en'
   import { TYPE_GUIDES } from '../budget/typeGuide'
@@ -150,6 +150,60 @@
     }
   })
 
+  /**
+   * Holds the page still while the tour is running.
+   *
+   * Without it the page scrolls out from under the halo: the blocker takes
+   * clicks, but a wheel, a trackpad swipe or a Page Down still moves the
+   * document behind it and the ring is left around whatever slid into place.
+   *
+   * **Not** `overflow: hidden`, which was the first attempt and is the usual
+   * advice. Hiding the scrollbar widens the viewport by its width — 15px on
+   * this machine — and every `position: fixed` element jumps right by that
+   * much: the navigation bar, the dial, the banners. Padding the root pays
+   * back in-flow content but does nothing for fixed elements, which are laid
+   * out against the viewport. So the one step that rings the navigation would
+   * have moved the navigation as it appeared.
+   *
+   * Refusing the events instead costs no layout at all. `passive: false`
+   * because a passive listener may not call `preventDefault`, and capture so
+   * a scroll container inside the page cannot consume the event first.
+   *
+   * Left through deliberately: Space and Enter, which the card's buttons
+   * need, and dragging the scrollbar itself, which is hard to intercept and
+   * harmless anyway — the halo re-measures on scroll and follows.
+   */
+  const SCROLL_KEYS = new Set([
+    'PageUp',
+    'PageDown',
+    'Home',
+    'End',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+  ])
+
+  $effect(() => {
+    if (!tour.running) return
+
+    const swallow = (event: Event) => event.preventDefault()
+    const swallowKey = (event: KeyboardEvent) => {
+      if (SCROLL_KEYS.has(event.key)) event.preventDefault()
+    }
+
+    const options = { passive: false, capture: true } as const
+    window.addEventListener('wheel', swallow, options)
+    window.addEventListener('touchmove', swallow, options)
+    window.addEventListener('keydown', swallowKey, options)
+
+    return () => {
+      window.removeEventListener('wheel', swallow, options)
+      window.removeEventListener('touchmove', swallow, options)
+      window.removeEventListener('keydown', swallowKey, options)
+    }
+  })
+
   /** Re-measures after anything that moves the thing being pointed at. */
   $effect(() => {
     if (!tour.running) return
@@ -202,17 +256,22 @@
   })
 
   /**
-   * On a phone, whether the pinned card would sit on top of what it is
-   * ringing. See `phoneCardAtTop`.
+   * On a phone: which end the card sits at, and how tall it may be.
+   *
+   * Both, not just the end. Choosing the far end from the halo is no use if
+   * the card is then free to grow back across the screen into it. See
+   * `phonePlacement`.
    */
-  let atTop = $derived.by(() => {
-    if (wide || !rect) return false
-    return phoneCardAtTop({
+  const PHONE_MIN_CARD_PX = 140
+
+  let phone = $derived.by(() => {
+    if (wide) return null
+    return phonePlacement({
       rect,
-      cardHeight,
       viewportHeight: window.innerHeight,
       navHeight: navHeight(),
       gap: PHONE_GAP_PX,
+      minHeight: PHONE_MIN_CARD_PX,
     })
   })
 
@@ -261,7 +320,8 @@
     class="card"
     class:floating={placement !== null}
     class:centred={wide && rect === null}
-    class:at-top={atTop}
+    class:at-top={phone?.atTop}
+    style:max-height={phone ? `${phone.maxHeight}px` : undefined}
     style:top={placement ? `${placement.top}px` : undefined}
     style:left={placement ? `${placement.left}px` : undefined}
     role="dialog"

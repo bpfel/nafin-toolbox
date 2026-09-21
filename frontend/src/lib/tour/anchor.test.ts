@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from 'vitest'
-import { anchorRect, anchorElement, placeCard, phoneCardAtTop } from './anchor'
+import { anchorRect, anchorElement, placeCard, phonePlacement } from './anchor'
 
 /**
  * Both halves of this file are regressions. Every case below was found by
@@ -53,6 +53,45 @@ describe('finding what a step points at', () => {
     el('nav', { width: 190, height: 676 })
 
     expect(anchorElement('nav')).toBe(first)
+  })
+
+  /**
+   * A budget type is its heading *and* a row underneath it, which cannot share
+   * a wrapper: one is a div, the other a tr. They are vertically adjacent, so
+   * the union is the band between them.
+   */
+  test('spans everything wearing the name', () => {
+    el('type-bill', { top: 100, bottom: 130, left: 20, right: 400, width: 380, height: 30 })
+    el('type-bill', { top: 150, bottom: 190, left: 20, right: 420, width: 400, height: 40 })
+
+    const rect = anchorRect('type-bill')!
+
+    expect(rect.top).toBe(100)
+    expect(rect.bottom).toBe(190)
+    expect(rect.left).toBe(20)
+    expect(rect.right).toBe(420)
+  })
+
+  test('a copy with no box does not stretch the union', () => {
+    // The dial case: one element has geometry at this width and the other
+    // does not, so the union must be the one that does — not a band reaching
+    // back to the origin.
+    el('dial', { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 })
+    el('dial', { top: 140, bottom: 184, left: 190, right: 1010, width: 820, height: 44 })
+
+    const rect = anchorRect('dial')!
+
+    expect(rect.top).toBe(140)
+    expect(rect.left).toBe(190)
+  })
+
+  test('a hidden copy does not stretch the union either', () => {
+    el('type-bill', { top: 900, bottom: 940, left: 0, right: 500, width: 500, height: 40 }, false)
+    el('type-bill', { top: 100, bottom: 130, left: 20, right: 400, width: 380, height: 30 })
+
+    const rect = anchorRect('type-bill')!
+
+    expect(rect.bottom).toBe(130)
   })
 
   test('a name nothing wears resolves to nothing', () => {
@@ -133,33 +172,62 @@ describe('where the callout goes', () => {
   })
 })
 
-describe('which end of a phone the callout sits at', () => {
-  const PHONE = { cardHeight: 190, viewportHeight: 640, navHeight: 60, gap: 12 }
+describe('where the callout sits on a phone, and how big it may be', () => {
+  const PHONE = { viewportHeight: 640, navHeight: 60, gap: 12, minHeight: 140 }
 
   /**
-   * Both regressions from the first walk-through on a phone: the navigation
-   * bar and the dial's dot each sat behind the bottom-pinned card, so the tour
-   * drew a ring round something and then covered it up.
+   * Both regressions from walking it on a phone. First the card was pinned
+   * to the foot and sat over the navigation bar and the dial's dot; then,
+   * moved to the far end, a long card simply grew back across the screen
+   * into the halo — which is what the screenshot of step 5.4 showed, the
+   * card covering the section heading it had just ringed.
    */
-  test('moves to the top when the anchor is the navigation bar', () => {
+  test('moves to the top when the anchor is at the foot', () => {
     const nav = rectOf({ top: 566, bottom: 638, height: 72 })
 
-    expect(phoneCardAtTop({ rect: nav, ...PHONE })).toBe(true)
+    expect(phonePlacement({ rect: nav, ...PHONE }).atTop).toBe(true)
   })
 
-  test('moves to the top when the anchor is the dial dot', () => {
-    const dot = rectOf({ top: 490, bottom: 566, height: 76 })
-
-    expect(phoneCardAtTop({ rect: dot, ...PHONE })).toBe(true)
-  })
-
-  test('stays at the foot for an anchor higher up the page', () => {
+  test('stays at the foot for an anchor high up the page', () => {
     const high = rectOf({ top: 100, bottom: 160, height: 60 })
 
-    expect(phoneCardAtTop({ rect: high, ...PHONE })).toBe(false)
+    expect(phonePlacement({ rect: high, ...PHONE }).atTop).toBe(false)
   })
 
-  test('stays at the foot when there is nothing to point at', () => {
-    expect(phoneCardAtTop({ rect: null, ...PHONE })).toBe(false)
+  test('never grows past the gap it was put in', () => {
+    // Step 5.4: a two-paragraph guide, and a halo covering a heading and a
+    // row. The card goes above it and must stop there.
+    const halo = rectOf({ top: 408, bottom: 520, height: 112 })
+
+    const { atTop, maxHeight } = phonePlacement({ rect: halo, ...PHONE })
+
+    expect(atTop).toBe(true)
+    expect(maxHeight).toBeLessThanOrEqual(halo.top)
+  })
+
+  test('the gap below is measured from above the navigation, not the screen edge', () => {
+    const halo = rectOf({ top: 40, bottom: 100, height: 60 })
+
+    const { atTop, maxHeight } = phonePlacement({ rect: halo, ...PHONE })
+
+    expect(atTop).toBe(false)
+    // 640 - 60 nav - 100 bottom - 24 gaps. A card sized to the screen edge
+    // would put its buttons behind the navigation bar.
+    expect(maxHeight).toBe(456)
+  })
+
+  test('a cramped gap still leaves a readable card', () => {
+    // Nothing fits: a card that can be scrolled beats a correct one nobody
+    // can read, and this is the only case where an overlap remains possible.
+    const huge = rectOf({ top: 20, bottom: 600, height: 580 })
+
+    expect(phonePlacement({ rect: huge, ...PHONE }).maxHeight).toBe(PHONE.minHeight)
+  })
+
+  test('with nothing to point at, the card has the screen above the navigation', () => {
+    const { atTop, maxHeight } = phonePlacement({ rect: null, ...PHONE })
+
+    expect(atTop).toBe(false)
+    expect(maxHeight).toBe(556)
   })
 })

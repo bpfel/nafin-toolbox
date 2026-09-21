@@ -29,7 +29,7 @@ export const fr: PartialContent = {
     },
     types: {
       title: 'Cinq sortes de lignes',
-      body: 'Une ligne de budget n’est pas qu’un montant — sa sorte dit ce qu’il advient de l’argent. L’exemple suisse ci-dessous est prêté le temps de la visite et disparaît avec elle ; votre propre budget reste intact. Les cinq étapes suivantes en prennent une chacune.',
+      body: 'Une ligne de budget n’est pas qu’un montant — sa sorte dit ce qu’il advient de l’argent.',
     },
     budget: {
       title: 'Un plan permanent',

@@ -94,6 +94,21 @@ describe('anchors survive an empty app', () => {
     expect(seeds).toBeLessThan(firstSeeded)
   })
 
+  test('each anchored type has a row the tour can single out', () => {
+    // The halo rings the heading plus the section's *first* row. A type with
+    // no entry at all would leave the step ringing a heading and nothing
+    // else, which reads as a mistake rather than as an example.
+    const vault = createEmptyVault()
+    seedDefaults(vault)
+
+    for (const step of TOUR_STEPS) {
+      if (!step.anchor || !SEEDED_ANCHORS.has(step.anchor)) continue
+      const type = step.anchor.replace('type-', '')
+      const rows = vault.budget.entries.filter(e => e.type === type)
+      expect(rows.length, step.id).toBeGreaterThan(0)
+    }
+  })
+
   test('the seeded defaults really do cover every anchored type', () => {
     // The other half of the bargain. If a type stops being seeded, its step
     // silently disappears from the tour rather than failing anywhere.

@@ -28,7 +28,7 @@ export const it: PartialContent = {
     },
     types: {
       title: 'Cinque tipi di riga',
-      body: 'Una riga di budget non è solo un importo — il suo tipo dice che cosa succede al denaro. L’esempio svizzero qui sotto è in prestito per il tour e sparisce con esso; il tuo budget resta intatto. I cinque passi successivi ne prendono uno ciascuno.',
+      body: 'Una riga di budget non è solo un importo — il suo tipo dice che cosa succede al denaro.',
     },
     budget: {
       title: 'Un piano permanente',

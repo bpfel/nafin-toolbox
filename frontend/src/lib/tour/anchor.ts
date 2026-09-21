@@ -45,16 +45,39 @@ function isVisible(element: Element): boolean {
 /**
  * The rect to draw a halo around, or null if this step has nothing to point at.
  *
+ * The **union** of everything wearing the name, not the first of them. One
+ * name may sit on two elements for either of two reasons:
+ *
+ * - because only one of them has a box at this width — the dial and the
+ *   toolbar inside it — in which case the union is that one and nothing
+ *   changes;
+ * - because the thing worth ringing is not a single element. A budget type is
+ *   its heading *and* a row underneath it, and those cannot be wrapped in a
+ *   shared box: one is a `div` and the other is a `tr`. They are vertically
+ *   adjacent, so their union is the band between them.
+ *
  * Null is an ordinary answer, not an error: a step whose anchor is missing is
  * skipped, and a step with no anchor at all never asks.
  */
 export function anchorRect(name: string, root: ParentNode = document): DOMRect | null {
+  let union: DOMRect | null = null
+
   for (const element of root.querySelectorAll(`[data-tour="${name}"]`)) {
     if (!isVisible(element)) continue
     const rect = element.getBoundingClientRect()
-    if (hasBox(rect)) return rect
+    if (!hasBox(rect)) continue
+    union = union ? unite(union, rect) : rect
   }
-  return null
+
+  return union
+}
+
+function unite(a: DOMRect, b: DOMRect): DOMRect {
+  const left = Math.min(a.left, b.left)
+  const top = Math.min(a.top, b.top)
+  const right = Math.max(a.right, b.right)
+  const bottom = Math.max(a.bottom, b.bottom)
+  return new DOMRect(left, top, right - left, bottom - top)
 }
 
 /** The element itself, for scrolling it into view before measuring. */
@@ -127,32 +150,52 @@ export function placeCard(input: PlacementInput): Placement {
   return { top, left }
 }
 
+export interface PhonePlacement {
+  /** Pinned to the top of the screen rather than above the navigation. */
+  atTop: boolean
+  /** How tall the card may grow before it starts scrolling inside itself. */
+  maxHeight: number
+}
+
 /**
- * Which end of a phone the callout sits at.
+ * Where the callout sits on a phone, and how much room it may take.
  *
  * It is pinned rather than floated below 768px — a card chasing a highlight
  * around a 320px screen ends up covering what it describes, and being always
  * fully readable in one known place is worth more than being adjacent.
  *
- * But the foot of the screen is also where the interesting chrome lives: the
- * navigation bar, and the dial's dot just above it. Both sit squarely under a
- * bottom-pinned card, so the tour rings something and then hides it. When the
- * anchor would fall behind the card, the card goes to the top instead — the
- * one place on a phone that is guaranteed to be clear of it.
+ * Which end was once the whole question, and that was not enough: choosing
+ * the far end from the anchor still let a long card grow back across the
+ * screen into it. A bill's explanation runs to two paragraphs, the halo now
+ * covers a heading *and* a row, and on a short phone the two met — the card
+ * sat over the section heading it had just drawn a ring around.
  *
- * Unanchored steps stay at the foot, where the thumb is.
+ * So the card is bounded as well as placed: it goes in whichever gap is
+ * larger and may not outgrow it. Anything longer scrolls inside the card,
+ * which it is already built to do.
+ *
+ * `minHeight` is the floor, for the case where neither gap is usable — a
+ * cramped card that can be scrolled beats a correct one nobody can read, and
+ * it is the only case where an overlap is still possible.
  */
-export function phoneCardAtTop(input: {
+export function phonePlacement(input: {
   rect: DOMRect | null
-  cardHeight: number
   viewportHeight: number
   /** Height of the fixed navigation the card is pinned above. */
   navHeight: number
   gap: number
-}): boolean {
-  const { rect, cardHeight, viewportHeight, navHeight, gap } = input
-  if (!rect) return false
-  const cardTop = viewportHeight - navHeight - gap - cardHeight
-  // Overlap in the vertical axis is enough: the card runs the full width.
-  return rect.bottom > cardTop && rect.top < viewportHeight
+  minHeight: number
+}): PhonePlacement {
+  const { rect, viewportHeight, navHeight, gap, minHeight } = input
+
+  // Nothing to point at: the whole screen is the card's, above the navigation.
+  if (!rect) {
+    return { atTop: false, maxHeight: Math.max(minHeight, viewportHeight - navHeight - gap * 2) }
+  }
+
+  const above = rect.top - gap * 2
+  const below = viewportHeight - navHeight - rect.bottom - gap * 2
+  const atTop = above > below
+
+  return { atTop, maxHeight: Math.max(minHeight, atTop ? above : below) }
 }

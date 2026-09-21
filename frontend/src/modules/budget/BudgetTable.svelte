@@ -270,11 +270,19 @@
     same two things above every section — ten labels for two facts, and both are
     plain from the figures underneath.
   -->
-  <!-- The guided tour stops at each type in turn; this is what it rings. It
-       wraps the heading and the table so the halo covers the rows being
-       described, not just the word above them. -->
-  <div class="type-section" data-tour="type-{type}">
-  <div class="section-head section-{type}">
+  <!--
+    The guided tour stops at each type in turn, and rings the heading together
+    with one row beneath it — not the whole table. Both wear the same name and
+    the halo takes the union, which is a single band because the two are
+    vertically adjacent: title, then the category heading if this section has
+    more than one, then the row.
+
+    One row rather than all of them because the point of the step is what a
+    *kind* of line means, and a section with fourteen entries in it turns that
+    into a spotlight the size of the screen.
+  -->
+  {@const firstRowId = sectionCategories[0]?.entries[0]?.entryId}
+  <div class="section-head section-{type}" data-tour="type-{type}">
     <h2 class="section-name">{t(`section.${type}` as 'section.expense')}</h2>
     <InfoButton
       label={t('guide.explain', { type: t(`section.${type}` as 'section.expense') })}
@@ -338,7 +346,12 @@
         {/if}
         {#if !isCollapsed(type, category.categoryName)}
           {#each category.entries as entry (entry.entryId)}
-            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
+            <BudgetEntryRow
+              {entry}
+              {viewMode}
+              tour={entry.entryId === firstRowId ? `type-${type}` : undefined}
+              onedit={openEditModal}
+            />
           {/each}
         {/if}
       </tbody>
@@ -349,7 +362,6 @@
       {/if}
     </tfoot>
   </table>
-  </div>
 
 {/snippet}
 
@@ -482,14 +494,6 @@
    * indentation currently says the opposite of the nesting. Untouched here
    * because it is a layout question, not a typographic one.
    */
-  /* Purely an anchor for the tour. A flex item rather than `display: contents`,
-     because a box with no geometry cannot be pointed at — and the item keeps
-     the heading's top margin inside it, so the spacing between sections is
-     exactly what it was. */
-  .type-section {
-    display: block;
-  }
-
   .section-head {
     display: flex;
     align-items: center;
