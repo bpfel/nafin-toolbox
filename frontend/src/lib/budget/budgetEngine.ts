@@ -518,10 +518,13 @@ interface DefaultCategory {
 
 interface DefaultEntry {
   key: SeedKey
-  type: 'income' | 'expense'
+  type: EntryType
   sortOrder: number
   categoryKey: SeedKey
   amount: string
+  /** What a `bill` or `purchase` is saving towards, and over how long. */
+  targetAmount?: string
+  periodMonths?: number
 }
 
 function bfsDefaultCategories(): DefaultCategory[] {
@@ -549,11 +552,30 @@ function bfsDefaults(): DefaultEntry[] {
     { key: 'clothing', type: 'expense', sortOrder: 10, categoryKey: 'cat.lifestyle', amount: '100.00' },
     { key: 'entertainment', type: 'expense', sortOrder: 20, categoryKey: 'cat.lifestyle', amount: '250.00' },
     { key: 'diningOut', type: 'expense', sortOrder: 30, categoryKey: 'cat.lifestyle', amount: '250.00' },
-    { key: 'savings', type: 'expense', sortOrder: 10, categoryKey: 'cat.savings', amount: '500.00' },
+    // Serafe collects the federal radio and television levy. It is the
+    // household bill that is the same for every household in the country,
+    // which makes it the one worked example of a `bill` that needs no
+    // qualification: an amount known in advance, arriving on a known cycle.
+    //
+    // 335.00 a year is the rate set by the Federal Council, unchanged since
+    // 2021. It drops to 312.00 on 1 January 2027 and is due to fall again
+    // after that, so this line has a date on it — see bakom.admin.ch/de/abgabe.
+    // A seeded figure is a starting point the user overwrites, not a promise.
+    { key: 'serafe', type: 'bill', sortOrder: 40, categoryKey: 'cat.insuranceTaxes', amount: '27.92', targetAmount: '335.00', periodMonths: 12 },
+    // And the worked example of a `purchase`: a thing that wears out rather
+    // than a bill that arrives. 1'512 over seven years is exactly 18.00 a
+    // month, which is the point of the odd-looking price — a round monthly
+    // figure reads as a decision, and 17.86 reads as arithmetic.
+    { key: 'laptop', type: 'purchase', sortOrder: 40, categoryKey: 'cat.living', amount: '18.00', targetAmount: '1512.00', periodMonths: 84 },
+    // Savings, not expense. Until v7 there was no type that meant "leaves the
+    // account without leaving your net worth", so these two were seeded as
+    // expenses and the budget claimed a household consumed its own 3a
+    // contributions. The type exists now and they take it.
+    { key: 'savings', type: 'savings', sortOrder: 10, categoryKey: 'cat.savings', amount: '500.00' },
     // Pillar 3a is budgeted like any other set-aside: the money leaves the
     // spending plan but stays yours. 588.00 is the 2026 employee cap (7'056)
     // spread over twelve months — a starting point, not a rule.
-    { key: 'pillar3a', type: 'expense', sortOrder: 20, categoryKey: 'cat.savings', amount: '588.00' },
+    { key: 'pillar3a', type: 'savings', sortOrder: 20, categoryKey: 'cat.savings', amount: '588.00' },
   ]
 }
 
@@ -564,7 +586,13 @@ function bfsDefaults(): DefaultEntry[] {
  * sticks, and switching language later leaves them alone. That is the whole
  * reason they are data here rather than slugs resolved at render.
  */
-export function seedDefaults(vault: VaultData, locale: Locale = 'en'): void {
+/**
+ * @param anchorMonth `YYYY-MM`, the month the seeded reserves are anchored to.
+ *   Required now that the defaults include a bill and a purchase, and passed
+ *   in rather than read from a clock — the engine deliberately does not know
+ *   what day it is, which is what makes every one of these tests repeatable.
+ */
+export function seedDefaults(vault: VaultData, locale: Locale = 'en', anchorMonth = '2026-01'): void {
   if (vault.budget.entries.length > 0) return
 
   const name = seedNamesFor(locale)
@@ -581,6 +609,9 @@ export function seedDefaults(vault: VaultData, locale: Locale = 'en'): void {
       type: d.type,
       categoryName: name[d.categoryKey],
       sortOrder: d.sortOrder,
+      anchorMonth,
+      targetAmount: d.targetAmount,
+      periodMonths: d.periodMonths,
     })
     setPlanned(vault, entry.id, d.amount)
   }

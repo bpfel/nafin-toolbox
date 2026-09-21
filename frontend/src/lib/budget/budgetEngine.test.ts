@@ -22,7 +22,7 @@ import {
   deleteSnapshot,
   seedDefaults,
 } from './budgetEngine'
-import { createEmptyVault, type VaultData } from '../crypto/vault'
+import { createEmptyVault, holdsMoney, savesTowardsTarget, type VaultData } from '../crypto/vault'
 import { isLegalEntryRouting, isLegalRouting, primaryAccountId } from '../accounts/routing'
 
 describe('listCategories', () => {
@@ -1123,8 +1123,60 @@ describe('seedDefaults', () => {
 
     expect(summary.entries).toHaveLength(vault.budget.entries.length)
     expect(summary.totalPlannedIncome).toBe('6000.00')
-    expect(summary.totalPlannedExpenses).toBe('5559.67')
-    expect(summary.plannedBalance).toBe('440.33')
+    // Consumed and gone. Lower than it once was by exactly the two set-asides
+    // that used to be mis-typed as expenses: the defaults claimed a household
+    // spent its own savings and its own 3a contributions.
+    expect(summary.totalPlannedExpenses).toBe('4471.67')
+    // Out of the account, still in the net worth: savings, 3a, Serafe and the
+    // laptop fund. This total could not be asserted before, because nothing in
+    // the seeded data distinguished the four from an expense.
+    expect(summary.totalPlannedSavings).toBe('1133.92')
+    expect(summary.plannedBalance).toBe('394.41')
+  })
+
+  test('the defaults exercise every entry type', () => {
+    // The reason the two new lines exist: a tour, or anyone reading the
+    // starter budget, should meet all five kinds rather than two of them.
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+
+    const seeded = new Set(vault.budget.entries.map(e => e.type))
+    expect([...seeded].sort()).toEqual(['bill', 'expense', 'income', 'purchase', 'savings'])
+  })
+
+  test('the seeded bill and purchase carry a reserve that matches their plan', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'en', '2026-03')
+
+    for (const entry of vault.budget.entries.filter(e => savesTowardsTarget(e.type))) {
+      const reserve = entry.reserve
+      expect(reserve, entry.name).toBeDefined()
+      expect(reserve!.anchorMonth).toBe('2026-03')
+      // The monthly figure has to be able to reach the target within the
+      // period, or the line is a schedule that can never meet itself.
+      const monthly = Number(plannedFor(vault, entry.id))
+      const needed = Number(reserve!.targetAmount) / reserve!.periodMonths
+      expect(Math.abs(monthly - needed), entry.name).toBeLessThan(0.01)
+    }
+  })
+
+  test('the laptop fund is a whole number of francs a month', () => {
+    // 1'512 over seven years is exactly 18.00. The odd-looking price is the
+    // point: a round monthly figure reads as a decision rather than as
+    // arithmetic, and this is the line a tour stops at to explain the type.
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const laptop = vault.budget.entries.find(e => e.type === 'purchase')!
+
+    expect(plannedFor(vault, laptop.id)).toBe('18.00')
+    expect(laptop.reserve).toEqual({
+      targetAmount: '1512.00',
+      periodMonths: 84,
+      anchorMonth: '2026-01',
+    })
   })
 
   test('is idempotent', () => {
@@ -1153,6 +1205,13 @@ describe('seedDefaults', () => {
       if (cat.type === 'income') {
         expect(cat.sourceAccountId).toBeNull()
         expect(cat.sinkAccountId).toBe(primary)
+      } else if (holdsMoney(cat.type)) {
+        // Leaves what is spendable without leaving the net worth, so it has
+        // both ends: out of the account it is planned against, and into the
+        // one holding it. Seeding a bill and a purchase is what first made
+        // this branch reachable.
+        expect(cat.sourceAccountId, cat.name).toBe(primary)
+        expect(cat.sinkAccountId, cat.name).toBe(primary)
       } else {
         expect(cat.sourceAccountId).toBe(primary)
         expect(cat.sinkAccountId).toBeNull()
