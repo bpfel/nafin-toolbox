@@ -3,7 +3,14 @@
   import { t, getLocale } from '../i18n/index.svelte'
   import { getRoute, navigate } from '../nav/router.svelte'
   import { focusTrap } from '../util/focusTrap'
-  import { anchorElement, anchorRect, placeCard, phonePlacement, scrollAdjustment } from './anchor'
+  import {
+    anchorElement,
+    anchorRect,
+    needsScroll,
+    placeCard,
+    phonePlacement,
+    scrollAdjustment,
+  } from './anchor'
   import { loadContent, type TourCopy } from '../knowledge/content'
   import { en } from '../knowledge/content/en'
   import { TYPE_GUIDES } from '../budget/typeGuide'
@@ -152,7 +159,10 @@
       if (rect && !wide) {
         const delta = scrollAdjustment({
           rect,
-          cardHeight: card?.offsetHeight ?? 0,
+          // `scrollHeight`, not `offsetHeight`: the latter reports the height
+          // the cap has already forced, so the shortfall came out as zero, the
+          // page was never nudged, and the card scrolled instead.
+          cardHeight: card?.scrollHeight ?? 0,
           viewportHeight: window.innerHeight,
           navHeight: navHeight(),
           gap: PHONE_GAP_PX,
@@ -261,9 +271,13 @@
 
   // The card's own height decides whether it fits above or below; measured
   // rather than assumed, because three lines of German is not two of English.
+  // `scrollHeight` is the content's height whether or not a cap is currently
+  // applied, which is what makes the two readings below independent of each
+  // other rather than circular.
   $effect(() => {
     void step
-    if (card) cardHeight = card.offsetHeight
+    void wide
+    if (card) cardHeight = card.scrollHeight
   })
 
   /**
@@ -307,6 +321,15 @@
       minHeight: PHONE_MIN_CARD_PX,
     })
   })
+
+  /**
+   * Whether to cap the card at all.
+   *
+   * Left off unless the content really does exceed the room, so a card with
+   * nothing hidden shows no scrollbar — and none of the sub-pixel scrollbars
+   * a cap equal to the content produces.
+   */
+  let capped = $derived(phone !== null && needsScroll(cardHeight, phone.maxHeight))
 
   function onKeydown(event: KeyboardEvent) {
     if (!tour.running) return
@@ -354,7 +377,7 @@
     class:floating={placement !== null}
     class:centred={wide && rect === null}
     class:at-top={phone?.atTop}
-    style:max-height={phone ? `${phone.maxHeight}px` : undefined}
+    style:max-height={capped && phone ? `${phone.maxHeight}px` : undefined}
     style:top={placement ? `${placement.top}px` : undefined}
     style:left={placement ? `${placement.left}px` : undefined}
     role="dialog"

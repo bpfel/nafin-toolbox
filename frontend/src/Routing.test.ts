@@ -132,6 +132,36 @@ describe('the shell', () => {
     expect(nav.querySelectorAll('a').length).toBe(4)
   })
 
+  /**
+   * The build id used to sit under every screen. It is on one page now, which
+   * only works if it is actually on that page — and the test that would have
+   * caught its absence is this one, not the component's own.
+   */
+  test('the build is named on the profile page', async () => {
+    currentUser = admin
+    const { container } = render(App)
+
+    // Reached by pressing the tab rather than by typing the address. `at()`
+    // sets the URL but the router only reads it once, on mount, so an address
+    // that is not the role's landing screen is redirected away before the
+    // shell sees it. Every other test here happens to name a landing screen,
+    // which is why nothing had noticed.
+    const nav = await screen.findByRole('navigation', { name: 'Sections' })
+    const profile = [...nav.querySelectorAll('a')].find(a => a.textContent?.trim() === 'Profile')!
+    profile.click()
+
+    await waitFor(() => expect(container.textContent).toContain('nafin'))
+  })
+
+  test('and nowhere else', async () => {
+    currentUser = admin
+    at('/users')
+    const { container } = render(App)
+
+    await waitFor(() => expect(screen.queryByText('User Management')).toBeTruthy())
+    expect(container.textContent).not.toContain('nafin')
+  })
+
   test('an admin is offered no library, having no vault to explain', async () => {
     currentUser = admin
     at('/knowledge')

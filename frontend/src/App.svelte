@@ -14,7 +14,6 @@
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import TourOverlay from './lib/tour/TourOverlay.svelte'
   import { resetTour } from './lib/tour/tourStore.svelte'
-  import VersionTag from './lib/util/VersionTag.svelte'
   import AppShell from './lib/nav/AppShell.svelte'
   import { getRoute, navigate, replace, startRouting, syncFromLocation } from './lib/nav/router.svelte'
   import { gateFor } from './lib/nav/gate'
@@ -325,8 +324,8 @@
   />
 {/if}
 
-<!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
-<VersionTag />
+<!-- Outside the branch chain: a stale tab is worth flagging on every screen.
+     The version tag is not here any more — it lives on the profile page. -->
 <UpdateBanner />
 <UnsavedBanner />
 <!-- Here rather than inside a screen: the tour walks across screens, and a

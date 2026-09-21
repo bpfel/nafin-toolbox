@@ -1,5 +1,12 @@
 import { describe, test, expect, afterEach } from 'vitest'
-import { anchorRect, anchorElement, placeCard, phonePlacement, scrollAdjustment } from './anchor'
+import {
+  anchorRect,
+  anchorElement,
+  needsScroll,
+  placeCard,
+  phonePlacement,
+  scrollAdjustment,
+} from './anchor'
 
 /**
  * Both halves of this file are regressions. Every case below was found by
@@ -285,5 +292,34 @@ describe('nudging the page to make room', () => {
     const after = phonePlacement({ rect: moved, ...PHONE, minHeight: 140 })
     expect(after.maxHeight).toBeGreaterThanOrEqual(cardHeight)
     expect(scrollAdjustment({ rect: moved, cardHeight, ...PHONE })).toBe(0)
+  })
+})
+
+/**
+ * When the card is capped at all.
+ *
+ * A scrollbar on a card with nothing hidden sends the reader looking for
+ * something that is not there, so the cap is left off unless it is earned.
+ */
+describe('deciding whether the callout needs to scroll', () => {
+  test('content that fits is not capped', () => {
+    expect(needsScroll(200, 400)).toBe(false)
+  })
+
+  test('content that does not fit is', () => {
+    expect(needsScroll(500, 400)).toBe(true)
+  })
+
+  /**
+   * The case the tolerance exists for. Rects come in fractions, so a card
+   * 396.4px tall inside a 396px box scrolls — showing a scrollbar to hide
+   * four tenths of a pixel.
+   */
+  test('a sub-pixel difference is not a reason to scroll', () => {
+    expect(needsScroll(396.4, 396)).toBe(false)
+  })
+
+  test('exactly equal is not a reason either', () => {
+    expect(needsScroll(400, 400)).toBe(false)
   })
 })

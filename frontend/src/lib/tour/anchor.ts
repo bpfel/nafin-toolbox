@@ -237,3 +237,21 @@ export function scrollAdjustment(input: {
   // Card above: the anchor has to come down, which means scrolling up.
   return atTop ? -deficit : deficit
 }
+
+/**
+ * Whether the callout genuinely has more to show than it has room for.
+ *
+ * Asked so the height cap can be left off entirely when it is not needed. A
+ * cap that is merely *equal* to the content still produces a scrollbar on
+ * sub-pixel rounding — `getBoundingClientRect` deals in fractions and a
+ * card 396.4px tall inside a 396px box scrolls — and a scrollbar on a card
+ * with nothing hidden is an invitation to look for something that is not
+ * there.
+ *
+ * `natural` must be the content's own height, not the height it has been
+ * clamped to. `scrollHeight` reports that; `offsetHeight` reports the clamp,
+ * which is how the cap became self-confirming.
+ */
+export function needsScroll(natural: number, maxHeight: number, tolerance = 2): boolean {
+  return natural > maxHeight + tolerance
+}
