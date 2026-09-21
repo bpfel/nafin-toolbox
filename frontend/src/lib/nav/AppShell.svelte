@@ -6,6 +6,7 @@
   import AppNav from './AppNav.svelte'
   import BudgetScreen from '../../screens/BudgetScreen.svelte'
   import AccountsScreen from '../../screens/AccountsScreen.svelte'
+  import KnowledgeScreen from '../../screens/KnowledgeScreen.svelte'
   import ProfileScreen from '../../screens/ProfileScreen.svelte'
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
@@ -101,6 +102,16 @@
       <div class="screen" hidden={route.screen !== 'accounts'}>
         <AccountsScreen />
       </div>
+
+      <!--
+        Rendered rather than hidden, unlike the two above. That treatment exists
+        to keep a half-typed amount or an open dialog alive across a tab switch;
+        Knowledge holds neither, and its content is a lazy chunk that a session
+        which never opens it should never fetch.
+      -->
+      {#if route.screen === 'knowledge'}
+        <KnowledgeScreen />
+      {/if}
 
       {#if route.screen === 'profile'}
         <ProfileScreen {email} {role} {onlogout} />

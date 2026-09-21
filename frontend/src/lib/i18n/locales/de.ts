@@ -8,6 +8,7 @@ export const de: Messages = {
   // --- Navigation and profile ---
   'nav.budget': 'Budget',
   'nav.accounts': 'Konten',
+  'nav.knowledge': 'Wissen',
   'nav.profile': 'Profil',
   'nav.audit': 'Protokoll',
   'nav.label': 'Bereiche',
@@ -468,4 +469,11 @@ export const de: Messages = {
   // --- Roles. Server-supplied values, so no scan can see them. ---
   'role.user': 'Benutzer',
   'role.admin': 'Admin',
+
+  // --- Wissen: die Bibliothek ---
+  'knowledge.about': 'Über diese App',
+  'knowledge.swiss': 'Schweizer Grundlagen',
+  'knowledge.sources': 'Offizielle Quellen',
+  'knowledge.inEnglish': 'Noch nicht übersetzt — auf Englisch.',
+
 }

@@ -22,6 +22,7 @@ describe('reading the address bar', () => {
     ['/', 'home'],
     ['/budget', 'budget'],
     ['/accounts', 'accounts'],
+    ['/knowledge', 'knowledge'],
     ['/profile', 'profile'],
     ['/users', 'users'],
     ['/audit', 'audit'],

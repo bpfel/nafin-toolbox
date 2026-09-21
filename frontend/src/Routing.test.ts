@@ -115,7 +115,29 @@ describe('the shell', () => {
 
     const nav = await screen.findByRole('navigation', { name: 'Sections' })
     const labels = [...nav.querySelectorAll('a')].map((a) => a.textContent?.trim())
-    expect(labels).toEqual(['Budget', 'Accounts', 'Profile'])
+    expect(labels).toEqual(['Budget', 'Accounts', 'Knowledge', 'Profile'])
+  })
+
+  /**
+   * Four, and the reason it is worth asserting the count rather than only the
+   * contents: the bar was drawn against a 320px screen and four labels is what
+   * fits. A fifth destination has to be a decision about what stops being one,
+   * not something that arrives with a feature.
+   */
+  test('a user has four places, which is what the bar was drawn for', async () => {
+    currentUser = user
+    render(App)
+
+    const nav = await screen.findByRole('navigation', { name: 'Sections' })
+    expect(nav.querySelectorAll('a').length).toBe(4)
+  })
+
+  test('an admin is offered no library, having no vault to explain', async () => {
+    currentUser = admin
+    at('/knowledge')
+    render(App)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/users'))
   })
 
   test('and an admin a different set, not a shortened one', async () => {

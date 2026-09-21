@@ -16,6 +16,7 @@ export const en = {
   // --- Navigation and profile ---
   'nav.budget': 'Budget',
   'nav.accounts': 'Accounts',
+  'nav.knowledge': 'Knowledge',
   'nav.profile': 'Profile',
   'nav.audit': 'Audit',
   'nav.label': 'Sections',
@@ -494,6 +495,13 @@ export const en = {
   // --- Roles. Server-supplied values, so no scan can see them. ---
   'role.user': 'User',
   'role.admin': 'Admin',
+
+  // --- Knowledge: the library ---
+  'knowledge.about': 'About this app',
+  'knowledge.swiss': 'Swiss basics',
+  'knowledge.sources': 'Official sources',
+  'knowledge.inEnglish': 'Not yet translated — shown in English.',
+
 } as const
 
 /**

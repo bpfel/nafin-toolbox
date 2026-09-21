@@ -14,7 +14,7 @@ import type { Screen } from './router.svelte'
  * password with other people's accounts and bury an audit log that wants a
  * screen of its own.
  */
-export type IconName = 'budget' | 'accounts' | 'profile' | 'users' | 'audit'
+export type IconName = 'budget' | 'accounts' | 'knowledge' | 'profile' | 'users' | 'audit'
 
 export interface Destination {
   screen: Screen
@@ -34,8 +34,17 @@ export interface Destination {
 const FOR_USER: Destination[] = [
   { screen: 'budget', path: '/budget', icon: 'budget', label: () => t('nav.budget') },
   { screen: 'accounts', path: '/accounts', icon: 'accounts', label: () => t('nav.accounts') },
+  { screen: 'knowledge', path: '/knowledge', icon: 'knowledge', label: () => t('nav.knowledge') },
   { screen: 'profile', path: '/profile', icon: 'profile', label: () => t('nav.profile') },
 ]
+
+/*
+ * Four fits at 320px. Five does not — which is the constraint the shell was
+ * drawn against, and it has not moved. Savings and a dashboard are both owed a
+ * slot, so whoever adds the fifth destination has to decide what stops being
+ * one; Knowledge is the likeliest candidate, since a library is a place you go
+ * deliberately rather than one you switch to while working.
+ */
 
 const FOR_ADMIN: Destination[] = [
   { screen: 'users', path: '/users', icon: 'users', label: () => t('menu.users') },
