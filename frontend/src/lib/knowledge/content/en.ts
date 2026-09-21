@@ -22,7 +22,7 @@ export const en: Content = {
     },
     places: {
       title: 'The different screens',
-      body: 'Budget is where you plan a month. Accounts lists the real balances behind it. Knowledge holds this tour and short pieces on Swiss finance. Profile has your language, password and security settings.',
+      body: 'Budget is where you plan a month. Accounts lists the real balances behind it. Knowledge holds this tour and short pieces on Swiss finance.',
     },
     types: {
       title: 'Different budget entries',
@@ -56,19 +56,19 @@ export const en: Content = {
     'about-budget': {
       title: 'What the budget is for',
       body: [
-        'The budget is a description of a typical month: what comes in, what goes out, and what is held back. It is a plan you maintain, not a record of transactions — the app never sees your bank.',
-        'Entries are grouped under headings you choose. Each entry has a type, and the type is the part worth getting right: income and expense are money arriving and money gone, while savings, bills and purchases all leave your account without leaving your net worth.',
-        'There is one plan, not one per month. When something changes enough to be worth remembering — a raise, a move, a new insurance — take a named snapshot, and the plan carries on live beside it.',
+        'The budget is a description of a typical month: what comes in, what goes out, and what is held back. You maintain it yourself, and it is not a log of transactions — the app never sees your bank.',
+        'Entries are grouped under headings you choose. Each entry has a type, and the type is what matters most: income and expense are money arriving and money gone, while savings, bills and purchases all leave your account without leaving your net worth.',
+        'There is one standing plan, not one per month. When something changes enough to record — a raise, a move, a new insurance — take a named snapshot, and it carries on live beside that copy.',
       ],
     },
 
     'pillar-3a': {
       title: 'Pillar 3a',
       body: [
-        'Pillar 3a is the tax-privileged part of private Swiss retirement saving. What you pay in during a year can be deducted from your taxable income for that year, which is most of the reason it exists.',
-        'It is capped. There is a legal maximum each year, and it differs depending on whether you are already covered by an occupational pension. The figure is set federally and changes from time to time, so it is not repeated here — the tax administration publishes the current one.',
+        'Pillar 3a is the tax-privileged part of private Swiss retirement saving. What you pay in is deducted from your taxable income for the same year, which is most of the reason it exists.',
+        'It is capped. There is a legal maximum each year, and it differs depending on whether you are already covered by an occupational pension. The figure is set federally and changes periodically, so it is not repeated here — the tax administration publishes the current one.',
         'The money is locked until roughly retirement age, with a short list of exceptions including buying a home you live in, leaving Switzerland permanently, and becoming self-employed.',
-        'Anything beyond that cap, or that you want to be able to reach, is pillar 3b — ordinary savings and investments, with no cap and no deduction.',
+        'Anything beyond that cap, or that you want to be able to reach, is pillar 3b — ordinary savings and investments, with no ceiling and no deduction.',
       ],
       sources: [
         {

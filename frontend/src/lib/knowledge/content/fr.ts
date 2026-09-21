@@ -25,7 +25,7 @@ export const fr: PartialContent = {
     },
     places: {
       title: 'Les différents écrans',
-      body: 'Budget, c’est là que vous planifiez un mois. Comptes montre les soldes réels correspondants. Savoir abrite cette visite et de courts textes sur les finances suisses. Profil contient la langue, le mot de passe et les réglages de sécurité.',
+      body: 'Budget, c’est là que vous planifiez un mois. Comptes montre les soldes réels correspondants. Savoir abrite cette visite et de courts textes sur les finances suisses.',
     },
     types: {
       title: 'Différentes entrées budgétaires',
@@ -58,19 +58,19 @@ export const fr: PartialContent = {
     'about-budget': {
       title: 'À quoi sert le budget',
       body: [
-        'Le budget décrit un mois type : ce qui entre, ce qui sort et ce qui est mis de côté. C’est un plan que vous tenez à jour, pas un relevé d’opérations — l’application ne voit jamais votre banque.',
-        'Les entrées sont regroupées sous des titres que vous choisissez. Chaque entrée a un type, et c’est lui qui compte : revenus et dépenses sont de l’argent qui arrive et de l’argent parti, tandis que l’épargne, les factures et les achats quittent votre compte sans quitter votre patrimoine.',
-        'Il y a un seul plan, pas un par mois. Quand quelque chose change assez pour mériter d’être retenu — une augmentation, un déménagement, une nouvelle assurance —, prenez un instantané nommé : le plan continue de vivre à côté.',
+        'Le budget décrit un mois ordinaire : ce qui entre, ce qui sort et ce qui est mis de côté. Vous le tenez à jour ; ce n’est pas un relevé d’opérations — l’application ne voit jamais votre banque.',
+        'Les entrées sont regroupées sous des titres que vous choisissez. Chaque entrée a un type, et c’est lui qui importe : revenus et dépenses sont de l’argent qui arrive et qui repart, tandis que l’épargne, les factures et les achats quittent votre compte sans quitter votre patrimoine.',
+        'Il y a un seul plan, pas un par mois. Quand quelque chose change assez pour mériter d’être retenu — une augmentation, un déménagement, une nouvelle assurance —, prenez un instantané nommé : il continue de vivre en parallèle.',
       ],
     },
 
     'pillar-3a': {
       title: 'Pilier 3a',
       body: [
-        'Le pilier 3a est la part fiscalement privilégiée de la prévoyance privée. Ce que vous y versez dans l’année se déduit de votre revenu imposable de cette année-là, et c’est l’essentiel de sa raison d’être.',
-        'Il est plafonné. Un maximum légal s’applique chaque année, et il diffère selon que vous êtes déjà affilié à une caisse de pension ou non. Le montant est fixé par la Confédération et change de temps à autre : il n’est donc pas repris ici, l’administration fiscale publie celui qui est en vigueur.',
+        'Le pilier 3a est la part fiscalement privilégiée de la prévoyance privée. Ce que vous y versez se déduit de votre revenu imposable de la même année, et c’est l’essentiel de sa raison d’être.',
+        'Il est plafonné. Un maximum légal s’applique chaque année, et il diffère selon que vous êtes déjà affilié à une caisse de pension ou non. Le montant est fixé par la Confédération et change périodiquement : il n’est donc pas repris ici, l’administration fiscale publie celui qui est en vigueur.',
         'L’argent est bloqué jusqu’à l’approche de l’âge de la retraite, avec une courte liste d’exceptions : acheter un logement que vous habitez, quitter définitivement la Suisse, ou vous mettre à votre compte.',
-        'Tout ce qui dépasse ce plafond, et tout ce que vous voulez pouvoir retirer, relève du pilier 3b : épargne et placements ordinaires, sans plafond et sans déduction.',
+        'Tout ce qui dépasse ce plafond, et ce que vous voulez pouvoir retirer, relève du pilier 3b : épargne et placements ordinaires, ni limite ni déduction.',
       ],
       sources: [
         {

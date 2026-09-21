@@ -24,7 +24,7 @@ export const it: PartialContent = {
     },
     places: {
       title: 'Le diverse schermate',
-      body: 'Budget è dove pianifichi un mese. Conti mostra i saldi reali corrispondenti. Sapere ospita questo tour e brevi testi sulle finanze svizzere. Profilo contiene lingua, password e impostazioni di sicurezza.',
+      body: 'Budget è dove pianifichi un mese. Conti mostra i saldi reali corrispondenti. Sapere ospita questo tour e brevi testi sulle finanze svizzere.',
     },
     types: {
       title: 'Diverse voci di budget',
@@ -57,19 +57,19 @@ export const it: PartialContent = {
     'about-budget': {
       title: 'A cosa serve il budget',
       body: [
-        'Il budget descrive un mese tipico: che cosa entra, che cosa esce e che cosa viene tenuto da parte. È un piano che aggiorni tu, non un registro dei movimenti — l’app non vede mai la tua banca.',
-        'Le voci stanno sotto intestazioni che scegli tu. Ogni voce ha un tipo, ed è quello che conta: entrate e uscite sono denaro che arriva e denaro che se n’è andato, mentre risparmi, fatture e acquisti lasciano il tuo conto senza lasciare il tuo patrimonio.',
-        'C’è un solo piano, non uno al mese. Quando qualcosa cambia abbastanza da valere la pena di ricordarlo — un aumento, un trasloco, una nuova assicurazione — scatta un’istantanea con un nome: il piano continua a vivere accanto a essa.',
+        'Il budget descrive un mese tipico: ciò che entra, ciò che esce e ciò che viene tenuto da parte. Lo aggiorni tu, non è un registro dei movimenti — l’app non vede mai la tua banca.',
+        'Le voci stanno sotto intestazioni che scegli tu. Ogni voce ha un tipo, ed è quello che conta: entrate e uscite sono denaro che arriva e che se n’è andato, mentre risparmi, fatture e acquisti lasciano il tuo conto senza lasciare il tuo patrimonio.',
+        'C’è un solo piano, non uno al mese. Quando qualcosa cambia abbastanza da valere la pena di ricordarlo — un aumento, un trasloco, una nuova assicurazione — scatta un’istantanea con un nome: continua a vivere accanto a essa.',
       ],
     },
 
     'pillar-3a': {
       title: 'Pilastro 3a',
       body: [
-        'Il pilastro 3a è la parte fiscalmente privilegiata della previdenza privata. Quanto versi in un anno lo puoi dedurre dal reddito imponibile di quell’anno, ed è in buona parte la ragione per cui esiste.',
-        'Ha un tetto. Ogni anno c’è un importo massimo di legge, diverso a seconda che tu sia già affiliato a una cassa pensioni oppure no. L’importo è fissato dalla Confederazione e cambia di tanto in tanto, perciò qui non è riportato: quello in vigore lo pubblica l’amministrazione delle contribuzioni.',
-        'Il denaro resta vincolato fin verso l’età di pensionamento, con poche eccezioni: acquistare un’abitazione in cui vivi, lasciare definitivamente la Svizzera, oppure metterti in proprio.',
-        'Tutto ciò che va oltre quel tetto, e tutto ciò a cui vuoi poter accedere, è pilastro 3b: risparmio e investimenti ordinari, senza tetto e senza deduzione.',
+        'Il pilastro 3a è la parte fiscalmente privilegiata della previdenza privata. Quanto versi lo puoi dedurre dal reddito imponibile dello stesso anno, ed è in gran misura la ragione per cui esiste.',
+        'È soggetto a un massimale. Ogni anno la legge fissa un importo, diverso a seconda che tu sia già affiliato a una cassa pensioni oppure no. L’importo è fissato dalla Confederazione e cambia periodicamente, perciò qui non è riportato: quello in vigore lo pubblica l’amministrazione delle contribuzioni.',
+        'Il denaro resta vincolato fin verso l’età di pensionamento, con poche eccezioni: acquistare un’abitazione in cui vivi, lasciare definitivamente la Svizzera, o metterti in proprio.',
+        'Tutto ciò che va oltre quel tetto, e ciò che vuoi poter ritirare, è pilastro 3b: risparmio e investimenti ordinari — nessun limite, nessuna deduzione.',
       ],
       sources: [
         {

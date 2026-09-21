@@ -24,7 +24,7 @@ export const de: PartialContent = {
     },
     places: {
       title: 'Die Bildschirme',
-      body: 'Budget ist, wo Sie einen Monat planen. Konten zeigt die tatsächlichen Salden dahinter. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen. Profil enthält Sprache, Passwort und Sicherheitseinstellungen.',
+      body: 'Budget ist, wo Sie einen Monat planen. Konten zeigt die tatsächlichen Salden dahinter. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen.',
     },
     types: {
       title: 'Verschiedene Budgeteinträge',
@@ -57,19 +57,19 @@ export const de: PartialContent = {
     'about-budget': {
       title: 'Wozu das Budget da ist',
       body: [
-        'Das Budget beschreibt einen typischen Monat: was hereinkommt, was hinausgeht und was zurückgehalten wird. Es ist ein Plan, den Sie pflegen, und keine Aufzeichnung von Transaktionen — die App sieht Ihre Bank nie.',
-        'Einträge stehen unter Überschriften, die Sie selbst wählen. Jeder Eintrag hat eine Art, und auf die kommt es an: Einnahmen und Ausgaben sind Geld, das kommt, und Geld, das weg ist, während Sparen, Rechnungen und Anschaffungen zwar Ihr Konto verlassen, nicht aber Ihr Vermögen.',
-        'Es gibt einen Plan, nicht einen pro Monat. Ändert sich etwas, das es zu behalten lohnt — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, erstellen Sie eine benannte Momentaufnahme, und der Plan läuft daneben weiter.',
+        'Das Budget beschreibt einen typischen Monat: was hereinkommt, was hinausgeht und was zurückgehalten wird. Es ist etwas, das Sie pflegen, und keine Aufzeichnung von Transaktionen — die App sieht Ihre Bank nie.',
+        'Einträge stehen unter Überschriften, die Sie selbst wählen. Jeder Eintrag hat eine Art, und die ist entscheidend: Einnahmen und Ausgaben meinen eingehendes und verbrauchtes Geld, während Sparen, Rechnungen und Anschaffungen zwar Ihr Konto verlassen, nicht aber Ihr Vermögen.',
+        'Es gibt einen Plan, nicht einen pro Monat. Ändert sich etwas, das es zu behalten lohnt — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, erstellen Sie eine benannte Momentaufnahme, und er läuft daneben weiter.',
       ],
     },
 
     'pillar-3a': {
       title: 'Säule 3a',
       body: [
-        'Die Säule 3a ist der steuerlich begünstigte Teil der privaten Vorsorge. Was Sie in einem Jahr einzahlen, können Sie in diesem Jahr vom steuerbaren Einkommen abziehen — das ist der wesentliche Grund, weshalb es sie gibt.',
-        'Sie ist gedeckelt. Es gibt jedes Jahr einen gesetzlichen Höchstbetrag, und er ist unterschiedlich, je nachdem ob Sie bereits einer Pensionskasse angeschlossen sind. Der Betrag wird vom Bund festgelegt und ändert sich von Zeit zu Zeit, deshalb steht er hier nicht — die Steuerverwaltung veröffentlicht den aktuellen.',
-        'Das Geld ist bis ungefähr zum Rentenalter gebunden. Es gibt wenige Ausnahmen, darunter der Kauf von Wohneigentum zum Eigenbedarf, das endgültige Verlassen der Schweiz und der Schritt in die Selbstständigkeit.',
-        'Alles darüber hinaus, und alles, woran Sie jederzeit herankommen wollen, ist Säule 3b: gewöhnliches Sparen und Anlegen, ohne Obergrenze und ohne Abzug.',
+        'Die Säule 3a ist der steuerlich begünstigte Teil der privaten Vorsorge. Einzahlungen können Sie im selben Jahr vom steuerbaren Einkommen abziehen — das ist der wesentliche Grund für ihre Existenz.',
+        'Sie ist gedeckelt. Es gibt jedes Jahr einen gesetzlichen Höchstbetrag, und er ist unterschiedlich, je nachdem ob Sie bereits einer Pensionskasse angeschlossen sind. Der Betrag wird vom Bund festgelegt und ändert sich gelegentlich, deshalb steht er hier nicht — die Steuerverwaltung veröffentlicht den aktuellen.',
+        'Das Geld ist bis ungefähr zum Rentenalter gebunden. Wenige Ausnahmen bestehen: der Kauf von Wohneigentum zum Eigenbedarf, das endgültige Verlassen der Schweiz und der Schritt in die Selbstständigkeit.',
+        'Alles darüber hinaus, und was Sie jederzeit erreichen wollen, ist Säule 3b: gewöhnliches Sparen und Anlegen — keine Obergrenze, kein Abzug.',
       ],
       sources: [
         {
