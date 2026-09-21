@@ -111,12 +111,16 @@
 
 <style>
   main {
-    /* Room at the foot for the navigation and whatever the home indicator
-       takes. It used to reserve 8rem for two fixed layers; the action strip is
-       pinned to the top now, so the second one is gone and roughly fifty
-       pixels of every phone page came back. */
+    /* Room at the foot for the navigation, the dial's dot standing above it,
+       and whatever the home indicator takes — so the last row of a list is not
+       left under the dot with no way to scroll it clear.
+
+       This is about what the two fixed bars reserved before them, and buys
+       something they could not: the space is empty page rather than a band of
+       chrome. Content scrolls up through it and stays readable the whole way,
+       except in the one corner the dot occupies. */
     padding: 1.5rem var(--app-gutter)
-      calc(var(--app-nav-height) + 2rem + env(safe-area-inset-bottom, 0));
+      calc(var(--app-nav-height) + 5rem + env(safe-area-inset-bottom, 0));
   }
 
   .screen[hidden] {

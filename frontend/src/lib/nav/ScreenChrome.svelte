@@ -4,6 +4,7 @@
   import { isEditing, toggleEditing } from '../util/editMode.svelte'
   import { getVaultState } from '../crypto/vaultStore.svelte'
   import ActionButton from './ActionButton.svelte'
+  import ActionDial from './ActionDial.svelte'
   import {
     beginPeek,
     endPeek,
@@ -20,14 +21,9 @@
    * because the sub-tabs say it too. The heading survives for screen readers,
    * which navigate by heading and would otherwise find a document with none.
    *
-   * The controls move to the foot for the same reason the navigation is there:
-   * a thumb reaches the bottom of a phone and does not reach the top corner.
-   * Edit and the hide-amounts eye are pressed while working, which is exactly
-   * the case a top-right corner serves worst.
-   *
-   * Above 768px the strip is an ordinary toolbar at the top of the content —
-   * the same trade the navigation makes when it becomes a rail. Bottom-anchored
-   * controls on a wide screen solve a problem a mouse does not have.
+   * Where the controls go is `ActionDial`'s business: a toolbar at the top of a
+   * desktop page, a dot in the corner of a phone. This file decides only which
+   * controls there are.
    */
   interface Props {
     /** Names the screen for anything that reads the document rather than sees it. */
@@ -47,11 +43,18 @@
      * say. They sit beside the shared ones rather than inside the content,
      * because a control that acts on the whole screen should be where the
      * screen's other controls are and should not scroll away from them.
+     *
+     * First in the list: the toolbar reads them leftmost, and the dial stacks
+     * them nearest the dot, because this is where a screen puts the thing a
+     * person came to it to do.
      */
     children?: Snippet
   }
 
-  let { title, editKey, eye = true, children }: Props = $props()
+  // Renamed on the way in: the dial is handed a snippet of its own called
+  // `children`, and two of that name in one scope is a component that renders
+  // itself for ever.
+  let { title, editKey, eye = true, children: screenControls }: Props = $props()
 
   const vaultState = getVaultState()
 
@@ -95,81 +98,81 @@
 <h1 class="screen-heading">{title}</h1>
 
 <!--
-  Nothing to do, nothing to show: an empty strip is a bar of chrome that earns
-  none of the room it takes, and on a phone that room is the scarce thing.
+  Nothing to do: no dial, and no dot standing in the corner of the screen
+  offering to open an empty stack. Profile is the one such screen — signing out
+  sits at the foot of its own list, where the rest of the page's actions are.
+
+  The vault's saving state is not a reason to draw one. Everything that writes
+  to the vault is on Budget or Accounts, both of which have controls of their
+  own, so a dial with nothing in it but a ring would be reporting on work that
+  happened on a screen the user has already left.
 -->
-{#if eye || editKey || children || vaultState.saving || vaultState.dirty}
-  <div class="screen-actions">
-    {#if vaultState.saving}
-      <span class="save-indicator">{t('state.saving')}</span>
-    {:else if vaultState.dirty}
-      <span class="save-indicator unsaved">{t('state.unsaved')}</span>
-    {/if}
+{#if eye || editKey || screenControls}
+  <ActionDial saving={vaultState.saving} dirty={vaultState.dirty}>
+    {#snippet children()}
+      {#if screenControls}
+        {@render screenControls()}
+      {/if}
 
-    <span class="spacer"></span>
-
-    {#if children}
-      {@render children()}
-    {/if}
-
-    {#if editKey}
-      <ActionButton
-        label={isEditing(editKey) ? t('action.done') : t('action.edit')}
-        pressed={isEditing(editKey)}
-        onclick={() => toggleEditing(editKey)}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
+      {#if editKey}
+        <ActionButton
+          label={isEditing(editKey) ? t('action.done') : t('action.edit')}
+          pressed={isEditing(editKey)}
+          onclick={() => toggleEditing(editKey)}
         >
-          {#if isEditing(editKey)}
-            <!-- A tick while the mode is on: the button now means "finished". -->
-            <polyline points="20 6 9 17 4 12" />
-          {:else}
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          {/if}
-        </svg>
-      </ActionButton>
-    {/if}
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            {#if isEditing(editKey)}
+              <!-- A tick while the mode is on: the button now means "finished". -->
+              <polyline points="20 6 9 17 4 12" />
+            {:else}
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            {/if}
+          </svg>
+        </ActionButton>
+      {/if}
 
-    {#if eye}
-      <ActionButton
-        label={hidingAmounts() ? t('privacy.show') : t('privacy.hide')}
-        pressed={hidingAmounts()}
-        onclick={clicked}
-        onpointerdown={pressed}
-        onpointerup={released}
-        onpointerleave={released}
-        onpointercancel={released}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
+      {#if eye}
+        <ActionButton
+          label={hidingAmounts() ? t('privacy.show') : t('privacy.hide')}
+          pressed={hidingAmounts()}
+          onclick={clicked}
+          onpointerdown={pressed}
+          onpointerup={released}
+          onpointerleave={released}
+          onpointercancel={released}
         >
-          {#if hidingAmounts()}
-            <path
-              d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
-            />
-            <line x1="1" y1="1" x2="23" y2="23" />
-          {:else}
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-          {/if}
-        </svg>
-      </ActionButton>
-    {/if}
-  </div>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            {#if hidingAmounts()}
+              <path
+                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+              />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            {:else}
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            {/if}
+          </svg>
+        </ActionButton>
+      {/if}
+    {/snippet}
+  </ActionDial>
 {/if}
 
 <style>
@@ -188,64 +191,5 @@
     clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
-  }
-
-  /*
-   * One toolbar, pinned to the top, at every width.
-   *
-   * The phone strip used to be fixed just above the navigation, in the half of
-   * the screen a thumb covers — persistent, like this, but at the other edge.
-   * Two mechanisms for one property, and the two widths disagreed about which
-   * edge the screen's controls live on.
-   *
-   * The reach argument for the bottom was real and is what is being traded
-   * away: these controls are now at the far end of a one-handed stretch. What
-   * is bought is one bar in one place, and the foot of every phone page back —
-   * `main` no longer reserves room for a second fixed layer down there.
-   */
-  .screen-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-
-    position: sticky;
-    top: 0;
-    z-index: 39;
-
-    /* Content passes underneath, so the strip needs a ground of its own.
-       Opaque rather than the frosted panel the phone bar used to be: text
-       scrolling under a translucent bar moves behind the icons, and a control
-       has to stay legible while the page slides past it.
-
-       It bleeds out to the shell's gutter and pads itself back, because the
-       accounts row is deliberately a few pixels wider than the content box to
-       leave its cards room for their shadows — without this a card edge shows
-       alongside the toolbar as it passes under. */
-    background: var(--ground);
-    margin: 0 calc(-1 * var(--app-gutter)) 1rem;
-    padding: 0.5rem var(--app-gutter);
-    border-bottom: 1px solid #ececec;
-  }
-
-  .spacer {
-    flex: 1;
-  }
-
-  .save-indicator {
-    font-size: 0.75rem;
-    color: #2d6a4f;
-    font-weight: 500;
-  }
-
-  .save-indicator.unsaved {
-    color: #e67e22;
-  }
-
-  @media (min-width: 768px) {
-    /* Wider gutter, and room to breathe. Everything else is already shared. */
-    .screen-actions {
-      padding: 0.75rem var(--app-gutter);
-      margin-bottom: 1.25rem;
-    }
   }
 </style>

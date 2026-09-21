@@ -117,6 +117,7 @@ export const de: Messages = {
   'address.country': 'Land',
 
   'action.close': 'Schliessen',
+  'action.more': 'Aktionen',
 
   // --- Security settings ---
   'security.twofaTitle': 'Zwei-Faktor-Authentifizierung',
@@ -180,9 +181,8 @@ export const de: Messages = {
   'budget.expensesYr': 'Ausgaben /J.',
   'budget.month': 'Monat',
   'budget.year': 'Jahr',
-  'budget.viewToggle': 'Zeigt {mode} Beträge — wechseln zu {other}',
-  'budget.monthly': 'monatliche',
-  'budget.yearly': 'jährliche',
+  'budget.switchToYearly': 'Auf Jahr wechseln',
+  'budget.switchToMonthly': 'Auf Monat wechseln',
   'budget.dragToReorder': 'Zum Umsortieren ziehen',
   'budget.editPlannedMo': 'Monatsbetrag für {entry} bearbeiten',
   'budget.editPlannedYr': 'Jahresbetrag für {entry} bearbeiten',

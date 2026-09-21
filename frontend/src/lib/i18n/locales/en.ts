@@ -130,6 +130,9 @@ export const en = {
   'address.country': 'Country',
 
   'action.close': 'Close',
+  // The dial's dot, which opens the screen's controls. Never "menu": it holds
+  // what this screen can do, not somewhere else to go.
+  'action.more': 'Actions',
 
   // --- Security settings ---
   'security.twofaTitle': 'Two-Factor Authentication',
@@ -193,9 +196,8 @@ export const en = {
   'budget.expensesYr': 'Expenses /yr',
   'budget.month': 'Month',
   'budget.year': 'Year',
-  'budget.viewToggle': 'Showing {mode} amounts — switch to {other}',
-  'budget.monthly': 'monthly',
-  'budget.yearly': 'yearly',
+  'budget.switchToYearly': 'Switch to yearly',
+  'budget.switchToMonthly': 'Switch to monthly',
   'budget.dragToReorder': 'Drag to reorder',
   'budget.editPlannedMo': 'Edit planned per month for {entry}',
   'budget.editPlannedYr': 'Edit planned per year for {entry}',

@@ -49,13 +49,15 @@
       because there is no icon for "switch to yearly" and *Month* / *Year* is a
       pair whose widths differ in every language. It says the state it is in, as
       the eye beside it does.
+
+      The name says only where the tap goes, not also where it is now. Saying
+      both — "showing monthly amounts, switch to yearly" — was a sentence, and a
+      sentence does not fit in the dial's pill: in German it ran off the side of
+      the screen. The digit beside it already says which state it is in.
     -->
     <span class="period-toggle">
       <ActionButton
-        label={t('budget.viewToggle', {
-          mode: viewMode === 'monthly' ? t('budget.monthly') : t('budget.yearly'),
-          other: viewMode === 'monthly' ? t('budget.yearly') : t('budget.monthly'),
-        })}
+        label={viewMode === 'monthly' ? t('budget.switchToYearly') : t('budget.switchToMonthly')}
         onclick={() => (viewMode = viewMode === 'monthly' ? 'yearly' : 'monthly')}
       >
         <span class="period">{viewMode === 'monthly' ? '1' : '12'}</span>
@@ -75,7 +77,16 @@
     letter-spacing: -0.02em;
   }
 
-
+  /*
+   * A wrapper that exists only to be switched off above 768px, so it must not
+   * also be a box. In the dial the controls are laid out in a column and hidden
+   * one by one; a span standing between the container and the button would take
+   * the button's place in that column and keep its share of the gap after the
+   * button inside it had gone.
+   */
+  .period-toggle {
+    display: contents;
+  }
 
   @media (min-width: 768px) {
     /* Both columns fit up here, so there is nothing to choose between. */

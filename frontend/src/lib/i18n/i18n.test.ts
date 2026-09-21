@@ -263,10 +263,10 @@ describe('splitting a sentence around a slot', () => {
   test('fills the other placeholders as usual', async () => {
     const { tAround } = await load()
 
-    const [before, after] = tAround('budget.viewToggle', 'mode', { other: 'yearly' })
+    const [before, after] = tAround('snapshot.deleteExplain.one', 'name', { count: 3 })
 
-    expect(before).toBe('Showing ')
-    expect(after).toBe(' amounts — switch to yearly')
+    expect(before).toBe('Delete ')
+    expect(after).toBe(' and its 3 line?')
   })
 
   test('a sentence without that placeholder comes back whole', async () => {

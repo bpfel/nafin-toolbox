@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
+  import { inDial } from './dial'
 
   /**
    * One control in the action strip.
@@ -63,6 +64,19 @@
     onpointercancel,
     children,
   }: Props = $props()
+
+  /**
+   * In the dial the symbol is joined by the label, spelled out beside it.
+   *
+   * `title` is what explains a glyph to a pointer, and a phone has no hover to
+   * summon it — so in the one place these controls are only ever touched, the
+   * words are on the screen. The strip could not afford them: a row of pills
+   * shifts sideways when Edit becomes Done, and a column does not.
+   *
+   * Decided once, at construction. Whether a control is in the dial is a fact
+   * about where it was rendered, not something that changes under it.
+   */
+  const spelled = inDial()
 </script>
 
 <button
@@ -79,6 +93,11 @@
   {onpointerleave}
   {onpointercancel}
 >
+  <!-- Before the symbol, so the symbols line up in one column under the dot
+       however long the words beside them run. Hidden until the dial is opened;
+       `aria-label` is what carries this to a screen reader either way, and the
+       two are the same string so they cannot drift apart. -->
+  {#if spelled}<span class="pill">{label}</span>{/if}
   {@render children()}
 </button>
 
@@ -141,6 +160,19 @@
 
   .action.pressed:focus-visible {
     background: #eaf1ee;
+  }
+
+  /*
+   * Off until the dial opens, which is the only place it is ever shown — see
+   * ActionDial, which turns it on from outside because it is the thing that
+   * knows whether it is open.
+   */
+  .pill {
+    display: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    color: inherit;
   }
 
   /* Whatever the caller puts inside: an icon, or the digits of a period. */
