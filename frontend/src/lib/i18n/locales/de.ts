@@ -470,10 +470,24 @@ export const de: Messages = {
   'role.user': 'Benutzer',
   'role.admin': 'Admin',
 
-  // --- Wissen: die Bibliothek ---
+  // --- Wissen: die Bibliothek und der Rundgang darin ---
+  'knowledge.tourTitle': 'Rundgang starten',
+  'knowledge.tourAgainTitle': 'Rundgang wiederholen',
+  'knowledge.tourBody': 'Ein kurzer Gang durch die wichtigsten Ansichten und ihre Bedienelemente.',
+  'knowledge.tourStart': 'Start',
+  'knowledge.tourAgain': 'Erneut',
   'knowledge.about': 'Über diese App',
   'knowledge.swiss': 'Schweizer Grundlagen',
   'knowledge.sources': 'Offizielle Quellen',
   'knowledge.inEnglish': 'Noch nicht übersetzt — auf Englisch.',
+  'tour.progress': '{position} von {total}',
+  'tour.next': 'Weiter',
+  'tour.back': 'Zurück',
+  'tour.skip': 'Überspringen',
+  'tour.finish': 'Fertig',
+  'tour.offerTitle': 'Neu hier?',
+  'tour.offerBody': 'Ein kurzer Rundgang durch die wichtigsten Ansichten dauert etwa eine Minute.',
+  'tour.offerAccept': 'Rundgang starten',
+  'tour.offerDecline': 'Später',
 
 }

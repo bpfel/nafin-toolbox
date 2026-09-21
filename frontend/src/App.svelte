@@ -12,6 +12,8 @@
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
+  import TourOverlay from './lib/tour/TourOverlay.svelte'
+  import { resetTour } from './lib/tour/tourStore.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
   import AppShell from './lib/nav/AppShell.svelte'
   import { getRoute, navigate, replace, startRouting, syncFromLocation } from './lib/nav/router.svelte'
@@ -88,6 +90,9 @@
     error = null
     show2FAEnforcement = false
     clearEditing()
+    // A tour left running would otherwise still be running over the next
+    // person's sign-in, pointing at a screen that is no longer theirs.
+    resetTour()
     navigate('/')
   }
 
@@ -324,6 +329,10 @@
 <VersionTag />
 <UpdateBanner />
 <UnsavedBanner />
+<!-- Here rather than inside a screen: the tour walks across screens, and a
+     component owned by one of them would be destroyed halfway through. It
+     renders nothing unless the tour is running. -->
+<TourOverlay />
 
 <style>
   .loading {

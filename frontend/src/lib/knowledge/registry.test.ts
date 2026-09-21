@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest'
 import { ARTICLES, articlesIn, type ArticleId } from './registry'
 import { en } from './content/en'
+import { TOUR_STEPS } from '../tour/steps'
 
 /**
  * Holds the two halves of the library to each other, and holds the Swiss half
@@ -103,5 +104,18 @@ describe('no figure is baked into the prose', () => {
     for (const paragraph of en.articles[id].body) {
       expect(AMOUNT.test(paragraph), paragraph).toBe(false)
     }
+  })
+})
+
+describe('the tour has words in every language it claims', () => {
+  test('every step has English copy', () => {
+    const missing = TOUR_STEPS.filter(s => en.tour[s.id] === undefined).map(s => s.id)
+    expect(missing).toEqual([])
+  })
+
+  test('no copy is left over from a removed step', () => {
+    const used = new Set(TOUR_STEPS.map(s => s.id))
+    const orphans = Object.keys(en.tour).filter(id => !used.has(id as never))
+    expect(orphans).toEqual([])
   })
 })

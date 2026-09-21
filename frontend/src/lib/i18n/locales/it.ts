@@ -463,10 +463,24 @@ export const it: Messages = {
   'role.user': 'Utente',
   'role.admin': 'Admin',
 
-  // --- Sapere: la biblioteca ---
+  // --- Sapere: la biblioteca e il tour guidato che vi si trova ---
+  'knowledge.tourTitle': 'Fai il tour',
+  'knowledge.tourAgainTitle': 'Ripeti il tour',
+  'knowledge.tourBody': 'Un breve percorso tra le viste principali e i loro comandi.',
+  'knowledge.tourStart': 'Avvia',
+  'knowledge.tourAgain': 'Ripeti',
   'knowledge.about': 'Su questa app',
   'knowledge.swiss': 'Basi svizzere',
   'knowledge.sources': 'Fonti ufficiali',
   'knowledge.inEnglish': 'Non ancora tradotto — in inglese.',
+  'tour.progress': '{position} di {total}',
+  'tour.next': 'Avanti',
+  'tour.back': 'Indietro',
+  'tour.skip': 'Salta',
+  'tour.finish': 'Fatto',
+  'tour.offerTitle': 'Prima volta?',
+  'tour.offerBody': 'Un breve tour delle viste principali dura circa un minuto.',
+  'tour.offerAccept': 'Fai il tour',
+  'tour.offerDecline': 'Più tardi',
 
 }

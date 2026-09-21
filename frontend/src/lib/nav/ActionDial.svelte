@@ -112,8 +112,25 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="dial" class:expanded>
-  <div class="strip" bind:this={stack} id={stripId} role="presentation" onclick={controlUsed}>
+<!--
+  One anchor name for the guided tour, on both boxes deliberately.
+
+  It goes on the container rather than on a control inside it, because below
+  768px the strip is folded away behind the dot and a halo drawn round the eye
+  would ring something nobody can see. But the container only *has* a box at
+  that width: above 768px it is `display: contents` and the box belongs to the
+  strip. So both wear the name and the tour takes whichever one the current
+  width actually draws. See `lib/tour/anchor.ts`.
+-->
+<div class="dial" class:expanded data-tour="dial">
+  <div
+    class="strip"
+    data-tour="dial"
+    bind:this={stack}
+    id={stripId}
+    role="presentation"
+    onclick={controlUsed}
+  >
     <!--
       One element that changes its words rather than two that come and go. A
       live region is only announced while it is already in the document, so a

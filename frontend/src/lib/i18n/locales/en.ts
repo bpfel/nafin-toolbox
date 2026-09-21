@@ -496,11 +496,25 @@ export const en = {
   'role.user': 'User',
   'role.admin': 'Admin',
 
-  // --- Knowledge: the library ---
+  // --- Knowledge: the library, and the guided tour that lives in it ---
+  'knowledge.tourTitle': 'Take the tour',
+  'knowledge.tourAgainTitle': 'Take the tour again',
+  'knowledge.tourBody': 'A short walk through the main views and the controls on them.',
+  'knowledge.tourStart': 'Start',
+  'knowledge.tourAgain': 'Start again',
   'knowledge.about': 'About this app',
   'knowledge.swiss': 'Swiss basics',
   'knowledge.sources': 'Official sources',
   'knowledge.inEnglish': 'Not yet translated — shown in English.',
+  'tour.progress': '{position} of {total}',
+  'tour.next': 'Next',
+  'tour.back': 'Back',
+  'tour.skip': 'Skip',
+  'tour.finish': 'Done',
+  'tour.offerTitle': 'New here?',
+  'tour.offerBody': 'A short tour of the main views takes about a minute.',
+  'tour.offerAccept': 'Take the tour',
+  'tour.offerDecline': 'Not now',
 
 } as const
 

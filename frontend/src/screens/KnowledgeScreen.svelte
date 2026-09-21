@@ -6,19 +6,25 @@
   import { articlesIn, type ArticleMeta, type ArticleSection } from '../lib/knowledge/registry'
   import { loadContent, type LoadedContent } from '../lib/knowledge/content'
   import { en } from '../lib/knowledge/content/en'
+  import { getVaultState } from '../lib/crypto/vaultStore.svelte'
+  import { startTour } from '../lib/tour/tourStore.svelte'
+  import { hasTakenTour } from '../lib/tour/tourState'
 
   /**
    * Where the app explains itself.
    *
-   * Two sections for now, in an order that is an argument: what each view of
-   * *this app* is for, then how *Swiss money* works. The first is ours to get
-   * right; the second describes rules we do not set, which is why every piece
-   * in it carries a link to whoever does.
+   * Three sections in one order, and the order is the argument: the tour first
+   * because it is the fastest way to stop being lost, then what each view of
+   * *this app* is for, then how *Swiss money* works. The first two are ours to
+   * get right; the third describes rules we do not set, which is why every
+   * piece in it carries a link to whoever does.
    *
    * An article opens as a sheet rather than an address. Two navigation levels
    * is a hard stop, and a library of short pieces is exactly the case that
    * tempts you into a third.
    */
+  const vaultState = getVaultState()
+
   let loaded = $state<LoadedContent>({ content: en, translated: new Set() })
   let open = $state<ArticleMeta | null>(null)
 
@@ -33,6 +39,8 @@
     }
   })
 
+  let taken = $derived(hasTakenTour(vaultState.vault))
+
   const SECTIONS: { id: ArticleSection; heading: () => string }[] = [
     { id: 'about', heading: () => t('knowledge.about') },
     { id: 'swiss', heading: () => t('knowledge.swiss') },
@@ -42,6 +50,21 @@
 <ScreenChrome title={t('nav.knowledge')} eye={false} />
 
 <div class="knowledge">
+  <!--
+    The tour, first and on its own. It is the only thing on this screen that
+    does something rather than says something, so it does not sit in a list of
+    articles pretending to be one.
+  -->
+  <section class="settings-card tour-card">
+    <div class="tour-text">
+      <h2>{taken ? t('knowledge.tourAgainTitle') : t('knowledge.tourTitle')}</h2>
+      <p>{t('knowledge.tourBody')}</p>
+    </div>
+    <button class="start" onclick={startTour}>
+      {taken ? t('knowledge.tourAgain') : t('knowledge.tourStart')}
+    </button>
+  </section>
+
   {#each SECTIONS as section (section.id)}
     {@const articles = articlesIn(section.id)}
     {#if articles.length > 0}
@@ -84,6 +107,35 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+  }
+
+  .tour-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .tour-text h2 {
+    margin: 0 0 0.2rem;
+    font-size: 1rem;
+  }
+
+  .tour-text p {
+    margin: 0;
+    font-size: 0.87rem;
+    line-height: 1.5;
+    color: var(--ink-muted);
+  }
+
+  .start {
+    flex: none;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.9rem;
+    /* 44px: this is the one control on the screen and it is pressed with a
+       thumb like everything else in the app. */
+    min-height: 44px;
   }
 
   .section {

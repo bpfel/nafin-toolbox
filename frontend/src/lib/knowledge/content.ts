@@ -1,5 +1,6 @@
 import type { Locale } from '../i18n/index.svelte'
 import type { ArticleId } from './registry'
+import type { TourStepId } from '../tour/steps'
 import { en } from './content/en'
 
 /**
@@ -39,13 +40,20 @@ export interface Article {
   sources?: { label: string; url: string }[]
 }
 
+export interface TourCopy {
+  title: string
+  body: string
+}
+
 export interface Content {
   articles: Record<ArticleId, Article>
+  tour: Record<TourStepId, TourCopy>
 }
 
 /** What a locale that is still filling in may provide. */
 export type PartialContent = {
   articles?: Partial<Record<ArticleId, Article>>
+  tour?: Partial<Record<TourStepId, TourCopy>>
 }
 
 /**
@@ -109,6 +117,7 @@ export async function loadContent(locale: Locale): Promise<LoadedContent> {
   return {
     content: {
       articles: { ...en.articles, ...loaded.articles },
+      tour: { ...en.tour, ...loaded.tour },
     },
     translated: new Set(Object.keys(loaded.articles ?? {}) as ArticleId[]),
   }

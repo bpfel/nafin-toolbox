@@ -15,6 +15,41 @@ import type { Content } from '../content'
  *    figure lives on the official page; this file links to it.
  */
 export const en: Content = {
+  tour: {
+    welcome: {
+      title: 'This is a plan, not a bank',
+      body: 'Nothing here is connected to your accounts. Every figure is one you typed, and stays right because you keep it right — which is also why nobody else can read it.',
+    },
+    places: {
+      title: 'Four places',
+      body: 'Budget is what you plan. Accounts is where the money actually sits. Knowledge is this tour and a small library. Profile is everything about you rather than your money.',
+    },
+    budget: {
+      title: 'One standing plan',
+      body: 'Not a ledger of months. You describe a typical month once, and take a named snapshot when something changes enough to be worth remembering.',
+    },
+    controls: {
+      title: 'The screen’s own controls',
+      body: 'Anything that acts on the whole screen is here — editing its structure, hiding the figures. On a phone they stack above this dot, where your thumb already is.',
+    },
+    privacy: {
+      title: 'The eye hides the amounts',
+      body: 'It blurs every figure and leaves the labels readable, for a train or a shared desk. Press and hold to peek without switching it back. It is cosmetic — it is not the lock on your data.',
+    },
+    accounts: {
+      title: 'Where the money sits',
+      body: 'An account is a real place with a real balance: a salary account, a savings account, cash in a drawer. You tell the app what each one holds, and when you last checked.',
+    },
+    allocations: {
+      title: 'Two views here',
+      body: 'Accounts lists the balances. Allocations answers the harder question — which account each budget line comes out of, and which one it goes into.',
+    },
+    knowledge: {
+      title: 'You can come back',
+      body: 'This tour lives here, along with short pieces on what each view is for and on how Swiss money works. Nothing you have just seen has to be remembered.',
+    },
+  },
+
   articles: {
     'about-budget': {
       title: 'What the budget is for',
