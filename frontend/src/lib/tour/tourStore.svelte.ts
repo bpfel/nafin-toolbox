@@ -1,6 +1,8 @@
-import { TOUR_STEPS, type TourStep } from './steps'
+import { TOUR_STEPS, numbering, type TourStep } from './steps'
 import { getVaultState, markDirty } from '../crypto/vaultStore.svelte'
 import { recordCompleted, recordDismissed } from './tourState'
+import { seedDefaults } from '../budget/budgetEngine'
+import { getLocale } from '../i18n/index.svelte'
 
 /**
  * Where the tour is, if it is running.
@@ -34,12 +36,13 @@ export function getTourState() {
     get step(): TourStep | null {
       return running ? (TOUR_STEPS[index] ?? null) : null
     },
-    /** 1-based, for "3 of 9". */
+    /** What the counter shows: "4", or "5.2" inside a group. See `numbering`. */
     get position() {
-      return index + 1
+      return numbering()[index]?.label ?? String(index + 1)
     },
+    /** Topics, not steps — five of them are parts of one. */
     get total() {
-      return TOUR_STEPS.length
+      return numbering()[index]?.total ?? TOUR_STEPS.length
     },
     get atFirst() {
       return index === 0
@@ -50,10 +53,37 @@ export function getTourState() {
   }
 }
 
+/**
+ * Fills an empty budget with the Swiss defaults, if this step needs rows.
+ *
+ * The five type steps point at real sections of the budget table, and an
+ * empty budget has none — so the tour puts something there rather than
+ * highlighting nothing. The defaults are the same ones the empty budget
+ * screen offers behind its own button, so this is the app doing what the user
+ * could have done a moment earlier, not a second way of seeding.
+ *
+ * Two guards, both load-bearing. It never runs on a budget that already has
+ * entries, so nobody's own figures are touched. And it is announced in the
+ * step's own words rather than happening quietly, because writing to someone's
+ * vault as a side effect of reading a tutorial is exactly the kind of thing
+ * that should not be a surprise.
+ */
+function prepare(step: TourStep): void {
+  if (!step.needsExampleBudget) return
+  const vault = getVaultState().vault
+  if (!vault || vault.budget.entries.length > 0) return
+
+  const now = new Date()
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  seedDefaults(vault, getLocale(), month)
+  markDirty()
+}
+
 export function startTour(): void {
   index = 0
   direction = 1
   running = true
+  prepare(TOUR_STEPS[0])
 }
 
 /**
@@ -77,6 +107,7 @@ export function moveTour(delta: 1 | -1): void {
     return
   }
   index = next
+  prepare(TOUR_STEPS[next])
 }
 
 /**

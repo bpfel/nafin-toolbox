@@ -12,6 +12,7 @@ vi.mock('../crypto/vaultStore.svelte', async importOriginal => ({
 }))
 
 import { getVaultState } from '../crypto/vaultStore.svelte'
+import { numbering } from './steps'
 import {
   getTourState,
   startTour,
@@ -26,11 +27,28 @@ import {
 const vaultState = getVaultState()
 const tour = getTourState()
 
+/**
+ * An empty vault that still keeps the vault's own invariant: at least one
+ * account, so every entry can be routed from the moment it is created.
+ *
+ * It said `accounts: []` until the tour started seeding an example budget,
+ * at which point the fixture was the only vault in the codebase that could
+ * not have existed — `createEmptyVault` has always made one.
+ */
 function emptyVault(): VaultData {
   return {
     version: 8,
     budget: { categories: [], entries: [], plan: [], snapshots: [] },
-    accounts: [],
+    accounts: [
+      {
+        id: 'acc-main',
+        name: 'Main',
+        kind: 'transactional',
+        currency: 'CHF',
+        currentAmount: '0.00',
+        lastCorrectedAt: '2026-01-01',
+      },
+    ],
     tour: { completedAt: null, dismissedAt: null },
   }
 }
@@ -45,7 +63,7 @@ describe('walking the tour', () => {
   test('starts at the first step', () => {
     startTour()
     expect(tour.running).toBe(true)
-    expect(tour.position).toBe(1)
+    expect(tour.position).toBe('1')
     expect(tour.step?.id).toBe(TOUR_STEPS[0].id)
     expect(tour.atFirst).toBe(true)
   })
@@ -58,16 +76,32 @@ describe('walking the tour', () => {
   test('next and back move one step', () => {
     startTour()
     moveTour(1)
-    expect(tour.position).toBe(2)
+    expect(tour.index).toBe(1)
     moveTour(-1)
-    expect(tour.position).toBe(1)
+    expect(tour.index).toBe(0)
   })
 
-  test('the counter reads one-based against the real total', () => {
+  /**
+   * The counter names topics, not steps: five of them are parts of one, so a
+   * tour of thirteen steps reads as eight. See `numbering`.
+   */
+  test('the counter reads against topics rather than steps', () => {
     startTour()
-    expect(tour.total).toBe(TOUR_STEPS.length)
-    moveTour(1)
-    expect(tour.position).toBe(2)
+    const topics = numbering().at(-1)!.total
+
+    expect(tour.total).toBe(topics)
+    expect(topics).toBeLessThan(TOUR_STEPS.length)
+    expect(tour.position).toBe('1')
+  })
+
+  test('a sub-step is numbered under the step it belongs to', () => {
+    const first = TOUR_STEPS.findIndex(s => s.sub)
+    expect(first, 'no sub-steps to check').toBeGreaterThan(0)
+
+    startTour()
+    for (let i = 0; i < first; i++) moveTour(1)
+
+    expect(tour.position).toBe(`${numbering()[first - 1].label}.1`)
   })
 
   test('moving does nothing when the tour is not running', () => {
@@ -143,9 +177,9 @@ describe('a step with nothing to point at', () => {
   test('carries on forwards when the tour was going forwards', () => {
     startTour()
     moveTour(1)
-    const before = tour.position
+    const before = tour.index
     skipUnshowableStep()
-    expect(tour.position).toBe(before + 1)
+    expect(tour.index).toBe(before + 1)
   })
 
   /**
@@ -157,9 +191,9 @@ describe('a step with nothing to point at', () => {
     moveTour(1)
     moveTour(1)
     moveTour(-1)
-    const before = tour.position
+    const before = tour.index
     skipUnshowableStep()
-    expect(tour.position).toBe(before - 1)
+    expect(tour.index).toBe(before - 1)
   })
 
   test('a tour whose anchors are all missing walks off the end rather than spinning', () => {

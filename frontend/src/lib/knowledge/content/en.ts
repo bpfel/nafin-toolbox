@@ -24,6 +24,10 @@ export const en: Content = {
       title: 'The different screens',
       body: 'Budget is where you define your monthly cash flows. Accounts defines how money moves between your bank accounts. Knowledge is the home of this tour and holds links to official sources on Swiss personal finance. Profile holds your personal settings.',
     },
+    types: {
+      title: 'Five kinds of line',
+      body: 'A budget line is not just an amount — its kind says what happens to the money. We have filled in an example Swiss budget so there is something to look at; edit or reset it afterwards. The next five steps take one kind each.',
+    },
     budget: {
       title: 'One standing plan',
       body: 'Not a ledger of months. You describe a typical month once, and take a named snapshot when something changes enough to be worth remembering.',

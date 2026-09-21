@@ -61,7 +61,18 @@ export interface TourCopy {
 
 export interface Content {
   articles: Record<ArticleId, Article>
-  tour: Record<TourStepId, TourCopy>
+  /**
+   * Partial, and not because English is allowed gaps.
+   *
+   * Five steps take their words from `TYPE_GUIDES` in the catalogue instead —
+   * the app already explains every budget type there, in four languages, and
+   * saying it twice would leave the tour's copy as the one nobody updates. So
+   * which steps need prose here is a fact about the step list, not about the
+   * type, and `registry.test.ts` is where it is enforced: every step without a
+   * `guideType` must have English copy, and no copy may name a step that has
+   * one.
+   */
+  tour: Partial<Record<TourStepId, TourCopy>>
 }
 
 /** What a locale that is still filling in may provide. */

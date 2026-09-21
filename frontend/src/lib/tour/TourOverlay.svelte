@@ -6,6 +6,7 @@
   import { anchorElement, anchorRect, placeCard, phoneCardAtTop } from './anchor'
   import { loadContent, type TourCopy } from '../knowledge/content'
   import { en } from '../knowledge/content/en'
+  import { TYPE_GUIDES } from '../budget/typeGuide'
   import {
     getTourState,
     moveTour,
@@ -51,14 +52,35 @@
     return Number.parseFloat(raw) || 0
   }
 
-  let copy = $state<Record<string, TourCopy>>(en.tour)
+  let copy = $state<Partial<Record<string, TourCopy>>>(en.tour)
   let rect = $state<DOMRect | null>(null)
   let card = $state<HTMLElement | null>(null)
   let cardHeight = $state(0)
   let wide = $state(false)
 
   let step = $derived(tour.step)
-  let text = $derived(step ? copy[step.id] : null)
+
+  /**
+   * What this step says.
+   *
+   * Two sources, deliberately. Most steps carry prose in the content module;
+   * the five that explain a budget type borrow the explanation the app already
+   * shows behind the info mark on that section's heading, which is written
+   * once and translated in all four catalogues. Saying it twice would leave
+   * the tour's copy as the one nobody remembers to update.
+   */
+  let text = $derived.by((): (TourCopy & { note?: string }) | null => {
+    if (!step) return null
+    if (step.guideType) {
+      const guide = TYPE_GUIDES[step.guideType]
+      return {
+        title: t(guide.title),
+        body: t(guide.body),
+        note: guide.note ? t(guide.note) : undefined,
+      }
+    }
+    return copy[step.id] ?? null
+  })
 
   // The tour's own words come from the article content modules, not the
   // catalogue — they are prose, and prose is translated on its own schedule.
@@ -255,6 +277,11 @@
          the dial's dot rather than laid out in a row. See `TourCopy`. -->
     {#if wide && text.hoverNote}
       <p class="body note">{text.hoverNote}</p>
+    {/if}
+    <!-- A type guide's second paragraph, where the rule needs one. Bills have
+         a real constraint about cycles. -->
+    {#if text.note}
+      <p class="body note">{text.note}</p>
     {/if}
 
     <div class="controls">

@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest'
 import { loadContent, type PartialContent } from './content'
 import { en } from './content/en'
 import { ARTICLES } from './registry'
-import { TOUR_STEPS } from '../tour/steps'
+import { TOUR_STEPS, type TourStepId } from '../tour/steps'
 
 /**
  * Guards the translated content modules.
@@ -27,6 +27,13 @@ function translations(): [string, PartialContent][] {
 }
 
 const STEP_IDS = new Set<string>(TOUR_STEPS.map(s => s.id))
+
+/**
+ * The steps whose words live here at all. The five type steps take theirs
+ * from `TYPE_GUIDES` in the catalogue, so a locale that does not mention them
+ * is complete rather than lacking.
+ */
+const WRITTEN_STEPS = TOUR_STEPS.filter(s => !s.guideType)
 const ARTICLE_IDS = new Set<string>(ARTICLES.map(a => a.id))
 
 describe('every translation is wired to something real', () => {
@@ -55,7 +62,7 @@ describe('every translation is wired to something real', () => {
   test.each(translations())('%s translates every tour step, or none', (_locale, content) => {
     const translated = Object.keys(content.tour ?? {})
     if (translated.length === 0) return
-    const missing = [...STEP_IDS].filter(id => !translated.includes(id))
+    const missing = WRITTEN_STEPS.map(s => s.id).filter(id => !translated.includes(id))
     expect(missing).toEqual([])
   })
 
@@ -63,6 +70,7 @@ describe('every translation is wired to something real', () => {
     for (const [id, copy] of Object.entries(content.tour ?? {})) {
       expect(copy?.title.trim(), `${id} title`).toBeTruthy()
       expect(copy?.body.trim(), `${id} body`).toBeTruthy()
+      expect(copy, id).toBeDefined()
     }
     for (const [id, article] of Object.entries(content.articles ?? {})) {
       expect(article?.title.trim(), `${id} title`).toBeTruthy()
@@ -75,7 +83,7 @@ describe('every translation is wired to something real', () => {
     // translation: the fallback would have produced the same words, and no
     // reviewer scanning the file would spot it.
     const copied = Object.entries(content.tour ?? {})
-      .filter(([id, copy]) => copy?.body === en.tour[id as keyof typeof en.tour]?.body)
+      .filter(([id, copy]) => copy?.body === en.tour[id as TourStepId]?.body)
       .map(([id]) => id)
     expect(copied).toEqual([])
   })
@@ -111,18 +119,18 @@ describe('loading a locale', () => {
   test('English is served whole, and counts as translated', async () => {
     const { content, translated } = await loadContent('en')
 
-    expect(content.tour.welcome.title).toBe(en.tour.welcome.title)
+    expect(content.tour.welcome?.title).toBe(en.tour.welcome?.title)
     for (const { id } of ARTICLES) expect(translated.has(id)).toBe(true)
   })
 
   test('German serves German tour copy', async () => {
     const { content } = await loadContent('de')
 
-    expect(content.tour.welcome.title).not.toBe(en.tour.welcome.title)
-    // Every step, not just the first: the merge is per key, so a locale that
-    // is complete must come back complete.
-    for (const step of TOUR_STEPS) {
-      expect(content.tour[step.id].title, step.id).not.toBe(en.tour[step.id].title)
+    expect(content.tour.welcome?.title).not.toBe(en.tour.welcome?.title)
+    // Every written step, not just the first: the merge is per key, so a
+    // locale that is complete must come back complete.
+    for (const step of WRITTEN_STEPS) {
+      expect(content.tour[step.id]?.title, step.id).not.toBe(en.tour[step.id]?.title)
     }
   })
 
@@ -145,15 +153,15 @@ describe('loading a locale', () => {
     // and nothing should be claimed as translated.
     const { content, translated } = await loadContent('rm')
 
-    expect(content.tour.welcome.title).toBe(en.tour.welcome.title)
+    expect(content.tour.welcome?.title).toBe(en.tour.welcome?.title)
     expect(translated.size).toBe(0)
   })
 
   test.each(['fr', 'it'] as const)('%s serves its own tour copy', async locale => {
     const { content } = await loadContent(locale)
 
-    for (const step of TOUR_STEPS) {
-      expect(content.tour[step.id].title, step.id).not.toBe(en.tour[step.id].title)
+    for (const step of WRITTEN_STEPS) {
+      expect(content.tour[step.id]?.title, step.id).not.toBe(en.tour[step.id]?.title)
     }
   })
 })

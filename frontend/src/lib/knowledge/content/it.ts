@@ -22,6 +22,10 @@ export const it: PartialContent = {
       title: 'Le diverse schermate',
       body: 'Budget è dove definisci i tuoi flussi mensili. Conti definisce come il denaro si muove tra i tuoi conti bancari. Sapere è la sede di questo tour e rimanda a fonti ufficiali sulle finanze personali svizzere. Profilo contiene le tue impostazioni personali.',
     },
+    types: {
+      title: 'Cinque tipi di riga',
+      body: 'Una riga di budget non è solo un importo — il suo tipo dice che cosa succede al denaro. Abbiamo inserito un budget svizzero di esempio così che ci sia qualcosa da guardare; potrai modificarlo o azzerarlo dopo. I cinque passi successivi ne prendono uno ciascuno.',
+    },
     budget: {
       title: 'Un piano permanente',
       body: 'Non un registro mensile. Descrivi una volta sola un mese tipico e scatti un’istantanea con un nome quando qualcosa cambia abbastanza da valerne la pena.',

@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest'
 import { ARTICLES, articlesIn, type ArticleId } from './registry'
 import { en } from './content/en'
 import { TOUR_STEPS } from '../tour/steps'
+import { TYPE_GUIDES } from '../budget/typeGuide'
 
 /**
  * Holds the two halves of the library to each other, and holds the Swiss half
@@ -108,14 +109,34 @@ describe('no figure is baked into the prose', () => {
 })
 
 describe('the tour has words in every language it claims', () => {
-  test('every step has English copy', () => {
-    const missing = TOUR_STEPS.filter(s => en.tour[s.id] === undefined).map(s => s.id)
+  test('every step without a type guide has English copy', () => {
+    const missing = TOUR_STEPS.filter(s => !s.guideType && en.tour[s.id] === undefined).map(
+      s => s.id,
+    )
     expect(missing).toEqual([])
+  })
+
+  /**
+   * The other half, and the one that actually bites: a step given a
+   * `guideType` takes its words from the catalogue, so copy left here for it
+   * is dead text that reads as maintained.
+   */
+  test('a step with a type guide has no copy of its own', () => {
+    const duplicated = TOUR_STEPS.filter(s => s.guideType && en.tour[s.id] !== undefined).map(
+      s => s.id,
+    )
+    expect(duplicated).toEqual([])
   })
 
   test('no copy is left over from a removed step', () => {
     const used = new Set(TOUR_STEPS.map(s => s.id))
     const orphans = Object.keys(en.tour).filter(id => !used.has(id as never))
     expect(orphans).toEqual([])
+  })
+
+  /** Every guide a step points at must actually exist. */
+  test('every type guide a step names is defined', () => {
+    const missing = TOUR_STEPS.filter(s => s.guideType && !TYPE_GUIDES[s.guideType]).map(s => s.id)
+    expect(missing).toEqual([])
   })
 })

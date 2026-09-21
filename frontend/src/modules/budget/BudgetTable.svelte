@@ -270,6 +270,10 @@
     same two things above every section — ten labels for two facts, and both are
     plain from the figures underneath.
   -->
+  <!-- The guided tour stops at each type in turn; this is what it rings. It
+       wraps the heading and the table so the halo covers the rows being
+       described, not just the word above them. -->
+  <div class="type-section" data-tour="type-{type}">
   <div class="section-head section-{type}">
     <h2 class="section-name">{t(`section.${type}` as 'section.expense')}</h2>
     <InfoButton
@@ -345,6 +349,7 @@
       {/if}
     </tfoot>
   </table>
+  </div>
 
 {/snippet}
 
@@ -477,6 +482,14 @@
    * indentation currently says the opposite of the nesting. Untouched here
    * because it is a layout question, not a typographic one.
    */
+  /* Purely an anchor for the tour. A flex item rather than `display: contents`,
+     because a box with no geometry cannot be pointed at — and the item keeps
+     the heading's top margin inside it, so the spacing between sections is
+     exactly what it was. */
+  .type-section {
+    display: block;
+  }
+
   .section-head {
     display: flex;
     align-items: center;

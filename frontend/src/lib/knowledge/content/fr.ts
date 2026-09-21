@@ -23,6 +23,10 @@ export const fr: PartialContent = {
       title: 'Les différents écrans',
       body: 'Budget, c’est là que vous définissez vos flux mensuels. Comptes définit comment l’argent circule entre vos comptes bancaires. Savoir est le point de départ de cette visite et renvoie à des sources officielles sur les finances personnelles suisses. Profil contient vos réglages personnels.',
     },
+    types: {
+      title: 'Cinq sortes de lignes',
+      body: 'Une ligne de budget n’est pas qu’un montant — sa sorte dit ce qu’il advient de l’argent. Nous avons rempli un budget suisse d’exemple pour qu’il y ait quelque chose à regarder ; vous pourrez le modifier ou le réinitialiser ensuite. Les cinq étapes suivantes en prennent une chacune.',
+    },
     budget: {
       title: 'Un plan permanent',
       body: 'Pas un journal mensuel. Vous décrivez une seule fois un mois type, et vous prenez un instantané nommé quand quelque chose change assez pour mériter d’être retenu.',

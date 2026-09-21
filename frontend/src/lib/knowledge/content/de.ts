@@ -23,6 +23,10 @@ export const de: PartialContent = {
       title: 'Die Bildschirme',
       body: 'Budget ist, wo Sie Ihre monatlichen Geldflüsse festlegen. Konten legt fest, wie Geld zwischen Ihren Bankkonten fliesst. Wissen ist das Zuhause dieses Rundgangs und verweist auf offizielle Quellen zu Schweizer Finanzthemen. Profil enthält Ihre persönlichen Einstellungen.',
     },
+    types: {
+      title: 'Fünf Arten von Zeilen',
+      body: 'Eine Budgetzeile ist nicht nur ein Betrag — ihre Art sagt, was mit dem Geld geschieht. Wir haben ein Schweizer Beispielbudget eingesetzt, damit es etwas zu sehen gibt; Sie können es danach ändern oder zurücksetzen. Die nächsten fünf Schritte nehmen je eine Art.',
+    },
     budget: {
       title: 'Ein stehender Plan',
       body: 'Kein Monatsjournal. Sie beschreiben einmal einen typischen Monat und erstellen eine benannte Momentaufnahme, wenn sich etwas ändert, das es wert ist.',
