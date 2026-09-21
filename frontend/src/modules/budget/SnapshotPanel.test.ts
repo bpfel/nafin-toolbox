@@ -33,7 +33,8 @@ function snapshotAmount(entryName: string): string {
 
 function makeVault(): VaultData {
   return {
-    version: 7,
+    version: 8,
+    tour: { completedAt: null, dismissedAt: null },
     accounts: [
       {
         id: 'main',

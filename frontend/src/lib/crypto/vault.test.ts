@@ -212,7 +212,8 @@ describe('encryptVault and decryptVault', () => {
   test('round-trip encryption and decryption preserves data', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -359,7 +360,8 @@ describe('encryptVault and decryptVault', () => {
   test('preserves complex vault with multiple snapshots', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -407,7 +409,8 @@ describe('encryptVault and decryptVault', () => {
   test('preserves archived flag in entries', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -432,7 +435,8 @@ describe('encryptVault and decryptVault', () => {
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '1234.05', lastCorrectedAt: '2026-08-15' },
       ],
@@ -464,7 +468,8 @@ describe('encryptVault and decryptVault', () => {
   test('preserves special characters in text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: 'a1', name: 'Zürich «Haupt»', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -497,7 +502,8 @@ describe('encryptVault and decryptVault', () => {
   test('preserves sortOrder values', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -531,7 +537,8 @@ describe('encryptVault and decryptVault', () => {
 
     // Create a large vault with many entries
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: Array.from({ length: 5 }, (_, i) => ({
         id: `a${i}`,
         name: `Account ${i}`,
@@ -589,7 +596,8 @@ describe('encryptVault and decryptVault', () => {
   test('handles empty strings in all text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: '', name: '', kind: 'cash', currency: 'CHF', currentAmount: '', lastCorrectedAt: '' },
       ],
@@ -619,7 +627,8 @@ describe('encryptVault and decryptVault', () => {
   test('preserves exact JSON structure including whitespace in strings', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -651,7 +660,8 @@ describe('encryptVault and decryptVault', () => {
     const encryptedSmall = await encryptVault(smallVault, mek)
 
     const largeVault: VaultData = {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [],
       budget: {
         categories: Array.from({ length: 50 }, (_, i) => ({
@@ -761,7 +771,7 @@ describe('migrateVault — legacy versions forward', () => {
   test('keeps everything else — this is a migration, not a scrub', () => {
     const migrated = migrateVault(v2Vault())
 
-    expect(migrated.version).toBe(7)
+    expect(migrated.version).toBe(VAULT_VERSION)
     expect(migrated.budget.entries).toHaveLength(2)
     expect(migrated.budget.entries[0].name).toBe('Rent')
     expect(migrated.budget.categories).toHaveLength(1)
@@ -792,7 +802,7 @@ describe('migrateVault — legacy versions forward', () => {
 
     expect(migrated.budget.entries).toHaveLength(2)
     expect(migrated.budget.plan).toEqual([{ entryId: 'c1', plannedAmount: '1350.00' }])
-    expect(migrated.version).toBe(7)
+    expect(migrated.version).toBe(VAULT_VERSION)
   })
 
   // v4 -> v5 renamed the vocabulary and nothing else, so every id, amount and
@@ -800,7 +810,7 @@ describe('migrateVault — legacy versions forward', () => {
   test('v4 groups become categories and v4 categories become entries', () => {
     const migrated = migrateVault(v4Vault())
 
-    expect(migrated.version).toBe(7)
+    expect(migrated.version).toBe(VAULT_VERSION)
     expect(migrated.budget.categories).toEqual([
       { id: 'g1', name: 'Housing', side: 'expense', sortOrder: 10 },
     ])
@@ -901,7 +911,7 @@ describe('migrateVault — legacy versions forward', () => {
   test('v5 archives become v6 snapshots, contents untouched', () => {
     const migrated = migrateVault(v5Vault())
 
-    expect(migrated.version).toBe(7)
+    expect(migrated.version).toBe(VAULT_VERSION)
     expect(migrated.budget.snapshots).toHaveLength(1)
     expect(migrated.budget.snapshots[0].name).toBe('Q1')
     expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
@@ -1034,7 +1044,7 @@ describe('migrateVault — legacy versions forward', () => {
     // invented there.
     const migrated = migrateVault(v2Vault())
 
-    expect(migrated.version).toBe(7)
+    expect(migrated.version).toBe(VAULT_VERSION)
     expect(typeOf(migrated, 'c1')).toBe('expense')
     expect(typeOf(migrated, 'c2')).toBe('bill')
   })
@@ -1042,26 +1052,124 @@ describe('migrateVault — legacy versions forward', () => {
   test('a v4 vault is carried through both renames', () => {
     const migrated = migrateVault(v4Vault())
 
-    expect(migrated.version).toBe(7)
+    expect(migrated.version).toBe(VAULT_VERSION)
     expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
     expect(migrated.budget.snapshots[0].lines[0].categoryName).toBe('Housing')
   })
 
+  /**
+   * v7 -> v8: the tour flag.
+   *
+   * Additive, so the only thing that can go wrong is the app deciding an
+   * upgraded vault has already been offered the tour — which would mean every
+   * existing user silently never hears about it.
+   */
+  function v7Vault() {
+    return {
+      version: 7,
+      budget: {
+        categories: [{ id: 'c1', name: 'Housing', side: 'expense', sortOrder: 10 }],
+        entries: [
+          {
+            id: 'rent',
+            name: 'Rent',
+            type: 'expense',
+            sortOrder: 0,
+            archived: false,
+            categoryId: 'c1',
+            sourceAccountId: 'a1',
+            sinkAccountId: null,
+          },
+        ],
+        plan: [{ entryId: 'rent', plannedAmount: '1800.00' }],
+        snapshots: [],
+      },
+      accounts: [
+        {
+          id: 'a1',
+          name: 'Main',
+          kind: 'transactional',
+          currency: 'CHF',
+          currentAmount: '4200.00',
+          lastCorrectedAt: '2026-09-01',
+        },
+      ],
+    }
+  }
+
+  test('a v7 vault gains the tour flag and keeps everything else', () => {
+    const migrated = migrateVault(v7Vault())
+
+    expect(migrated.version).toBe(VAULT_VERSION)
+    expect(migrated.tour).toEqual({ completedAt: null, dismissedAt: null })
+    expect(migrated.budget.entries[0].name).toBe('Rent')
+    expect(migrated.budget.plan).toEqual(v7Vault().budget.plan)
+    expect(migrated.accounts).toEqual(v7Vault().accounts)
+  })
+
+  test('an upgraded vault has not been offered the tour', () => {
+    // The failure this guards: stamping an existing user as having seen a tour
+    // that did not exist when they signed up, so they never hear about it.
+    const migrated = migrateVault(v7Vault())
+
+    expect(migrated.tour.completedAt).toBeNull()
+    expect(migrated.tour.dismissedAt).toBeNull()
+  })
+
+  test('a vault stamped v8 but missing the tour flag is migrated anyway', () => {
+    // The same tell every version since v5 has needed: the number is a claim
+    // and the key is the evidence.
+    const mislabelled = { ...v7Vault(), version: 8 }
+
+    const migrated = migrateVault(mislabelled)
+
+    expect(migrated.tour).toEqual({ completedAt: null, dismissedAt: null })
+    expect(migrated.budget.entries[0].name).toBe('Rent')
+  })
+
+  test('an answer already given is not overwritten on a later read', () => {
+    const answered = { ...v7Vault(), version: 8, tour: { completedAt: '2026-09-01T00:00:00.000Z', dismissedAt: null } }
+
+    const migrated = migrateVault(answered)
+
+    expect(migrated.tour.completedAt).toBe('2026-09-01T00:00:00.000Z')
+  })
+
+  test('a v6 vault is carried through to v8 in one pass', () => {
+    const migrated = migrateVault(v6Vault())
+
+    expect(migrated.version).toBe(VAULT_VERSION)
+    expect(migrated.tour).toEqual({ completedAt: null, dismissedAt: null })
+    expect(migrated.budget.categories[0].side).toBe('expense')
+  })
+
   test('a vault from a newer build is refused, not emptied', () => {
-    expect(() => migrateVault({ version: 8, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
+    expect(() => migrateVault({ version: 9, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
     expect(() => migrateVault({ version: 99, budget: { entries: [] } })).toThrow(/newer version/)
+  })
+
+  /**
+   * A future vault will not carry any key this build knows to look for, so it
+   * arrives looking exactly like a vault missing something. It must still be
+   * refused rather than migrated: reshaping data written by a newer build is
+   * how a save silently drops whatever that build added.
+   */
+  test('a newer vault is refused even though it is missing this version’s keys', () => {
+    expect(() => migrateVault({ version: 9, budget: { entries: [] }, accounts: [] })).toThrow(
+      VaultVersionAheadError,
+    )
   })
 
   test('the refusal names both versions, so the log says what to do', () => {
     try {
-      migrateVault({ version: 8, budget: { entries: [] } })
+      migrateVault({ version: 9, budget: { entries: [] } })
       throw new Error('should have refused')
     } catch (e) {
       expect(e).toBeInstanceOf(VaultVersionAheadError)
-      expect((e as VaultVersionAheadError).found).toBe(8)
+      expect((e as VaultVersionAheadError).found).toBe(9)
       // Both numbers: the one found, and the one this build can read.
+      expect((e as Error).message).toContain('v9')
       expect((e as Error).message).toContain('v8')
-      expect((e as Error).message).toContain('v7')
     }
   })
 
@@ -1071,6 +1179,19 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrateVault({ version: 1, budget: {} }).budget.entries).toHaveLength(0)
     // No version at all — nothing to be ahead of.
     expect(migrateVault({ budget: {} }).budget.entries).toHaveLength(0)
+  })
+
+  /**
+   * Regression. v8's tell is a key being *absent*, which is true of junk, of a
+   * versionless blob and of every pre-v2 vault as well as of the one case it
+   * is meant to catch. Written without the version check it read all of those
+   * as v7 and migrated them, so a scrub became a migration of nothing and the
+   * refusal above never fired.
+   */
+  test('a missing tour flag alone does not make a blob into a v7 vault', () => {
+    expect(migrateVault({ version: 1, budget: {} }).version).toBe(VAULT_VERSION)
+    expect(migrateVault({ version: 1, budget: {} }).budget.categories).toHaveLength(0)
+    expect(migrateVault({ budget: {} }).accounts).toHaveLength(1)
   })
 })
 
@@ -1146,5 +1267,22 @@ describe('assertVaultShape', () => {
     const noAccounts = createEmptyVault() as unknown as { accounts?: unknown }
     delete noAccounts.accounts
     expect(() => assertVaultShape(noAccounts as unknown as VaultData)).toThrow(/accounts is missing/)
+  })
+
+  // v8's addition, and the same reasoning as every tell above it: a vault
+  // stamped 8 without the key was renumbered rather than reshaped, and writing
+  // it is worse than refusing to.
+  test('rejects a v8 stamp with no tour flag', () => {
+    const bad = createEmptyVault() as unknown as { tour?: unknown }
+    delete bad.tour
+
+    expect(() => assertVaultShape(bad as unknown as VaultData)).toThrow(/tour is missing/)
+  })
+
+  test('accepts a vault that has answered the tour', () => {
+    const answered = createEmptyVault()
+    answered.tour = { completedAt: '2026-09-01T00:00:00.000Z', dismissedAt: null }
+
+    expect(() => assertVaultShape(answered)).not.toThrow()
   })
 })
