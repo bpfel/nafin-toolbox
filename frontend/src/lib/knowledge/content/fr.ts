@@ -28,8 +28,8 @@ export const fr: PartialContent = {
       body: 'Budget, c’est là que vous définissez vos flux mensuels. Comptes définit comment l’argent circule entre vos comptes bancaires. Savoir est le point de départ de cette visite et renvoie à des sources officielles sur les finances personnelles suisses. Profil contient vos réglages personnels.',
     },
     types: {
-      title: 'Cinq types d’entrées budgétaires',
-      body: 'Une entrée budgétaire n’est pas qu’un montant — son type dit ce qu’il advient de l’argent.',
+      title: 'Différentes entrées budgétaires',
+      body: 'Le budget comporte plusieurs types, qui sont présentés juste après.',
     },
     budget: {
       title: 'Un plan permanent',
@@ -41,12 +41,12 @@ export const fr: PartialContent = {
       hoverNote: 'Survolez un symbole pour voir ce qu’il fait.',
     },
     accounts: {
-      title: 'Où se trouve l’argent',
-      body: 'Un compte est un endroit réel avec un solde réel : compte salaire, compte d’épargne, espèces dans un tiroir. Vous indiquez à l’application ce qu’il contient et quand vous avez vérifié pour la dernière fois. Ajoutez un IBAN et les informations qui vont avec, et vous pourrez générer des QR-factures payables sur ce compte.',
+      title: 'Comptes',
+      body: 'Cet écran contient tous vos comptes bancaires. Si vous ajoutez l’IBAN et les informations qui vont avec, vous pourrez générer des QR-factures payables sur ce compte.',
     },
     allocations: {
-      title: 'Deux vues ici',
-      body: 'Comptes liste les soldes. Affectations répond à la question plus difficile — de quel compte sort chaque entrée du budget, et sur lequel elle arrive.',
+      title: 'Affectations',
+      body: 'Ici, vous reliez vos entrées budgétaires à des comptes. Votre salaire, par exemple, arrive sur votre compte principal. Pour épargner en vue de l’ordinateur portable et mettre de côté la facture Serafe, vous pourriez virer cet argent sur un autre compte. Vous obtenez ainsi un solde par compte et une projection des réserves nécessaires.',
     },
     knowledge: {
       title: 'Vous pouvez revenir',

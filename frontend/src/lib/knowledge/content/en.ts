@@ -25,8 +25,8 @@ export const en: Content = {
       body: 'Budget is where you define your monthly cash flows. Accounts defines how money moves between your bank accounts. Knowledge is the home of this tour and holds links to official sources on Swiss personal finance. Profile holds your personal settings.',
     },
     types: {
-      title: 'Five types of budget entry',
-      body: 'A budget entry is not just an amount — its type says what happens to the money.',
+      title: 'Different budget entries',
+      body: 'The budget contains multiple types, which will be presented shortly.',
     },
     budget: {
       title: 'One standing plan',
@@ -38,12 +38,12 @@ export const en: Content = {
       hoverNote: 'Hover over a symbol to see what it does.',
     },
     accounts: {
-      title: 'Where the money sits',
-      body: 'An account is a real place with a real balance: a salary account, a savings account, cash in a drawer. You tell the app what each one holds, and when you last checked. Add an IBAN and the details that go with it, and you can generate QR-bills payable to that account.',
+      title: 'Accounts',
+      body: 'This screen contains all of your bank accounts. If you add the IBAN and the details that go with it, you can generate QR-bills payable to that account.',
     },
     allocations: {
-      title: 'Two views here',
-      body: 'Accounts lists the balances. Allocations answers the harder question — which account each budget entry comes out of, and which one it goes into.',
+      title: 'Allocations',
+      body: 'Here you can link your budget entries to accounts. Your salary, for example, arrives in your main account. To save up for the laptop and set aside money for the Serafe bill, you might transfer that money to another account. This gives you a balance per account and a projection of the reserves you need.',
     },
     knowledge: {
       title: 'You can come back',

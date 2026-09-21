@@ -42,7 +42,7 @@ describe('AddEntryTypeSheet', () => {
     // The guide titles, which are already one line each and already translated.
     expect(screen.getByText('Money coming in')).toBeTruthy()
     expect(screen.getByText('Money spent and gone')).toBeTruthy()
-    expect(screen.getByText('Money kept, with nothing in mind')).toBeTruthy()
+    expect(screen.getByText('Money kept')).toBeTruthy()
     expect(screen.getByText('A bill that keeps coming back')).toBeTruthy()
     expect(screen.getByText('Something that wears out')).toBeTruthy()
   })

@@ -16,7 +16,7 @@ import type { EntryType } from '../crypto/vault'
 export interface Guide {
   title: MessageKey
   body: MessageKey
-  /** A second paragraph where the rule needs one. Bills have a real constraint. */
+  /** A second paragraph where the rule needs one. Bills say when the money is ready. */
   note?: MessageKey
 }
 
@@ -24,6 +24,6 @@ export const TYPE_GUIDES: Record<EntryType, Guide> = {
   income: { title: 'guide.income.title', body: 'guide.income.body' },
   expense: { title: 'guide.expense.title', body: 'guide.expense.body' },
   savings: { title: 'guide.savings.title', body: 'guide.savings.body' },
-  bill: { title: 'guide.bill.title', body: 'guide.bill.body', note: 'guide.bill.cycles' },
-  purchase: { title: 'guide.purchase.title', body: 'guide.purchase.body' },
+  bill: { title: 'guide.bill.title', body: 'guide.bill.body', note: 'guide.bill.ready' },
+  purchase: { title: 'guide.purchase.title', body: 'guide.purchase.body', note: 'guide.purchase.reset' },
 }

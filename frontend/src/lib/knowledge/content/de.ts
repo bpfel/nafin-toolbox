@@ -27,8 +27,8 @@ export const de: PartialContent = {
       body: 'Budget ist, wo Sie Ihre monatlichen Geldflüsse festlegen. Konten legt fest, wie Geld zwischen Ihren Bankkonten fliesst. Wissen ist das Zuhause dieses Rundgangs und verweist auf offizielle Quellen zu Schweizer Finanzthemen. Profil enthält Ihre persönlichen Einstellungen.',
     },
     types: {
-      title: 'Fünf Arten von Budgeteinträgen',
-      body: 'Ein Budgeteintrag ist nicht nur ein Betrag — seine Art sagt, was mit dem Geld geschieht.',
+      title: 'Verschiedene Budgeteinträge',
+      body: 'Das Budget kennt mehrere Arten, die gleich vorgestellt werden.',
     },
     budget: {
       title: 'Ein stehender Plan',
@@ -40,12 +40,12 @@ export const de: PartialContent = {
       hoverNote: 'Fahren Sie mit der Maus über ein Symbol, um zu sehen, was es tut.',
     },
     accounts: {
-      title: 'Wo das Geld liegt',
-      body: 'Ein Konto ist ein realer Ort mit einem realen Saldo: Lohnkonto, Sparkonto, Bargeld in der Schublade. Sie sagen der App, was darauf liegt und wann Sie zuletzt nachgesehen haben. Mit IBAN und den übrigen Angaben können Sie QR-Rechnungen erstellen, die auf dieses Konto lauten.',
+      title: 'Konten',
+      body: 'Auf diesem Bildschirm stehen alle Ihre Bankkonten. Wenn Sie die IBAN und die übrigen Angaben erfassen, können Sie QR-Rechnungen erstellen, die auf dieses Konto lauten.',
     },
     allocations: {
-      title: 'Zwei Ansichten',
-      body: 'Konten zeigt die Salden. Zuordnungen beantwortet die schwierigere Frage — von welchem Konto jeder Budgeteintrag abgeht und auf welches er geht.',
+      title: 'Zuordnungen',
+      body: 'Hier verknüpfen Sie Ihre Budgeteinträge mit Konten. Ihr Lohn kommt zum Beispiel auf dem Hauptkonto an. Um auf den Laptop zu sparen und Geld für die Serafe-Rechnung zurückzulegen, können Sie es auf ein anderes Konto überweisen. Daraus ergeben sich ein Saldo je Konto und eine Vorschau der nötigen Reserven.',
     },
     knowledge: {
       title: 'Sie können zurückkommen',

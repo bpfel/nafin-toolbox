@@ -27,8 +27,8 @@ export const it: PartialContent = {
       body: 'Budget è dove definisci i tuoi flussi mensili. Conti definisce come il denaro si muove tra i tuoi conti bancari. Sapere è la sede di questo tour e rimanda a fonti ufficiali sulle finanze personali svizzere. Profilo contiene le tue impostazioni personali.',
     },
     types: {
-      title: 'Cinque tipi di voci di budget',
-      body: 'Una voce di budget non è solo un importo — il suo tipo dice che cosa succede al denaro.',
+      title: 'Diverse voci di budget',
+      body: 'Il budget contiene diversi tipi, presentati qui di seguito.',
     },
     budget: {
       title: 'Un piano permanente',
@@ -40,12 +40,12 @@ export const it: PartialContent = {
       hoverNote: 'Passa il puntatore su un simbolo per vedere che cosa fa.',
     },
     accounts: {
-      title: 'Dove si trova il denaro',
-      body: 'Un conto è un luogo reale con un saldo reale: conto stipendio, conto di risparmio, contanti in un cassetto. Dici all’app quanto contiene e quando hai controllato l’ultima volta. Aggiungi un IBAN e i dati che lo accompagnano, e potrai generare QR-fatture pagabili su questo conto.',
+      title: 'Conti',
+      body: 'Questa schermata contiene tutti i tuoi conti bancari. Se aggiungi l’IBAN e i dati che lo accompagnano, potrai generare QR-fatture pagabili su questo conto.',
     },
     allocations: {
-      title: 'Due viste qui',
-      body: 'Conti elenca i saldi. Assegnazioni risponde alla domanda più difficile — da quale conto esce ogni voce del budget e su quale entra.',
+      title: 'Assegnazioni',
+      body: 'Qui colleghi le tue voci di budget ai conti. Lo stipendio, per esempio, arriva sul conto principale. Per mettere da parte il computer portatile e accantonare la fattura Serafe, potresti trasferire quel denaro su un altro conto. Ne risultano un saldo per conto e una proiezione delle riserve necessarie.',
     },
     knowledge: {
       title: 'Puoi tornare qui',
