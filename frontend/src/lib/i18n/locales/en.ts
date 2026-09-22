@@ -240,7 +240,7 @@ export const en = {
   'guide.bill.ready': 'The app makes sure the money is ready one month before it is due.',
   'guide.bill.cycles': 'Cycles divide the year: every 2, 3, 4, 6 or 12 months. One that arrives monthly is simply an expense — there is nothing to save up for.',
   'guide.purchase.title': 'Something that wears out',
-  'guide.purchase.body': 'A laptop, a car, a large purchase you can see coming. Say what it will cost and how long it should last, and the monthly amount follows — or name that figure, and you find out what lifetime it buys.',
+  'guide.purchase.body': 'A laptop, a car, a large purchase you can see coming. Say what it will cost and how long it should last, and the monthly amount follows — or say what you can put aside each month, and you learn when you have saved enough.',
   'guide.purchase.reset': 'When you buy it, set the Bought date on the entry and the clock starts again.',
   'entry.deleteTitle': 'Delete entry',
 

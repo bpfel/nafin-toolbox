@@ -241,8 +241,8 @@ export const fr: Messages = {
   'guide.bill.ready': 'L’application fait en sorte que l’argent soit prêt un mois avant l’échéance.',
   'guide.bill.cycles': 'Les cycles divisent l’année : 2, 3, 4, 6 ou 12 mois. Ce qui tombe mensuellement est simplement une dépense — il n’y a rien à provisionner.',
   'guide.purchase.title': 'Quelque chose qui s’use',
-  'guide.purchase.body': 'Un ordinateur portable, une voiture, un achat important que tu vois venir. Indique le coût prévu et la durée de vie visée, le montant mensuel en découle — ou fixe cette somme, et tu sauras combien de temps elle couvre.',
-  'guide.purchase.reset': 'Quand tu achètes, renseigne la date sous « Acheté » et le compteur repart.',
+  'guide.purchase.body': 'Un ordinateur portable, une voiture, un achat important que tu vois venir. Indique le coût prévu et la durée de vie visée, le montant mensuel en découle — ou fixe ce que tu peux mettre de côté chaque mois, et tu sauras quand tu auras assez épargné.',
+  'guide.purchase.reset': 'Une fois l’achat fait, renseigne la date sous « Acheté » et le compteur repart.',
   'entry.deleteTitle': 'Supprimer l’entrée',
   'entry.deleteExplain': 'Retirer {name} de ton budget? Son montant prévu disparaît avec elle. Un instantané qui l’a déjà enregistrée en conserve la copie.',
 

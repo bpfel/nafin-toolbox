@@ -225,7 +225,7 @@ export const de: Messages = {
   'guide.bill.ready': 'Die App sorgt dafür, dass das Geld einen Monat vor Fälligkeit bereit ist.',
   'guide.bill.cycles': 'Zyklen teilen das Jahr: alle 2, 3, 4, 6 oder 12 Monate. Was monatlich anfällt, ist schlicht eine Ausgabe — da gibt es nichts anzusparen.',
   'guide.purchase.title': 'Etwas, das sich abnutzt',
-  'guide.purchase.body': 'Ein Laptop, ein Auto, eine grössere Anschaffung, die absehbar ist. Nenn Kosten und Ziellebensdauer, der Monatsbetrag ergibt sich daraus — oder gib den Betrag vor, und du erfährst, für wie lange er reicht.',
+  'guide.purchase.body': 'Ein Laptop, ein Auto, eine grössere Anschaffung, die absehbar ist. Nenn Kosten und Ziellebensdauer, der Monatsbetrag ergibt sich daraus — oder gib den monatlichen Beitrag vor, und du erfährst, wann du genügend angespart hast.',
   'guide.purchase.reset': 'Sobald du kaufst, trag das Datum unter «Gekauft» ein, und die Uhr beginnt von vorn.',
   'entry.deleteTitle': 'Eintrag löschen',
 
