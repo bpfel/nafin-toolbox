@@ -155,3 +155,32 @@ export async function recoverVaultKeys(recoveryKey: string): Promise<{ encrypted
     return null
   }
 }
+
+/**
+ * Mail the signed-in administrator the figures that are due for a look.
+ *
+ * The entries travel *up*, because the register is compiled into this build
+ * beside the figures it describes and the server holds no copy. The recipient
+ * does not travel at all: the server takes it from the session. There is no
+ * parameter here for who receives it, and there must not be — an endpoint that
+ * accepted one would be a way to send mail from this domain to anybody.
+ */
+export interface UpkeepReminderEntry {
+  subject: string
+  current: string
+  becomes?: string
+  changesOn?: string
+  cadence?: string
+  where?: string
+  source?: string
+  sourceUrl?: string
+}
+
+export async function sendUpkeepReminder(
+  entries: UpkeepReminderEntry[],
+): Promise<{ sent_to: string; entries: number }> {
+  return request<{ sent_to: string; entries: number }>('/upkeep/remind', {
+    method: 'POST',
+    body: JSON.stringify({ entries }),
+  })
+}
