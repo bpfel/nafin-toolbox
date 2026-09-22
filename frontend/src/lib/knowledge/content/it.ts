@@ -37,7 +37,7 @@ export const it: PartialContent = {
     },
     controls: {
       title: 'I comandi',
-      body: 'Tutto ciò che agisce sull’intera schermata si trova qui.',
+      body: 'Tutte le opzioni per la schermata corrente sono qui.',
       hoverNote: 'Passa il puntatore su un simbolo per vedere che cosa fa.',
     },
     accounts: {

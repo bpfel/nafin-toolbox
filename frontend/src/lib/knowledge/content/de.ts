@@ -37,7 +37,7 @@ export const de: PartialContent = {
     },
     controls: {
       title: 'Bedienelemente',
-      body: 'Alles, was auf den ganzen Bildschirm wirkt, ist hier.',
+      body: 'Alle Optionen für den aktuellen Bildschirm sind hier.',
       hoverNote: 'Fahren Sie mit der Maus über ein Symbol, um zu sehen, was es tut.',
     },
     accounts: {

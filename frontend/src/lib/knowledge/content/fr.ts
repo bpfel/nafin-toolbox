@@ -38,7 +38,7 @@ export const fr: PartialContent = {
     },
     controls: {
       title: 'Les commandes',
-      body: 'Tout ce qui agit sur l’écran entier se trouve ici.',
+      body: 'Toutes les options pour l’écran en cours sont ici.',
       hoverNote: 'Survolez un symbole pour voir ce qu’il fait.',
     },
     accounts: {

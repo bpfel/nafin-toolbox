@@ -35,7 +35,7 @@ export const en: Content = {
     },
     controls: {
       title: 'Controls',
-      body: 'Everything that acts on the whole screen is here.',
+      body: 'All the options for the current screen are here.',
       hoverNote: 'Hover over a symbol to see what it does.',
     },
     accounts: {
