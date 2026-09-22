@@ -1203,6 +1203,26 @@ describe('seedDefaults', () => {
     expect(summary.yearlySavings).not.toBe((Number(summary.totalPlannedSavings) * 12).toFixed(2))
   })
 
+  /**
+   * Reported from a screenshot: a category reading 3'995.04 above a single row
+   * reading 3'995.00. Every total that a year is shown for has to be summed
+   * from the exact figures, not multiplied at the end — the row, the category
+   * and the summary bar alike, or two of them disagree in public.
+   */
+  test('a category of one bill totals exactly that bill', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const inLiving = summary.entries.filter(
+      e => e.categoryName === 'Living' && e.entryType === 'bill',
+    )
+
+    expect(inLiving).toHaveLength(1)
+    const total = inLiving.reduce((sum, e) => sum + Number(e.yearlyAmount), 0)
+    expect(total.toFixed(2)).toBe('3995.00')
+  })
+
   test('two bills are seeded, so the type does not read as a special case', () => {
     const vault = createEmptyVault()
 

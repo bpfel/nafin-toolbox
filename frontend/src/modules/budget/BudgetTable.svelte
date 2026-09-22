@@ -21,6 +21,13 @@
     categoryId: string
     entries: PlanEntryView[]
     plannedTotal: number
+    /**
+     * Summed from the rows' own yearly figures, not from twelve times the
+     * monthly total. A bill states its real annual amount, so a category
+     * holding one would otherwise disagree with the line beneath it — 3'995.04
+     * above 3'995.00, which is the arithmetic showing its working.
+     */
+    yearlyTotal: number
   }
 
   interface Props {
@@ -95,11 +102,13 @@
           categoryId: e.categoryId,
           entries: [],
           plannedTotal: 0,
+          yearlyTotal: 0,
         })
       }
       const g = map.get(key)!
       g.entries.push(e)
       g.plannedTotal += Number(e.plannedAmount)
+      g.yearlyTotal += Number(e.yearlyAmount)
     }
     // Order by the category's own sortOrder. This used to be inferred from wherever
     // each category's first entry landed in the entry sort, which meant
@@ -341,7 +350,7 @@
               {/if}
             </td>
             <td class="right subtotal col-planned-mo"><Money value={category.plannedTotal} /></td>
-            <td class="right subtotal yearly col-planned-yr"><Money value={category.plannedTotal * 12} /></td>
+            <td class="right subtotal yearly col-planned-yr"><Money value={category.yearlyTotal} /></td>
           </tr>
         {/if}
         {#if !isCollapsed(type, category.categoryName)}

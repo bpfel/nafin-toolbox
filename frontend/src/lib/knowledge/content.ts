@@ -139,9 +139,13 @@ export async function loadContent(locale: Locale): Promise<LoadedContent> {
   let loaded: PartialContent
   try {
     loaded = (await chunk()).default
-  } catch {
+  } catch (error) {
     // A chunk that will not load is a deploy problem, not a reason to show the
-    // user an empty library. English is already in hand.
+    // user an empty library — English is already in hand. But it is said out
+    // loud, because falling back silently makes a failed download and an
+    // untranslated locale look identical from the outside, and the first is a
+    // bug while the second is the design.
+    console.error(`[knowledge] no content for ${locale}, showing English`, error)
     return { content: en, translated: new Set() }
   }
 
