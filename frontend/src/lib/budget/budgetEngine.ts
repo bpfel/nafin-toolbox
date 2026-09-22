@@ -12,6 +12,7 @@ import {
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
 import { seedNamesFor, type SeedKey } from './seedNames'
 import type { Locale } from '../i18n/index.svelte'
+import { fromCents, toCents } from '../accounts/reserveMath'
 
 // --- Entry Categories ---
 
@@ -366,10 +367,28 @@ export interface PlanEntryView {
   categoryId: string
   categoryName: string
   plannedAmount: string
+  /**
+   * What a year of this costs.
+   *
+   * Twelve monthlies for most entries, but *exact* for a bill or a purchase:
+   * those know their real total and the cycle it falls on, so a year of them
+   * is arithmetic rather than inference.
+   *
+   * It has to be, because the monthly figure is rounded to the rappen and
+   * multiplying it back up shows the rounding. A GA at 3'995 a year plans at
+   * 332.92 a month, and twelve of those is 3'995.04 — four rappen of nothing,
+   * on a line whose whole point is that the amount is known in advance.
+   */
+  yearlyAmount: string
 }
 
 export interface PlanSummary {
   entries: PlanEntryView[]
+  /** The three totals again, over a year, summed from the exact figures above. */
+  yearlyIncome: string
+  yearlyExpenses: string
+  yearlySavings: string
+  yearlyBalance: string
   totalPlannedIncome: string
   /** Consumed and gone. Since v7 this excludes what is only being held. */
   totalPlannedExpenses: string
@@ -394,12 +413,21 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
   let totalPlannedExpenses = 0
   let totalPlannedSavings = 0
 
+  // Accumulated separately rather than multiplied at the end: a year is the
+  // sum of exact yearly figures, not twelve times a sum of rounded monthly
+  // ones, and those differ by a rappen per reserve.
+  let yearlyIncome = 0
+  let yearlyExpenses = 0
+  let yearlySavings = 0
+
   const entries: PlanEntryView[] = []
 
   for (const cat of listEntries(vault)) {
     const category = categories.find(g => g.id === cat.categoryId)
     const plannedAmount = plannedFor(vault, cat.id)
     const planned = Number(plannedAmount)
+    const yearlyAmount = yearlyFor(cat, plannedAmount)
+    const yearly = Number(yearlyAmount)
 
     entries.push({
       entryId: cat.id,
@@ -408,14 +436,18 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
       categoryId: cat.categoryId,
       categoryName: category?.name ?? '',
       plannedAmount,
+      yearlyAmount,
     })
 
     if (cat.type === 'income') {
       totalPlannedIncome += planned
+      yearlyIncome += yearly
     } else if (holdsMoney(cat.type)) {
       totalPlannedSavings += planned
+      yearlySavings += yearly
     } else {
       totalPlannedExpenses += planned
+      yearlyExpenses += yearly
     }
   }
 
@@ -428,7 +460,28 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
     // and the allocation screen inferred it from routing on every keystroke.
     totalPlannedSavings: totalPlannedSavings.toFixed(2),
     plannedBalance: (totalPlannedIncome - totalPlannedExpenses - totalPlannedSavings).toFixed(2),
+    yearlyIncome: yearlyIncome.toFixed(2),
+    yearlyExpenses: yearlyExpenses.toFixed(2),
+    yearlySavings: yearlySavings.toFixed(2),
+    yearlyBalance: (yearlyIncome - yearlyExpenses - yearlySavings).toFixed(2),
   }
+}
+
+/**
+ * A year of one entry.
+ *
+ * A bill or a purchase states its real total and the cycle it falls on, so a
+ * year of it is `target x 12 / period` — exact, whatever the monthly rounds
+ * to. Everything else has no figure truer than twelve of its monthly.
+ *
+ * In centimes, because the whole point is the rappen.
+ */
+function yearlyFor(entry: VaultEntry, plannedAmount: string): string {
+  const reserve = entry.reserve
+  if (reserve && reserve.periodMonths > 0) {
+    return fromCents(Math.round((toCents(reserve.targetAmount) * 12) / reserve.periodMonths))
+  }
+  return fromCents(toCents(plannedAmount) * 12)
 }
 
 // --- Snapshots ---
@@ -518,10 +571,13 @@ interface DefaultCategory {
 
 interface DefaultEntry {
   key: SeedKey
-  type: 'income' | 'expense'
+  type: EntryType
   sortOrder: number
   categoryKey: SeedKey
   amount: string
+  /** What a `bill` or `purchase` is saving towards, and over how long. */
+  targetAmount?: string
+  periodMonths?: number
 }
 
 function bfsDefaultCategories(): DefaultCategory[] {
@@ -544,16 +600,48 @@ function bfsDefaults(): DefaultEntry[] {
     { key: 'otherInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insuranceTaxes', amount: '166.67' },
     { key: 'taxes', type: 'expense', sortOrder: 30, categoryKey: 'cat.insuranceTaxes', amount: '833.33' },
     { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '500.00' },
-    { key: 'transport', type: 'expense', sortOrder: 20, categoryKey: 'cat.living', amount: '400.00' },
+    // 67.08, not 400: the GA below takes 332.92 of HABE's transport figure and
+    // this is the rest — the occasional taxi, a bike, a car shared for a
+    // weekend. Split rather than reduced, so the two together are still
+    // exactly the 400.00 the survey reports and the setup screen's claim
+    // about where these numbers come from stays true.
+    { key: 'transport', type: 'expense', sortOrder: 20, categoryKey: 'cat.living', amount: '67.08' },
     { key: 'telecoms', type: 'expense', sortOrder: 30, categoryKey: 'cat.living', amount: '80.00' },
     { key: 'clothing', type: 'expense', sortOrder: 10, categoryKey: 'cat.lifestyle', amount: '100.00' },
     { key: 'entertainment', type: 'expense', sortOrder: 20, categoryKey: 'cat.lifestyle', amount: '250.00' },
     { key: 'diningOut', type: 'expense', sortOrder: 30, categoryKey: 'cat.lifestyle', amount: '250.00' },
-    { key: 'savings', type: 'expense', sortOrder: 10, categoryKey: 'cat.savings', amount: '500.00' },
+    // Serafe collects the federal radio and television levy. It is the
+    // household bill that is the same for every household in the country,
+    // which makes it the one worked example of a `bill` that needs no
+    // qualification: an amount known in advance, arriving on a known cycle.
+    //
+    // 335.00 a year is the rate set by the Federal Council, unchanged since
+    // 2021. It drops to 312.00 on 1 January 2027 and is due to fall again
+    // after that, so this line has a date on it — see bakom.admin.ch/de/abgabe.
+    // A seeded figure is a starting point the user overwrites, not a promise.
+    { key: 'serafe', type: 'bill', sortOrder: 40, categoryKey: 'cat.insuranceTaxes', amount: '27.92', targetAmount: '335.00', periodMonths: 12 },
+    // And the worked example of a `purchase`: a thing that wears out rather
+    // than a bill that arrives. 1'512 over seven years is exactly 18.00 a
+    // month, which is the point of the odd-looking price — a round monthly
+    // figure reads as a decision, and 17.86 reads as arithmetic.
+    // A second bill, so the type does not read as "the radio levy and nothing
+    // else". The GA is the Swiss annual bill most households recognise, and
+    // unlike Serafe it is one you choose — which is the more common shape.
+    //
+    // 3'995 is the adult second-class fare. Like every figure here it is a
+    // starting point the user overwrites, and it moves; 332.92 a month is
+    // what follows from it.
+    { key: 'travelPass', type: 'bill', sortOrder: 50, categoryKey: 'cat.living', amount: '332.92', targetAmount: '3995.00', periodMonths: 12 },
+    { key: 'laptop', type: 'purchase', sortOrder: 40, categoryKey: 'cat.living', amount: '18.00', targetAmount: '1512.00', periodMonths: 84 },
+    // Savings, not expense. Until v7 there was no type that meant "leaves the
+    // account without leaving your net worth", so these two were seeded as
+    // expenses and the budget claimed a household consumed its own 3a
+    // contributions. The type exists now and they take it.
+    { key: 'savings', type: 'savings', sortOrder: 10, categoryKey: 'cat.savings', amount: '500.00' },
     // Pillar 3a is budgeted like any other set-aside: the money leaves the
     // spending plan but stays yours. 588.00 is the 2026 employee cap (7'056)
     // spread over twelve months — a starting point, not a rule.
-    { key: 'pillar3a', type: 'expense', sortOrder: 20, categoryKey: 'cat.savings', amount: '588.00' },
+    { key: 'pillar3a', type: 'savings', sortOrder: 20, categoryKey: 'cat.savings', amount: '588.00' },
   ]
 }
 
@@ -564,7 +652,13 @@ function bfsDefaults(): DefaultEntry[] {
  * sticks, and switching language later leaves them alone. That is the whole
  * reason they are data here rather than slugs resolved at render.
  */
-export function seedDefaults(vault: VaultData, locale: Locale = 'en'): void {
+/**
+ * @param anchorMonth `YYYY-MM`, the month the seeded reserves are anchored to.
+ *   Required now that the defaults include a bill and a purchase, and passed
+ *   in rather than read from a clock — the engine deliberately does not know
+ *   what day it is, which is what makes every one of these tests repeatable.
+ */
+export function seedDefaults(vault: VaultData, locale: Locale = 'en', anchorMonth = '2026-01'): void {
   if (vault.budget.entries.length > 0) return
 
   const name = seedNamesFor(locale)
@@ -581,6 +675,9 @@ export function seedDefaults(vault: VaultData, locale: Locale = 'en'): void {
       type: d.type,
       categoryName: name[d.categoryKey],
       sortOrder: d.sortOrder,
+      anchorMonth,
+      targetAmount: d.targetAmount,
+      periodMonths: d.periodMonths,
     })
     setPlanned(vault, entry.id, d.amount)
   }

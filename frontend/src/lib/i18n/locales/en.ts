@@ -16,6 +16,7 @@ export const en = {
   // --- Navigation and profile ---
   'nav.budget': 'Budget',
   'nav.accounts': 'Accounts',
+  'nav.knowledge': 'Knowledge',
   'nav.profile': 'Profile',
   'nav.audit': 'Audit',
   'nav.label': 'Sections',
@@ -212,8 +213,8 @@ export const en = {
   'entry.editTitle': 'Edit entry',
   'entry.addTitle': 'Add entry',
   'entry.category': 'Category',
-  'entry.addOne': 'Add a budget line',
-  'entry.chooseType': 'What kind of line?',
+  'entry.addOne': 'Add a budget entry',
+  'entry.chooseType': 'What type of entry?',
   'entryType.income': 'Income',
   'entryType.expense': 'Expense',
   'entryType.savings': 'Savings',
@@ -229,16 +230,18 @@ export const en = {
   'entry.values': 'Values',
   'guide.explain': 'What does {type} mean?',
   'guide.income.title': 'Money coming in',
-  'guide.income.body': 'Salary, a pension, anything that arrives from outside your accounts. Plan what you expect in an ordinary month; everything else in the budget is measured against it.',
+  'guide.income.body': 'Salary, a pension, anything that regularly arrives in your accounts from outside.',
   'guide.expense.title': 'Money spent and gone',
-  'guide.expense.body': 'Rent, groceries, a monthly subscription. It leaves your accounts and does not come back, which is what separates it from the three below.',
-  'guide.savings.title': 'Money kept, with nothing in mind',
-  'guide.savings.body': 'An emergency fund, a pillar 3a contribution. It leaves what you can spend but stays yours, so your net worth does not change when you set it aside — only when you eventually spend it.',
+  'guide.expense.body': 'Rent, groceries, a monthly subscription. It leaves your accounts and does not come back.',
+  'guide.savings.title': 'Money kept',
+  'guide.savings.body': 'An emergency fund, a pillar 3a contribution. Set aside rather than spent, and still in your accounts.',
   'guide.bill.title': 'A bill that keeps coming back',
-  'guide.bill.body': 'Quarterly health insurance, a half-yearly tax instalment, an annual subscription. Say what the bill is and how often it arrives, and the monthly amount follows — the money is ready a month before it falls due, so paying it is never a surprise.',
-  'guide.bill.cycles': 'Cycles divide the year: every 2, 3, 4, 6 or 12 months. A bill that arrives every month is simply an expense — there is nothing to save up for.',
+  'guide.bill.body': 'Quarterly health insurance, a half-yearly tax instalment, an annual membership. Define the amount and the period, and the monthly contribution follows.',
+  'guide.bill.ready': 'The app makes sure the money is ready one month before it is due.',
+  'guide.bill.cycles': 'Cycles divide the year: every 2, 3, 4, 6 or 12 months. One that arrives monthly is simply an expense — there is nothing to save up for.',
   'guide.purchase.title': 'Something that wears out',
-  'guide.purchase.body': 'A laptop, a bike, a washing machine. Say what it costs and how long it lasts and the monthly amount follows — or say what you can put aside each month and find out when that gets you there. When you buy the next one, the clock starts again.',
+  'guide.purchase.body': 'A laptop, a car, a large purchase you can see coming. Say what it will cost and how long it should last, and the monthly amount follows — or say what you can put aside each month, and you learn when you have saved enough.',
+  'guide.purchase.reset': 'When you buy it, set the Bought date on the entry and the clock starts again.',
   'entry.deleteTitle': 'Delete entry',
 
   // --- Category dialog ---
@@ -494,6 +497,27 @@ export const en = {
   // --- Roles. Server-supplied values, so no scan can see them. ---
   'role.user': 'User',
   'role.admin': 'Admin',
+
+  // --- Knowledge: the library, and the guided tour that lives in it ---
+  'knowledge.tourTitle': 'Take the tour',
+  'knowledge.tourAgainTitle': 'Take the tour again',
+  'knowledge.tourBody': 'A short walk through the main views and the controls on them.',
+  'knowledge.tourStart': 'Start',
+  'knowledge.tourAgain': 'Start again',
+  'knowledge.about': 'About this app',
+  'knowledge.swiss': 'Swiss basics',
+  'knowledge.sources': 'Official sources',
+  'knowledge.inEnglish': 'Not yet translated — shown in English.',
+  'tour.progress': '{position} of {total}',
+  'tour.next': 'Next',
+  'tour.back': 'Back',
+  'tour.skip': 'Skip',
+  'tour.finish': 'Done',
+  'tour.offerTitle': 'New here?',
+  'tour.offerBody': 'A short tour of the main views takes about a minute.',
+  'tour.offerAccept': 'Take the tour',
+  'tour.offerDecline': 'Not now',
+
 } as const
 
 /**

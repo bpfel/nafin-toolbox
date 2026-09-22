@@ -11,8 +11,10 @@
   import { autofocus } from './lib/util/autofocus'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
-  import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
+  import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
+  import TourOverlay from './lib/tour/TourOverlay.svelte'
+  import { resetTour } from './lib/tour/tourStore.svelte'
   import AppShell from './lib/nav/AppShell.svelte'
   import { getRoute, navigate, replace, startRouting, syncFromLocation } from './lib/nav/router.svelte'
   import { gateFor } from './lib/nav/gate'
@@ -88,6 +90,9 @@
     error = null
     show2FAEnforcement = false
     clearEditing()
+    // A tour left running would otherwise still be running over the next
+    // person's sign-in, pointing at a screen that is no longer theirs.
+    resetTour()
     navigate('/')
   }
 
@@ -320,10 +325,26 @@
   />
 {/if}
 
+<!--
+  The build, on the screens that have no profile page to put it on.
+
+  `chromeless` is exactly the gate chain — signing in, unlocking, a vault the
+  build cannot read — and those are the screens someone is looking at when
+  they most need to say which build they are on, because they cannot get past
+  them to look anywhere else. Everywhere else it sits at the foot of the
+  profile page instead of under every screen.
+-->
+{#if chromeless}
+  <VersionTag />
+{/if}
+
 <!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
-<VersionTag />
 <UpdateBanner />
 <UnsavedBanner />
+<!-- Here rather than inside a screen: the tour walks across screens, and a
+     component owned by one of them would be destroyed halfway through. It
+     renders nothing unless the tour is running. -->
+<TourOverlay />
 
 <style>
   .loading {

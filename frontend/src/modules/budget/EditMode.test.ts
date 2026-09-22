@@ -32,6 +32,7 @@ function entry(): PlanEntryView {
     categoryId: 'g1',
     categoryName: 'Housing',
     plannedAmount: '1350.00',
+    yearlyAmount: '16200.00',
   }
 }
 
@@ -134,7 +135,8 @@ describe('single-category budgets hide the category name', () => {
   // anywhere else would only be restating the implementation.
   function vaultWith(categories: { id: string; name: string; side: 'income' | 'expense' }[]): VaultData {
     return {
-      version: 7,
+      version: 8,
+      tour: { completedAt: null, dismissedAt: null },
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',
@@ -156,6 +158,7 @@ describe('single-category budgets hide the category name', () => {
       categoryId: categoryId,
       categoryName: categoryName,
       plannedAmount: '100.00',
+      yearlyAmount: '1200.00',
     }
   }
 

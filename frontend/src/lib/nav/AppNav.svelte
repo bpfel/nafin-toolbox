@@ -27,7 +27,10 @@
   }
 </script>
 
-<nav class="app-nav" aria-label={t('nav.label')}>
+<!-- `data-tour` marks what the guided tour stops at. The bar as a whole is one
+     stop; the Knowledge tab is another, because the tour ends by showing you
+     where to start it again. -->
+<nav class="app-nav" aria-label={t('nav.label')} data-tour="nav">
   {#each destinations as destination (destination.screen)}
     {@const active = route.screen === destination.screen}
     <a
@@ -35,6 +38,7 @@
       class:active
       href={destination.path}
       aria-current={active ? 'page' : undefined}
+      data-tour={destination.screen === 'knowledge' ? 'nav-knowledge' : undefined}
       onclick={(event) => go(event, destination.path)}
     >
       <NavIcon name={destination.icon} />

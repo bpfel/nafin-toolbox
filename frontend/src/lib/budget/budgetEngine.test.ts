@@ -22,7 +22,7 @@ import {
   deleteSnapshot,
   seedDefaults,
 } from './budgetEngine'
-import { createEmptyVault, type VaultData } from '../crypto/vault'
+import { createEmptyVault, holdsMoney, savesTowardsTarget, type VaultData } from '../crypto/vault'
 import { isLegalEntryRouting, isLegalRouting, primaryAccountId } from '../accounts/routing'
 
 describe('listCategories', () => {
@@ -1123,8 +1123,160 @@ describe('seedDefaults', () => {
 
     expect(summary.entries).toHaveLength(vault.budget.entries.length)
     expect(summary.totalPlannedIncome).toBe('6000.00')
-    expect(summary.totalPlannedExpenses).toBe('5559.67')
-    expect(summary.plannedBalance).toBe('440.33')
+    // Consumed and gone. Lower than it once was by exactly the two set-asides
+    // that used to be mis-typed as expenses: the defaults claimed a household
+    // spent its own savings and its own 3a contributions.
+    expect(summary.totalPlannedExpenses).toBe('4138.75')
+    // Out of the account, still in the net worth: savings, 3a, Serafe and the
+    // laptop fund. This total could not be asserted before, because nothing in
+    // the seeded data distinguished the four from an expense.
+    expect(summary.totalPlannedSavings).toBe('1466.84')
+    expect(summary.plannedBalance).toBe('394.41')
+  })
+
+  /**
+   * The GA is carved out of HABE's transport figure rather than added on top
+   * of it, so the household is not shown paying for transport twice. Asserted
+   * as a sum, because the point is the total and either number may be
+   * restated without breaking it.
+   */
+  test('the travel pass and what is left of transport still make the survey figure', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const of = (name: string) =>
+      Number(plannedFor(vault, vault.budget.entries.find(e => e.name === name)!.id))
+
+    expect(of('Transportation') + of('GA travelcard')).toBeCloseTo(400, 2)
+  })
+
+  /**
+   * The reported defect: a GA priced at 3'995 a year showed 3'995.04, because
+   * the yearly column was twelve times a monthly rounded to the rappen. A bill
+   * knows its real total, so a year of it is arithmetic rather than inference.
+   */
+  test('a year of a bill is its real total, not twelve rounded monthlies', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const yearly = (name: string) => summary.entries.find(e => e.entryName === name)!.yearlyAmount
+
+    expect(yearly('GA travelcard')).toBe('3995.00')
+    expect(yearly('Serafe')).toBe('335.00')
+    // And the purchase, whose cycle is not a year: 1'512 over seven years is
+    // 216.00 of laptop per year.
+    expect(yearly('Laptop')).toBe('216.00')
+  })
+
+  test('an entry with no reserve is still twelve of its monthly', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const rent = summary.entries.find(e => e.entryName === 'Rent')!
+
+    expect(rent.yearlyAmount).toBe('16200.00')
+  })
+
+  /**
+   * The totals are summed from the exact figures rather than multiplied at the
+   * end, or the summary bar would disagree with the rows underneath it by a
+   * rappen per reserve.
+   */
+  test('the yearly totals agree with the rows they summarise', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const sum = (pick: (t: string) => boolean) =>
+      summary.entries
+        .filter(e => pick(e.entryType))
+        .reduce((total, e) => total + Number(e.yearlyAmount), 0)
+
+    expect(Number(summary.yearlyIncome)).toBeCloseTo(sum(t => t === 'income'), 2)
+    expect(Number(summary.yearlySavings)).toBeCloseTo(
+      sum(t => t === 'savings' || t === 'bill' || t === 'purchase'),
+      2,
+    )
+    // Twelve times the monthly total would be 4330.08 for the bills alone.
+    expect(summary.yearlySavings).not.toBe((Number(summary.totalPlannedSavings) * 12).toFixed(2))
+  })
+
+  /**
+   * Reported from a screenshot: a category reading 3'995.04 above a single row
+   * reading 3'995.00. Every total that a year is shown for has to be summed
+   * from the exact figures, not multiplied at the end — the row, the category
+   * and the summary bar alike, or two of them disagree in public.
+   */
+  test('a category of one bill totals exactly that bill', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const summary = getPlanSummary(vault)
+    const inLiving = summary.entries.filter(
+      e => e.categoryName === 'Living' && e.entryType === 'bill',
+    )
+
+    expect(inLiving).toHaveLength(1)
+    const total = inLiving.reduce((sum, e) => sum + Number(e.yearlyAmount), 0)
+    expect(total.toFixed(2)).toBe('3995.00')
+  })
+
+  test('two bills are seeded, so the type does not read as a special case', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const bills = vault.budget.entries.filter(e => e.type === 'bill')
+
+    expect(bills).toHaveLength(2)
+    // Serafe sorts first, and the allocations step names it by name.
+    expect(bills[0].name).toBe('Serafe')
+  })
+
+  test('the defaults exercise every entry type', () => {
+    // The reason the two new lines exist: a tour, or anyone reading the
+    // starter budget, should meet all five kinds rather than two of them.
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+
+    const seeded = new Set(vault.budget.entries.map(e => e.type))
+    expect([...seeded].sort()).toEqual(['bill', 'expense', 'income', 'purchase', 'savings'])
+  })
+
+  test('the seeded bill and purchase carry a reserve that matches their plan', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault, 'en', '2026-03')
+
+    for (const entry of vault.budget.entries.filter(e => savesTowardsTarget(e.type))) {
+      const reserve = entry.reserve
+      expect(reserve, entry.name).toBeDefined()
+      expect(reserve!.anchorMonth).toBe('2026-03')
+      // The monthly figure has to be able to reach the target within the
+      // period, or the line is a schedule that can never meet itself.
+      const monthly = Number(plannedFor(vault, entry.id))
+      const needed = Number(reserve!.targetAmount) / reserve!.periodMonths
+      expect(Math.abs(monthly - needed), entry.name).toBeLessThan(0.01)
+    }
+  })
+
+  test('the laptop fund is a whole number of francs a month', () => {
+    // 1'512 over seven years is exactly 18.00. The odd-looking price is the
+    // point: a round monthly figure reads as a decision rather than as
+    // arithmetic, and this is the line a tour stops at to explain the type.
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const laptop = vault.budget.entries.find(e => e.type === 'purchase')!
+
+    expect(plannedFor(vault, laptop.id)).toBe('18.00')
+    expect(laptop.reserve).toEqual({
+      targetAmount: '1512.00',
+      periodMonths: 84,
+      anchorMonth: '2026-01',
+    })
   })
 
   test('is idempotent', () => {
@@ -1153,6 +1305,13 @@ describe('seedDefaults', () => {
       if (cat.type === 'income') {
         expect(cat.sourceAccountId).toBeNull()
         expect(cat.sinkAccountId).toBe(primary)
+      } else if (holdsMoney(cat.type)) {
+        // Leaves what is spendable without leaving the net worth, so it has
+        // both ends: out of the account it is planned against, and into the
+        // one holding it. Seeding a bill and a purchase is what first made
+        // this branch reachable.
+        expect(cat.sourceAccountId, cat.name).toBe(primary)
+        expect(cat.sinkAccountId, cat.name).toBe(primary)
       } else {
         expect(cat.sourceAccountId).toBe(primary)
         expect(cat.sinkAccountId).toBeNull()

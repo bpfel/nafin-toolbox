@@ -21,6 +21,13 @@
     categoryId: string
     entries: PlanEntryView[]
     plannedTotal: number
+    /**
+     * Summed from the rows' own yearly figures, not from twelve times the
+     * monthly total. A bill states its real annual amount, so a category
+     * holding one would otherwise disagree with the line beneath it — 3'995.04
+     * above 3'995.00, which is the arithmetic showing its working.
+     */
+    yearlyTotal: number
   }
 
   interface Props {
@@ -95,11 +102,13 @@
           categoryId: e.categoryId,
           entries: [],
           plannedTotal: 0,
+          yearlyTotal: 0,
         })
       }
       const g = map.get(key)!
       g.entries.push(e)
       g.plannedTotal += Number(e.plannedAmount)
+      g.yearlyTotal += Number(e.yearlyAmount)
     }
     // Order by the category's own sortOrder. This used to be inferred from wherever
     // each category's first entry landed in the entry sort, which meant
@@ -270,7 +279,19 @@
     same two things above every section — ten labels for two facts, and both are
     plain from the figures underneath.
   -->
-  <div class="section-head section-{type}">
+  <!--
+    The guided tour stops at each type in turn, and rings the heading together
+    with one row beneath it — not the whole table. Both wear the same name and
+    the halo takes the union, which is a single band because the two are
+    vertically adjacent: title, then the category heading if this section has
+    more than one, then the row.
+
+    One row rather than all of them because the point of the step is what a
+    *kind* of line means, and a section with fourteen entries in it turns that
+    into a spotlight the size of the screen.
+  -->
+  {@const firstRowId = sectionCategories[0]?.entries[0]?.entryId}
+  <div class="section-head section-{type}" data-tour="type-{type}">
     <h2 class="section-name">{t(`section.${type}` as 'section.expense')}</h2>
     <InfoButton
       label={t('guide.explain', { type: t(`section.${type}` as 'section.expense') })}
@@ -329,12 +350,17 @@
               {/if}
             </td>
             <td class="right subtotal col-planned-mo"><Money value={category.plannedTotal} /></td>
-            <td class="right subtotal yearly col-planned-yr"><Money value={category.plannedTotal * 12} /></td>
+            <td class="right subtotal yearly col-planned-yr"><Money value={category.yearlyTotal} /></td>
           </tr>
         {/if}
         {#if !isCollapsed(type, category.categoryName)}
           {#each category.entries as entry (entry.entryId)}
-            <BudgetEntryRow {entry} {viewMode} onedit={openEditModal} />
+            <BudgetEntryRow
+              {entry}
+              {viewMode}
+              tour={entry.entryId === firstRowId ? `type-${type}` : undefined}
+              onedit={openEditModal}
+            />
           {/each}
         {/if}
       </tbody>

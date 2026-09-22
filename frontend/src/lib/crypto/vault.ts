@@ -1,6 +1,6 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 7
+export const VAULT_VERSION = 8
 
 /**
  * A stored vault written by a build newer than this one.
@@ -19,9 +19,29 @@ export class VaultVersionAheadError extends Error {
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 7
+  version: 8
   budget: BudgetVaultData
   accounts: VaultAccount[]
+  /** Whether the guided tour has been taken, or turned down. */
+  tour: TourState
+}
+
+/**
+ * What the app knows about the tour having been offered.
+ *
+ * Two timestamps rather than one flag, because "finished it" and "said no
+ * thanks" are different answers and the Knowledge screen says different things
+ * about them — one offers the tour again, the other offers it for the first
+ * time. Both null is the only state in which the app volunteers anything.
+ *
+ * In the vault rather than localStorage so it follows the user to a new device.
+ * The cost is that it cannot be read before the vault is unlocked, which is no
+ * cost at all: every screen the tour walks needs an unlocked vault anyway, and
+ * an administrator — who has no vault — correctly gets no offer.
+ */
+export interface TourState {
+  completedAt: string | null
+  dismissedAt: string | null
 }
 
 export interface BudgetVaultData {
@@ -253,6 +273,13 @@ export function assertVaultShape(vault: VaultData): void {
   if (!Array.isArray(vault.accounts)) {
     throw new VaultShapeError('accounts is missing')
   }
+
+  // v8's one addition. Absent means something stamped the number without
+  // adding the field, which is the same class of bug as the tells above.
+  const tour = (vault as unknown as { tour?: unknown }).tour
+  if (!tour || typeof tour !== 'object') {
+    throw new VaultShapeError('tour is missing')
+  }
 }
 
 // --- Encrypt / decrypt ---
@@ -326,6 +353,7 @@ export function migrateVault(parsed: unknown): VaultData {
 
   const vault = parsed as {
     version?: unknown
+    tour?: unknown
     budget?: {
       categories?: { type?: unknown; side?: unknown }[]
       entries?: unknown
@@ -366,24 +394,50 @@ export function migrateVault(parsed: unknown): VaultData {
     Array.isArray(vault.budget.categories) &&
     vault.budget.categories.some(c => c != null && c.side === undefined && c.type !== undefined)
 
-  if (vault.version === VAULT_VERSION && !wearingV4Keys && !wearingV5Keys && !wearingV6Keys) {
+  // v8 only added a key, so the tell is the key's *absence* rather than an
+  // older name surviving — and an absence is much weaker evidence than a
+  // presence. `tour === undefined` alone is true of a v1 vault, a blob with no
+  // version, `null`, and a vault from a future build, so on its own it drags
+  // every one of those onto the v7 path: junk that should be scrubbed is
+  // migrated instead, and a vault this build cannot read is quietly accepted
+  // rather than refused.
+  //
+  // Narrowed to the one case the tell is for: a vault claiming to be current
+  // while missing the key a current vault always writes. The honest case —
+  // a vault that says 7 — is handled by its own branch below.
+  const wearingV7Keys = vault.version === VAULT_VERSION && vault.tour === undefined
+
+  if (
+    vault.version === VAULT_VERSION &&
+    !wearingV4Keys &&
+    !wearingV5Keys &&
+    !wearingV6Keys &&
+    !wearingV7Keys
+  ) {
     return vault as unknown as VaultData
   }
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
   // for being four steps behind.
   if (vault.version === 2) {
-    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault)))))
+    return migrateV7ToV8(
+      migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault))))),
+    )
   }
   if (vault.version === 3) {
-    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape))))
+    return migrateV7ToV8(
+      migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape)))),
+    )
   }
   if (vault.version === 4 || wearingV4Keys) {
-    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape)))
+    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape))))
   }
   if (vault.version === 5 || wearingV5Keys) {
-    return migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape))
+    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape)))
   }
-  if (vault.version === 6 || wearingV6Keys) return migrateV6ToV7(vault as unknown as V6Shape)
+  if (vault.version === 6 || wearingV6Keys) {
+    return migrateV7ToV8(migrateV6ToV7(vault as unknown as V6Shape))
+  }
+  if (vault.version === 7 || wearingV7Keys) return migrateV7ToV8(vault as unknown as V7Shape)
 
   // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
   // the data. Refuse it so the app can say so, instead of handing back an empty
@@ -655,11 +709,15 @@ function migrateV5ToV6(vault: V5Shape): V6Shape {
  * ends up stamped with a version its shape does not match — which is the exact
  * failure the tells in `assertVaultShape` exist to catch.
  */
-function migrateV6ToV7(vault: V6Shape): VaultData {
+function migrateV6ToV7(vault: V6Shape): V7Shape {
   const budget = vault.budget ?? {}
 
-  const migrated = vault as unknown as VaultData
-  migrated.version = VAULT_VERSION
+  // 7, not VAULT_VERSION. This step produces a v7 vault and the next one takes
+  // it from there; writing the constant here is how a chained migration starts
+  // stamping whatever the newest version happens to be while leaving the shape
+  // two steps behind — the exact failure `assertVaultShape` exists to catch.
+  const migrated = vault as unknown as V7Shape
+  migrated.version = 7
   migrated.budget = {
     categories: (budget.categories ?? []).map(({ type, ...rest }) => ({
       ...rest,
@@ -719,6 +777,31 @@ function migrateV2ToV3(vault: { version?: unknown; budget?: { categories?: unkno
   return vault as unknown as V3Shape
 }
 
+/**
+ * v7 in full: identical to v8 but for the key v8 adds. Only the migration
+ * speaks this.
+ */
+interface V7Shape {
+  version: number
+  budget: BudgetVaultData
+  accounts: VaultAccount[]
+}
+
+/**
+ * v7 -> v8: the tour records whether it has been offered.
+ *
+ * Purely additive, and everyone arrives un-offered — including users who have
+ * been running the app for months. That is deliberate rather than an oversight
+ * about existing users: the tour is new to them too, and an offer they can turn
+ * down in one tap is a smaller imposition than never telling them it exists.
+ */
+function migrateV7ToV8(vault: V7Shape): VaultData {
+  const migrated = vault as unknown as VaultData
+  migrated.version = VAULT_VERSION
+  migrated.tour = { completedAt: null, dismissedAt: null }
+  return migrated
+}
+
 export function createEmptyVault(): VaultData {
   return {
     version: VAULT_VERSION,
@@ -731,6 +814,7 @@ export function createEmptyVault(): VaultData {
     // Invariant: a vault always holds at least one account, so every category
     // can be routed from the moment it is created.
     accounts: [createMainAccount()],
+    tour: { completedAt: null, dismissedAt: null },
   }
 }
 

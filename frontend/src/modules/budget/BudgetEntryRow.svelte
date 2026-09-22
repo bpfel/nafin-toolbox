@@ -8,6 +8,12 @@
   interface Props {
     entry: PlanEntryView
     viewMode?: 'monthly' | 'yearly'
+    /**
+     * Names this row for the guided tour, which rings one row per type rather
+     * than a whole table. A prop rather than a wrapper, because a `<tr>` will
+     * not tolerate being wrapped in anything.
+     */
+    tour?: string
     onedit: (
       entryId: string,
       entryName: string,
@@ -17,7 +23,7 @@
     ) => void
   }
 
-  let { entry, viewMode = 'monthly', onedit }: Props = $props()
+  let { entry, viewMode = 'monthly', tour, onedit }: Props = $props()
 
   // Amounts are read-only here. Changing one is an edit like renaming or
   // reordering is, so it goes through edit mode and the entry dialog -- one
@@ -35,6 +41,7 @@
 <tr
   class="entry-row"
   data-entry-id={entry.entryId}
+  data-tour={tour}
 >
   <td class="name-cell">
     <div class="name-cell-inner">
@@ -64,10 +71,10 @@
   <td class="amount-cell yearly planned-yr-cell">
     {#if editing}
       <button class="cell-value cell-button" onclick={openEditor} aria-label={t('budget.editPlannedYr', { entry: entry.entryName })}>
-        <Money value={planned * 12} />
+        <Money value={entry.yearlyAmount} />
       </button>
     {:else}
-      <span class="cell-value"><Money value={planned * 12} /></span>
+      <span class="cell-value"><Money value={entry.yearlyAmount} /></span>
     {/if}
   </td>
 </tr>

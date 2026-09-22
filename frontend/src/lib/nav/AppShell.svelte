@@ -6,6 +6,10 @@
   import AppNav from './AppNav.svelte'
   import BudgetScreen from '../../screens/BudgetScreen.svelte'
   import AccountsScreen from '../../screens/AccountsScreen.svelte'
+  import KnowledgeScreen from '../../screens/KnowledgeScreen.svelte'
+  import TourOffer from '../tour/TourOffer.svelte'
+  import { getVaultState } from '../crypto/vaultStore.svelte'
+  import { shouldOfferTour } from '../tour/tourState'
   import ProfileScreen from '../../screens/ProfileScreen.svelte'
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
@@ -28,7 +32,22 @@
   let { email, role, onlogout }: Props = $props()
 
   const route = getRoute()
+  const vaultState = getVaultState()
   let isAdmin = $derived(role === 'admin')
+
+  /**
+   * Whether to volunteer the tour, and where.
+   *
+   * On the landing screen only. An offer that followed the user onto every
+   * screen would be a banner rather than an invitation, and Budget is where a
+   * new session starts anyway.
+   *
+   * It reads the vault, so an administrator — who has none — is never offered
+   * anything, which is correct: the tour walks screens they do not have.
+   */
+  let offerTour = $derived(
+    !isAdmin && route.screen === 'budget' && shouldOfferTour(vaultState.vault),
+  )
   let reachable = $derived(new Set(destinationsFor(role).map((d) => d.screen)))
 
   /**
@@ -95,12 +114,26 @@
         Only the two money screens. Profile is cheap to build and holds nothing
         worth keeping.
       -->
+      {#if offerTour}
+        <TourOffer />
+      {/if}
+
       <div class="screen" hidden={route.screen !== 'budget'}>
         <BudgetScreen />
       </div>
       <div class="screen" hidden={route.screen !== 'accounts'}>
         <AccountsScreen />
       </div>
+
+      <!--
+        Rendered rather than hidden, unlike the two above. That treatment exists
+        to keep a half-typed amount or an open dialog alive across a tab switch;
+        Knowledge holds neither, and its content is a lazy chunk that a session
+        which never opens it should never fetch.
+      -->
+      {#if route.screen === 'knowledge'}
+        <KnowledgeScreen />
+      {/if}
 
       {#if route.screen === 'profile'}
         <ProfileScreen {email} {role} {onlogout} />

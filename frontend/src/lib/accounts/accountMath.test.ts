@@ -57,7 +57,8 @@ function vaultWith(
   plan: VaultPlanEntry[] = [],
 ): VaultData {
   return {
-    version: 7,
+    version: 8,
+    tour: { completedAt: null, dismissedAt: null },
     budget: { categories: [], entries, plan, snapshots: [] },
     accounts,
   }
@@ -135,7 +136,8 @@ describe('allocationBreakdown', () => {
   // Three reserves into Reserves, deliberately out of size order in the vault.
   function vault() {
     return {
-      version: 7 as const,
+      version: 8 as const,
+      tour: { completedAt: null, dismissedAt: null },
       budget: {
         categories: [
           { id: 'cat-tax', name: 'Taxes', side: 'expense' as const, sortOrder: 10 },

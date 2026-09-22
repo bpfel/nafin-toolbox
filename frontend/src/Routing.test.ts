@@ -73,14 +73,28 @@ vi.mock('./lib/util/buildVersion.svelte', () => ({
 }))
 
 import App from './App.svelte'
-import { navigate } from './lib/nav/router.svelte'
+import { navigate, syncFromLocation } from './lib/nav/router.svelte'
 import { isEditing, toggleEditing, clearEditing } from './lib/util/editMode.svelte'
 
 const admin = { id: 1, email: 'admin@example.ch', role: 'admin', must_change_password: false }
 const user = { id: 2, email: 'anna@example.ch', role: 'user', must_change_password: false }
 
+/**
+ * Puts the address bar *and* the router at `path`.
+ *
+ * `replaceState` alone was not enough. The router reads the address once, on
+ * mount, so a path set before render was only honoured if the shell did not
+ * redirect first — and it redirects anything that is not the role's landing
+ * screen. Every test in this file happened to name a landing screen, so they
+ * all passed either way and none of them proved what it looked like it
+ * proved.
+ *
+ * `syncFromLocation` is the seam the router already exposes for this, for the
+ * verification page, which rewrites the address itself.
+ */
 function at(path: string) {
   window.history.replaceState({}, '', path)
+  syncFromLocation()
 }
 
 describe('the shell', () => {
@@ -115,7 +129,51 @@ describe('the shell', () => {
 
     const nav = await screen.findByRole('navigation', { name: 'Sections' })
     const labels = [...nav.querySelectorAll('a')].map((a) => a.textContent?.trim())
-    expect(labels).toEqual(['Budget', 'Accounts', 'Profile'])
+    expect(labels).toEqual(['Budget', 'Accounts', 'Knowledge', 'Profile'])
+  })
+
+  /**
+   * Four, and the reason it is worth asserting the count rather than only the
+   * contents: the bar was drawn against a 320px screen and four labels is what
+   * fits. A fifth destination has to be a decision about what stops being one,
+   * not something that arrives with a feature.
+   */
+  test('a user has four places, which is what the bar was drawn for', async () => {
+    currentUser = user
+    render(App)
+
+    const nav = await screen.findByRole('navigation', { name: 'Sections' })
+    expect(nav.querySelectorAll('a').length).toBe(4)
+  })
+
+  /**
+   * The build id used to sit under every screen. It is on one page now, which
+   * only works if it is actually on that page — and the test that would have
+   * caught its absence is this one, not the component's own.
+   */
+  test('the build is named on the profile page', async () => {
+    currentUser = admin
+    at('/profile')
+    const { container } = render(App)
+
+    await waitFor(() => expect(container.textContent).toContain('nafin'))
+  })
+
+  test('and nowhere else', async () => {
+    currentUser = admin
+    at('/users')
+    const { container } = render(App)
+
+    await waitFor(() => expect(screen.queryByText('User Management')).toBeTruthy())
+    expect(container.textContent).not.toContain('nafin')
+  })
+
+  test('an admin is offered no library, having no vault to explain', async () => {
+    currentUser = admin
+    at('/knowledge')
+    render(App)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/users'))
   })
 
   test('and an admin a different set, not a shortened one', async () => {

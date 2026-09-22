@@ -28,11 +28,20 @@
  * comes first for that role, which differs between a user and an administrator
  * and so cannot be decided here.
  */
-export type Screen = 'home' | 'budget' | 'accounts' | 'profile' | 'users' | 'audit' | 'verify'
+export type Screen =
+  | 'home'
+  | 'budget'
+  | 'accounts'
+  | 'knowledge'
+  | 'profile'
+  | 'users'
+  | 'audit'
+  | 'verify'
 
 const SCREENS: Record<string, Screen> = {
   budget: 'budget',
   accounts: 'accounts',
+  knowledge: 'knowledge',
   profile: 'profile',
   users: 'users',
   audit: 'audit',

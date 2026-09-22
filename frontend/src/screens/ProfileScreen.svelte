@@ -3,6 +3,7 @@
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
   import SecuritySettings from '../lib/auth/SecuritySettings.svelte'
   import LanguagePicker from '../lib/nav/LanguagePicker.svelte'
+  import VersionTag from '../lib/util/VersionTag.svelte'
 
   /**
    * Everything about the person rather than their money.
@@ -64,6 +65,15 @@
   <div class="settings-card">
     <button class="sign-out" onclick={onlogout}>{t('menu.logout')}</button>
   </div>
+
+  <!--
+    Which build this is. It used to sit under every screen, on the reasoning
+    that the first question when something is wrong is which build you are on
+    — true, and also a line of small print under the budget for ever. It is
+    one scroll away here, on the page people are already sent to for anything
+    that is about them rather than about their money.
+  -->
+  <VersionTag />
 </div>
 
 <style>

@@ -2,7 +2,7 @@
   import type { IconName } from './destinations'
 
   // Feather outlines at 24, matching the gear and the globe already in the bar.
-  // Inline rather than a sprite: five icons is not a payload problem, and a
+  // Inline rather than a sprite: six icons is not a payload problem, and a
   // sprite would put them behind a fetch the shell has to wait for.
   let { name }: { name: IconName } = $props()
 </script>
@@ -24,6 +24,11 @@
   {:else if name === 'accounts'}
     <rect x="2" y="5" width="20" height="14" rx="2" />
     <line x1="2" y1="10" x2="22" y2="10" />
+  {:else if name === 'knowledge'}
+    <!-- Feather's book-open: two leaves meeting at a spine. A closed book reads
+         as a ledger next to the card and the bar chart either side of it. -->
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
   {:else if name === 'profile'}
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />

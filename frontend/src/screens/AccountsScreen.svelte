@@ -61,7 +61,7 @@
   {/snippet}
 </ScreenChrome>
 
-<nav class="view-tabs" aria-label={t('accounts.viewsLabel')}>
+<nav class="view-tabs" aria-label={t('accounts.viewsLabel')} data-tour="accounts-tabs">
   <a
     class="tab"
     class:active={!onAllocations}
