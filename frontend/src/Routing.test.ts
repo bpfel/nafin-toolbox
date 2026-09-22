@@ -182,7 +182,45 @@ describe('the shell', () => {
 
     const nav = await screen.findByRole('navigation', { name: 'Sections' })
     const labels = [...nav.querySelectorAll('a')].map((a) => a.textContent?.trim())
-    expect(labels).toEqual(['Users', 'Audit', 'Profile'])
+    expect(labels).toEqual(['Users', 'Audit', 'Upkeep', 'Profile'])
+  })
+
+  /**
+   * The admin list took the fourth slot Upkeep needed, and it was the list that
+   * had one free. Asserting the count here for the same reason it is asserted
+   * for a user: both bars are now full, and the next destination in either is a
+   * decision rather than an addition.
+   */
+  test('an admin also has four, which fills the bar', async () => {
+    currentUser = admin
+    render(App)
+
+    const nav = await screen.findByRole('navigation', { name: 'Sections' })
+    expect(nav.querySelectorAll('a').length).toBe(4)
+  })
+
+  test('an admin can open the register of dated figures', async () => {
+    currentUser = admin
+    at('/upkeep')
+    const { container } = render(App)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/upkeep'))
+    expect(container.textContent).toContain('Serafe')
+  })
+
+  /**
+   * A user has nothing to do here — they cannot edit a seed or cut a release —
+   * and the screen carries a button that makes the server send mail. The bar
+   * never points them at it; the address bar would, if the guard let it.
+   */
+  test('a user typing the register\u2019s address is sent back to their own', async () => {
+    currentUser = user
+    at('/upkeep')
+
+    render(App)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/budget'))
+    expect(screen.queryByText('Upkeep')).toBeNull()
   })
 
   test('a typed address belonging to the other role does not open it', async () => {

@@ -15,6 +15,7 @@ export const fr: Messages = {
   'nav.knowledge': 'Savoir',
   'nav.profile': 'Profil',
   'nav.audit': 'Journal',
+  'nav.upkeep': 'Entretien',
   'nav.label': 'Sections',
   'privacy.hide': 'Masquer les montants',
   'privacy.show': 'Afficher les montants',

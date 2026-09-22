@@ -14,7 +14,7 @@ import type { Screen } from './router.svelte'
  * password with other people's accounts and bury an audit log that wants a
  * screen of its own.
  */
-export type IconName = 'budget' | 'accounts' | 'knowledge' | 'profile' | 'users' | 'audit'
+export type IconName = 'budget' | 'accounts' | 'knowledge' | 'profile' | 'users' | 'audit' | 'upkeep'
 
 export interface Destination {
   screen: Screen
@@ -46,9 +46,16 @@ const FOR_USER: Destination[] = [
  * deliberately rather than one you switch to while working.
  */
 
+/*
+ * Upkeep sits third, before Profile, for the same reason Profile is last: the
+ * first two are other people, the third is the build, and the last is
+ * themselves. It is the fourth tab the bar has room for, and the admin list is
+ * the one that had a slot free.
+ */
 const FOR_ADMIN: Destination[] = [
   { screen: 'users', path: '/users', icon: 'users', label: () => t('menu.users') },
   { screen: 'audit', path: '/audit', icon: 'audit', label: () => t('nav.audit') },
+  { screen: 'upkeep', path: '/upkeep', icon: 'upkeep', label: () => t('nav.upkeep') },
   { screen: 'profile', path: '/profile', icon: 'profile', label: () => t('nav.profile') },
 ]
 

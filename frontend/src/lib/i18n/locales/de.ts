@@ -11,6 +11,7 @@ export const de: Messages = {
   'nav.knowledge': 'Wissen',
   'nav.profile': 'Profil',
   'nav.audit': 'Protokoll',
+  'nav.upkeep': 'Pflege',
   'nav.label': 'Bereiche',
   'privacy.hide': 'Beträge verbergen',
   'privacy.show': 'Beträge zeigen',

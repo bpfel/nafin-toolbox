@@ -19,6 +19,7 @@ export const en = {
   'nav.knowledge': 'Knowledge',
   'nav.profile': 'Profile',
   'nav.audit': 'Audit',
+  'nav.upkeep': 'Upkeep',
   'nav.label': 'Sections',
   'privacy.hide': 'Hide amounts',
   'privacy.show': 'Show amounts',

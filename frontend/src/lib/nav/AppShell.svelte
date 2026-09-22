@@ -13,6 +13,7 @@
   import ProfileScreen from '../../screens/ProfileScreen.svelte'
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
+  import UpkeepScreen from '../../screens/UpkeepScreen.svelte'
 
   /**
    * The app once every gate has been passed: the places, and whichever one the
@@ -99,6 +100,8 @@
         <InvitePanel />
       {:else if route.screen === 'audit'}
         <AuditLogViewer />
+      {:else if route.screen === 'upkeep'}
+        <UpkeepScreen />
       {:else if route.screen === 'profile'}
         <ProfileScreen {email} {role} {onlogout} />
       {/if}

@@ -23,7 +23,12 @@ import { describe, test, expect } from 'vitest'
  */
 
 /** Admin-only screens stay English by decision, not by oversight. */
-const ADMIN_ONLY = ['AuditLogViewer.svelte', 'InvitePanel.svelte', 'DeleteUserModal.svelte']
+const ADMIN_ONLY = [
+  'AuditLogViewer.svelte',
+  'InvitePanel.svelte',
+  'DeleteUserModal.svelte',
+  'UpkeepScreen.svelte',
+]
 
 /**
  * Every component's source, read through Vite rather than `node:fs` — the
