@@ -1,8 +1,8 @@
 import type { PartialContent } from '../content'
 
 /**
- * Italiano, con il «tu» come nel resto del catalogo — che dà del tu dove il
- * tedesco e il francese danno del Lei — e con l’apostrofo tipografico.
+ * Italiano, con il «tu» come nel resto del catalogo. Lo dava già quando il
+ * tedesco e il francese davano ancora del Lei; ora lo danno anche loro.
  *
  * E le parole che l’interfaccia usa già: Budget, Conti, Assegnazioni,
  * istantanea, Sapere, Profilo. Un tour che chiama le cose diversamente dalle
