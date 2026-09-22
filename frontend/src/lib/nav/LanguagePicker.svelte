@@ -14,9 +14,20 @@
   // settings menu at all. Until this existed, the language of those screens was
   // decided entirely by the browser's Accept-Language, with no way to correct it.
   //
-  // A bare globe, no 'DE | FR | IT': the icon is one of the few that reads
-  // without language, and a row of codes would compete with the gear beside it.
-  // The list itself is in endonyms, so it is legible from any starting language.
+  // It shows the current language by name. It was a bare globe while it sat in
+  // a row of icons beside the gear, where a word would have competed with them
+  // and where nothing else said what the control was for. The gear is gone and
+  // the profile page gives it a labelled row of its own, so the icon was
+  // answering a question the row already answers — and answering it less well,
+  // since a globe says "language" without saying *which*.
+  //
+  // The name works on the signed-out screens too, which have no row and no
+  // label: an endonym identifies itself. Someone who lands in a language they
+  // cannot read sees the word for the language they are in, which is more than
+  // a globe told them.
+  //
+  // The list is in endonyms for the same reason, so it stays legible from any
+  // starting language.
 
   let open = $state(false)
 
@@ -44,17 +55,18 @@
 
 <div class="picker">
   <button
-    class="globe"
+    class="trigger"
     aria-haspopup="menu"
     aria-expanded={open}
     aria-label={t('menu.language')}
     title={t('menu.language')}
     onclick={() => (open ? close() : (open = true))}
   >
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10"></circle>
-      <line x1="2" y1="12" x2="22" y2="12"></line>
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+    <span class="current">{t(`language.${getLocale()}` as 'language.en')}</span>
+    <!-- A word on its own in a settings row reads as a value rather than as a
+         control; the chevron is what says it can be opened. -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="6 9 12 15 18 9" />
     </svg>
   </button>
 
@@ -86,23 +98,38 @@
   .picker {
     position: relative;
   }
-  .globe {
+  .trigger {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: 0.3rem;
     background: #e0e0e0;
     color: #333;
     border: none;
     border-radius: 6px;
-    padding: 0.35rem;
-    min-width: 34px;
+    /* Less padding on the chevron side: the glyph carries its own. */
+    padding: 0.35rem 0.5rem 0.35rem 0.7rem;
     min-height: 34px;
+    font: inherit;
+    font-size: 0.9rem;
     cursor: pointer;
   }
-  .globe:hover { background: #ccc; }
-  .globe:focus-visible {
+  .trigger:hover { background: #ccc; }
+  .trigger:focus-visible {
     outline: 2px solid #2d6a4f;
     outline-offset: 2px;
+  }
+
+  /* Never wraps. The longest endonym is Rumantsch, and a language name broken
+     across two lines reads as a fault rather than as a label. */
+  .current {
+    white-space: nowrap;
+  }
+
+  .trigger svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    opacity: 0.7;
   }
 
   /* Transparent, as in the settings menu: dimming the page would overstate

@@ -15,29 +15,40 @@ afterEach(() => {
   localStorage.clear()
 })
 
-const globe = () => screen.getByRole('button', { name: 'Language' })
+const trigger = () => screen.getByRole('button', { name: 'Language' })
 
 async function open() {
-  await fireEvent.click(globe())
+  await fireEvent.click(trigger())
   return screen.getByRole('menu', { name: 'Language' })
 }
 
-describe('the globe', () => {
+describe('the trigger', () => {
   test('starts closed and says so', () => {
     render(LanguagePicker)
 
     expect(screen.queryByRole('menu')).toBeNull()
-    expect(globe().getAttribute('aria-expanded')).toBe('false')
-    expect(globe().getAttribute('aria-haspopup')).toBe('menu')
+    expect(trigger().getAttribute('aria-expanded')).toBe('false')
+    expect(trigger().getAttribute('aria-haspopup')).toBe('menu')
   })
 
   test('names itself, since the icon carries no words', () => {
     render(LanguagePicker)
 
     // Both, deliberately: the label for assistive tech, the tooltip for a
-    // pointer. A bare globe is legible without either, but only just.
-    expect(globe().getAttribute('aria-label')).toBe('Language')
-    expect(globe().getAttribute('title')).toBe('Language')
+    // pointer. The name carries the meaning; these carry the purpose.
+    expect(trigger().getAttribute('aria-label')).toBe('Language')
+    expect(trigger().getAttribute('title')).toBe('Language')
+  })
+
+  /**
+   * It used to be a globe, which said "language" without saying which. The
+   * name says both, and on the signed-out screens — which have no label beside
+   * it — the endonym is the only thing identifying the control at all.
+   */
+  test('names the language it is currently in', () => {
+    render(LanguagePicker)
+
+    expect(trigger().textContent).toContain('English')
   })
 
   test('Escape closes it', async () => {
@@ -49,11 +60,11 @@ describe('the globe', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
-  test('the globe toggles it shut again', async () => {
+  test('the trigger toggles it shut again', async () => {
     render(LanguagePicker)
     await open()
 
-    await fireEvent.click(globe())
+    await fireEvent.click(trigger())
 
     expect(screen.queryByRole('menu')).toBeNull()
   })
