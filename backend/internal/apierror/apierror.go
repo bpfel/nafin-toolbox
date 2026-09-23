@@ -94,6 +94,14 @@ var codes = map[string]string{
 	Vault + "|failed to update keys":       "VAULT-013",
 	Vault + "|failed to hash recovery key": "VAULT-014",
 
+	// --- Households, which are vaults with more than one person in them ---
+	Vault + "|failed to list households":  "VAULT-020",
+	Vault + "|failed to create household": "VAULT-021",
+	Vault + "|failed to read household":   "VAULT-022",
+	Vault + "|failed to save household":   "VAULT-023",
+	Vault + "|failed to rename household": "VAULT-024",
+	Vault + "|failed to delete household": "VAULT-025",
+
 	// --- Upkeep reminders ---
 	Upkeep + "|invalid request body":    "UPK-001",
 	Upkeep + "|admin access required":   "UPK-002",
