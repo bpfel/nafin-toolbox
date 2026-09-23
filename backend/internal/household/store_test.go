@@ -22,8 +22,8 @@ import (
 // Skipped unless TEST_DATABASE_URL is set, so the ordinary `go test ./...` stays
 // offline:
 //
-//	docker compose -p nafin-shared exec -T db true   # a database is up
-//	TEST_DATABASE_URL=postgres://finance:finance@localhost:5434/finance?sslmode=disable \
+//	docker compose -p nafin up -d db                 # a database is up
+//	TEST_DATABASE_URL=postgres://finance:finance@localhost:5432/finance?sslmode=disable \
 //	  go test ./internal/household/ -run TestStore -v
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
@@ -416,4 +416,86 @@ func TestStore_ListIsNewestFirst(t *testing.T) {
 	if len(got) != 2 || got[0].EncryptedName != "newer" {
 		t.Errorf("order = %v, want newer first", []string{got[0].EncryptedName, got[1].EncryptedName})
 	}
+}
+
+// A household nobody is in should not exist.
+//
+// Found the hard way: deleting a test account took its membership with it, via
+// the cascade from users, and left the household behind — ciphertext nobody has
+// a key to, which no screen can show and no query will ask for.
+func TestStore_AHouseholdDiesWithItsLastMember(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	countVault := func(id int) int {
+		t.Helper()
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM shared_vaults WHERE id = $1`, id).Scan(&n); err != nil {
+			t.Fatalf("counting households: %v", err)
+		}
+		return n
+	}
+
+	t.Run("when the account is deleted", func(t *testing.T) {
+		anna := makeUser(t, db, "anna-last@example.ch")
+		id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+
+		if _, err := db.Exec(`DELETE FROM users WHERE id = $1`, anna); err != nil {
+			t.Fatalf("deleting user: %v", err)
+		}
+		if n := countVault(id); n != 0 {
+			t.Errorf("%d households survived their only member", n)
+		}
+	})
+
+	t.Run("when the last member leaves", func(t *testing.T) {
+		anna := makeUser(t, db, "anna-leaves@example.ch")
+		ben := makeUser(t, db, "ben-stays@example.ch")
+
+		id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		if _, err := db.Exec(
+			`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
+			 VALUES ($1, $2, 'k', $3, FALSE)`, id, ben, WrapGranted); err != nil {
+			t.Fatalf("adding member: %v", err)
+		}
+
+		// One of two leaving changes nothing.
+		if _, err := db.Exec(`DELETE FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2`, id, anna); err != nil {
+			t.Fatalf("removing first member: %v", err)
+		}
+		if n := countVault(id); n != 1 {
+			t.Fatalf("the household went away while a member remained")
+		}
+
+		// The second leaving takes it.
+		if _, err := db.Exec(`DELETE FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2`, id, ben); err != nil {
+			t.Fatalf("removing last member: %v", err)
+		}
+		if n := countVault(id); n != 0 {
+			t.Errorf("%d households survived their last member", n)
+		}
+	})
+
+	// Deleting the household cascades to its members, which fires the trigger,
+	// which deletes a household that is already gone. It must simply stop.
+	t.Run("deleting the household outright does not recurse", func(t *testing.T) {
+		anna := makeUser(t, db, "anna-recurse@example.ch")
+		id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		if err := store.Delete(ctx, id, anna); err != nil {
+			t.Fatalf("Delete: %v", err)
+		}
+		if n := countVault(id); n != 0 {
+			t.Errorf("%d households survived a direct delete", n)
+		}
+	})
 }
