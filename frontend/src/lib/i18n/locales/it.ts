@@ -133,6 +133,37 @@ export const it: Messages = {
   'address.country': 'Paese',
 
   // --- Security settings ---
+  // --- Following an invitation link ---
+  'join.working': 'Adesione…',
+  'join.doneTitle': 'Invito accettato',
+  'join.doneHint': 'Devi ancora essere fatto entrare. Poi l’economia domestica comparirà.',
+  'join.failedTitle': 'Questo invito non ha funzionato',
+  'join.failedHint': 'Potrebbe essere scaduto, ritirato, o destinato a un altro indirizzo. Chiedine uno nuovo.',
+  'join.continue': 'Continua',
+
+  // --- Inviting somebody in ---
+  'invite.title': 'Persone',
+  'invite.add': 'Invita qualcuno',
+  'invite.emailLabel': 'Indirizzo e-mail',
+  'invite.send': 'Crea invito',
+  'invite.creating': 'Creazione…',
+  'invite.linkReady': 'Mandagli questo link tu. Viene mostrato una volta sola e non si può recuperare.',
+  'invite.linkWhy': 'Solo mandandolo tu l’app può verificare la sua chiave. Il codice da scansionare è il più sicuro.',
+  'invite.copy': 'Copia il link',
+  'invite.copied': 'Copiato',
+  'invite.done': 'Fatto',
+  'invite.pending': 'Invitato, in attesa',
+  'invite.readyToConfirm': 'Accettato — pronto per entrare',
+  'invite.mismatch': 'La chiave offerta non corrisponde all’invito. Non farlo entrare; invitalo di nuovo.',
+  'invite.confirm': 'Fallo entrare',
+  'invite.confirming': 'In corso…',
+  'invite.withdraw': 'Ritira',
+  'invite.expires': 'Scade {when}',
+  'invite.remove': 'Rimuovi',
+  'invite.leave': 'Esci',
+  'invite.removeWarning': 'Quello che ha già visto gli resta. Rimuoverlo impedisce solo di vedere il resto.',
+  'invite.you': 'Tu',
+
   // --- Households ---
   'household.title': 'Economie domestiche',
   'household.hint': 'Un’economia domestica è un budget da condividere. Nulla è condiviso finché non inviti qualcuno.',

@@ -349,3 +349,19 @@ export async function hashInviteToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
+
+/**
+ * Who a grant claims to be from, without checking whether it is.
+ *
+ * Only for finding which member to check it *against* — the answer is a claim,
+ * not a fact, and treating it as one would defeat the whole exercise. The
+ * verification happens in `openGrant`, against a key the caller chose.
+ */
+export function claimedSender(grant: string): string | null {
+  try {
+    const parsed = JSON.parse(grant)
+    return typeof parsed?.sender === 'string' ? parsed.sender : null
+  } catch {
+    return null
+  }
+}

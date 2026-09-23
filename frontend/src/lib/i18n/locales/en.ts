@@ -137,6 +137,37 @@ export const en = {
   'action.more': 'Actions',
 
   // --- Security settings ---
+  // --- Following an invitation link ---
+  'join.working': 'Joining…',
+  'join.doneTitle': 'Invitation accepted',
+  'join.doneHint': 'They still have to let you in. The household appears once they do.',
+  'join.failedTitle': 'That invitation did not work',
+  'join.failedHint': 'It may have expired, been withdrawn, or been meant for a different address. Ask for a new one.',
+  'join.continue': 'Continue',
+
+  // --- Inviting somebody in ---
+  'invite.title': 'People',
+  'invite.add': 'Invite someone',
+  'invite.emailLabel': 'Their email address',
+  'invite.send': 'Create invitation',
+  'invite.creating': 'Creating…',
+  'invite.linkReady': 'Send them this link yourself. It is shown once and cannot be recovered.',
+  'invite.linkWhy': 'Sending it yourself is what lets the app check their key for you. Scanning the code is the surest way.',
+  'invite.copy': 'Copy link',
+  'invite.copied': 'Copied',
+  'invite.done': 'Done',
+  'invite.pending': 'Invited, waiting for them',
+  'invite.readyToConfirm': 'Accepted — ready to let in',
+  'invite.mismatch': 'The key offered for this person does not match the invitation. Do not let them in; invite them again.',
+  'invite.confirm': 'Let them in',
+  'invite.confirming': 'Letting them in…',
+  'invite.withdraw': 'Withdraw',
+  'invite.expires': 'Expires {when}',
+  'invite.remove': 'Remove',
+  'invite.leave': 'Leave',
+  'invite.removeWarning': 'They keep what they have already seen. Removing them only stops them seeing what comes next.',
+  'invite.you': 'You',
+
   // --- Households ---
   'household.title': 'Households',
   'household.hint': 'A household is a budget you can share. Nothing is shared until you invite someone.',

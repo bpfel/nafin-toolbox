@@ -22,10 +22,12 @@
   interface Props {
     email: string
     role: string
+    /** Passed down so a household's member list can say which row is you. */
+    userId?: number | null
     onlogout: () => void
   }
 
-  let { email, role, onlogout }: Props = $props()
+  let { email, role, userId = null, onlogout }: Props = $props()
 </script>
 
 <ScreenChrome title={t('nav.profile')} eye={false} />
@@ -54,7 +56,7 @@
     an account working rather than while setting one up — and because a person
     arriving here to change a password should not have to scroll past it.
   -->
-  <HouseholdSettings />
+  <HouseholdSettings myUserId={userId} />
 
   <!--
     Last, and on the page rather than in the screen's controls.

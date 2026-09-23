@@ -11,6 +11,7 @@
   import { getVaultState } from '../crypto/vaultStore.svelte'
   import { shouldOfferTour } from '../tour/tourState'
   import ProfileScreen from '../../screens/ProfileScreen.svelte'
+  import JoinHousehold from '../household/JoinHousehold.svelte'
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
   import UpkeepScreen from '../../screens/UpkeepScreen.svelte'
@@ -27,10 +28,12 @@
   interface Props {
     email: string
     role: string
+    /** Passed through to Profile, where a household's member list needs it. */
+    userId?: number | null
     onlogout: () => void
   }
 
-  let { email, role, onlogout }: Props = $props()
+  let { email, role, userId = null, onlogout }: Props = $props()
 
   const route = getRoute()
   const vaultState = getVaultState()
@@ -103,7 +106,9 @@
       {:else if route.screen === 'upkeep'}
         <UpkeepScreen />
       {:else if route.screen === 'profile'}
-        <ProfileScreen {email} {role} {onlogout} />
+        <ProfileScreen {email} {role} {userId} {onlogout} />
+      {:else if route.screen === 'join'}
+        <JoinHousehold />
       {/if}
     {:else}
       <!--
@@ -139,7 +144,11 @@
       {/if}
 
       {#if route.screen === 'profile'}
-        <ProfileScreen {email} {role} {onlogout} />
+        <ProfileScreen {email} {role} {userId} {onlogout} />
+      {/if}
+
+      {#if route.screen === 'join'}
+        <JoinHousehold />
       {/if}
     {/if}
   </main>

@@ -3,6 +3,7 @@
   import { getVaultState, createHousehold, renameHousehold, deleteHousehold, switchTo } from '../crypto/vaultStore.svelte'
   import { initialsOf } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
+  import HouseholdPeople from './HouseholdPeople.svelte'
 
   /**
    * Where a household is started, named, and given up.
@@ -18,7 +19,17 @@
    * drawn before anyone is looking at it, rather than in the moment of asking
    * them to.
    */
+  interface Props {
+    /** This account, so a member list can say which row is you. */
+    myUserId?: number | null
+  }
+
+  let { myUserId = null }: Props = $props()
+
   const vaultState = getVaultState()
+
+  /** Which household has its people showing. One at a time; the list is short. */
+  let showingPeople = $state<number | null>(null)
 
   let naming = $state(false)
   let name = $state('')
@@ -134,6 +145,13 @@
                 {t('household.rename')}
               </button>
 
+              <button
+                class="btn-secondary"
+                onclick={() => (showingPeople = showingPeople === household.id ? null : household.id)}
+              >
+                {t('invite.title')}
+              </button>
+
               <!-- Only the owner may delete, which the server enforces too. -->
               {#if household.isOwner}
                 <button class="btn-danger" onclick={() => (confirmingId = household.id)}>
@@ -141,6 +159,10 @@
                 </button>
               {/if}
             </div>
+
+            {#if showingPeople === household.id}
+              <HouseholdPeople householdId={household.id} isOwner={household.isOwner} {myUserId} />
+            {/if}
           {/if}
         </li>
       {/each}

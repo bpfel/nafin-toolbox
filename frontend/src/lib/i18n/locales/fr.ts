@@ -133,6 +133,37 @@ export const fr: Messages = {
   'address.country': 'Pays',
 
   // --- Security settings ---
+  // --- Following an invitation link ---
+  'join.working': 'Adhésion…',
+  'join.doneTitle': 'Invitation acceptée',
+  'join.doneHint': 'Il reste à t’admettre. Le ménage apparaîtra ensuite.',
+  'join.failedTitle': 'Cette invitation n’a pas fonctionné',
+  'join.failedHint': 'Elle a peut-être expiré, été retirée, ou visait une autre adresse. Demandes-en une nouvelle.',
+  'join.continue': 'Continuer',
+
+  // --- Inviting somebody in ---
+  'invite.title': 'Personnes',
+  'invite.add': 'Inviter quelqu’un',
+  'invite.emailLabel': 'Adresse e-mail',
+  'invite.send': 'Créer l’invitation',
+  'invite.creating': 'Création…',
+  'invite.linkReady': 'Envoie-lui ce lien toi-même. Il s’affiche une fois et ne peut pas être récupéré.',
+  'invite.linkWhy': 'C’est en l’envoyant toi-même que l’app peut vérifier sa clé. Le code à scanner est le plus sûr.',
+  'invite.copy': 'Copier le lien',
+  'invite.copied': 'Copié',
+  'invite.done': 'Terminé',
+  'invite.pending': 'Invité, en attente',
+  'invite.readyToConfirm': 'Accepté — prêt à être admis',
+  'invite.mismatch': 'La clé proposée ne correspond pas à l’invitation. Ne l’admets pas; invite à nouveau.',
+  'invite.confirm': 'L’admettre',
+  'invite.confirming': 'Admission…',
+  'invite.withdraw': 'Retirer',
+  'invite.expires': 'Expire {when}',
+  'invite.remove': 'Retirer',
+  'invite.leave': 'Quitter',
+  'invite.removeWarning': 'Ce qu’ils ont déjà vu leur reste. Les retirer empêche seulement de voir la suite.',
+  'invite.you': 'Toi',
+
   // --- Households ---
   'household.title': 'Ménages',
   'household.hint': 'Un ménage est un budget à partager. Rien n’est partagé avant que tu n’invites quelqu’un.',

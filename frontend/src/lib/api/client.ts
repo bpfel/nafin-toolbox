@@ -228,6 +228,8 @@ export interface HouseholdListing {
   wrap_kind: string
   is_owner: boolean
   version: number
+  /** Which generation of the key `wrapped_key` is. */
+  key_epoch: number
   updated_at: string
 }
 
@@ -306,4 +308,98 @@ export async function renameHousehold(id: number, encryptedName: string): Promis
 
 export async function deleteHousehold(id: number): Promise<void> {
   await request(`/households/${id}`, { method: 'DELETE' })
+}
+
+// Inviting somebody into a household
+//
+// Two steps, because nobody can do both halves: at invite time the inviter has
+// an e-mail address, which is not a public key; at confirm time only a member
+// holds the plaintext household key, so only they can wrap it.
+
+export interface HouseholdMember {
+  user_id: number
+  email: string
+  is_owner: boolean
+  wrap_kind: string
+  /** SPKI, base64. Served only inside a household you belong to. */
+  public_key: string
+  /** Ed25519, base64. What a grant's signature is checked against. */
+  verifying_key: string
+  joined_at: string
+}
+
+export interface HouseholdInvite {
+  id: number
+  invited_email: string
+  /** The invite secret, sealed under the household key. */
+  secret_sealed: string
+  expires_at: string
+  created_at: string
+  accepted_at?: string
+  accepted_user_id?: number
+  /** MAC of the accepting user's public key under the invite secret. */
+  public_key_mac?: string
+  public_key?: string
+  verifying_key?: string
+}
+
+export async function fetchHouseholdMembers(id: number): Promise<HouseholdMember[]> {
+  return request<HouseholdMember[]>(`/households/${id}/members`)
+}
+
+export async function fetchHouseholdInvites(id: number): Promise<HouseholdInvite[]> {
+  return request<HouseholdInvite[]>(`/households/${id}/invites`)
+}
+
+export async function createHouseholdInvite(
+  id: number,
+  body: { token_hash: string; invited_email: string; secret_sealed: string },
+): Promise<{ id: number }> {
+  return request<{ id: number }>(`/households/${id}/invites`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteHouseholdInvite(id: number, inviteId: number): Promise<void> {
+  await request(`/households/${id}/invites/${inviteId}`, { method: 'DELETE' })
+}
+
+/** Binds this account to an invitation. Grants nothing by itself. */
+export async function acceptHouseholdInvite(
+  token: string,
+  publicKeyMAC: string,
+): Promise<{ household_id: number }> {
+  return request<{ household_id: number }>('/households/invites/accept', {
+    method: 'POST',
+    body: JSON.stringify({ token, public_key_mac: publicKeyMAC }),
+  })
+}
+
+/** Writes the membership, with the key a member signcrypted for the invitee. */
+export async function confirmHouseholdInvite(
+  id: number,
+  body: { invite_id: number; wrapped_key: string },
+): Promise<void> {
+  await request(`/households/${id}/members`, { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function removeHouseholdMember(id: number, userId: number): Promise<void> {
+  await request(`/households/${id}/members/${userId}`, { method: 'DELETE' })
+}
+
+export async function rekeyHousehold(
+  id: number,
+  body: {
+    encrypted_name: string
+    ciphertext: string
+    nonce: string
+    version: number
+    members: { user_id: number; wrapped_key: string; wrap_kind: string }[]
+  },
+): Promise<{ status: string; updated_at: string }> {
+  return request<{ status: string; updated_at: string }>(`/households/${id}/rekey`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
 }

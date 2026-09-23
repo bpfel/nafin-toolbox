@@ -4,9 +4,20 @@ import {
   fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError,
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
+  fetchHouseholdMembers, fetchHouseholdInvites, createHouseholdInvite, deleteHouseholdInvite,
+  acceptHouseholdInvite, confirmHouseholdInvite, removeHouseholdMember,
+  type HouseholdMember, type HouseholdInvite,
 } from '../api/client'
 import { generateIdentity, sealIdentity, openIdentity, isComplete, type OpenIdentity } from './identity'
-import { generateHouseholdKey, sealKeyForSelf, sealName, openListedHousehold, type OpenHousehold } from './household'
+import {
+  generateHouseholdKey, sealKeyForSelf, sealName, openName, openListedHousehold, openGrantedKey,
+  type OpenHousehold,
+} from './household'
+import {
+  sealGrant, macPublicKey, verifyPublicKeyMAC, generateInviteSecret, generateInviteToken,
+  hashInviteToken,
+} from './grant'
+import { fromBase64, toBase64, importPublicKey, openUnder, sealUnder } from './identity'
 
 /**
  * Which vault the screens are looking at.
@@ -279,16 +290,88 @@ export async function switchTo(id: VaultId): Promise<void> {
 async function loadHouseholds(withMEK: CryptoKey): Promise<void> {
   try {
     const listed = await fetchHouseholds()
-    const opened = await Promise.all(listed.map(l => openListedHousehold(l, withMEK).catch(() => null)))
-    // A household whose key will not open is dropped rather than shown as a
-    // name leading nowhere. `openListedHousehold` also returns null for a wrap
-    // kind this build cannot yet verify.
+    const opened = await Promise.all(
+      listed.map(async l => {
+        try {
+          if (l.wrap_kind !== 'granted') return await openListedHousehold(l, withMEK)
+          return await openGranted(l)
+        } catch {
+          // A household whose key will not open is dropped rather than shown as
+          // a name leading nowhere. That includes one whose grant fails its
+          // checks — a refused grant is not a household, it is a question.
+          return null
+        }
+      }),
+    )
     households = opened.filter((h): h is OpenHousehold => h !== null)
   } catch {
     // Not fatal. Someone whose households could not be listed still has their
     // own vault, and refusing to unlock over it would be the wrong trade.
     households = []
   }
+}
+
+/**
+ * Open a household whose key somebody else wrapped for us.
+ *
+ * Costs one extra request — the member list, to learn the granter's verifying
+ * key. Only for granted households, and only once per unlock, which is the
+ * price of not taking the server's word for who signed something.
+ *
+ * What is learned is written back: the granter's key is pinned, so a later
+ * change is a substitution rather than a surprise, and the epoch becomes the
+ * floor for every future grant on this household.
+ */
+async function openGranted(listing: {
+  id: number
+  encrypted_name: string
+  wrapped_key: string
+  is_owner: boolean
+  updated_at: string
+}): Promise<OpenHousehold | null> {
+  if (!identity || !current.data) return null
+
+  const members = await fetchHouseholdMembers(listing.id)
+  const { key, epoch, pin } = await openGrantedKey({
+    grant: listing.wrapped_key,
+    householdId: listing.id,
+    members,
+    trust: current.data.trust,
+    identity,
+  })
+
+  rememberTrust(pin.userId, pin.verifyingKey, listing.id, epoch)
+
+  return {
+    id: listing.id,
+    name: await openName(listing.encrypted_name, key),
+    key,
+    isOwner: listing.is_owner,
+    updatedAt: listing.updated_at,
+  }
+}
+
+/**
+ * Write down what a verified grant taught us.
+ *
+ * In the personal vault, because it is this person's record of what they have
+ * accepted and nobody else's. Saved rather than merely held, or the next unlock
+ * would start over and accept whatever key was there then.
+ */
+function rememberTrust(userId: number, verifyingKey: string, householdId: number, epoch: number): void {
+  const trust = current.data?.trust
+  if (!trust) return
+
+  let changed = false
+  if (trust.pins[String(userId)] !== verifyingKey) {
+    trust.pins[String(userId)] = verifyingKey
+    changed = true
+  }
+  if ((trust.epochs[String(householdId)] ?? 0) < epoch) {
+    trust.epochs[String(householdId)] = epoch
+    changed = true
+  }
+  if (changed) markDirty()
 }
 
 /**
@@ -654,4 +737,167 @@ if (typeof window !== 'undefined') {
       e.preventDefault()
     }
   })
+}
+
+// --- inviting somebody into a household ---
+
+/**
+ * A pending invitation, and whether it may be confirmed.
+ *
+ * Deliberately carries no link. Only the token's hash was ever stored, so a
+ * link cannot be recovered — it exists at the moment it is minted and nowhere
+ * afterwards. That is the property that makes a leaked database useless, and a
+ * field here that quietly returned an empty string would have hidden it.
+ * Re-inviting mints a new one.
+ */
+export interface PendingInvite extends HouseholdInvite {
+  /** The MAC checks out: the offered key really is the invitee's. */
+  verified: boolean
+}
+
+/**
+ * Ask somebody to join, and produce the link to hand them.
+ *
+ * The secret is generated here, travels in the link, and is *never* sent to the
+ * server — only a copy sealed under the household key, so a member can read it
+ * back at confirm time. Without that, confirming would only work from the tab
+ * that created the invitation.
+ */
+export async function inviteToHousehold(householdId: number, email: string): Promise<string> {
+  const household = households.find(h => h.id === householdId)
+  if (!household) throw new Error('no such household')
+
+  const token = generateInviteToken()
+  const secret = generateInviteSecret()
+
+  await createHouseholdInvite(householdId, {
+    token_hash: await hashInviteToken(token),
+    invited_email: email,
+    secret_sealed: await sealUnder(secret, household.key),
+  })
+
+  return inviteLink(token, secret)
+}
+
+/**
+ * The link itself.
+ *
+ * Both halves in the fragment rather than the query string: a fragment is not
+ * sent to the server on navigation and does not turn up in its logs, which for
+ * the secret is the entire point.
+ */
+function inviteLink(token: string, secret: Uint8Array): string {
+  const base = typeof window === 'undefined' ? '' : window.location.origin
+  return `${base}/join#t=${encodeURIComponent(token)}&s=${encodeURIComponent(toBase64(secret))}`
+}
+
+/**
+ * The invitations on a household, with each one's link and whether it may be
+ * confirmed.
+ *
+ * "May be confirmed" means the MAC checks out: the key the server is offering
+ * really does belong to whoever held the link. A pending invitation that fails
+ * this is the one thing in the app that should stop somebody in their tracks.
+ */
+export async function loadInvites(householdId: number): Promise<PendingInvite[]> {
+  const household = households.find(h => h.id === householdId)
+  if (!household) return []
+
+  const invites = await fetchHouseholdInvites(householdId)
+  return Promise.all(
+    invites.map(async invite => {
+      const secret = await openUnder(invite.secret_sealed, household.key)
+      const verified =
+        !!invite.public_key_mac &&
+        !!invite.public_key &&
+        (await verifyPublicKeyMAC(secret, fromBase64(invite.public_key), invite.public_key_mac))
+      return { ...invite, verified }
+    }),
+  )
+}
+
+/**
+ * Hand over the household key, signed so the recipient can tell it was us.
+ *
+ * Refuses unless the MAC checks out. The MAC is the only thing standing between
+ * this and wrapping the household key to a key the server chose — so it is
+ * checked here, at the moment of granting, rather than trusted from a flag
+ * something else computed earlier.
+ */
+export async function confirmMember(householdId: number, invite: HouseholdInvite): Promise<void> {
+  const household = households.find(h => h.id === householdId)
+  if (!household || !identity) throw new Error('not ready')
+  if (!invite.public_key || !invite.verifying_key || !invite.public_key_mac) {
+    throw new Error('this invitation has not been accepted yet')
+  }
+
+  const secret = await openUnder(invite.secret_sealed, household.key)
+  const publicKey = fromBase64(invite.public_key)
+  if (!(await verifyPublicKeyMAC(secret, publicKey, invite.public_key_mac))) {
+    throw new Error('the key offered for this person does not match the invitation')
+  }
+
+  const listing = (await fetchHouseholds()).find(h => h.id === householdId)
+  const grant = await sealGrant({
+    householdKey: household.key,
+    householdId,
+    epoch: listing?.key_epoch ?? 1,
+    recipientPublicKey: await importPublicKey(invite.public_key),
+    recipientVerifyingKey: fromBase64(invite.verifying_key),
+    senderSigningKey: identity.signingKey,
+    senderVerifyingKey: identity.verifyingKey,
+  })
+
+  await confirmHouseholdInvite(householdId, { invite_id: invite.id, wrapped_key: grant })
+}
+
+/**
+ * Take an invitation link and bind this account to it.
+ *
+ * Grants nothing. Afterwards the household is still unreadable — a member has
+ * to confirm before any key exists for us. What this does is prove, to whoever
+ * invited us, that the public key the server will offer them is really ours.
+ */
+export async function acceptInvite(token: string, secret: Uint8Array): Promise<number> {
+  if (!identity) throw new Error('Vault not unlocked')
+
+  const keys = await fetchVaultKeys()
+  if (!keys?.public_key) throw new Error('no identity to prove')
+
+  const mac = await macPublicKey(secret, fromBase64(keys.public_key))
+  const { household_id } = await acceptHouseholdInvite(token, mac)
+  return household_id
+}
+
+export async function withdrawInvite(householdId: number, inviteId: number): Promise<void> {
+  await deleteHouseholdInvite(householdId, inviteId)
+}
+
+export async function listMembers(householdId: number): Promise<HouseholdMember[]> {
+  return fetchHouseholdMembers(householdId)
+}
+
+/**
+ * Remove somebody, or leave.
+ *
+ * Note what this does *not* do: it stops the server serving them new
+ * ciphertext, it does not take back the key they already hold. Only a rekey
+ * does that, and only for what is written afterwards — nothing can un-share
+ * what they already read.
+ */
+export async function removeMember(householdId: number, userId: number): Promise<void> {
+  await removeHouseholdMember(householdId, userId)
+  if (households.find(h => h.id === householdId) && userId === currentMemberId) {
+    households = households.filter(h => h.id !== householdId)
+    stashed.delete(householdId)
+    if (currentId === householdId) await switchTo('personal')
+  }
+}
+
+/** This account's own user id, learned from whichever household lists it. */
+let currentMemberId = $state<number | null>(null)
+
+/** Told to the store by the shell, which is where the signed-in user lives. */
+export function setCurrentMemberId(id: number | null): void {
+  currentMemberId = id
 }

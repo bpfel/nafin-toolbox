@@ -38,6 +38,7 @@ export type Screen =
   | 'audit'
   | 'upkeep'
   | 'verify'
+  | 'join'
 
 const SCREENS: Record<string, Screen> = {
   budget: 'budget',
@@ -48,6 +49,9 @@ const SCREENS: Record<string, Screen> = {
   audit: 'audit',
   upkeep: 'upkeep',
   verify: 'verify',
+  // Where an invitation link lands. A screen rather than a destination: it is
+  // arrived at once, from outside, and there is nothing to go back to.
+  join: 'join',
 }
 
 export interface Route {

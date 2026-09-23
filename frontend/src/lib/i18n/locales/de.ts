@@ -122,6 +122,37 @@ export const de: Messages = {
   'action.more': 'Aktionen',
 
   // --- Security settings ---
+  // --- Following an invitation link ---
+  'join.working': 'Wird beigetreten…',
+  'join.doneTitle': 'Einladung angenommen',
+  'join.doneHint': 'Du musst noch freigegeben werden. Danach erscheint der Haushalt.',
+  'join.failedTitle': 'Diese Einladung hat nicht funktioniert',
+  'join.failedHint': 'Sie ist vielleicht abgelaufen, zurückgezogen worden oder war für eine andere Adresse gedacht. Bitte um eine neue.',
+  'join.continue': 'Weiter',
+
+  // --- Inviting somebody in ---
+  'invite.title': 'Personen',
+  'invite.add': 'Jemanden einladen',
+  'invite.emailLabel': 'E-Mail-Adresse',
+  'invite.send': 'Einladung erstellen',
+  'invite.creating': 'Wird erstellt…',
+  'invite.linkReady': 'Schick ihnen diesen Link selbst. Er wird einmal angezeigt und lässt sich nicht wiederherstellen.',
+  'invite.linkWhy': 'Nur wenn du ihn selbst schickst, kann die App den Schlüssel für dich prüfen. Am sichersten ist der Code zum Scannen.',
+  'invite.copy': 'Link kopieren',
+  'invite.copied': 'Kopiert',
+  'invite.done': 'Fertig',
+  'invite.pending': 'Eingeladen, wartet auf Antwort',
+  'invite.readyToConfirm': 'Angenommen — bereit zum Freigeben',
+  'invite.mismatch': 'Der angebotene Schlüssel passt nicht zur Einladung. Nicht freigeben, sondern neu einladen.',
+  'invite.confirm': 'Freigeben',
+  'invite.confirming': 'Wird freigegeben…',
+  'invite.withdraw': 'Zurückziehen',
+  'invite.expires': 'Läuft ab {when}',
+  'invite.remove': 'Entfernen',
+  'invite.leave': 'Verlassen',
+  'invite.removeWarning': 'Was sie schon gesehen haben, bleibt ihnen. Entfernen verhindert nur, dass sie Neues sehen.',
+  'invite.you': 'Du',
+
   // --- Households ---
   'household.title': 'Haushalte',
   'household.hint': 'Ein Haushalt ist ein Budget zum Teilen. Geteilt wird erst, wenn du jemanden einlädst.',

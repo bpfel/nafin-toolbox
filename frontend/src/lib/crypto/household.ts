@@ -1,4 +1,6 @@
-import { sealUnder, openUnder, ownBuffer, toBase64, fromBase64 } from './identity'
+import { sealUnder, openUnder, ownBuffer, toBase64, fromBase64, type OpenIdentity } from './identity'
+import { openGrant, claimedSender, fingerprintOf, GrantError } from './grant'
+import type { VaultTrust } from './vault'
 
 /**
  * The key to a household, and the two small things sealed under it.
@@ -116,9 +118,10 @@ export interface OpenHousehold {
 /**
  * Turn what the server listed into something with a readable name.
  *
- * Only handles `wrap_kind: 'self'` so far; a granted copy has to be verified
- * against the granter's pinned key before it is opened, which arrives with
- * invitations. An unknown kind is skipped rather than guessed at.
+ * Only `wrap_kind: 'self'` — a copy somebody else wrapped has to be checked
+ * against their key first, which needs the household's member list, so it goes
+ * through `openGrantedKey` instead. An unknown kind is skipped rather than
+ * guessed at.
  */
 export async function openListedHousehold(
   listed: { id: number; encrypted_name: string; wrapped_key: string; wrap_kind: string; is_owner: boolean; updated_at: string },
@@ -139,3 +142,61 @@ export async function openListedHousehold(
 // Re-exported so callers working with households do not have to know that the
 // base64 helpers happen to live next door in `identity`.
 export { toBase64, fromBase64 }
+
+/**
+ * Open a household key somebody else wrapped for you.
+ *
+ * Everything that makes this safe is a *choice about which key to check
+ * against*, so it is all here rather than scattered over the caller:
+ *
+ * 1. The grant says whose signature it carries. That is a claim, so it is used
+ *    only to pick which member to check it against.
+ * 2. If that member's verifying key has been seen before, it must be the same
+ *    one. The server serves public keys unsigned and is the directory; a key
+ *    that silently changes is a substitution, not an update.
+ * 3. The signature is checked against that key, and the household id, both
+ *    identities and the epoch are bound inside what it covers.
+ * 4. A grant older than one already accepted is refused, so a compromised
+ *    server cannot roll somebody back onto a key that was rotated away.
+ *
+ * Returns the key and what should now be remembered. Deliberately does not
+ * write to the trust record itself: deciding and recording are different acts,
+ * and the caller is the one holding a vault it can save.
+ */
+export async function openGrantedKey(params: {
+  grant: string
+  householdId: number
+  members: { user_id: number; verifying_key: string }[]
+  trust: VaultTrust
+  identity: OpenIdentity
+}): Promise<{ key: CryptoKey; epoch: number; pin: { userId: number; verifyingKey: string } }> {
+  const sender = claimedSender(params.grant)
+  if (!sender) throw new GrantError('malformed')
+
+  // Which member's key hashes to the fingerprint the grant names.
+  let granter: { user_id: number; verifying_key: string } | null = null
+  for (const member of params.members) {
+    if (!member.verifying_key) continue
+    const fingerprint = toBase64(await fingerprintOf(fromBase64(member.verifying_key)))
+    if (fingerprint === sender) {
+      granter = member
+      break
+    }
+  }
+  if (!granter) throw new GrantError('wrong-sender')
+
+  // Trust on first use, and only first use.
+  const pinned = params.trust.pins[String(granter.user_id)]
+  if (pinned && pinned !== granter.verifying_key) throw new GrantError('wrong-sender')
+
+  const { key, epoch } = await openGrant({
+    grant: params.grant,
+    householdId: params.householdId,
+    minimumEpoch: params.trust.epochs[String(params.householdId)] ?? 0,
+    senderVerifyingKey: fromBase64(granter.verifying_key),
+    recipientPrivateKey: params.identity.privateKey,
+    recipientVerifyingKey: params.identity.verifyingKey,
+  })
+
+  return { key, epoch, pin: { userId: granter.user_id, verifyingKey: granter.verifying_key } }
+}
