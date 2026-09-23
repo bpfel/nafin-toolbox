@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 	"time"
 )
 
@@ -217,4 +218,339 @@ func (s *Store) Delete(ctx context.Context, vaultID, userID int) error {
 	}
 	_, err = s.db.ExecContext(ctx, `DELETE FROM shared_vaults WHERE id = $1`, vaultID)
 	return err
+}
+
+// ErrNotOwner means the user belongs to the household but does not own it.
+//
+// Distinct from ErrNotMember on purpose: a member learning they are not the
+// owner discovers nothing they did not already know, whereas a stranger
+// learning a household exists does.
+var ErrNotOwner = errors.New("only the owner may do this")
+
+// ErrInviteInvalid covers an invitation that is missing, expired, already used,
+// or addressed to somebody else. One error for all of them, so a leaked link
+// cannot be used to probe which of those it is.
+var ErrInviteInvalid = errors.New("invitation is not valid")
+
+func (s *Store) requireOwner(ctx context.Context, vaultID, userID int) error {
+	isOwner, err := s.Membership(ctx, vaultID, userID)
+	if err != nil {
+		return err
+	}
+	if !isOwner {
+		return ErrNotOwner
+	}
+	return nil
+}
+
+// CreateInvite records that somebody was asked to join. Owner only.
+func (s *Store) CreateInvite(ctx context.Context, vaultID, userID int, req CreateInviteRequest, expiresAt time.Time) (int, error) {
+	if err := s.requireOwner(ctx, vaultID, userID); err != nil {
+		return 0, err
+	}
+	var id int
+	err := s.db.QueryRowContext(ctx,
+		`INSERT INTO shared_vault_invites (vault_id, token_hash, invited_email, secret_sealed, expires_at)
+		 VALUES ($1, $2, $3, $4, $5)
+		 ON CONFLICT (vault_id, lower(invited_email)) DO UPDATE
+		 SET token_hash = EXCLUDED.token_hash, secret_sealed = EXCLUDED.secret_sealed,
+		     expires_at = EXCLUDED.expires_at, created_at = NOW(),
+		     accepted_user_id = NULL, public_key_mac = NULL, accepted_at = NULL
+		 RETURNING id`,
+		vaultID, req.TokenHash, req.InvitedEmail, req.SecretSealed, expiresAt,
+	).Scan(&id)
+	return id, err
+}
+
+// ListInvites returns the household's pending invitations, with the accepting
+// user's public halves once there is one.
+//
+// Any member may see them, not only the owner: an invitation is a fact about
+// the household, and somebody about to be handed a key is not a secret from the
+// people they are joining.
+func (s *Store) ListInvites(ctx context.Context, vaultID, userID int) ([]Invite, error) {
+	if _, err := s.Membership(ctx, vaultID, userID); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT i.id, i.invited_email, i.secret_sealed, i.expires_at, i.created_at,
+		        i.accepted_user_id, i.accepted_at, i.public_key_mac,
+		        COALESCE(u.public_key, ''), COALESCE(u.verifying_key, '')
+		 FROM shared_vault_invites i
+		 LEFT JOIN users u ON u.id = i.accepted_user_id
+		 WHERE i.vault_id = $1 AND i.expires_at > NOW()
+		 ORDER BY i.created_at DESC`,
+		vaultID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	invites := []Invite{}
+	for rows.Next() {
+		var in Invite
+		var mac sql.NullString
+		var acceptedAt sql.NullTime
+		var acceptedBy sql.NullInt64
+		if err := rows.Scan(&in.ID, &in.InvitedEmail, &in.SecretSealed, &in.ExpiresAt, &in.CreatedAt,
+			&acceptedBy, &acceptedAt, &mac, &in.PublicKey, &in.VerifyingKey); err != nil {
+			return nil, err
+		}
+		if acceptedBy.Valid {
+			id := int(acceptedBy.Int64)
+			in.AcceptedUserID = &id
+		}
+		if acceptedAt.Valid {
+			t := acceptedAt.Time
+			in.AcceptedAt = &t
+		}
+		in.PublicKeyMAC = mac.String
+		invites = append(invites, in)
+	}
+	return invites, rows.Err()
+}
+
+// DeleteInvite withdraws an invitation. Owner only.
+func (s *Store) DeleteInvite(ctx context.Context, vaultID, userID, inviteID int) error {
+	if err := s.requireOwner(ctx, vaultID, userID); err != nil {
+		return err
+	}
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM shared_vault_invites WHERE id = $1 AND vault_id = $2`, inviteID, vaultID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrInviteInvalid
+	}
+	return nil
+}
+
+// AcceptInvite binds an account to an invitation and records the MAC it posted.
+//
+// Nothing is granted here. The invitee still holds no key and can read nothing;
+// all that has happened is that "somebody at this address" became "this account,
+// with this public key, vouched for by a MAC only the link-holder could compute".
+func (s *Store) AcceptInvite(ctx context.Context, tokenHash string, userID int, email, mac string) (int, error) {
+	var vaultID int
+	err := s.db.QueryRowContext(ctx,
+		`UPDATE shared_vault_invites
+		 SET accepted_user_id = $2, public_key_mac = $3, accepted_at = NOW()
+		 WHERE token_hash = $1
+		   AND expires_at > NOW()
+		   AND lower(invited_email) = lower($4)
+		   AND accepted_user_id IS NULL
+		 RETURNING vault_id`,
+		tokenHash, userID, mac, email,
+	).Scan(&vaultID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrInviteInvalid
+	}
+	return vaultID, err
+}
+
+// ConfirmInvite writes the membership and consumes the invitation. Owner only.
+//
+// One transaction, because an invitation consumed without a membership written
+// is somebody who accepted and can never be let in, and a membership written
+// without the invitation consumed is a second grant waiting to happen.
+func (s *Store) ConfirmInvite(ctx context.Context, vaultID, userID, inviteID int, wrappedKey string) error {
+	if err := s.requireOwner(ctx, vaultID, userID); err != nil {
+		return err
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	var invitee int
+	err = tx.QueryRowContext(ctx,
+		`SELECT accepted_user_id FROM shared_vault_invites
+		 WHERE id = $1 AND vault_id = $2 AND expires_at > NOW() AND accepted_user_id IS NOT NULL`,
+		inviteID, vaultID,
+	).Scan(&invitee)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrInviteInvalid
+	}
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
+		 VALUES ($1, $2, $3, $4, FALSE)
+		 ON CONFLICT (vault_id, user_id) DO UPDATE
+		 SET wrapped_key = EXCLUDED.wrapped_key, wrap_kind = EXCLUDED.wrap_kind`,
+		vaultID, invitee, wrappedKey, WrapGranted,
+	); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM shared_vault_invites WHERE id = $1`, inviteID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ListMembers returns everybody in the household, with their public halves.
+func (s *Store) ListMembers(ctx context.Context, vaultID, userID int) ([]Member, error) {
+	if _, err := s.Membership(ctx, vaultID, userID); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT m.user_id, u.email, m.is_owner, m.wrap_kind,
+		        COALESCE(u.public_key, ''), COALESCE(u.verifying_key, ''), m.joined_at
+		 FROM shared_vault_members m
+		 JOIN users u ON u.id = m.user_id
+		 WHERE m.vault_id = $1
+		 ORDER BY m.is_owner DESC, m.joined_at`,
+		vaultID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	members := []Member{}
+	for rows.Next() {
+		var m Member
+		if err := rows.Scan(&m.UserID, &m.Email, &m.IsOwner, &m.WrapKind,
+			&m.PublicKey, &m.VerifyingKey, &m.JoinedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, rows.Err()
+}
+
+// RemoveMember takes somebody out of a household.
+//
+// Leaving is always unilateral: anybody may remove themselves, at any time,
+// without the others' cooperation. Removing somebody *else* is the owner's
+// alone — the one asymmetry in the model.
+//
+// Note what this does not do. It stops the server serving that person new
+// ciphertext; it does not take back the key they already hold. Only a rekey
+// does that, and only for what is written afterwards.
+func (s *Store) RemoveMember(ctx context.Context, vaultID, userID, targetID int) error {
+	if userID != targetID {
+		if err := s.requireOwner(ctx, vaultID, userID); err != nil {
+			return err
+		}
+	} else if _, err := s.Membership(ctx, vaultID, userID); err != nil {
+		return err
+	}
+
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2`, vaultID, targetID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotMember
+	}
+	return nil
+}
+
+// Rekey replaces the household key, everything encrypted under it, and every
+// member's copy of it, in one statement's worth of atomicity.
+//
+// Owner only, and deliberately all-or-nothing: a half-applied rekey leaves
+// members holding keys to different versions of the same household, which is
+// not a state any of them could recover from without help.
+func (s *Store) Rekey(ctx context.Context, vaultID, userID int, req RekeyRequest, ciphertext, nonce []byte) (time.Time, error) {
+	if err := s.requireOwner(ctx, vaultID, userID); err != nil {
+		return time.Time{}, err
+	}
+	// Whoever is doing this has to end up still holding it. Rekeying yourself
+	// out of your own household is not a thing to let somebody do by accident.
+	keeps := false
+	for _, m := range req.Members {
+		if m.UserID == userID {
+			keeps = true
+		}
+	}
+	if !keeps {
+		return time.Time{}, ErrNotMember
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	var updatedAt time.Time
+	if err := tx.QueryRowContext(ctx,
+		`UPDATE shared_vaults
+		 SET encrypted_name = $2, ciphertext = $3, nonce = $4, version = $5, updated_at = NOW()
+		 WHERE id = $1
+		 RETURNING updated_at`,
+		vaultID, req.EncryptedName, ciphertext, nonce, req.Version,
+	).Scan(&updatedAt); err != nil {
+		return time.Time{}, err
+	}
+
+	// Everyone not in the list goes. Done before the upserts so a member being
+	// kept is never briefly absent.
+	ids := make([]int, 0, len(req.Members))
+	for _, m := range req.Members {
+		ids = append(ids, m.UserID)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM shared_vault_members
+		 WHERE vault_id = $1 AND user_id <> ALL($2::int[])`,
+		vaultID, pqIntArray(ids),
+	); err != nil {
+		return time.Time{}, err
+	}
+
+	for _, m := range req.Members {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE shared_vault_members SET wrapped_key = $3, wrap_kind = $4
+			 WHERE vault_id = $1 AND user_id = $2`,
+			vaultID, m.UserID, m.WrappedKey, m.WrapKind,
+		); err != nil {
+			return time.Time{}, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return time.Time{}, err
+	}
+	return updatedAt, nil
+}
+
+// pqIntArray renders ints as a PostgreSQL array literal.
+//
+// Hand-written rather than pulling in lib/pq for one call: this driver is pgx,
+// the values are ints the server produced, and the alternative is a second
+// Postgres library in go.mod to format a list of numbers.
+func pqIntArray(ids []int) string {
+	if len(ids) == 0 {
+		return "{}"
+	}
+	out := make([]byte, 0, len(ids)*4+2)
+	out = append(out, '{')
+	for i, id := range ids {
+		if i > 0 {
+			out = append(out, ',')
+		}
+		out = strconv.AppendInt(out, int64(id), 10)
+	}
+	return string(append(out, '}'))
 }

@@ -499,3 +499,331 @@ func TestStore_AHouseholdDiesWithItsLastMember(t *testing.T) {
 		}
 	})
 }
+
+// --- inviting somebody in ---
+//
+// Again against a real database, because again the rules are in SQL: who may
+// invite, whose acceptance counts, and who may hand over a key.
+
+func anInvite(email string) CreateInviteRequest {
+	return CreateInviteRequest{
+		TokenHash:    "hash-" + email,
+		InvitedEmail: email,
+		SecretSealed: "sealed-secret",
+	}
+}
+
+func hour() time.Time { return time.Now().Add(time.Hour) }
+
+// Adds a member directly, the shape a confirmed invitation produces.
+func addMember(t *testing.T, db *sql.DB, vaultID, userID int) {
+	t.Helper()
+	if _, err := db.Exec(
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
+		 VALUES ($1, $2, 'granted-key', $3, FALSE)`, vaultID, userID, WrapGranted); err != nil {
+		t.Fatalf("adding member: %v", err)
+	}
+}
+
+func TestStore_OnlyTheOwnerMayInvite(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-inv@example.ch")
+	ben := makeUser(t, db, "ben-inv@example.ch")
+	stranger := makeUser(t, db, "stranger-inv@example.ch")
+
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+
+	if _, err := store.CreateInvite(ctx, id, anna, anInvite("new@example.ch"), hour()); err != nil {
+		t.Errorf("owner cannot invite: %v", err)
+	}
+	// A member is not a stranger, and gets told so rather than told the
+	// household does not exist.
+	if _, err := store.CreateInvite(ctx, id, ben, anInvite("other@example.ch"), hour()); err != ErrNotOwner {
+		t.Errorf("member inviting = %v, want ErrNotOwner", err)
+	}
+	if _, err := store.CreateInvite(ctx, id, stranger, anInvite("other@example.ch"), hour()); err != ErrNotMember {
+		t.Errorf("stranger inviting = %v, want ErrNotMember", err)
+	}
+}
+
+func TestStore_AcceptingAnInvitation(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-acc@example.ch")
+	ben := makeUser(t, db, "ben-acc@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	t.Run("the addressee may", func(t *testing.T) {
+		if _, err := store.CreateInvite(ctx, id, anna, anInvite("ben-acc@example.ch"), hour()); err != nil {
+			t.Fatalf("CreateInvite: %v", err)
+		}
+		got, err := store.AcceptInvite(ctx, "hash-ben-acc@example.ch", ben, "BEN-ACC@example.ch", "the-mac")
+		if err != nil {
+			t.Fatalf("AcceptInvite: %v", err)
+		}
+		if got != id {
+			t.Errorf("vault = %d, want %d", got, id)
+		}
+	})
+
+	// Accepting grants nothing. Until somebody confirms, the invitee holds no
+	// key and the household is not theirs.
+	t.Run("but is still not a member", func(t *testing.T) {
+		if _, err := store.GetVault(ctx, id, ben); err != ErrNotMember {
+			t.Errorf("GetVault after accepting = %v, want ErrNotMember", err)
+		}
+	})
+
+	t.Run("and cannot accept it twice", func(t *testing.T) {
+		if _, err := store.AcceptInvite(ctx, "hash-ben-acc@example.ch", ben, "ben-acc@example.ch", "again"); err != ErrInviteInvalid {
+			t.Errorf("second accept = %v, want ErrInviteInvalid", err)
+		}
+	})
+}
+
+// A leaked link still needs the mailbox it was addressed to.
+func TestStore_AnInvitationIsAddressed(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-addr@example.ch")
+	wrong := makeUser(t, db, "wrong@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := store.CreateInvite(ctx, id, anna, anInvite("intended@example.ch"), hour()); err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+
+	if _, err := store.AcceptInvite(ctx, "hash-intended@example.ch", wrong, "wrong@example.ch", "mac"); err != ErrInviteInvalid {
+		t.Errorf("accepting somebody else's invitation = %v, want ErrInviteInvalid", err)
+	}
+}
+
+func TestStore_AnExpiredInvitationIsNoInvitation(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-exp@example.ch")
+	ben := makeUser(t, db, "ben-exp@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	past := time.Now().Add(-time.Minute)
+	if _, err := store.CreateInvite(ctx, id, anna, anInvite("ben-exp@example.ch"), past); err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+
+	if _, err := store.AcceptInvite(ctx, "hash-ben-exp@example.ch", ben, "ben-exp@example.ch", "mac"); err != ErrInviteInvalid {
+		t.Errorf("accepting an expired invitation = %v, want ErrInviteInvalid", err)
+	}
+	// And it is not listed either, so nobody is invited to confirm it.
+	invites, err := store.ListInvites(ctx, id, anna)
+	if err != nil {
+		t.Fatalf("ListInvites: %v", err)
+	}
+	if len(invites) != 0 {
+		t.Errorf("%d expired invitations listed, want 0", len(invites))
+	}
+}
+
+func TestStore_ConfirmingWritesTheMembership(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-conf@example.ch")
+	ben := makeUser(t, db, "ben-conf@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := store.CreateInvite(ctx, id, anna, anInvite("ben-conf@example.ch"), hour()); err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if _, err := store.AcceptInvite(ctx, "hash-ben-conf@example.ch", ben, "ben-conf@example.ch", "the-mac"); err != nil {
+		t.Fatalf("AcceptInvite: %v", err)
+	}
+
+	invites, err := store.ListInvites(ctx, id, anna)
+	if err != nil {
+		t.Fatalf("ListInvites: %v", err)
+	}
+	if len(invites) != 1 || invites[0].PublicKeyMAC != "the-mac" {
+		t.Fatalf("the inviter cannot see the MAC to check: %+v", invites)
+	}
+
+	if err := store.ConfirmInvite(ctx, id, anna, invites[0].ID, "signcrypted-key"); err != nil {
+		t.Fatalf("ConfirmInvite: %v", err)
+	}
+
+	// Now, and only now, Ben can read it.
+	if _, err := store.GetVault(ctx, id, ben); err != nil {
+		t.Errorf("confirmed member cannot read: %v", err)
+	}
+	bens, err := store.ListForUser(ctx, ben)
+	if err != nil {
+		t.Fatalf("ListForUser: %v", err)
+	}
+	if len(bens) != 1 || bens[0].WrappedKey != "signcrypted-key" || bens[0].WrapKind != WrapGranted || bens[0].IsOwner {
+		t.Errorf("member's view is %+v", bens)
+	}
+
+	// The invitation is consumed, so it cannot grant a second key.
+	after, err := store.ListInvites(ctx, id, anna)
+	if err != nil {
+		t.Fatalf("ListInvites: %v", err)
+	}
+	if len(after) != 0 {
+		t.Errorf("%d invitations survived being confirmed", len(after))
+	}
+}
+
+func TestStore_ConfirmingIsTheOwnersAlone(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-confown@example.ch")
+	ben := makeUser(t, db, "ben-confown@example.ch")
+	carl := makeUser(t, db, "carl-confown@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+	if _, err := store.CreateInvite(ctx, id, anna, anInvite("carl-confown@example.ch"), hour()); err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if _, err := store.AcceptInvite(ctx, "hash-carl-confown@example.ch", carl, "carl-confown@example.ch", "mac"); err != nil {
+		t.Fatalf("AcceptInvite: %v", err)
+	}
+	invites, _ := store.ListInvites(ctx, id, anna)
+
+	if err := store.ConfirmInvite(ctx, id, ben, invites[0].ID, "key"); err != ErrNotOwner {
+		t.Errorf("member confirming = %v, want ErrNotOwner", err)
+	}
+	if _, err := store.GetVault(ctx, id, carl); err != ErrNotMember {
+		t.Error("the invitee got in anyway")
+	}
+}
+
+// Leaving is always unilateral; removing somebody else is the owner's alone.
+func TestStore_RemovingAMember(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-rm@example.ch")
+	ben := makeUser(t, db, "ben-rm@example.ch")
+	carl := makeUser(t, db, "carl-rm@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+	addMember(t, db, id, carl)
+
+	t.Run("a member may not remove another", func(t *testing.T) {
+		if err := store.RemoveMember(ctx, id, ben, carl); err != ErrNotOwner {
+			t.Errorf("member removing another = %v, want ErrNotOwner", err)
+		}
+	})
+
+	t.Run("but may always remove themselves", func(t *testing.T) {
+		if err := store.RemoveMember(ctx, id, ben, ben); err != nil {
+			t.Fatalf("member leaving: %v", err)
+		}
+		if _, err := store.GetVault(ctx, id, ben); err != ErrNotMember {
+			t.Error("they can still read it after leaving")
+		}
+	})
+
+	t.Run("and the owner may remove anybody", func(t *testing.T) {
+		if err := store.RemoveMember(ctx, id, anna, carl); err != nil {
+			t.Errorf("owner removing a member: %v", err)
+		}
+	})
+}
+
+func TestStore_Rekey(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-rk@example.ch")
+	ben := makeUser(t, db, "ben-rk@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("old"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+
+	t.Run("replaces the payload and everybody’s key, and drops whoever is left out", func(t *testing.T) {
+		_, err := store.Rekey(ctx, id, anna, RekeyRequest{
+			EncryptedName: "new-sealed-name",
+			Version:       9,
+			Members:       []RekeyMember{{UserID: anna, WrappedKey: "new-self", WrapKind: WrapSelf}},
+		}, []byte("new"), []byte("n2"))
+		if err != nil {
+			t.Fatalf("Rekey: %v", err)
+		}
+
+		v, err := store.GetVault(ctx, id, anna)
+		if err != nil {
+			t.Fatalf("GetVault: %v", err)
+		}
+		if string(v.Ciphertext) != "new" {
+			t.Errorf("ciphertext = %q, want the re-encrypted one", v.Ciphertext)
+		}
+		mine, _ := store.ListForUser(ctx, anna)
+		if len(mine) != 1 || mine[0].WrappedKey != "new-self" || mine[0].EncryptedName != "new-sealed-name" {
+			t.Errorf("owner's view after rekey: %+v", mine)
+		}
+		// Ben was not in the list, so Ben is out.
+		if _, err := store.GetVault(ctx, id, ben); err != ErrNotMember {
+			t.Errorf("the removed member can still read: %v", err)
+		}
+	})
+
+	// Rekeying yourself out of your own household is not a thing to let
+	// somebody do by accident.
+	t.Run("refuses to leave the household without the person doing it", func(t *testing.T) {
+		other := makeUser(t, db, "other-rk@example.ch")
+		_, err := store.Rekey(ctx, id, anna, RekeyRequest{
+			EncryptedName: "n",
+			Members:       []RekeyMember{{UserID: other, WrappedKey: "k", WrapKind: WrapGranted}},
+		}, []byte("x"), []byte("y"))
+		if err != ErrNotMember {
+			t.Errorf("Rekey without self = %v, want ErrNotMember", err)
+		}
+	})
+
+	t.Run("is the owner’s alone", func(t *testing.T) {
+		carl := makeUser(t, db, "carl-rk@example.ch")
+		addMember(t, db, id, carl)
+		_, err := store.Rekey(ctx, id, carl, RekeyRequest{
+			EncryptedName: "n",
+			Members:       []RekeyMember{{UserID: carl, WrappedKey: "k", WrapKind: WrapGranted}},
+		}, []byte("x"), []byte("y"))
+		if err != ErrNotOwner {
+			t.Errorf("member rekeying = %v, want ErrNotOwner", err)
+		}
+	})
+}

@@ -102,6 +102,16 @@ var codes = map[string]string{
 	Vault + "|failed to rename household": "VAULT-024",
 	Vault + "|failed to delete household": "VAULT-025",
 
+	// --- Inviting somebody into a household ---
+	Vault + "|failed to create invitation":   "VAULT-030",
+	Vault + "|failed to list invitations":    "VAULT-031",
+	Vault + "|failed to withdraw invitation": "VAULT-032",
+	Vault + "|failed to accept invitation":   "VAULT-033",
+	Vault + "|failed to confirm invitation":  "VAULT-034",
+	Vault + "|failed to list members":        "VAULT-035",
+	Vault + "|failed to remove member":       "VAULT-036",
+	Vault + "|failed to rekey household":     "VAULT-037",
+
 	// --- Upkeep reminders ---
 	Upkeep + "|invalid request body":    "UPK-001",
 	Upkeep + "|admin access required":   "UPK-002",

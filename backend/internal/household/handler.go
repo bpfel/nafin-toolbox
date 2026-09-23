@@ -2,8 +2,10 @@ package household
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -38,16 +40,36 @@ func Routes(db *sql.DB) func(r chi.Router) {
 	return RoutesWith(store)
 }
 
+// validWrapKind guards what a client may claim about a key it is handing over.
+func validWrapKind(kind string) bool {
+	return kind == WrapSelf || kind == WrapGranted
+}
+
 // RoutesWith is Routes against any Storer, so the handlers can be tested
 // without a database.
-func RoutesWith(store Storer) func(r chi.Router) {
+func RoutesWith(store InviteStorer) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Get("/", handleList(store))
 		r.Post("/", handleCreate(store))
+
+		// Before "/{id}/...", because chi would otherwise read "invites" as an
+		// id and answer 400 to every acceptance.
+		r.Post("/invites/accept", handleAcceptInvite(store))
+
 		r.Get("/{id}/vault", handleGetVault(store))
 		r.Put("/{id}/vault", handlePutVault(store))
 		r.Put("/{id}/name", handleRename(store))
 		r.Delete("/{id}", handleDelete(store))
+
+		r.Get("/{id}/invites", handleListInvites(store))
+		r.Post("/{id}/invites", handleCreateInvite(store))
+		r.Delete("/{id}/invites/{inviteId}", handleDeleteInvite(store))
+
+		r.Get("/{id}/members", handleListMembers(store))
+		r.Post("/{id}/members", handleConfirmInvite(store))
+		r.Delete("/{id}/members/{userId}", handleRemoveMember(store))
+
+		r.Put("/{id}/rekey", handleRekey(store))
 	}
 }
 
@@ -277,4 +299,293 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// --- membership, and asking somebody to join ---
+
+/*
+An invitation is two steps because nobody can do both halves.
+
+At invite time the inviter knows an e-mail address, which is not a public key,
+and the person may not have an account at all. At confirm time only an existing
+member holds the plaintext household key, so only they can wrap it for somebody
+new — the server structurally cannot. The gap between the two is where the check
+goes.
+*/
+
+// How long a link is good for.
+//
+// Bitwarden allows five days. That is too long for something handed over in
+// person or scanned off a screen, and the shorter it is the smaller the window
+// in which a leaked link is worth anything.
+const inviteLifetime = 24 * time.Hour
+
+// InviteStorer is the storage the membership handlers need.
+type InviteStorer interface {
+	Storer
+	CreateInvite(ctx context.Context, vaultID, userID int, req CreateInviteRequest, expiresAt time.Time) (int, error)
+	ListInvites(ctx context.Context, vaultID, userID int) ([]Invite, error)
+	DeleteInvite(ctx context.Context, vaultID, userID, inviteID int) error
+	AcceptInvite(ctx context.Context, tokenHash string, userID int, email, mac string) (int, error)
+	ConfirmInvite(ctx context.Context, vaultID, userID, inviteID int, wrappedKey string) error
+	ListMembers(ctx context.Context, vaultID, userID int) ([]Member, error)
+	RemoveMember(ctx context.Context, vaultID, userID, targetID int) error
+	Rekey(ctx context.Context, vaultID, userID int, req RekeyRequest, ciphertext, nonce []byte) (time.Time, error)
+}
+
+// hashToken is how a link's token becomes the thing the database holds.
+//
+// SHA-256 rather than bcrypt, and deliberately: the token is 32 random bytes
+// from a CSPRNG, not a password, so there is nothing to slow an attacker down
+// *for* — no dictionary, no reuse, no human-chosen pattern. What matters is
+// that the stored form is useless, which a hash gives either way.
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+func writeMembershipError(w http.ResponseWriter, err error) bool {
+	switch {
+	case errors.Is(err, ErrNotMember):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such household"})
+	case errors.Is(err, ErrNotOwner):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "only the owner may do this"})
+	case errors.Is(err, ErrInviteInvalid):
+		// Missing, expired, used, or addressed to somebody else — all one
+		// answer, so a leaked link cannot be used to work out which.
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "invitation is not valid"})
+	default:
+		return false
+	}
+	return true
+}
+
+func handleCreateInvite(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+
+		var req CreateInviteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if req.TokenHash == "" || req.InvitedEmail == "" || req.SecretSealed == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "token_hash, invited_email and secret_sealed are required"})
+			return
+		}
+
+		id, err := store.CreateInvite(r.Context(), vaultID, userID, req, time.Now().Add(inviteLifetime))
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to create invitation")
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]int{"id": id})
+	}
+}
+
+func handleListInvites(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+
+		invites, err := store.ListInvites(r.Context(), vaultID, userID)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to list invitations")
+			return
+		}
+		writeJSON(w, http.StatusOK, invites)
+	}
+}
+
+func handleDeleteInvite(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+		inviteID, err := strconv.Atoi(chi.URLParam(r, "inviteId"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation id"})
+			return
+		}
+
+		err = store.DeleteInvite(r.Context(), vaultID, userID, inviteID)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to withdraw invitation")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// handleAcceptInvite binds an account to an invitation. Grants nothing.
+//
+// The invitee still holds no key and can read nothing afterwards. All that has
+// happened is that "somebody at this address" became "this account, with this
+// public key, vouched for by a MAC only whoever held the link could compute".
+func handleAcceptInvite(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := auth.UserFromContext(r.Context())
+		if user == nil {
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		var req AcceptInviteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if req.Token == "" || req.PublicKeyMAC == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "token and public_key_mac are required"})
+			return
+		}
+
+		vaultID, err := store.AcceptInvite(r.Context(), hashToken(req.Token), user.ID, user.Email, req.PublicKeyMAC)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to accept invitation")
+			return
+		}
+		writeJSON(w, http.StatusOK, AcceptInviteResponse{HouseholdID: vaultID})
+	}
+}
+
+// handleConfirmInvite writes the membership, with the key a member wrapped.
+//
+// The server stores that key without being able to read or check it. The
+// verification that matters already happened on the inviter's client, against a
+// MAC the server never held the secret for.
+func handleConfirmInvite(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+
+		var req ConfirmInviteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if req.WrappedKey == "" || req.InviteID == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invite_id and wrapped_key are required"})
+			return
+		}
+
+		err := store.ConfirmInvite(r.Context(), vaultID, userID, req.InviteID, req.WrappedKey)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to confirm invitation")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+func handleListMembers(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+
+		members, err := store.ListMembers(r.Context(), vaultID, userID)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to list members")
+			return
+		}
+		writeJSON(w, http.StatusOK, members)
+	}
+}
+
+func handleRemoveMember(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+		targetID, err := strconv.Atoi(chi.URLParam(r, "userId"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			return
+		}
+
+		err = store.RemoveMember(r.Context(), vaultID, userID, targetID)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to remove member")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// handleRekey replaces the key, the payload and every member's copy at once.
+//
+// Removing somebody stops the server serving them new ciphertext; it does not
+// take back the key they already hold. This is what does — for everything
+// written afterwards. It cannot un-leak what they already synced, and nothing
+// can.
+func handleRekey(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+
+		var req RekeyRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if req.EncryptedName == "" || len(req.Members) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "encrypted_name and at least one member are required"})
+			return
+		}
+		for _, m := range req.Members {
+			if m.WrappedKey == "" || !validWrapKind(m.WrapKind) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "every member needs a wrapped_key and a valid wrap_kind"})
+				return
+			}
+		}
+
+		ciphertext, nonce, bad := decodePayload(w, req.Ciphertext, req.Nonce)
+		if bad {
+			return
+		}
+
+		updatedAt, err := store.Rekey(r.Context(), vaultID, userID, req, ciphertext, nonce)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to rekey household")
+			return
+		}
+		writeJSON(w, http.StatusOK, PutResponse{Status: "ok", UpdatedAt: updatedAt})
+	}
 }

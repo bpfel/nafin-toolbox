@@ -86,3 +86,100 @@ type PutResponse struct {
 type RenameRequest struct {
 	EncryptedName string `json:"encrypted_name"`
 }
+
+// --- membership, and asking somebody to join ---
+
+// Member is one person in a household, as the others see them.
+//
+// Carries their public halves so a member can wrap the household key for them
+// without a general public-key directory existing: keys are served only inside
+// a household somebody already belongs to, or an invitation they created.
+type Member struct {
+	UserID       int       `json:"user_id"`
+	Email        string    `json:"email"`
+	IsOwner      bool      `json:"is_owner"`
+	WrapKind     string    `json:"wrap_kind"`
+	PublicKey    string    `json:"public_key"`
+	VerifyingKey string    `json:"verifying_key"`
+	JoinedAt     time.Time `json:"joined_at"`
+}
+
+// Invite is a pending invitation, as its household sees it.
+type Invite struct {
+	ID           int    `json:"id"`
+	InvitedEmail string `json:"invited_email"`
+	// The invite secret, sealed under the household key. Opaque to the server.
+	SecretSealed string     `json:"secret_sealed"`
+	ExpiresAt    time.Time  `json:"expires_at"`
+	CreatedAt    time.Time  `json:"created_at"`
+	AcceptedAt   *time.Time `json:"accepted_at,omitempty"`
+
+	// Present once accepted: who accepted, the MAC they posted over their own
+	// public key, and the keys themselves. The inviter checks the MAC against
+	// the secret before wrapping anything for them.
+	AcceptedUserID *int   `json:"accepted_user_id,omitempty"`
+	PublicKeyMAC   string `json:"public_key_mac,omitempty"`
+	PublicKey      string `json:"public_key,omitempty"`
+	VerifyingKey   string `json:"verifying_key,omitempty"`
+}
+
+// CreateInviteRequest is sent by POST /households/{id}/invites.
+//
+// The token is hashed on the client and the secret is sealed there, so neither
+// reaches the server in a usable form. The server's part is to remember that
+// somebody was asked, and to recognise them when they turn up.
+type CreateInviteRequest struct {
+	TokenHash    string `json:"token_hash"`
+	InvitedEmail string `json:"invited_email"`
+	SecretSealed string `json:"secret_sealed"`
+}
+
+// AcceptInviteRequest is sent by POST /households/invites/accept.
+//
+// The raw token comes from the link; the server hashes it to find the row. The
+// MAC proves the account posting it is the one that received the link, which is
+// what the inviter checks before wrapping a key for them.
+type AcceptInviteRequest struct {
+	Token        string `json:"token"`
+	PublicKeyMAC string `json:"public_key_mac"`
+}
+
+// AcceptInviteResponse tells the invitee which household they have joined the
+// queue for, so the app can say so while they wait to be confirmed.
+type AcceptInviteResponse struct {
+	HouseholdID int `json:"household_id"`
+}
+
+// ConfirmInviteRequest is sent by POST /households/{id}/members.
+//
+// The wrapped key was signcrypted on a member's client to the invitee's public
+// key. The server writes it down without being able to read or verify it — the
+// verification that matters happened before this call, against a MAC the server
+// never had the secret for.
+type ConfirmInviteRequest struct {
+	InviteID   int    `json:"invite_id"`
+	WrappedKey string `json:"wrapped_key"`
+}
+
+// RekeyRequest is sent by PUT /households/{id}/rekey, after a member leaves.
+//
+// Removing somebody revokes the server's willingness to serve them new
+// ciphertext; it does not take back the key they already hold. So the remaining
+// members generate a new one, re-encrypt everything under it, and hand the
+// server all of it at once — which has to be atomic, because a half-applied
+// rekey is a household whose members hold keys to different versions of it.
+type RekeyRequest struct {
+	EncryptedName string `json:"encrypted_name"`
+	Ciphertext    string `json:"ciphertext"`
+	Nonce         string `json:"nonce"`
+	Version       int    `json:"version"`
+	// Every remaining member, with their copy of the new key. Anybody missing
+	// from this list is removed by the same statement.
+	Members []RekeyMember `json:"members"`
+}
+
+type RekeyMember struct {
+	UserID     int    `json:"user_id"`
+	WrappedKey string `json:"wrapped_key"`
+	WrapKind   string `json:"wrap_kind"`
+}

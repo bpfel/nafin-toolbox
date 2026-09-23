@@ -32,7 +32,30 @@ type mockStore struct {
 	renameErr error
 	deleteErr error
 
+	invites         []Invite
+	members         []Member
+	createdInviteID int
+	acceptedVaultID int
+
+	createInviteErr error
+	listInvitesErr  error
+	deleteInviteErr error
+	acceptErr       error
+	confirmErr      error
+	listMembersErr  error
+	removeMemberErr error
+	rekeyErr        error
+
 	// Captured so tests can assert what reached the store.
+	lastInvite     CreateInviteRequest
+	lastInviteID   int
+	lastTargetID   int
+	lastTokenHash  string
+	lastEmail      string
+	lastMAC        string
+	lastWrappedKey string
+	lastRekey      RekeyRequest
+	lastExpiresAt  time.Time
 	lastUserID     int
 	lastVaultID    int
 	lastCreate     CreateRequest
@@ -77,7 +100,7 @@ func userCtx(userID int) context.Context {
 }
 
 // serve routes the request the way the app does, so chi fills in {id}.
-func serve(store Storer, method, target, body string, ctx context.Context) *httptest.ResponseRecorder {
+func serve(store InviteStorer, method, target, body string, ctx context.Context) *httptest.ResponseRecorder {
 	r := chi.NewRouter()
 	r.Route("/households", RoutesWith(store))
 
@@ -362,4 +385,46 @@ func TestHandlers_RejectMalformedJSON(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- the membership half of the store ---
+
+func (m *mockStore) CreateInvite(ctx context.Context, vaultID, userID int, req CreateInviteRequest, expiresAt time.Time) (int, error) {
+	m.lastUserID, m.lastVaultID, m.lastInvite, m.lastExpiresAt = userID, vaultID, req, expiresAt
+	return m.createdInviteID, m.createInviteErr
+}
+
+func (m *mockStore) ListInvites(ctx context.Context, vaultID, userID int) ([]Invite, error) {
+	m.lastUserID, m.lastVaultID = userID, vaultID
+	return m.invites, m.listInvitesErr
+}
+
+func (m *mockStore) DeleteInvite(ctx context.Context, vaultID, userID, inviteID int) error {
+	m.lastUserID, m.lastVaultID, m.lastInviteID = userID, vaultID, inviteID
+	return m.deleteInviteErr
+}
+
+func (m *mockStore) AcceptInvite(ctx context.Context, tokenHash string, userID int, email, mac string) (int, error) {
+	m.lastTokenHash, m.lastUserID, m.lastEmail, m.lastMAC = tokenHash, userID, email, mac
+	return m.acceptedVaultID, m.acceptErr
+}
+
+func (m *mockStore) ConfirmInvite(ctx context.Context, vaultID, userID, inviteID int, wrappedKey string) error {
+	m.lastUserID, m.lastVaultID, m.lastInviteID, m.lastWrappedKey = userID, vaultID, inviteID, wrappedKey
+	return m.confirmErr
+}
+
+func (m *mockStore) ListMembers(ctx context.Context, vaultID, userID int) ([]Member, error) {
+	m.lastUserID, m.lastVaultID = userID, vaultID
+	return m.members, m.listMembersErr
+}
+
+func (m *mockStore) RemoveMember(ctx context.Context, vaultID, userID, targetID int) error {
+	m.lastUserID, m.lastVaultID, m.lastTargetID = userID, vaultID, targetID
+	return m.removeMemberErr
+}
+
+func (m *mockStore) Rekey(ctx context.Context, vaultID, userID int, req RekeyRequest, ciphertext, nonce []byte) (time.Time, error) {
+	m.lastUserID, m.lastVaultID, m.lastRekey = userID, vaultID, req
+	return m.updatedAt, m.rekeyErr
 }
