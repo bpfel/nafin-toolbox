@@ -146,6 +146,46 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 const MEK_STORAGE_KEY = 'vault_mek'
 
+/**
+ * Which vault was on screen, remembered across a reload.
+ *
+ * Beside the MEK rather than in the vault, because it has the MEK's lifetime
+ * exactly: this tab, this session, gone at sign-out. It is also not a fact
+ * about the person — two tabs may reasonably sit on two different households —
+ * so putting it in the vault would have made one tab's choice overwrite the
+ * other's.
+ *
+ * Without it, every refresh dropped the user back on their personal budget and
+ * they had to find their household again. That is a small annoyance once and an
+ * infuriating one daily.
+ */
+const CURRENT_VAULT_KEY = 'vault_current'
+
+function rememberCurrent(id: VaultId): void {
+  try {
+    sessionStorage.setItem(CURRENT_VAULT_KEY, String(id))
+  } catch {
+    // Private mode, blocked storage, a quota. Remembering is a convenience and
+    // failing to remember is not worth a broken switch.
+  }
+}
+
+/** What was on screen last, if it is still somewhere this user can go. */
+function recallCurrent(): VaultId {
+  let stored: string | null = null
+  try {
+    stored = sessionStorage.getItem(CURRENT_VAULT_KEY)
+  } catch {
+    return 'personal'
+  }
+  if (!stored || stored === 'personal') return 'personal'
+
+  const id = Number(stored)
+  // A household that has since been left, deleted, or whose grant no longer
+  // opens is not somewhere to land. Personal is always there.
+  return Number.isInteger(id) && households.some(h => h.id === id) ? id : 'personal'
+}
+
 /** Export MEK to sessionStorage so it survives page refreshes. */
 async function cacheMEK(key: CryptoKey): Promise<void> {
   const raw = await crypto.subtle.exportKey('raw', key)
@@ -244,6 +284,7 @@ export async function switchTo(id: VaultId): Promise<void> {
 
   await putCurrentAside()
   currentId = id
+  rememberCurrent(id)
 
   const waiting = stashed.get(id)
   if (waiting) {
@@ -416,6 +457,7 @@ export async function createHousehold(name: string): Promise<number> {
   // fetch succeeding, and a `null` answer drops a household from the list.
   await putCurrentAside()
   currentId = created.id
+  rememberCurrent(created.id)
   current = { ...emptySlot(), data: empty, key, lastUpdatedAt: created.updated_at }
 
   return created.id
@@ -438,6 +480,7 @@ export async function deleteHousehold(id: number): Promise<void> {
 
   if (currentId === id) {
     currentId = 'personal'
+    rememberCurrent('personal')
     current = stashed.get('personal') ?? emptySlot()
     stashed.delete('personal')
   }
@@ -469,6 +512,9 @@ export async function tryRestoreVault(): Promise<boolean> {
     identity = isComplete(keys) ? await openIdentity(keys, cachedMEK) : null
     await loadHouseholds(cachedMEK)
     unlocked = true
+    // After the households are known, so a remembered one can be checked
+    // against them rather than switched to on faith.
+    await switchTo(recallCurrent())
     return true
   } catch (e) {
     if (e instanceof VaultVersionAheadError) {
@@ -509,6 +555,7 @@ export async function initializeVault(password: string, email: string): Promise<
     await loadHouseholds(mek)
     await cacheMEK(mek)
     unlocked = true
+    await switchTo(recallCurrent())
     return 'ok'
   } catch (e) {
     mek = null
@@ -650,6 +697,9 @@ export function clearVault(): void {
   }
   current = emptySlot()
   currentId = 'personal'
+  try {
+    sessionStorage.removeItem(CURRENT_VAULT_KEY)
+  } catch { /* see rememberCurrent */ }
   // Every vault, not only the one on screen. A stashed slot holds a household's
   // decrypted budget and its key, and letting that outlive a sign-out would be
   // the same mistake as leaving the MEK behind.

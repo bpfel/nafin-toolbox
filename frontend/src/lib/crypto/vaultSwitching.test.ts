@@ -305,3 +305,82 @@ describe('signing out', () => {
     expect(state.vault).toBeNull()
   })
 })
+
+/**
+ * Creating a household opens it, and a reload keeps it open.
+ *
+ * The second half is the one that was missing: `currentId` was never persisted,
+ * so every refresh dropped the user back on their personal budget and they had
+ * to go and find their household again.
+ */
+describe('staying where you were', () => {
+  async function withHouseholds() {
+    const mek = await signIn()
+    const anna = await listed(3, 'Flat with Anna', mek)
+    api.fetchHouseholds.mockResolvedValue([anna.listing])
+    const payload = await encryptVault(createEmptyVault(), anna.key)
+    api.fetchHouseholdVault.mockResolvedValue({ ...payload, version: 9, updated_at: 'x' })
+    return mek
+  }
+
+  test('creating a household opens it, without being asked twice', async () => {
+    await signIn()
+    await tryRestoreVault()
+    api.createHousehold.mockResolvedValue({ id: 7, updated_at: 'x' })
+
+    await createHousehold('Zuhause')
+
+    expect(state.currentVaultId).toBe(7)
+  })
+
+  test('and a reload lands back on it', async () => {
+    await withHouseholds()
+    await tryRestoreVault()
+    await switchTo(3)
+    expect(state.currentVaultId).toBe(3)
+
+    // What a refresh does: the module state goes, the session storage stays.
+    clearVaultKeepingSession()
+    await tryRestoreVault()
+
+    expect(state.currentVaultId).toBe(3)
+  })
+
+  test('a household that has since gone falls back to personal', async () => {
+    await withHouseholds()
+    await tryRestoreVault()
+    await switchTo(3)
+
+    clearVaultKeepingSession()
+    // Signed in again, but that household is no longer theirs.
+    api.fetchHouseholds.mockResolvedValue([])
+    await tryRestoreVault()
+
+    expect(state.currentVaultId).toBe('personal')
+  })
+
+  test('signing out forgets it, so the next person starts on their own', async () => {
+    await withHouseholds()
+    await tryRestoreVault()
+    await switchTo(3)
+
+    clearVault()
+    await withHouseholds()
+    await tryRestoreVault()
+
+    expect(state.currentVaultId).toBe('personal')
+  })
+})
+
+/**
+ * A reload, as far as the store is concerned: everything in memory goes, and
+ * sessionStorage does not. `clearVault` is sign-out and clears both, so it
+ * cannot stand in for this.
+ */
+function clearVaultKeepingSession() {
+  const mek = sessionStorage.getItem('vault_mek')
+  const current = sessionStorage.getItem('vault_current')
+  clearVault()
+  if (mek) sessionStorage.setItem('vault_mek', mek)
+  if (current) sessionStorage.setItem('vault_current', current)
+}
