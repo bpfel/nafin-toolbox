@@ -93,10 +93,40 @@ func (s *Store) GetEncryptedMEK(ctx context.Context, userID int) (encryptedMEK s
 	return
 }
 
-func (s *Store) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string) error {
+// GetIdentity returns the user's two keypairs, or a zero Identity if they have
+// none — which is every user who set their vault up before identities existed.
+//
+// The columns are nullable, so each is scanned through a sql.NullString rather
+// than a string: a NULL into a *string is an error, and "this user has no
+// identity yet" is an ordinary answer rather than a failure.
+func (s *Store) GetIdentity(ctx context.Context, userID int) (Identity, error) {
+	var pub, priv, verify, sign sql.NullString
+	err := s.db.QueryRowContext(ctx,
+		`SELECT public_key, encrypted_private_key, verifying_key, encrypted_signing_key
+		 FROM users WHERE id = $1`,
+		userID,
+	).Scan(&pub, &priv, &verify, &sign)
+	if err != nil {
+		return Identity{}, err
+	}
+	return Identity{
+		PublicKey:           pub.String,
+		EncryptedPrivateKey: priv.String,
+		VerifyingKey:        verify.String,
+		EncryptedSigningKey: sign.String,
+	}, nil
+}
+
+func (s *Store) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string, identity Identity) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET encrypted_mek = $2, recovery_key_hash = $3, encrypted_mek_recovery = $4 WHERE id = $1`,
+		`UPDATE users
+		 SET encrypted_mek = $2, recovery_key_hash = $3, encrypted_mek_recovery = $4,
+		     public_key = $5, encrypted_private_key = $6,
+		     verifying_key = $7, encrypted_signing_key = $8
+		 WHERE id = $1`,
 		userID, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery,
+		identity.PublicKey, identity.EncryptedPrivateKey,
+		identity.VerifyingKey, identity.EncryptedSigningKey,
 	)
 	return err
 }

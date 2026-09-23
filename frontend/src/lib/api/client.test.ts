@@ -180,6 +180,10 @@ describe('setupVaultKeys', () => {
       encrypted_mek: 'base64encodedmek',
       recovery_key_hash: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
+      public_key: 'base64spki',
+      encrypted_private_key: 'base64sealedprivate',
+      verifying_key: 'base64verifying',
+      encrypted_signing_key: 'base64sealedsigning',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -203,6 +207,10 @@ describe('setupVaultKeys', () => {
       encrypted_mek: '',
       recovery_key_hash: '',
       encrypted_mek_recovery: '',
+      public_key: 'base64spki',
+      encrypted_private_key: 'base64sealedprivate',
+      verifying_key: 'base64verifying',
+      encrypted_signing_key: 'base64sealedsigning',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -226,6 +234,10 @@ describe('setupVaultKeys', () => {
       encrypted_mek: 'base64encodedmek',
       recovery_key_hash: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
+      public_key: 'base64spki',
+      encrypted_private_key: 'base64sealedprivate',
+      verifying_key: 'base64verifying',
+      encrypted_signing_key: 'base64sealedsigning',
     }
 
     mockFetch.mockResolvedValueOnce({

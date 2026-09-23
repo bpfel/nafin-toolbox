@@ -1,9 +1,11 @@
 package vault
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,6 +29,9 @@ type mockStore struct {
 	setMEKErr          error
 	updateMEKErr       error
 	getRecoveryDataErr error
+
+	identity    Identity
+	getIdentErr error
 
 	// Captured so tests can assert the precondition reached the store.
 	lastExpectedUpdatedAt *time.Time
@@ -68,13 +73,21 @@ func (m *mockStore) GetEncryptedMEK(ctx context.Context, userID int) (string, in
 	return m.encryptedMEK, m.iterations, nil
 }
 
-func (m *mockStore) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string) error {
+func (m *mockStore) GetIdentity(ctx context.Context, userID int) (Identity, error) {
+	if m.getIdentErr != nil {
+		return Identity{}, m.getIdentErr
+	}
+	return m.identity, nil
+}
+
+func (m *mockStore) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string, identity Identity) error {
 	if m.setMEKErr != nil {
 		return m.setMEKErr
 	}
 	m.encryptedMEK = encryptedMEK
 	m.recoveryKeyHash = recoveryKeyHash
 	m.encryptedMEKRecov = encryptedMEKRecovery
+	m.identity = identity
 	return nil
 }
 
@@ -1202,5 +1215,170 @@ func TestHandlePutVault_ReturnsNewUpdatedAt(t *testing.T) {
 	}
 	if got.UpdatedAt.IsZero() {
 		t.Error("response did not carry updated_at")
+	}
+}
+
+// --- Identity tests ---
+//
+// An identity is the pair of keypairs that lets one user wrap a shared vault's
+// key for another. The rule the handler enforces is that it arrives whole or
+// not at all; a half-stored identity would invite other users to encrypt to a
+// key this user can never unwrap, and the failure would surface much later, to
+// somebody else, as a vault that will not open.
+
+func completeIdentity() Identity {
+	return Identity{
+		PublicKey:           "cHVibGlj",
+		EncryptedPrivateKey: "cHJpdmF0ZQ==",
+		VerifyingKey:        "dmVyaWZ5",
+		EncryptedSigningKey: "c2lnbg==",
+	}
+}
+
+func TestHandleGetKeys_ReturnsIdentity(t *testing.T) {
+	store := &mockStore{
+		encryptedMEK: "bWVr",
+		iterations:   600000,
+		identity:     completeIdentity(),
+	}
+	handler := handleGetKeys(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/vault/keys", nil)
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	var got KeysResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if got.Identity != completeIdentity() {
+		t.Errorf("identity = %+v, want %+v", got.Identity, completeIdentity())
+	}
+}
+
+// A user who set their vault up before identities existed has none, and must
+// still be handed their MEK — refusing would lock them out of a vault they can
+// open perfectly well.
+func TestHandleGetKeys_NoIdentityIsNotAnError(t *testing.T) {
+	store := &mockStore{
+		encryptedMEK: "bWVr",
+		iterations:   600000,
+		getIdentErr:  errors.New("no identity"),
+	}
+	handler := handleGetKeys(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/vault/keys", nil)
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	var got KeysResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if got.EncryptedMEK != "bWVr" {
+		t.Errorf("encrypted_mek = %q, want %q", got.EncryptedMEK, "bWVr")
+	}
+	if !got.Identity.Empty() {
+		t.Errorf("identity = %+v, want empty", got.Identity)
+	}
+}
+
+func TestHandleSetupKeys_StoresIdentity(t *testing.T) {
+	store := &mockStore{}
+	handler := handleSetupKeys(store)
+
+	body := `{"encrypted_mek":"bWVr","recovery_key_hash":"cms=","encrypted_mek_recovery":"cmVj",
+	          "public_key":"cHVibGlj","encrypted_private_key":"cHJpdmF0ZQ==",
+	          "verifying_key":"dmVyaWZ5","encrypted_signing_key":"c2lnbg=="}`
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if store.identity != completeIdentity() {
+		t.Errorf("stored identity = %+v, want %+v", store.identity, completeIdentity())
+	}
+}
+
+func TestHandleSetupKeys_RejectsPartialIdentity(t *testing.T) {
+	// Every one of the four halves missing on its own, so no single field can
+	// quietly stop being required.
+	full := map[string]string{
+		"public_key":            "cHVibGlj",
+		"encrypted_private_key": "cHJpdmF0ZQ==",
+		"verifying_key":         "dmVyaWZ5",
+		"encrypted_signing_key": "c2lnbg==",
+	}
+
+	for omitted := range full {
+		t.Run("without "+omitted, func(t *testing.T) {
+			fields := map[string]string{
+				"encrypted_mek":          "bWVr",
+				"recovery_key_hash":      "cms=",
+				"encrypted_mek_recovery": "cmVj",
+			}
+			for k, v := range full {
+				if k != omitted {
+					fields[k] = v
+				}
+			}
+			body, err := json.Marshal(fields)
+			if err != nil {
+				t.Fatalf("marshalling body: %v", err)
+			}
+
+			store := &mockStore{}
+			handler := handleSetupKeys(store)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(userCtx(1))
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want %d; body %s", w.Code, http.StatusBadRequest, w.Body.String())
+			}
+			if store.encryptedMEK != "" {
+				t.Errorf("MEK was stored despite a partial identity")
+			}
+		})
+	}
+}
+
+// A client too old to send an identity must still be able to set a vault up.
+func TestHandleSetupKeys_AllowsAbsentIdentity(t *testing.T) {
+	store := &mockStore{}
+	handler := handleSetupKeys(store)
+
+	body := `{"encrypted_mek":"bWVr","recovery_key_hash":"cms=","encrypted_mek_recovery":"cmVj"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if !store.identity.Empty() {
+		t.Errorf("identity = %+v, want empty", store.identity)
 	}
 }

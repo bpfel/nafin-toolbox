@@ -1,6 +1,7 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
 import { fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError } from '../api/client'
+import { generateIdentity, sealIdentity, openIdentity, isComplete, type OpenIdentity } from './identity'
 
 let vault = $state<VaultData | null>(null)
 let mek = $state<CryptoKey | null>(null)
@@ -8,6 +9,17 @@ let dirty = $state(false)
 let saving = $state(false)
 let lastSaved = $state<Date | null>(null)
 let unlocked = $state(false)
+
+/**
+ * The user's own keypairs, once unsealed.
+ *
+ * Null for anyone whose vault predates identities, and null before unlock —
+ * both private halves are sealed under the MEK, so there is nothing to hold
+ * until the MEK is in hand. Nothing in the app needs it yet; it is here because
+ * the moment it can be derived is the moment the MEK becomes available, and
+ * deriving it later would mean asking for the password again.
+ */
+let identity = $state<OpenIdentity | null>(null)
 
 // The updated_at last seen from the server. Sent back on save so a stale write
 // is refused rather than silently replacing a newer vault. Null means "nothing
@@ -84,6 +96,12 @@ export function getVaultState() {
     get unlocked() { return unlocked },
     /** True while the screens are showing a throwaway copy. See `parked`. */
     get previewing() { return parked !== null },
+    /**
+     * The user's own keypairs, or null if they have none — which is every vault
+     * created before identities existed. A household cannot be shared without
+     * one.
+     */
+    get identity() { return identity },
   }
 }
 
@@ -133,6 +151,11 @@ export async function tryRestoreVault(): Promise<boolean> {
       lastUpdatedAt = null
     }
     mek = cachedMEK
+    // A restored session has to be as capable as a freshly unlocked one. If
+    // this were left out, reloading the page would silently take away the
+    // ability to share a household until the next real sign-in.
+    const keys = await fetchVaultKeys()
+    identity = isComplete(keys) ? await openIdentity(keys, cachedMEK) : null
     unlocked = true
     return true
   } catch (e) {
@@ -159,6 +182,7 @@ export async function initializeVault(password: string, email: string): Promise<
   try {
     const kek = await deriveKEK(password, email, keys.iterations)
     mek = await unwrapMEK(keys.encrypted_mek, kek)
+    identity = isComplete(keys) ? await openIdentity(keys, mek) : null
 
     const vaultData = await fetchVault()
     if (vaultData) {
@@ -199,12 +223,21 @@ export async function setupKeys(password: string, email: string): Promise<string
   // Hash the recovery key for server-side verification
   const recoveryKeyHash = await hashRecoveryKey(recoveryKey)
 
+  // Generated for everyone, sharing or not. A keypair that only appears when
+  // somebody first wants to share is a keypair that is missing at the moment an
+  // invitation arrives — and generating one then would need the password again,
+  // which by then has been typed and forgotten.
+  const freshIdentity = await generateIdentity()
+  const sealed = await sealIdentity(freshIdentity, newMEK)
+
   await setupVaultKeys({
     encrypted_mek: encryptedMEK,
     recovery_key_hash: recoveryKeyHash,
     encrypted_mek_recovery: encryptedMEKRecovery,
+    ...sealed,
   })
 
+  identity = await openIdentity(sealed, newMEK)
   mek = newMEK
   vault = createEmptyVault()
   await saveVault()
@@ -294,6 +327,9 @@ export function clearVault(): void {
   }
   vault = null
   mek = null
+  // With the MEK, and for the same reason: two unsealed private keys are worth
+  // no less than the vault they can open.
+  identity = null
   dirty = false
   saving = false
   lastSaved = null
@@ -338,8 +374,12 @@ export async function recoverVault(
   const newEncryptedMEK = await wrapMEK(recoveredMEK, newKEK)
   await updateVaultKeys(newEncryptedMEK)
 
-  // Decrypt vault
+  // The identity is sealed under the MEK, not under the password, so recovery
+  // does not disturb it — and the user keeps the keypairs their households
+  // already wrapped keys to.
   mek = recoveredMEK
+  identity = isComplete(result) ? await openIdentity(result, recoveredMEK) : null
+
   const vaultData = await fetchVault()
   if (vaultData) {
     vault = await decryptVault(vaultData.ciphertext, vaultData.nonce, mek)

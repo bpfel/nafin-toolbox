@@ -37,10 +37,50 @@ type PutVaultResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// Identity is the pair of keypairs that lets one user hand a key to another.
+//
+// Everything else in the vault is symmetric, which works only because one
+// person opens it. Wrapping a shared vault's key for a partner cannot be done
+// that way — it would mean knowing their password — so each user carries a
+// public half others can wrap to, and a signing half that says who did the
+// wrapping.
+//
+// The server stores all four fields and understands none of them: two are
+// public by design, and two are ciphertext under a key it never sees.
+type Identity struct {
+	// RSA-2048-OAEP-SHA256 public key, SPKI, base64.
+	PublicKey string `json:"public_key"`
+	// The matching private key, wrapped under the MEK.
+	EncryptedPrivateKey string `json:"encrypted_private_key"`
+	// Ed25519 public key, raw 32 bytes, base64.
+	VerifyingKey string `json:"verifying_key"`
+	// The matching Ed25519 private key, wrapped under the MEK.
+	EncryptedSigningKey string `json:"encrypted_signing_key"`
+}
+
+// Complete reports whether all four halves are present.
+//
+// Either an identity is whole or the user has none: a public key without its
+// private half would invite others to wrap keys this user can never unwrap.
+func (i Identity) Complete() bool {
+	return i.PublicKey != "" && i.EncryptedPrivateKey != "" &&
+		i.VerifyingKey != "" && i.EncryptedSigningKey != ""
+}
+
+// Empty reports whether none of the four halves is present, which is what every
+// user created before identities existed looks like.
+func (i Identity) Empty() bool {
+	return i.PublicKey == "" && i.EncryptedPrivateKey == "" &&
+		i.VerifyingKey == "" && i.EncryptedSigningKey == ""
+}
+
 // KeysResponse is returned by GET /vault/keys.
 type KeysResponse struct {
 	EncryptedMEK string `json:"encrypted_mek"`
 	Iterations   int    `json:"iterations"`
+	// Inline rather than nested, so a client reads one flat object. Every field
+	// is empty for a user who set their vault up before identities existed.
+	Identity
 }
 
 // KeySetupRequest is sent by POST /vault/keys (initial setup).
@@ -48,6 +88,7 @@ type KeySetupRequest struct {
 	EncryptedMEK         string `json:"encrypted_mek"`
 	RecoveryKeyHash      string `json:"recovery_key_hash"`
 	EncryptedMEKRecovery string `json:"encrypted_mek_recovery"`
+	Identity
 }
 
 // KeyUpdateRequest is sent by PUT /vault/keys (password change re-wrap).
@@ -63,4 +104,10 @@ type RecoveryRequest struct {
 // RecoveryResponse is returned after successful recovery verification.
 type RecoveryResponse struct {
 	EncryptedMEKRecovery string `json:"encrypted_mek_recovery"`
+	// Carried here as well as on KeysResponse, because recovery is the one path
+	// that reaches an unlocked vault without going through GET /keys. The
+	// identity is sealed under the MEK rather than the password, so it survives
+	// a password reset untouched — and a user who lost it would lose their place
+	// in every household that had wrapped a key to them.
+	Identity
 }

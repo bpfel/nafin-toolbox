@@ -49,6 +49,17 @@ export async function healthCheck(): Promise<{ status: string }> {
 export interface VaultKeysResponse {
   encrypted_mek: string
   iterations: number
+  /**
+   * The user's two keypairs, flat on the same object.
+   *
+   * Every field is absent for anyone who set their vault up before identities
+   * existed, which is why they are optional here rather than required. Use
+   * `isComplete` from `crypto/identity` rather than testing them one by one.
+   */
+  public_key?: string
+  encrypted_private_key?: string
+  verifying_key?: string
+  encrypted_signing_key?: string
 }
 
 export interface VaultPayloadResponse {
@@ -88,6 +99,10 @@ export async function setupVaultKeys(body: {
   encrypted_mek: string
   recovery_key_hash: string
   encrypted_mek_recovery: string
+  public_key: string
+  encrypted_private_key: string
+  verifying_key: string
+  encrypted_signing_key: string
 }): Promise<void> {
   await request('/vault/keys', {
     method: 'POST',
@@ -145,9 +160,18 @@ export async function putVault(body: {
   return res.json()
 }
 
-export async function recoverVaultKeys(recoveryKey: string): Promise<{ encrypted_mek_recovery: string } | null> {
+export interface VaultRecoveryResponse {
+  encrypted_mek_recovery: string
+  /** As on VaultKeysResponse: absent for a vault created before identities. */
+  public_key?: string
+  encrypted_private_key?: string
+  verifying_key?: string
+  encrypted_signing_key?: string
+}
+
+export async function recoverVaultKeys(recoveryKey: string): Promise<VaultRecoveryResponse | null> {
   try {
-    return await request<{ encrypted_mek_recovery: string }>('/vault/recovery', {
+    return await request<VaultRecoveryResponse>('/vault/recovery', {
       method: 'POST',
       body: JSON.stringify({ recovery_key: recoveryKey }),
     })
