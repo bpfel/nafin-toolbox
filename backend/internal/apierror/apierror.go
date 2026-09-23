@@ -26,6 +26,7 @@ const (
 	Vault  = "VAULT"
 	Module = "MOD"
 	Server = "SRV"
+	Upkeep = "UPK"
 )
 
 // codes maps "AREA|message" to the code the user sees.
@@ -92,6 +93,15 @@ var codes = map[string]string{
 	Vault + "|failed to save keys":         "VAULT-012",
 	Vault + "|failed to update keys":       "VAULT-013",
 	Vault + "|failed to hash recovery key": "VAULT-014",
+
+	// --- Upkeep reminders ---
+	Upkeep + "|invalid request body":    "UPK-001",
+	Upkeep + "|admin access required":   "UPK-002",
+	Upkeep + "|nothing to remind about": "UPK-003",
+	Upkeep + "|too many entries":        "UPK-004",
+	Upkeep + "|an entry has no subject": "UPK-005",
+	Upkeep + "|failed to send reminder": "UPK-006",
+	Upkeep + "|too many reminders":      "UPK-007",
 
 	// --- Request handling ---
 	Server + "|origin not allowed": "SRV-001",

@@ -12,6 +12,7 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/email"
+	"github.com/bpfel/nafin-toolbox/internal/upkeep"
 	"github.com/bpfel/nafin-toolbox/internal/vault"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -51,6 +52,9 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	setupLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verifyEmailLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verify2FALimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
+	// Four figures change about four times a year between them; six sends an
+	// hour is room to retry a bounced one without leaving a mail button open.
+	remindLimiter := auth.NewLoginRateLimiter(6, time.Hour)
 	if proxies := os.Getenv("TRUSTED_PROXIES"); proxies != "" {
 		var cidrs []string
 		for _, c := range strings.Split(proxies, ",") {
@@ -63,6 +67,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		setupLimiter.SetTrustedProxies(cidrs)
 		verifyEmailLimiter.SetTrustedProxies(cidrs)
 		verify2FALimiter.SetTrustedProxies(cidrs)
+		remindLimiter.SetTrustedProxies(cidrs)
 	}
 
 	deps := &auth.HandlerDeps{
@@ -112,6 +117,8 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))
+
+			r.Post("/upkeep/remind", upkeep.Handle(deps, remindLimiter))
 
 			r.Route("/vault", vault.Routes(s.db))
 		})

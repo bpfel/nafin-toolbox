@@ -36,6 +36,7 @@ export type Screen =
   | 'profile'
   | 'users'
   | 'audit'
+  | 'upkeep'
   | 'verify'
 
 const SCREENS: Record<string, Screen> = {
@@ -45,6 +46,7 @@ const SCREENS: Record<string, Screen> = {
   profile: 'profile',
   users: 'users',
   audit: 'audit',
+  upkeep: 'upkeep',
   verify: 'verify',
 }
 

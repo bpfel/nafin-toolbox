@@ -15,6 +15,7 @@ export const it: Messages = {
   'nav.knowledge': 'Sapere',
   'nav.profile': 'Profilo',
   'nav.audit': 'Registro',
+  'nav.upkeep': 'Manutenzione',
   'nav.label': 'Sezioni',
   'privacy.hide': 'Nascondi importi',
   'privacy.show': 'Mostra importi',

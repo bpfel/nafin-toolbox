@@ -70,7 +70,7 @@ func TestCodesLookLikeCodes(t *testing.T) {
 // it, or a user reads out AUTH-000 and we learn nothing.
 func TestEveryHandlerMessageHasACode(t *testing.T) {
 	areaOf := map[string]string{
-		"Auth": Auth, "Vault": Vault, "Module": Module, "Server": Server,
+		"Auth": Auth, "Vault": Vault, "Module": Module, "Server": Server, "Upkeep": Upkeep,
 	}
 	call := regexp.MustCompile(`apierror\.Write\(w, apierror\.(\w+), [^,]+, "([^"]*)"\)`)
 
