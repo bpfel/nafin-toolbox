@@ -52,7 +52,23 @@
   let offerTour = $derived(
     !isAdmin && route.screen === 'budget' && shouldOfferTour(vaultState.vault),
   )
-  let reachable = $derived(new Set(destinationsFor(role).map((d) => d.screen)))
+  /**
+   * Screens you can arrive at but cannot navigate to.
+   *
+   * `join` is reached by following an invitation link and has no button
+   * anywhere, by design — there is nothing to go back to and nobody browses to
+   * it. Without this it was treated as a typo and replaced with the landing
+   * screen, so every invitation link in existence quietly opened the budget.
+   *
+   * Not for an administrator: they have no vault, so no keypair, so nothing an
+   * invitation could ever be wrapped to. Sending them to their own landing
+   * screen is the right answer rather than a screen that could only fail.
+   */
+  let arrivable = $derived<Screen[]>(isAdmin ? [] : ['join'])
+
+  let reachable = $derived(
+    new Set([...destinationsFor(role).map((d) => d.screen), ...arrivable]),
+  )
 
   /**
    * Sends `/`, a typo, and another role's address to wherever this role starts.

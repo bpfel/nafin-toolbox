@@ -91,6 +91,9 @@
     busy = true
     try {
       await withdrawInvite(householdId, inviteId)
+      // The link on screen opens the invitation that was just withdrawn, so
+      // leaving it up offers somebody a link that cannot work.
+      freshLink = null
       await refresh()
     } catch {
       error = t('household.failed')
