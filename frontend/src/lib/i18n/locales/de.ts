@@ -122,6 +122,26 @@ export const de: Messages = {
   'action.more': 'Aktionen',
 
   // --- Security settings ---
+  // --- Households ---
+  'household.title': 'Haushalte',
+  'household.hint': 'Ein Haushalt ist ein Budget zum Teilen. Geteilt wird erst, wenn du jemanden einlädst.',
+  'household.none': 'Noch keine vorhanden.',
+  'household.create': 'Haushalt beginnen',
+  'household.nameLabel': 'Name',
+  'household.namePlaceholder': 'Zuhause, WG mit Anna…',
+  'household.creating': 'Wird erstellt…',
+  'household.owner': 'Deiner',
+  'household.member': 'Mit dir geteilt',
+  'household.rename': 'Umbenennen',
+  'household.delete': 'Löschen',
+  'household.deletePrompt': '{name} löschen? Alles darin geht verloren, für alle Beteiligten.',
+  'household.deleting': 'Wird gelöscht…',
+  'household.switchTo': 'Öffnen',
+  'household.personal': 'Persönlich',
+  'household.current': 'Jetzt offen',
+  'household.needsKeys': 'Richte zuerst die Verschlüsselung ein.',
+  'household.failed': 'Das hat nicht geklappt. Bitte erneut versuchen.',
+
   'security.twofaTitle': 'Zwei-Faktor-Authentifizierung',
   'security.currentPasswordPlaceholder': 'Aktuelles Passwort',
   'security.disablePrompt': 'Gib dein Passwort ein, um 2FA zu deaktivieren:',

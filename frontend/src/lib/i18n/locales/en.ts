@@ -137,6 +137,26 @@ export const en = {
   'action.more': 'Actions',
 
   // --- Security settings ---
+  // --- Households ---
+  'household.title': 'Households',
+  'household.hint': 'A household is a budget you can share. Nothing is shared until you invite someone.',
+  'household.none': 'You have none yet.',
+  'household.create': 'Start a household',
+  'household.nameLabel': 'Name',
+  'household.namePlaceholder': 'Zuhause, Flat with Anna…',
+  'household.creating': 'Creating…',
+  'household.owner': 'Yours',
+  'household.member': 'Shared with you',
+  'household.rename': 'Rename',
+  'household.delete': 'Delete',
+  'household.deletePrompt': 'Delete {name}? Everything in it is lost, for everyone in it.',
+  'household.deleting': 'Deleting…',
+  'household.switchTo': 'Open',
+  'household.personal': 'Personal',
+  'household.current': 'Open now',
+  'household.needsKeys': 'Set up encryption before starting a household.',
+  'household.failed': 'That did not work. Try again.',
+
   'security.twofaTitle': 'Two-Factor Authentication',
   'security.currentPasswordPlaceholder': 'Current password',
   'security.disablePrompt': 'Enter your password to disable 2FA:',

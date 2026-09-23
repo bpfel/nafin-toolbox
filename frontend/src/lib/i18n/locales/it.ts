@@ -133,6 +133,26 @@ export const it: Messages = {
   'address.country': 'Paese',
 
   // --- Security settings ---
+  // --- Households ---
+  'household.title': 'Economie domestiche',
+  'household.hint': 'Un’economia domestica è un budget da condividere. Nulla è condiviso finché non inviti qualcuno.',
+  'household.none': 'Non ne hai ancora.',
+  'household.create': 'Crea un’economia domestica',
+  'household.nameLabel': 'Nome',
+  'household.namePlaceholder': 'Casa, Coinquilini con Anna…',
+  'household.creating': 'Creazione…',
+  'household.owner': 'Tua',
+  'household.member': 'Condivisa con te',
+  'household.rename': 'Rinomina',
+  'household.delete': 'Elimina',
+  'household.deletePrompt': 'Eliminare {name}? Tutto il contenuto andrà perso, per tutti.',
+  'household.deleting': 'Eliminazione…',
+  'household.switchTo': 'Apri',
+  'household.personal': 'Personale',
+  'household.current': 'Aperta',
+  'household.needsKeys': 'Configura prima la cifratura.',
+  'household.failed': 'Non ha funzionato. Riprovate.',
+
   'security.twofaTitle': 'Autenticazione a due fattori',
   'security.currentPasswordPlaceholder': 'Password attuale',
   'security.disablePrompt': 'Inserisci la password per disattivare la 2FA:',

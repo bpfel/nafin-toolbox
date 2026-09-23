@@ -133,6 +133,26 @@ export const fr: Messages = {
   'address.country': 'Pays',
 
   // --- Security settings ---
+  // --- Households ---
+  'household.title': 'Ménages',
+  'household.hint': 'Un ménage est un budget à partager. Rien n’est partagé avant que tu n’invites quelqu’un.',
+  'household.none': 'Tu n’en as encore aucun.',
+  'household.create': 'Créer un ménage',
+  'household.nameLabel': 'Nom',
+  'household.namePlaceholder': 'Maison, Coloc avec Anna…',
+  'household.creating': 'Création…',
+  'household.owner': 'Le tien',
+  'household.member': 'Partagé avec toi',
+  'household.rename': 'Renommer',
+  'household.delete': 'Supprimer',
+  'household.deletePrompt': 'Supprimer {name} ? Tout son contenu sera perdu, pour tout le monde.',
+  'household.deleting': 'Suppression…',
+  'household.switchTo': 'Ouvrir',
+  'household.personal': 'Personnel',
+  'household.current': 'Ouvert',
+  'household.needsKeys': 'Configure d’abord le chiffrement.',
+  'household.failed': 'Cela n’a pas fonctionné. Réessayez.',
+
   'security.twofaTitle': 'Authentification à deux facteurs',
   'security.currentPasswordPlaceholder': 'Mot de passe actuel',
   'security.disablePrompt': 'Saisis ton mot de passe pour désactiver la 2FA:',

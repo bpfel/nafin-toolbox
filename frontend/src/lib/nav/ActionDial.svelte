@@ -3,6 +3,10 @@
   import { t } from '../i18n/index.svelte'
   import { getRoute } from './router.svelte'
   import { markDial } from './dial'
+  import { getVaultState } from '../crypto/vaultStore.svelte'
+  import { initialsOf } from '../crypto/household'
+  import HouseMark from '../household/HouseMark.svelte'
+  import VaultSwitch from '../household/VaultSwitch.svelte'
 
   /**
    * The controls that act on the whole screen: a toolbar on a desktop, a dial
@@ -43,6 +47,16 @@
   markDial()
 
   const route = getRoute()
+  const vaultState = getVaultState()
+
+  /**
+   * The household on screen, if any.
+   *
+   * The dot wears its mark instead of the three dots while one is open, because
+   * on a phone the dot is the only thing always visible — and which budget is
+   * being edited has to be answerable without opening anything.
+   */
+  const household = $derived(vaultState.currentHousehold)
 
   /**
    * Unique per dial, because there is more than one in the document.
@@ -144,6 +158,17 @@
       {saving ? t('state.saving') : dirty ? t('state.unsaved') : ''}
     </span>
 
+    <!--
+      Which budget this is, first in the strip and therefore leftmost on a
+      desktop toolbar. Before the spacer, so it stays with the screen's identity
+      rather than drifting into the row of things that act on it.
+
+      It draws nothing until a household exists: somebody who has never started
+      one has a single budget, and a control offering to switch to the only
+      thing there is would be furniture.
+    -->
+    <VaultSwitch />
+
     <span class="spacer"></span>
 
     {@render children()}
@@ -157,29 +182,43 @@
     type="button"
     aria-expanded={expanded}
     aria-controls={stripId}
-    aria-label={expanded ? t('action.close') : t('action.more')}
+    aria-label={expanded
+      ? t('action.close')
+      : household
+        ? `${t('action.more')} — ${household.name}`
+        : t('action.more')}
     title={expanded ? t('action.close') : t('action.more')}
     onclick={() => (expanded = !expanded)}
   >
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      {#if expanded}
-        <line x1="18" y1="6" x2="6" y2="18" />
-        <line x1="6" y1="6" x2="18" y2="18" />
-      {:else}
-        <!-- Three dots stacked the way the controls will be. -->
-        <circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" />
-        <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
-        <circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" />
-      {/if}
-    </svg>
+    {#if household && !expanded}
+      <!--
+        The house replaces the three dots rather than joining them. The dot is
+        56px and already carries the save ring on its rim; a mark and a glyph
+        together would be the fourth thing on a target meant to be hit without
+        looking.
+      -->
+      <HouseMark initials={initialsOf(household.name)} large />
+    {:else}
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        {#if expanded}
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        {:else}
+          <!-- Three dots stacked the way the controls will be. -->
+          <circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" />
+        {/if}
+      </svg>
+    {/if}
   </button>
 </div>
 

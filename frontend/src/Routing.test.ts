@@ -60,8 +60,18 @@ vi.mock('./lib/crypto/vaultStore.svelte', () => ({
     conflicted: false,
     lastSaved: null,
     versionAhead: false,
+    // Somebody who has never started a household. The switch draws nothing in
+    // that state, which is what every assertion below about the shell assumes.
+    identity: null,
+    households: [],
+    currentVaultId: 'personal',
+    currentHousehold: null,
   }),
   markDirty: vi.fn(),
+  switchTo: vi.fn(),
+  createHousehold: vi.fn(),
+  renameHousehold: vi.fn(),
+  deleteHousehold: vi.fn(),
 }))
 
 vi.mock('./lib/util/buildVersion.svelte', () => ({
