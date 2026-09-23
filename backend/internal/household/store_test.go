@@ -827,3 +827,40 @@ func TestStore_Rekey(t *testing.T) {
 		}
 	})
 }
+
+// A rekey advances the generation, so grants made after it cannot be confused
+// with grants made before.
+func TestStore_RekeyAdvancesTheEpoch(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-epoch@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	first, err := store.ListForUser(ctx, anna)
+	if err != nil {
+		t.Fatalf("ListForUser: %v", err)
+	}
+	if first[0].KeyEpoch != 1 {
+		t.Fatalf("a new household starts at epoch %d, want 1", first[0].KeyEpoch)
+	}
+
+	if _, err := store.Rekey(ctx, id, anna, RekeyRequest{
+		EncryptedName: "n",
+		Members:       []RekeyMember{{UserID: anna, WrappedKey: "k", WrapKind: WrapSelf}},
+	}, []byte("x"), []byte("y")); err != nil {
+		t.Fatalf("Rekey: %v", err)
+	}
+
+	after, err := store.ListForUser(ctx, anna)
+	if err != nil {
+		t.Fatalf("ListForUser: %v", err)
+	}
+	if after[0].KeyEpoch != 2 {
+		t.Errorf("epoch after a rekey = %d, want 2", after[0].KeyEpoch)
+	}
+}

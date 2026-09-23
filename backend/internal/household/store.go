@@ -74,7 +74,7 @@ func (s *Store) Create(ctx context.Context, userID int, req CreateRequest, ciphe
 // cost one decryption per entry.
 func (s *Store) ListForUser(ctx context.Context, userID int) ([]Household, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT v.id, v.encrypted_name, m.wrapped_key, m.wrap_kind, m.is_owner, v.version, v.updated_at
+		`SELECT v.id, v.encrypted_name, m.wrapped_key, m.wrap_kind, m.is_owner, v.version, v.key_epoch, v.updated_at
 		 FROM shared_vaults v
 		 JOIN shared_vault_members m ON m.vault_id = v.id
 		 WHERE m.user_id = $1
@@ -91,7 +91,7 @@ func (s *Store) ListForUser(ctx context.Context, userID int) ([]Household, error
 	households := []Household{}
 	for rows.Next() {
 		var h Household
-		if err := rows.Scan(&h.ID, &h.EncryptedName, &h.WrappedKey, &h.WrapKind, &h.IsOwner, &h.Version, &h.UpdatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.EncryptedName, &h.WrappedKey, &h.WrapKind, &h.IsOwner, &h.Version, &h.KeyEpoch, &h.UpdatedAt); err != nil {
 			return nil, err
 		}
 		households = append(households, h)
@@ -497,7 +497,8 @@ func (s *Store) Rekey(ctx context.Context, vaultID, userID int, req RekeyRequest
 	var updatedAt time.Time
 	if err := tx.QueryRowContext(ctx,
 		`UPDATE shared_vaults
-		 SET encrypted_name = $2, ciphertext = $3, nonce = $4, version = $5, updated_at = NOW()
+		 SET encrypted_name = $2, ciphertext = $3, nonce = $4, version = $5,
+		     key_epoch = key_epoch + 1, updated_at = NOW()
 		 WHERE id = $1
 		 RETURNING updated_at`,
 		vaultID, req.EncryptedName, ciphertext, nonce, req.Version,

@@ -103,8 +103,9 @@ describe('edit-mode controls are never hidden', () => {
 describe('the controls are in the DOM the moment edit mode is on', () => {
   function vault(): VaultData {
     return {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',

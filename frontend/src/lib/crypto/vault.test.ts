@@ -212,8 +212,9 @@ describe('encryptVault and decryptVault', () => {
   test('round-trip encryption and decryption preserves data', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -360,8 +361,9 @@ describe('encryptVault and decryptVault', () => {
   test('preserves complex vault with multiple snapshots', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -409,8 +411,9 @@ describe('encryptVault and decryptVault', () => {
   test('preserves archived flag in entries', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -435,8 +438,9 @@ describe('encryptVault and decryptVault', () => {
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '1234.05', lastCorrectedAt: '2026-08-15' },
       ],
@@ -468,8 +472,9 @@ describe('encryptVault and decryptVault', () => {
   test('preserves special characters in text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: 'a1', name: 'Zürich «Haupt»', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -502,8 +507,9 @@ describe('encryptVault and decryptVault', () => {
   test('preserves sortOrder values', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -537,8 +543,9 @@ describe('encryptVault and decryptVault', () => {
 
     // Create a large vault with many entries
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: Array.from({ length: 5 }, (_, i) => ({
         id: `a${i}`,
         name: `Account ${i}`,
@@ -596,8 +603,9 @@ describe('encryptVault and decryptVault', () => {
   test('handles empty strings in all text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: '', name: '', kind: 'cash', currency: 'CHF', currentAmount: '', lastCorrectedAt: '' },
       ],
@@ -627,8 +635,9 @@ describe('encryptVault and decryptVault', () => {
   test('preserves exact JSON structure including whitespace in strings', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -660,8 +669,9 @@ describe('encryptVault and decryptVault', () => {
     const encryptedSmall = await encryptVault(smallVault, mek)
 
     const largeVault: VaultData = {
-      version: 8,
+      version: 9,
       tour: { completedAt: null, dismissedAt: null },
+      trust: { pins: {}, epochs: {} },
       accounts: [],
       budget: {
         categories: Array.from({ length: 50 }, (_, i) => ({
@@ -1143,8 +1153,69 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrated.budget.categories[0].side).toBe('expense')
   })
 
+  /**
+   * v8 -> v9: what this client has decided to believe about other people.
+   *
+   * Additive again, and the thing that can go wrong is the opposite of v8's.
+   * There, inventing a value would have silently withheld the tour; here it
+   * would silently *grant* trust — a pin nobody checked would accept whatever
+   * key happened to be there first, which is worse than having no pin at all.
+   * So both records start empty, and are only ever written by a client that has
+   * verified something.
+   */
+  function v8Vault() {
+    return {
+      version: 8,
+      tour: { completedAt: '2026-09-01', dismissedAt: null },
+      budget: { categories: [], entries: [], plan: [], snapshots: [] },
+      accounts: [
+        {
+          id: 'a1',
+          name: 'Main',
+          kind: 'transactional',
+          currency: 'CHF',
+          currentAmount: '100.00',
+          lastCorrectedAt: '2026-08-15',
+        },
+      ],
+    }
+  }
+
+  test('a v8 vault gains an empty trust record', () => {
+    const migrated = migrateVault(v8Vault())
+
+    expect(migrated.version).toBe(VAULT_VERSION)
+    expect(migrated.trust).toEqual({ pins: {}, epochs: {} })
+  })
+
+  test('and keeps everything it already had', () => {
+    const migrated = migrateVault(v8Vault())
+
+    // The tour in particular: a migration that reset it would offer the tour
+    // again to somebody who has already taken it.
+    expect(migrated.tour).toEqual({ completedAt: '2026-09-01', dismissedAt: null })
+    expect(migrated.accounts[0].currentAmount).toBe('100.00')
+  })
+
+  // The tell, as for every version before it: a vault claiming to be current
+  // while missing what a current vault always writes was renumbered by
+  // something that did not reshape it.
+  test('a vault stamped v9 without a trust record is migrated, not taken at its word', () => {
+    const migrated = migrateVault({ ...v8Vault(), version: 9 })
+
+    expect(migrated.trust).toEqual({ pins: {}, epochs: {} })
+  })
+
+  // And the shape check refuses to write one, which is what stops a bad
+  // migration outliving the tab that made it.
+  test('a vault without a trust record cannot be saved', () => {
+    const missing = { ...v8Vault(), version: 9 } as unknown as VaultData
+
+    expect(() => assertVaultShape(missing)).toThrow(/trust is missing/)
+  })
+
   test('a vault from a newer build is refused, not emptied', () => {
-    expect(() => migrateVault({ version: 9, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
+    expect(() => migrateVault({ version: 10, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
     expect(() => migrateVault({ version: 99, budget: { entries: [] } })).toThrow(/newer version/)
   })
 
@@ -1155,21 +1226,21 @@ describe('migrateVault — legacy versions forward', () => {
    * how a save silently drops whatever that build added.
    */
   test('a newer vault is refused even though it is missing this version’s keys', () => {
-    expect(() => migrateVault({ version: 9, budget: { entries: [] }, accounts: [] })).toThrow(
+    expect(() => migrateVault({ version: 10, budget: { entries: [] }, accounts: [] })).toThrow(
       VaultVersionAheadError,
     )
   })
 
   test('the refusal names both versions, so the log says what to do', () => {
     try {
-      migrateVault({ version: 9, budget: { entries: [] } })
+      migrateVault({ version: 10, budget: { entries: [] } })
       throw new Error('should have refused')
     } catch (e) {
       expect(e).toBeInstanceOf(VaultVersionAheadError)
-      expect((e as VaultVersionAheadError).found).toBe(9)
+      expect((e as VaultVersionAheadError).found).toBe(10)
       // Both numbers: the one found, and the one this build can read.
-      expect((e as Error).message).toContain('v9')
-      expect((e as Error).message).toContain('v8')
+      expect((e as Error).message).toContain('v10')
+      expect((e as Error).message).toContain(`v${VAULT_VERSION}`)
     }
   })
 

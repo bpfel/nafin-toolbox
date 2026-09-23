@@ -12,11 +12,14 @@ type Household struct {
 	// Sealed under the shared vault key. The server has never read it.
 	EncryptedName string `json:"encrypted_name"`
 	// This member's copy of that key, and how it is wrapped.
-	WrappedKey string    `json:"wrapped_key"`
-	WrapKind   string    `json:"wrap_kind"`
-	IsOwner    bool      `json:"is_owner"`
-	Version    int       `json:"version"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	WrappedKey string `json:"wrapped_key"`
+	WrapKind   string `json:"wrap_kind"`
+	IsOwner    bool   `json:"is_owner"`
+	Version    int    `json:"version"`
+	// Which generation of the key `wrapped_key` is. A client refuses anything
+	// below the highest it has already accepted.
+	KeyEpoch  int       `json:"key_epoch"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Vault is the encrypted payload of one household.

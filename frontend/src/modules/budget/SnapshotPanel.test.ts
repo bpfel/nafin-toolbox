@@ -33,8 +33,9 @@ function snapshotAmount(entryName: string): string {
 
 function makeVault(): VaultData {
   return {
-    version: 8,
+    version: 9,
     tour: { completedAt: null, dismissedAt: null },
+    trust: { pins: {}, epochs: {} },
     accounts: [
       {
         id: 'main',

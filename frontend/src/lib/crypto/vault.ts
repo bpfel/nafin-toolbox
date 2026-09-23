@@ -1,6 +1,6 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 8
+export const VAULT_VERSION = 9
 
 /**
  * A stored vault written by a build newer than this one.
@@ -19,11 +19,46 @@ export class VaultVersionAheadError extends Error {
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 8
+  version: 9
   budget: BudgetVaultData
   accounts: VaultAccount[]
   /** Whether the guided tour has been taken, or turned down. */
   tour: TourState
+  /** What this client has decided to believe about other people. */
+  trust: VaultTrust
+}
+
+/**
+ * The things a client must remember in order not to be lied to twice.
+ *
+ * Both belong in the *personal* vault rather than in a household's, because
+ * both are needed to decide whether a household's key may be opened at all —
+ * and a fact kept inside the thing it guards is a fact you cannot read until
+ * you have already trusted it.
+ *
+ * Neither is shared. They are one person's record of what they have accepted,
+ * and another member's copy could disagree without either being wrong.
+ */
+export interface VaultTrust {
+  /**
+   * Verifying keys accepted for other people, by user id, base64.
+   *
+   * Pinned after the first grant from somebody is verified. The server serves
+   * public keys unsigned and is the directory, so a key that silently changes
+   * afterwards is a substitution — the paper behind all of this recommends
+   * exactly this as the cheap fix, noting that even without out-of-band
+   * verification it means an attacker "can then only substitute public keys on
+   * their first use".
+   */
+  pins: Record<string, string>
+  /**
+   * The highest grant generation accepted, by household id.
+   *
+   * Signatures are static and infinitely replayable, so a compromised server
+   * could otherwise hand back a grant from before a rotation and put somebody
+   * on a key that was rotated away. This is the ratchet that refuses it.
+   */
+  epochs: Record<string, number>
 }
 
 /**
@@ -280,6 +315,20 @@ export function assertVaultShape(vault: VaultData): void {
   if (!tour || typeof tour !== 'object') {
     throw new VaultShapeError('tour is missing')
   }
+
+  // And v9's. Writing a vault without it would lose every pin and every epoch
+  // the client had learned, which is not a blank slate — it is a client that
+  // has forgotten it was ever lied to.
+  const trust = (vault as unknown as { trust?: { pins?: unknown; epochs?: unknown } }).trust
+  if (!trust || typeof trust !== 'object') {
+    throw new VaultShapeError('trust is missing')
+  }
+  if (!trust.pins || typeof trust.pins !== 'object') {
+    throw new VaultShapeError('trust.pins is missing')
+  }
+  if (!trust.epochs || typeof trust.epochs !== 'object') {
+    throw new VaultShapeError('trust.epochs is missing')
+  }
 }
 
 // --- Encrypt / decrypt ---
@@ -405,39 +454,54 @@ export function migrateVault(parsed: unknown): VaultData {
   // Narrowed to the one case the tell is for: a vault claiming to be current
   // while missing the key a current vault always writes. The honest case —
   // a vault that says 7 — is handled by its own branch below.
-  const wearingV7Keys = vault.version === VAULT_VERSION && vault.tour === undefined
+  const wearingV7Keys =
+    vault.version === 8 && (vault as { tour?: unknown }).tour === undefined
+
+  // v9 added a key, so the same reasoning as v8's tell applies — and the same
+  // narrowing. Only a vault claiming to be current while missing what a current
+  // vault always writes; anything older is handled by its own branch.
+  const wearingV8Keys =
+    vault.version === VAULT_VERSION && (vault as { trust?: unknown }).trust === undefined
 
   if (
     vault.version === VAULT_VERSION &&
     !wearingV4Keys &&
     !wearingV5Keys &&
     !wearingV6Keys &&
-    !wearingV7Keys
+    !wearingV7Keys &&
+    !wearingV8Keys
   ) {
     return vault as unknown as VaultData
   }
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
   // for being four steps behind.
   if (vault.version === 2) {
-    return migrateV7ToV8(
-      migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault))))),
+    return migrateV8ToV9(
+      migrateV7ToV8(
+        migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault))))),
+      ),
     )
   }
   if (vault.version === 3) {
-    return migrateV7ToV8(
-      migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape)))),
+    return migrateV8ToV9(
+      migrateV7ToV8(
+        migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape)))),
+      ),
     )
   }
   if (vault.version === 4 || wearingV4Keys) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape))))
+    return migrateV8ToV9(
+      migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape)))),
+    )
   }
   if (vault.version === 5 || wearingV5Keys) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape)))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape))))
   }
   if (vault.version === 6 || wearingV6Keys) {
-    return migrateV7ToV8(migrateV6ToV7(vault as unknown as V6Shape))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(vault as unknown as V6Shape)))
   }
-  if (vault.version === 7 || wearingV7Keys) return migrateV7ToV8(vault as unknown as V7Shape)
+  if (vault.version === 7 || wearingV7Keys) return migrateV8ToV9(migrateV7ToV8(vault as unknown as V7Shape))
+  if (vault.version === 8 || wearingV8Keys) return migrateV8ToV9(vault as unknown as V8Shape)
 
   // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
   // the data. Refuse it so the app can say so, instead of handing back an empty
@@ -795,10 +859,35 @@ interface V7Shape {
  * about existing users: the tour is new to them too, and an offer they can turn
  * down in one tap is a smaller imposition than never telling them it exists.
  */
-function migrateV7ToV8(vault: V7Shape): VaultData {
+function migrateV7ToV8(vault: V7Shape): V8Shape {
+  const migrated = vault as unknown as V8Shape
+  // 8 rather than VAULT_VERSION. Stamping the current number here would have
+  // claimed v9 for a shape with no `trust` in it — which is precisely the class
+  // of bug every `wearing…Keys` tell above exists to catch.
+  migrated.version = 8
+  migrated.tour = { completedAt: null, dismissedAt: null }
+  return migrated
+}
+
+interface V8Shape {
+  version: number
+  budget: BudgetVaultData
+  accounts: VaultAccount[]
+  tour: TourState
+}
+
+/**
+ * v8 -> v9: what this client has decided to believe about other people.
+ *
+ * Empty for everybody, and correctly so. Pins and epochs are things a client
+ * *learns* by verifying a grant; inventing either would be recording a decision
+ * nobody made, and a pin nobody checked is worse than no pin at all — it would
+ * silently accept whatever key happened to be there first.
+ */
+function migrateV8ToV9(vault: V8Shape): VaultData {
   const migrated = vault as unknown as VaultData
   migrated.version = VAULT_VERSION
-  migrated.tour = { completedAt: null, dismissedAt: null }
+  migrated.trust = { pins: {}, epochs: {} }
   return migrated
 }
 
@@ -814,6 +903,7 @@ export function createEmptyVault(): VaultData {
     // Invariant: a vault always holds at least one account, so every category
     // can be routed from the moment it is created.
     accounts: [createMainAccount()],
+    trust: { pins: {}, epochs: {} },
     tour: { completedAt: null, dismissedAt: null },
   }
 }
