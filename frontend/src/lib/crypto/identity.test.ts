@@ -5,8 +5,8 @@ import {
   openIdentity,
   isComplete,
   importPublicKey,
-  sealUnderMEK,
-  openUnderMEK,
+  sealUnder,
+  openUnder,
   toBase64,
   fromBase64,
   sign,
@@ -44,20 +44,20 @@ describe('sealing under the MEK', () => {
     const mek = await aMEK()
     const secret = crypto.getRandomValues(new Uint8Array(32))
 
-    expect(await openUnderMEK(await sealUnderMEK(secret, mek), mek)).toEqual(secret)
+    expect(await openUnder(await sealUnder(secret, mek), mek)).toEqual(secret)
   })
 
   it('uses a fresh nonce, so the same bytes never seal the same way twice', async () => {
     const mek = await aMEK()
     const secret = crypto.getRandomValues(new Uint8Array(32))
 
-    expect(await sealUnderMEK(secret, mek)).not.toBe(await sealUnderMEK(secret, mek))
+    expect(await sealUnder(secret, mek)).not.toBe(await sealUnder(secret, mek))
   })
 
   it('refuses the wrong MEK', async () => {
-    const sealed = await sealUnderMEK(new Uint8Array([1, 2, 3]), await aMEK())
+    const sealed = await sealUnder(new Uint8Array([1, 2, 3]), await aMEK())
 
-    await expect(openUnderMEK(sealed, await aMEK())).rejects.toThrow()
+    await expect(openUnder(sealed, await aMEK())).rejects.toThrow()
   })
 })
 

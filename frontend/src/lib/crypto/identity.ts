@@ -92,7 +92,7 @@ export function toBase64(bytes: Uint8Array): string {
  * hundred bytes at these sizes and removes the question entirely, which beats a
  * cast that asserts something the compiler is right to doubt.
  */
-function ownBuffer(bytes: Uint8Array): ArrayBuffer {
+export function ownBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new ArrayBuffer(bytes.byteLength)
   new Uint8Array(copy).set(bytes)
   return copy
@@ -105,16 +105,18 @@ export function fromBase64(value: string): Uint8Array {
   return bytes
 }
 
-// --- sealing bytes under the MEK ---
+// --- sealing bytes under a symmetric key ---
 //
 // Both private halves are sealed the same way, as bytes, rather than one
-// through `wrapKey` and one by hand. The MEK is generated for `encrypt`/
-// `decrypt` and not for `wrapKey`, so `wrapKey` would need the MEK's usages
-// widened for no gain — and one code path for both keys is one thing to get
-// right.
+// through `wrapKey` and one by hand. A MEK is generated for `encrypt`/`decrypt`
+// and not for `wrapKey`, so `wrapKey` would need its usages widened for no gain
+// — and one code path for both keys is one thing to get right.
+//
+// Named for what it does rather than for the MEK, because households seal
+// things under a household key with exactly the same two functions.
 
 /** Nonce + ciphertext, base64. The same layout `wrapMEK` uses. */
-export async function sealUnderMEK(bytes: Uint8Array, mek: CryptoKey): Promise<string> {
+export async function sealUnder(bytes: Uint8Array, mek: CryptoKey): Promise<string> {
   const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH))
   const ciphertext = await crypto.subtle.encrypt({ name: AES_ALGO, iv: nonce }, mek, ownBuffer(bytes))
 
@@ -124,7 +126,7 @@ export async function sealUnderMEK(bytes: Uint8Array, mek: CryptoKey): Promise<s
   return toBase64(combined)
 }
 
-export async function openUnderMEK(sealed: string, mek: CryptoKey): Promise<Uint8Array> {
+export async function openUnder(sealed: string, mek: CryptoKey): Promise<Uint8Array> {
   const combined = fromBase64(sealed)
   const nonce = combined.subarray(0, NONCE_LENGTH)
   const ciphertext = combined.subarray(NONCE_LENGTH)
@@ -158,14 +160,14 @@ export async function sealIdentity(identity: Identity, mek: CryptoKey): Promise<
 
   return {
     public_key: toBase64(new Uint8Array(spki)),
-    encrypted_private_key: await sealUnderMEK(new Uint8Array(pkcs8), mek),
+    encrypted_private_key: await sealUnder(new Uint8Array(pkcs8), mek),
     verifying_key: toBase64(identity.verifyingKey),
-    encrypted_signing_key: await sealUnderMEK(identity.signingKey, mek),
+    encrypted_signing_key: await sealUnder(identity.signingKey, mek),
   }
 }
 
 export async function openIdentity(sealed: SealedIdentity, mek: CryptoKey): Promise<OpenIdentity> {
-  const pkcs8 = await openUnderMEK(sealed.encrypted_private_key, mek)
+  const pkcs8 = await openUnder(sealed.encrypted_private_key, mek)
 
   return {
     publicKey: await importPublicKey(sealed.public_key),
@@ -176,7 +178,7 @@ export async function openIdentity(sealed: SealedIdentity, mek: CryptoKey): Prom
       false, // never needs exporting again
       ['decrypt'],
     ),
-    signingKey: await openUnderMEK(sealed.encrypted_signing_key, mek),
+    signingKey: await openUnder(sealed.encrypted_signing_key, mek),
     verifyingKey: fromBase64(sealed.verifying_key),
   }
 }

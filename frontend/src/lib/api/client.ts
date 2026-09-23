@@ -208,3 +208,102 @@ export async function sendUpkeepReminder(
     body: JSON.stringify({ entries }),
   })
 }
+
+// Households
+//
+// A household is a vault with more than one person in it. The endpoints mirror
+// the personal ones, with two differences: the payload is addressed by id
+// rather than by "whoever is signed in", and a list comes back first — because
+// a user may belong to several, and the switch has to name them without opening
+// any.
+
+/** One household, as listed. Deliberately without its payload. */
+export interface HouseholdListing {
+  id: number
+  /** Sealed under the household's own key. Open it with `openName`. */
+  encrypted_name: string
+  /** This member's copy of that key. */
+  wrapped_key: string
+  /** How `wrapped_key` is wrapped: 'self' or 'granted'. */
+  wrap_kind: string
+  is_owner: boolean
+  version: number
+  updated_at: string
+}
+
+export interface HouseholdVaultResponse {
+  ciphertext: string
+  nonce: string
+  version: number
+  updated_at: string
+}
+
+export async function fetchHouseholds(): Promise<HouseholdListing[]> {
+  return request<HouseholdListing[]>('/households')
+}
+
+export async function createHousehold(body: {
+  encrypted_name: string
+  wrapped_key: string
+  ciphertext: string
+  nonce: string
+  version: number
+}): Promise<{ id: number; updated_at: string }> {
+  return request<{ id: number; updated_at: string }>('/households', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/**
+ * Null when the household is not ours, or no longer there.
+ *
+ * The server answers 404 to both, on purpose — telling them apart would let
+ * anyone discover which household ids exist. So the client cannot tell either,
+ * and does not need to: either answer means "show the user their other
+ * households instead".
+ */
+export async function fetchHouseholdVault(id: number): Promise<HouseholdVaultResponse | null> {
+  try {
+    return await request<HouseholdVaultResponse>(`/households/${id}/vault`)
+  } catch {
+    return null
+  }
+}
+
+export async function putHouseholdVault(
+  id: number,
+  payload: { ciphertext: string; nonce: string; version: number; expected_updated_at?: string },
+): Promise<{ status: string; updated_at: string }> {
+  const res = await fetch(`${API_BASE}/households/${id}/vault`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+
+  // Handled here rather than through `request`, for the same reason the personal
+  // vault does: a 409 is not a failure the caller should treat like any other.
+  // It means another member wrote while this client was editing, and the answer
+  // is to reload rather than retry — which only this error can say.
+  if (res.status === 409) {
+    const body = await res.json().catch(() => ({}))
+    throw new VaultConflictError(withCode(body))
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ? withCode(body) : `API error: ${res.status} ${res.statusText}`)
+  }
+  return res.json()
+}
+
+export async function renameHousehold(id: number, encryptedName: string): Promise<void> {
+  await request(`/households/${id}/name`, {
+    method: 'PUT',
+    body: JSON.stringify({ encrypted_name: encryptedName }),
+  })
+}
+
+export async function deleteHousehold(id: number): Promise<void> {
+  await request(`/households/${id}`, { method: 'DELETE' })
+}
