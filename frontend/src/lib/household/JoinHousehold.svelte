@@ -89,6 +89,6 @@
 
   p {
     margin: 0 0 1rem;
-    color: var(--text-muted);
+    color: var(--ink-muted);
   }
 </style>

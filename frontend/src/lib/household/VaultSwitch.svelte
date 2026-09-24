@@ -112,10 +112,10 @@
     max-width: 14rem;
     min-width: 0;
     padding: 0.35rem 0.6rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--rule);
     border-radius: 999px;
     background: var(--surface);
-    color: var(--text-muted);
+    color: var(--ink-faint);
     font: inherit;
     font-size: 0.875rem;
     cursor: pointer;
@@ -156,7 +156,7 @@
     padding: 0.25rem;
     list-style: none;
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--rule);
     border-radius: 0.6rem;
     box-shadow: var(--shadow-raised);
   }
@@ -177,7 +177,7 @@
   }
 
   .list button:hover {
-    background: var(--surface-hover, rgba(127, 127, 127, 0.12));
+    background: var(--sunken);
   }
 
   .list button.current {

@@ -221,16 +221,26 @@
 </div>
 
 <style>
+  /*
+   * Recessed rather than ruled off.
+   *
+   * A top rule here was the same hairline that separates one household from the
+   * next, so an unfolded panel read as ambiguously belonging to either side of
+   * it. Sitting the panel on the sunken ground settles that without asking
+   * anybody to follow a line: it is *inside* the household above it, and the
+   * inset says so.
+   */
   .people {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
+    margin: 0.5rem 0 0.25rem;
+    padding: 0.75rem;
+    background: var(--sunken);
+    border-radius: 6px;
   }
 
   h4 {
     margin: 0 0 0.5rem;
     font-size: 0.875rem;
-    color: var(--text-muted);
+    color: var(--ink-faint);
   }
 
   .list {
@@ -256,12 +266,12 @@
   }
 
   .invite .who {
-    color: var(--text-muted);
+    color: var(--ink-faint);
   }
 
   .tag {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--ink-faint);
     white-space: nowrap;
   }
 
@@ -275,8 +285,8 @@
     margin: 0.25rem 0 0;
     padding: 0.5rem 0.6rem;
     border-radius: 0.4rem;
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
-    color: var(--danger);
+    background: var(--alarm-soft);
+    color: var(--alarm);
     font-size: 0.875rem;
     font-weight: 600;
   }
@@ -295,7 +305,7 @@
   }
 
   .why {
-    color: var(--text-muted);
+    color: var(--ink-faint);
   }
 
   .naming {
@@ -311,7 +321,7 @@
 
   .error {
     margin: 0.5rem 0 0;
-    color: var(--danger);
+    color: var(--alarm);
     font-size: 0.875rem;
   }
 </style>

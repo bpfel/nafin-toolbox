@@ -225,22 +225,38 @@
 <style>
   .info {
     margin: 0 0 0.75rem;
-    color: var(--text-muted);
+    color: var(--ink-faint);
     font-size: 0.875rem;
   }
 
   .none {
     margin: 0 0 0.75rem;
-    color: var(--text-muted);
+    color: var(--ink-faint);
   }
 
+  /*
+   * Households are separated by a rule rather than by a gap.
+   *
+   * A gap alone could not do it: a row wraps on a phone, so the space between
+   * two of a household's own lines and the space between two households were
+   * the same space, and a name that ran long simply merged into the next one.
+   */
   .households {
     list-style: none;
     margin: 0 0 0.75rem;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  }
+
+  .households li + li {
+    border-top: 1px solid var(--rule);
+  }
+
+  .households li {
+    padding: 0.5rem 0;
+  }
+
+  .households li:first-child {
+    padding-top: 0;
   }
 
   .row {
@@ -287,7 +303,7 @@
     width: 16px;
     height: 16px;
     flex: none;
-    color: var(--text-muted);
+    color: var(--ink-faint);
     transition: transform 0.15s ease;
   }
 
@@ -303,7 +319,7 @@
 
   .tag {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--ink-faint);
     white-space: nowrap;
   }
 
@@ -325,7 +341,7 @@
 
   .error {
     margin: 0.5rem 0 0;
-    color: var(--danger);
+    color: var(--alarm);
     font-size: 0.875rem;
   }
 </style>
