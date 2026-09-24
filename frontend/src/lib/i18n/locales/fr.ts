@@ -139,6 +139,17 @@ export const fr: Messages = {
   'invite.leaveConfirm': 'Partir',
   'invite.removeConfirm': 'Retirer {name}',
 
+  'role.owner': 'Gère',
+  'role.writer': 'Peut modifier',
+  'role.reader': 'Peut consulter',
+  'invite.roleLabel': 'Peut',
+  'invite.changeRole': 'Changer ce que {name} peut faire',
+  'invite.refresh': 'Voir s’il y a une réponse',
+  'invite.inviteAction': 'Inviter quelqu’un',
+  'invite.createAction': 'Créer l’invitation',
+  'invite.cancelAction': 'Annuler',
+  'invite.doneAction': 'Terminé',
+
   // --- Following an invitation link ---
   'join.working': 'Adhésion…',
   'join.doneTitle': 'Invitation acceptée',

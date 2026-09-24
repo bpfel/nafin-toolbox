@@ -2,10 +2,12 @@
   import { t } from '../i18n/index.svelte'
   import {
     inviteToHousehold, loadInvites, confirmMember, withdrawInvite, listMembers, removeMember,
-    type PendingInvite,
+    changeRole, type PendingInvite,
   } from '../crypto/vaultStore.svelte'
   import type { HouseholdMember } from '../api/client'
   import InviteQR from './InviteQR.svelte'
+  import ActionButton from '../nav/ActionButton.svelte'
+  import { autofocus } from '../util/autofocus'
 
   /**
    * Who is in a household, and how somebody else gets in.
@@ -58,11 +60,35 @@
 
   let inviting = $state(false)
   let email = $state('')
+  /** What the invitee becomes. Never owner; there is exactly one of those. */
+  let inviteRole = $state('writer')
+
+  /** Whose role is being changed, and to what. */
+  let changingRole = $state<number | null>(null)
+
+  /**
+   * Which address the link on screen belongs to.
+   *
+   * Kept so the code can disappear the moment that person accepts. A QR for an
+   * invitation somebody has already taken up is an offer that cannot be
+   * accepted twice, still sitting on the screen inviting a second try.
+   */
+  let freshLinkFor = $state<string | null>(null)
 
   async function refresh() {
     try {
       members = await listMembers(householdId)
       invites = await loadInvites(householdId)
+
+      // The link is for somebody who has now answered, or for an invitation
+      // that is no longer there. Either way it has nothing left to offer.
+      if (freshLinkFor) {
+        const still = invites.find(i => i.invited_email === freshLinkFor)
+        if (!still || still.accepted_at) {
+          freshLink = null
+          freshLinkFor = null
+        }
+      }
     } catch {
       error = t('household.failed')
     }
@@ -79,9 +105,11 @@
     busy = true
     error = null
     try {
-      freshLink = await inviteToHousehold(householdId, address)
+      freshLink = await inviteToHousehold(householdId, address, inviteRole)
+      freshLinkFor = address
       inviting = false
       email = ''
+      inviteRole = 'writer'
       await refresh()
     } catch {
       error = t('household.failed')
@@ -111,6 +139,7 @@
       // The link on screen opens the invitation that was just withdrawn, so
       // leaving it up offers somebody a link that cannot work.
       freshLink = null
+      freshLinkFor = null
       await refresh()
     } catch {
       error = t('household.failed')
@@ -132,6 +161,20 @@
     }
   }
 
+  async function setRole(userId: number, role: string) {
+    busy = true
+    error = null
+    try {
+      await changeRole(householdId, userId, role)
+      changingRole = null
+      await refresh()
+    } catch {
+      error = t('household.failed')
+    } finally {
+      busy = false
+    }
+  }
+
   async function copy() {
     if (!freshLink) return
     await navigator.clipboard.writeText(freshLink)
@@ -141,7 +184,20 @@
 </script>
 
 <div class="people">
-  <h4>{t('invite.title')}</h4>
+  <div class="head">
+    <h4>{t('invite.title')}</h4>
+    <!--
+      An invitation is answered somewhere else, by somebody else, at a time
+      nobody here chooses. Without this the only way to find out was to fold the
+      household away and open it again.
+    -->
+    <ActionButton label={t('invite.refresh')} onclick={refresh}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+      </svg>
+    </ActionButton>
+  </div>
 
   <ul class="list">
     {#each members as member (member.user_id)}
@@ -150,8 +206,36 @@
         {#if member.user_id === myUserId}
           <span class="tag">{t('invite.you')}</span>
         {/if}
-        {#if member.is_owner}
-          <span class="tag">{t('household.owner')}</span>
+        <span class="tag">{t(`role.${member.role}` as 'role.owner')}</span>
+
+        <!--
+          Changing what somebody may do is the owner's, and not something to do
+          to yourself: an owner demoting themselves would strand the household,
+          which is the thing succession exists to prevent.
+        -->
+        {#if isOwner && member.role !== 'owner' && changingRole !== member.user_id}
+          <ActionButton
+            label={t('invite.changeRole').replace('{name}', member.email)}
+            onclick={() => (changingRole = member.user_id)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </ActionButton>
+        {/if}
+
+        {#if changingRole === member.user_id}
+          <select
+            class="role"
+            aria-label={t('invite.roleLabel')}
+            value={member.role}
+            disabled={busy}
+            onchange={e => setRole(member.user_id, (e.currentTarget as HTMLSelectElement).value)}
+          >
+            <option value="writer">{t('role.writer')}</option>
+            <option value="reader">{t('role.reader')}</option>
+          </select>
         {/if}
 
         {#if confirmingRemoval === member.user_id}
@@ -167,7 +251,7 @@
                 {t('invite.removeWarning')}
               {:else if members.length === 1}
                 {t('invite.leaveLast').replace('{name}', householdName)}
-              {:else if member.is_owner && successor}
+              {:else if member.role === 'owner' && successor}
                 {t('invite.leaveOwner')
                   .replace('{name}', householdName)
                   .replace('{successor}', successor.email)}
@@ -186,14 +270,18 @@
               </button>
             </div>
           </div>
-        {:else if member.user_id === myUserId}
-          <button class="btn-secondary" onclick={() => (confirmingRemoval = member.user_id)} disabled={busy}>
-            {t('invite.leave')}
-          </button>
-        {:else if isOwner}
-          <button class="btn-secondary" onclick={() => (confirmingRemoval = member.user_id)} disabled={busy}>
-            {t('invite.remove')}
-          </button>
+        {:else if member.user_id === myUserId || isOwner}
+          <ActionButton
+            danger
+            label={member.user_id === myUserId ? t('invite.leave') : t('invite.remove')}
+            disabled={busy}
+            onclick={() => (confirmingRemoval = member.user_id)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </ActionButton>
         {/if}
       </li>
     {/each}
@@ -208,15 +296,22 @@
           <span class="tag ready">{t('invite.readyToConfirm')}</span>
         {/if}
 
+        <span class="tag">{t(`role.${invite.role}` as 'role.writer')}</span>
+
         {#if isOwner}
           {#if invite.accepted_at && invite.verified}
-            <button class="btn-primary" onclick={() => letIn(invite)} disabled={busy}>
-              {busy ? t('invite.confirming') : t('invite.confirm')}
-            </button>
+            <ActionButton label={t('invite.confirm')} disabled={busy} onclick={() => letIn(invite)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </ActionButton>
           {/if}
-          <button class="btn-secondary" onclick={() => withdraw(invite.id)} disabled={busy}>
-            {t('invite.withdraw')}
-          </button>
+          <ActionButton danger label={t('invite.withdraw')} disabled={busy} onclick={() => withdraw(invite.id)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </ActionButton>
         {/if}
 
         <!--
@@ -238,31 +333,66 @@
       <InviteQR link={freshLink} />
       <p class="why">{t('invite.linkWhy')}</p>
       <div class="btn-row">
+        <!--
+          The one control here that keeps its words. Every other action in this
+          panel is a verb with an obvious mark; "copy this link" is a thing the
+          clipboard has no symbol for that anybody reads at a glance — and it is
+          the action somebody who cannot scan a code has to find.
+        -->
         <button class="btn-secondary" onclick={copy}>
           {copied ? t('invite.copied') : t('invite.copy')}
         </button>
-        <button class="btn-secondary" onclick={() => (freshLink = null)}>{t('invite.done')}</button>
+        <ActionButton
+          label={t('invite.doneAction')}
+          onclick={() => { freshLink = null; freshLinkFor = null }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </ActionButton>
       </div>
     </div>
   {:else if isOwner}
     {#if inviting}
       <form class="naming" onsubmit={e => { e.preventDefault(); invite() }}>
         <input
+          use:autofocus
           type="email"
           bind:value={email}
           aria-label={t('invite.emailLabel')}
           placeholder={t('invite.emailLabel')}
           disabled={busy}
         />
-        <button class="btn-primary" type="submit" disabled={busy || !email.trim()}>
-          {busy ? t('invite.creating') : t('invite.send')}
-        </button>
-        <button class="btn-secondary" type="button" onclick={() => { inviting = false; email = '' }}>
-          {t('action.cancel')}
-        </button>
+        <!--
+          Decided here rather than after they are in, so nobody is briefly able
+          to do more than was meant. Owner is not among the choices: there is
+          exactly one, and handing it over is its own act.
+        -->
+        <select class="role" bind:value={inviteRole} aria-label={t('invite.roleLabel')} disabled={busy}>
+          <option value="writer">{t('role.writer')}</option>
+          <option value="reader">{t('role.reader')}</option>
+        </select>
+        <ActionButton label={t('invite.createAction')} disabled={busy || !email.trim()} onclick={invite}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </ActionButton>
+        <ActionButton danger label={t('invite.cancelAction')} onclick={() => { inviting = false; email = '' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </ActionButton>
       </form>
     {:else}
-      <button class="btn-secondary" onclick={() => (inviting = true)}>{t('invite.add')}</button>
+      <ActionButton label={t('invite.inviteAction')} onclick={() => (inviting = true)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <line x1="19" y1="8" x2="19" y2="14" />
+          <line x1="22" y1="11" x2="16" y2="11" />
+        </svg>
+      </ActionButton>
     {/if}
   {/if}
 
@@ -288,10 +418,28 @@
     border-radius: 6px;
   }
 
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
   h4 {
-    margin: 0 0 0.5rem;
+    margin: 0;
     font-size: 0.875rem;
     color: var(--ink-faint);
+  }
+
+  .role {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid var(--rule);
+    border-radius: 0.3rem;
+    background: var(--surface);
+    color: inherit;
   }
 
   .list {

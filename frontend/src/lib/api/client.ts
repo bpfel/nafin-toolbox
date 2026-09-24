@@ -226,7 +226,8 @@ export interface HouseholdListing {
   wrapped_key: string
   /** How `wrapped_key` is wrapped: 'self' or 'granted'. */
   wrap_kind: string
-  is_owner: boolean
+  /** owner | writer | reader. */
+  role: string
   version: number
   /** Which generation of the key `wrapped_key` is. */
   key_epoch: number
@@ -319,7 +320,8 @@ export async function deleteHousehold(id: number): Promise<void> {
 export interface HouseholdMember {
   user_id: number
   email: string
-  is_owner: boolean
+  /** owner | writer | reader. Server-enforced, not cryptographic. */
+  role: string
   wrap_kind: string
   /** SPKI, base64. Served only inside a household you belong to. */
   public_key: string
@@ -331,6 +333,8 @@ export interface HouseholdMember {
 export interface HouseholdInvite {
   id: number
   invited_email: string
+  /** What they become on confirmation. Never owner. */
+  role: string
   /** The invite secret, sealed under the household key. */
   secret_sealed: string
   expires_at: string
@@ -353,7 +357,7 @@ export async function fetchHouseholdInvites(id: number): Promise<HouseholdInvite
 
 export async function createHouseholdInvite(
   id: number,
-  body: { token_hash: string; invited_email: string; secret_sealed: string },
+  body: { token_hash: string; invited_email: string; secret_sealed: string; role: string },
 ): Promise<{ id: number }> {
   return request<{ id: number }>(`/households/${id}/invites`, {
     method: 'POST',
@@ -382,6 +386,13 @@ export async function confirmHouseholdInvite(
   body: { invite_id: number; wrapped_key: string },
 ): Promise<void> {
   await request(`/households/${id}/members`, { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function changeHouseholdRole(id: number, userId: number, role: string): Promise<void> {
+  await request(`/households/${id}/members/${userId}/role`, {
+    method: 'PUT',
+    body: JSON.stringify({ role }),
+  })
 }
 
 export async function removeHouseholdMember(id: number, userId: number): Promise<void> {

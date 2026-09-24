@@ -194,7 +194,7 @@
                 </svg>
               </button>
 
-              <span class="tag">{household.isOwner ? t('household.owner') : t('household.member')}</span>
+              <span class="tag">{t(`role.${household.role}` as 'role.owner')}</span>
 
               <!--
                 Symbols rather than words, for the reason an account's card
@@ -224,7 +224,7 @@
               </ActionButton>
 
               <!-- Only the owner may delete, which the server enforces too. -->
-              {#if household.isOwner}
+              {#if household.role === 'owner'}
                 <ActionButton danger label={t('household.delete')} onclick={() => (confirmingId = household.id)}>
                   <svg
                     viewBox="0 0 24 24"
@@ -245,7 +245,7 @@
             {#if unfolded === household.id}
               <HouseholdPeople
                 householdId={household.id}
-                isOwner={household.isOwner}
+                isOwner={household.role === 'owner'}
                 householdName={household.name}
                 {myUserId}
               />

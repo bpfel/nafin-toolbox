@@ -133,7 +133,7 @@ describe('opening what the server listed', () => {
       encrypted_name: await sealName(name, key),
       wrapped_key: await sealKeyForSelf(key, mek),
       wrap_kind: 'self',
-      is_owner: true,
+      role: 'owner',
       updated_at: '2026-09-24T10:00:00Z',
     }
   }
@@ -144,7 +144,7 @@ describe('opening what the server listed', () => {
 
     expect(opened?.name).toBe('Zuhause')
     expect(opened?.id).toBe(3)
-    expect(opened?.isOwner).toBe(true)
+    expect(opened?.role).toBe('owner')
   })
 
   // A granted copy has to be checked against the granter's pinned key before it

@@ -139,6 +139,17 @@ export const it: Messages = {
   'invite.leaveConfirm': 'Esci',
   'invite.removeConfirm': 'Rimuovi {name}',
 
+  'role.owner': 'Gestisce',
+  'role.writer': 'Può modificare',
+  'role.reader': 'Può vedere',
+  'invite.roleLabel': 'Può',
+  'invite.changeRole': 'Cambia cosa può fare {name}',
+  'invite.refresh': 'Controlla se c’è una risposta',
+  'invite.inviteAction': 'Invita qualcuno',
+  'invite.createAction': 'Crea l’invito',
+  'invite.cancelAction': 'Annulla',
+  'invite.doneAction': 'Fatto',
+
   // --- Following an invitation link ---
   'join.working': 'Adesione…',
   'join.doneTitle': 'Invito accettato',

@@ -111,7 +111,8 @@ export interface OpenHousehold {
   id: number
   name: string
   key: CryptoKey
-  isOwner: boolean
+  /** owner | writer | reader — what this member may do, per the server. */
+  role: string
   updatedAt: string
 }
 
@@ -124,7 +125,7 @@ export interface OpenHousehold {
  * guessed at.
  */
 export async function openListedHousehold(
-  listed: { id: number; encrypted_name: string; wrapped_key: string; wrap_kind: string; is_owner: boolean; updated_at: string },
+  listed: { id: number; encrypted_name: string; wrapped_key: string; wrap_kind: string; role: string; updated_at: string },
   mek: CryptoKey,
 ): Promise<OpenHousehold | null> {
   if (listed.wrap_kind !== 'self') return null
@@ -134,7 +135,7 @@ export async function openListedHousehold(
     id: listed.id,
     name: await openName(listed.encrypted_name, key),
     key,
-    isOwner: listed.is_owner,
+    role: listed.role,
     updatedAt: listed.updated_at,
   }
 }

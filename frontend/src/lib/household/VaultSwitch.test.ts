@@ -3,7 +3,7 @@ import { render, screen, cleanup } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 
 const state = {
-  households: [] as { id: number; name: string; isOwner: boolean }[],
+  households: [] as { id: number; name: string; role: string }[],
   currentVaultId: 'personal' as 'personal' | number,
   currentHousehold: null as { id: number; name: string } | null,
 }
@@ -41,7 +41,7 @@ describe('the vault switch', () => {
    * readable without opening anything.
    */
   test('names the household on its face, not inside it', () => {
-    state.households = [{ id: 3, name: 'Flat with Anna', isOwner: true }]
+    state.households = [{ id: 3, name: 'Flat with Anna', role: 'owner' }]
     state.currentVaultId = 3
     state.currentHousehold = { id: 3, name: 'Flat with Anna' }
 
@@ -54,7 +54,7 @@ describe('the vault switch', () => {
   })
 
   test('says Personal when the personal vault is on screen', () => {
-    state.households = [{ id: 3, name: 'Flat with Anna', isOwner: true }]
+    state.households = [{ id: 3, name: 'Flat with Anna', role: 'owner' }]
 
     render(VaultSwitch)
 
@@ -63,8 +63,8 @@ describe('the vault switch', () => {
 
   test('lists the personal vault alongside every household', async () => {
     state.households = [
-      { id: 3, name: 'Flat with Anna', isOwner: true },
-      { id: 4, name: 'Ski cabin', isOwner: false },
+      { id: 3, name: 'Flat with Anna', role: 'owner' },
+      { id: 4, name: 'Ski cabin', role: 'writer' },
     ]
     render(VaultSwitch)
     // Captured before opening: once the list is up there are several buttons,
@@ -82,7 +82,7 @@ describe('the vault switch', () => {
   })
 
   test('switches to the one that is picked', async () => {
-    state.households = [{ id: 3, name: 'Flat with Anna', isOwner: true }]
+    state.households = [{ id: 3, name: 'Flat with Anna', role: 'owner' }]
     render(VaultSwitch)
     const trigger = screen.getByRole('button')
 
@@ -93,7 +93,7 @@ describe('the vault switch', () => {
   })
 
   test('closes on Escape without switching anything', async () => {
-    state.households = [{ id: 3, name: 'Flat with Anna', isOwner: true }]
+    state.households = [{ id: 3, name: 'Flat with Anna', role: 'owner' }]
     render(VaultSwitch)
     const trigger = screen.getByRole('button')
 

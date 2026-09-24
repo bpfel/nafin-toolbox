@@ -143,6 +143,17 @@ export const en = {
   'invite.leaveConfirm': 'Leave',
   'invite.removeConfirm': 'Remove {name}',
 
+  'role.owner': 'Owner',
+  'role.writer': 'Can edit',
+  'role.reader': 'Can view',
+  'invite.roleLabel': 'They may',
+  'invite.changeRole': 'Change what {name} may do',
+  'invite.refresh': 'Check for an answer',
+  'invite.inviteAction': 'Invite someone',
+  'invite.createAction': 'Create the invitation',
+  'invite.cancelAction': 'Cancel',
+  'invite.doneAction': 'Done',
+
   // --- Following an invitation link ---
   'join.working': 'Joining…',
   'join.doneTitle': 'Invitation accepted',

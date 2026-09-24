@@ -5,7 +5,7 @@ import {
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
   fetchHouseholdMembers, fetchHouseholdInvites, createHouseholdInvite, deleteHouseholdInvite,
-  acceptHouseholdInvite, confirmHouseholdInvite, removeHouseholdMember,
+  acceptHouseholdInvite, confirmHouseholdInvite, removeHouseholdMember, changeHouseholdRole,
   type HouseholdMember, type HouseholdInvite,
 } from '../api/client'
 import { generateIdentity, sealIdentity, openIdentity, isComplete, type OpenIdentity } from './identity'
@@ -367,7 +367,7 @@ async function openGranted(listing: {
   id: number
   encrypted_name: string
   wrapped_key: string
-  is_owner: boolean
+  role: string
   updated_at: string
 }): Promise<OpenHousehold | null> {
   if (!identity || !current.data) return null
@@ -387,7 +387,7 @@ async function openGranted(listing: {
     id: listing.id,
     name: await openName(listing.encrypted_name, key),
     key,
-    isOwner: listing.is_owner,
+    role: listing.role,
     updatedAt: listing.updated_at,
   }
 }
@@ -449,7 +449,7 @@ export async function createHousehold(name: string): Promise<number> {
     version: empty.version,
   })
 
-  households = [{ id: created.id, name, key, isOwner: true, updatedAt: created.updated_at }, ...households]
+  households = [{ id: created.id, name, key, role: 'owner', updatedAt: created.updated_at }, ...households]
 
   // Installed directly rather than through `switchTo`, which would fetch the
   // payload back from the server — a round trip to be told the thing we just
@@ -813,7 +813,7 @@ export interface PendingInvite extends HouseholdInvite {
  * back at confirm time. Without that, confirming would only work from the tab
  * that created the invitation.
  */
-export async function inviteToHousehold(householdId: number, email: string): Promise<string> {
+export async function inviteToHousehold(householdId: number, email: string, role: string): Promise<string> {
   const household = households.find(h => h.id === householdId)
   if (!household) throw new Error('no such household')
 
@@ -824,6 +824,7 @@ export async function inviteToHousehold(householdId: number, email: string): Pro
     token_hash: await hashInviteToken(token),
     invited_email: email,
     secret_sealed: await sealUnder(secret, household.key),
+    role,
   })
 
   return inviteLink(token, secret)
@@ -917,6 +918,11 @@ export async function acceptInvite(token: string, secret: Uint8Array): Promise<n
   const mac = await macPublicKey(secret, fromBase64(keys.public_key))
   const { household_id } = await acceptHouseholdInvite(token, mac)
   return household_id
+}
+
+/** Move somebody between writer and reader. Owner only, which the server holds. */
+export async function changeRole(householdId: number, userId: number, role: string): Promise<void> {
+  await changeHouseholdRole(householdId, userId, role)
 }
 
 export async function withdrawInvite(householdId: number, inviteId: number): Promise<void> {

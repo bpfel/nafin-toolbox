@@ -3,7 +3,7 @@ import { render, screen, cleanup } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 
 const state = {
-  households: [] as { id: number; name: string; isOwner: boolean }[],
+  households: [] as { id: number; name: string; role: string }[],
   currentVaultId: 'personal' as 'personal' | number,
   currentHousehold: null as { id: number; name: string } | null,
   identity: {} as unknown,
@@ -32,8 +32,8 @@ function rowFor(name: string): HTMLElement {
 beforeEach(() => {
   cleanup()
   state.households = [
-    { id: 3, name: 'Flat with Anna', isOwner: true },
-    { id: 4, name: 'Ski cabin', isOwner: false },
+    { id: 3, name: 'Flat with Anna', role: 'owner' },
+    { id: 4, name: 'Ski cabin', role: 'writer' },
   ]
   state.currentVaultId = 'personal'
   state.currentHousehold = null
