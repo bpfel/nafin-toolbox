@@ -126,11 +126,15 @@
   }
 
   async function remove(userId: number) {
+    const leaving = userId === myUserId
     busy = true
     try {
-      await removeMember(householdId, userId)
+      await removeMember(householdId, userId, leaving)
       confirmingRemoval = null
-      await refresh()
+      // Not refreshed when it was us: we are no longer allowed to list the
+      // members, so asking would fail and report the leave as an error — which
+      // is exactly what it used to do.
+      if (!leaving) await refresh()
     } catch {
       error = t('household.failed')
     } finally {
@@ -227,7 +231,10 @@
                   .replace('{name}', householdName)
                   .replace('{successor}', successor.email)}
               {:else}
-                {t('invite.removeWarning')}
+                <!-- Said to you, about you. The removal wording is about
+                     somebody else and reads as though it is happening to a
+                     third person who is not in the room. -->
+                {t('invite.leaveWarning')}
               {/if}
             </p>
             <div class="btn-row">

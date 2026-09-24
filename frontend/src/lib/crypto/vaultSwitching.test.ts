@@ -21,6 +21,15 @@ vi.mock('../api/client', () => ({
   putHouseholdVault: vi.fn(async () => ({ status: 'ok', updated_at: '2026-02-02T00:00:00Z' })),
   renameHousehold: vi.fn(),
   deleteHousehold: vi.fn(),
+  removeHouseholdMember: vi.fn(),
+  fetchHouseholdMembers: vi.fn(async () => []),
+  fetchHouseholdInvites: vi.fn(async () => []),
+  createHouseholdInvite: vi.fn(),
+  deleteHouseholdInvite: vi.fn(),
+  acceptHouseholdInvite: vi.fn(),
+  confirmHouseholdInvite: vi.fn(),
+  changeHouseholdRole: vi.fn(),
+  rekeyHousehold: vi.fn(),
 }))
 
 import * as client from '../api/client'
@@ -28,7 +37,7 @@ const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 import {
   getVaultState, tryRestoreVault, clearVault, switchTo, markDirty, saveVault,
-  createHousehold, renameHousehold, deleteHousehold,
+  createHousehold, renameHousehold, deleteHousehold, removeMember,
 } from './vaultStore.svelte'
 
 const state = getVaultState()
@@ -384,3 +393,51 @@ function clearVaultKeepingSession() {
   if (mek) sessionStorage.setItem('vault_mek', mek)
   if (current) sessionStorage.setItem('vault_current', current)
 }
+
+/**
+ * Leaving used to work and report failure.
+ *
+ * The membership was deleted, then the panel reloaded the members — which the
+ * person who had just left was no longer allowed to do — so an error appeared
+ * and the household stayed on screen. It looked exactly like nothing had
+ * happened, which is the worst thing a destructive action can look like.
+ */
+describe('leaving a household', () => {
+  async function inOne() {
+    const mek = await signIn()
+    const anna = await listed(3, 'Flat with Anna', mek)
+    api.fetchHouseholds.mockResolvedValue([anna.listing])
+    await tryRestoreVault()
+    const payload = await encryptVault(createEmptyVault(), anna.key)
+    api.fetchHouseholdVault.mockResolvedValue({ ...payload, version: 9, updated_at: 'x' })
+  }
+
+  test('takes the household off the list', async () => {
+    await inOne()
+    expect(state.households).toHaveLength(1)
+
+    await removeMember(3, 42, true)
+
+    expect(state.households).toHaveLength(0)
+  })
+
+  test('and brings you back to your own budget if you were in it', async () => {
+    await inOne()
+    await switchTo(3)
+    expect(state.currentVaultId).toBe(3)
+
+    await removeMember(3, 42, true)
+
+    expect(state.currentVaultId).toBe('personal')
+  })
+
+  // Removing somebody else leaves the household exactly where it was — it is
+  // still yours, and the panel refreshes rather than folding up.
+  test('removing somebody else leaves it alone', async () => {
+    await inOne()
+
+    await removeMember(3, 99, false)
+
+    expect(state.households).toHaveLength(1)
+  })
+})

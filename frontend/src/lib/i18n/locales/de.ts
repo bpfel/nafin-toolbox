@@ -170,6 +170,7 @@ export const de: Messages = {
   'invite.expires': 'Läuft ab {when}',
   'invite.remove': 'Entfernen',
   'invite.leave': 'Verlassen',
+  'invite.leaveWarning': 'Was du schon gesehen hast, bleibt dir. Verlassen verhindert nur, dass du Neues siehst.',
   'invite.removeWarning': 'Was sie schon gesehen haben, bleibt ihnen. Entfernen verhindert nur, dass sie Neues sehen.',
   'invite.you': 'Du',
 

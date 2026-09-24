@@ -990,24 +990,24 @@ export async function listMembers(householdId: number): Promise<HouseholdMember[
 /**
  * Remove somebody, or leave.
  *
- * Note what this does *not* do: it stops the server serving them new
+ * `leaving` rather than a comparison inside here: this module has no idea which
+ * account is signed in, and the version that tried to keep one never had it set
+ * — so leaving deleted the membership, left the household on screen, and then
+ * failed its own refresh because the person doing it was no longer allowed to
+ * list the members. It worked and reported failure, which is worse than not
+ * working.
+ *
+ * Note what removal does not do: it stops the server serving them new
  * ciphertext, it does not take back the key they already hold. Only a rekey
- * does that, and only for what is written afterwards — nothing can un-share
- * what they already read.
+ * does that, and only for what is written afterwards.
  */
-export async function removeMember(householdId: number, userId: number): Promise<void> {
+export async function removeMember(householdId: number, userId: number, leaving = false): Promise<void> {
   await removeHouseholdMember(householdId, userId)
-  if (households.find(h => h.id === householdId) && userId === currentMemberId) {
-    households = households.filter(h => h.id !== householdId)
-    stashed.delete(householdId)
-    if (currentId === householdId) await switchTo('personal')
-  }
+  if (!leaving) return
+
+  // Nothing here is ours any more, so it goes rather than being reloaded.
+  households = households.filter(h => h.id !== householdId)
+  stashed.delete(householdId)
+  if (currentId === householdId) await switchTo('personal')
 }
 
-/** This account's own user id, learned from whichever household lists it. */
-let currentMemberId = $state<number | null>(null)
-
-/** Told to the store by the shell, which is where the signed-in user lives. */
-export function setCurrentMemberId(id: number | null): void {
-  currentMemberId = id
-}
