@@ -576,6 +576,11 @@ export const en = {
   'knowledge.tourBody': 'A short walk through the main views and the controls on them.',
   'knowledge.tourStart': 'Start',
   'knowledge.tourAgain': 'Start again',
+  // The second walkthrough. Its own title and body; the buttons are shared
+  // with the first, because "Start" says all a button needs to.
+  'knowledge.sharedTourTitle': 'Set up shared budgets',
+  'knowledge.sharedTourAgainTitle': 'Shared budgets, again',
+  'knowledge.sharedTourBody': 'How two people keep a household plan beside their own, and who may change it.',
   'knowledge.about': 'About this app',
   'knowledge.swiss': 'Swiss basics',
   'knowledge.sources': 'Official sources',

@@ -27,7 +27,7 @@
   </div>
   <div class="actions">
     <button class="quiet" onclick={declineTour}>{t('tour.offerDecline')}</button>
-    <button class="accept" onclick={startTour}>{t('tour.offerAccept')}</button>
+    <button class="accept" onclick={() => startTour('basics')}>{t('tour.offerAccept')}</button>
   </div>
 </aside>
 

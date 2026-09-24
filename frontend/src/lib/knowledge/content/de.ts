@@ -52,6 +52,36 @@ export const de: PartialContent = {
       title: 'Du kannst zurückkommen',
       body: 'Von hier aus startet der Rundgang erneut, neben Texten zu jeder Ansicht und zu Schweizer Geldthemen. Nichts davon musst du dir jetzt merken.',
     },
+    sharedWhat: {
+      title: 'Teile die Freude',
+      body: 'Ein Haushalt ist ein zweites Budget, das du mit anderen teilen kannst.',
+    },
+    sharedStart: {
+      title: 'Einrichten',
+      body: 'Haushalte verwaltest du im Profil.',
+    },
+    sharedInvite: {
+      title: 'Andere einladen',
+      body: 'Klapp einen Haushalt auf, um andere einzuladen. Verwende für die Einladung ihre Konto-E-Mail und gib ihnen den Link zum Teilen — entweder kopiert oder als QR-Code. Du entscheidest, ob sie das geteilte Budget nur lesen oder auch ändern dürfen.',
+    },
+    sharedSwitch: {
+      title: 'Budget wechseln',
+      body: 'Sobald du zu einem Haushalt gehörst, verwaltest du mehrere Budgets. Der Punkt zeigt, an welchem du gerade arbeitest, und wechselt zwischen ihnen.',
+      wideBody: 'Sobald du zu einem Haushalt gehörst, verwaltest du mehrere Budgets. Die Kopfleiste zeigt, an welchem du gerade arbeitest, und wechselt zwischen ihnen.',
+    },
+    sharedEntries: {
+      title: 'Die verschiedenen Einträge',
+      body: 'Ganz wie im persönlichen Budget gibt es im Haushalt dieselben Eintragstypen. Nimm die, die du brauchst, um eure gemeinsamen Ausgaben zu planen.',
+      note: 'Die Zahlen hier sind ein Beispiel, für einen Haushalt zu zweit.',
+    },
+    sharedContributions: {
+      title: 'Einnahmen des Haushalts',
+      body: 'Die Einnahmenseite eines Haushaltsbudgets ist meist die Summe einzelner Beiträge und nicht ein ganzer Lohn.',
+    },
+    sharedKnowledge: {
+      title: 'Du kannst zurückkommen',
+      body: 'Diese Anleitung startet von hier aus wieder, neben der Tour und den Artikeln. Nichts davon musst du dir merken.',
+    },
   },
   articles: {
     'about-budget': {

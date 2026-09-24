@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import type { VaultData } from '../crypto/vault'
-import { TOUR_STEPS } from './steps'
+import { TOUR_STEPS, SHARED_STEPS } from './steps'
 
 const markDirty = vi.fn()
 
@@ -62,7 +62,7 @@ beforeEach(() => {
 
 describe('walking the tour', () => {
   test('starts at the first step', () => {
-    startTour()
+    startTour('basics')
     expect(tour.running).toBe(true)
     expect(tour.position).toBe('1')
     expect(tour.step?.id).toBe(TOUR_STEPS[0].id)
@@ -75,7 +75,7 @@ describe('walking the tour', () => {
   })
 
   test('next and back move one step', () => {
-    startTour()
+    startTour('basics')
     moveTour(1)
     expect(tour.index).toBe(1)
     moveTour(-1)
@@ -87,7 +87,7 @@ describe('walking the tour', () => {
    * tour of thirteen steps reads as eight. See `numbering`.
    */
   test('the counter reads against topics rather than steps', () => {
-    startTour()
+    startTour('basics')
     const topics = numbering().at(-1)!.total
 
     expect(tour.total).toBe(topics)
@@ -99,7 +99,7 @@ describe('walking the tour', () => {
     const first = TOUR_STEPS.findIndex(s => s.sub)
     expect(first, 'no sub-steps to check').toBeGreaterThan(0)
 
-    startTour()
+    startTour('basics')
     for (let i = 0; i < first; i++) moveTour(1)
 
     expect(tour.position).toBe(`${numbering()[first - 1].label}.1`)
@@ -114,7 +114,7 @@ describe('walking the tour', () => {
 
 describe('what the vault is told', () => {
   test('walking off the end counts as having taken it', () => {
-    startTour()
+    startTour('basics')
     for (let i = 0; i < TOUR_STEPS.length; i++) moveTour(1)
 
     expect(tour.running).toBe(false)
@@ -124,7 +124,7 @@ describe('what the vault is told', () => {
   })
 
   test('skipping partway through does not', () => {
-    startTour()
+    startTour('basics')
     moveTour(1)
     abandonTour()
 
@@ -140,7 +140,7 @@ describe('what the vault is told', () => {
    * material they did not.
    */
   test('going back off the start is a dismissal, not a completion', () => {
-    startTour()
+    startTour('basics')
     moveTour(-1)
 
     expect(tour.running).toBe(false)
@@ -158,7 +158,7 @@ describe('what the vault is told', () => {
 
   /** Someone who has taken the tour has taken it, whatever they do later. */
   test('a later dismissal does not unset having completed it', () => {
-    startTour()
+    startTour('basics')
     finishTour()
     const completedAt = vaultState.vault?.tour.completedAt
     declineTour()
@@ -168,15 +168,77 @@ describe('what the vault is told', () => {
 
   test('a locked vault is simply not written to', () => {
     vaultState.vault = null
-    startTour()
+    startTour('basics')
     expect(() => abandonTour()).not.toThrow()
     expect(markDirty).not.toHaveBeenCalled()
   })
 })
 
+/**
+ * The second walkthrough, which exists to prove the machinery is a machine.
+ *
+ * Only what is different is asserted here. Everything above — the counter, the
+ * skipping, the preview never being written — is the same code reading a
+ * different array, and restating it per tour would mean every future tour owes
+ * this file a copy of itself.
+ */
+describe('the shared-budgets walkthrough', () => {
+  test('walks its own steps, not the first tour’s', () => {
+    startTour('shared')
+
+    expect(tour.tour).toBe('shared')
+    expect(tour.step?.id).toBe(SHARED_STEPS[0].id)
+    expect(TOUR_STEPS.map(s => s.id)).not.toContain(tour.step!.id)
+  })
+
+  test('shows the household example rather than the personal one', () => {
+    startTour('shared')
+    while (tour.running && !tour.step?.example) moveTour(1)
+
+    const shown = vaultState.vault!
+    // Two income lines is the tell: the personal starter has exactly one, and
+    // the whole point of the household example is that income arrives as two
+    // people's contributions.
+    expect(shown.budget.entries.filter(e => e.type === 'income')).toHaveLength(2)
+    // And no per-person lines: insurance and 3a stay in the personal plan,
+    // which is what the step standing here says out loud.
+    expect(shown.budget.entries.map(e => e.name)).not.toContain('Pillar 3a')
+  })
+
+  /**
+   * The two tours are recorded apart. Sharing one pair of timestamps would
+   * have finishing either one tell Knowledge that both had been taken, and the
+   * card for the one you never opened would offer to run it "again".
+   */
+  test('finishing it does not mark the first tour as taken', () => {
+    startTour('shared')
+    for (let i = 0; i < SHARED_STEPS.length; i++) moveTour(1)
+
+    expect(vaultState.vault?.tour.shared?.completedAt).not.toBeNull()
+    expect(vaultState.vault?.tour.completedAt).toBeNull()
+  })
+
+  test('and finishing the first does not mark this one', () => {
+    startTour('basics')
+    for (let i = 0; i < TOUR_STEPS.length; i++) moveTour(1)
+
+    expect(vaultState.vault?.tour.completedAt).not.toBeNull()
+    expect(vaultState.vault?.tour.shared?.completedAt ?? null).toBeNull()
+  })
+
+  test('abandoning it is dismissed against its own record', () => {
+    startTour('shared')
+    moveTour(1)
+    abandonTour()
+
+    expect(vaultState.vault?.tour.shared?.dismissedAt).not.toBeNull()
+    expect(vaultState.vault?.tour.dismissedAt).toBeNull()
+  })
+})
+
 describe('a step with nothing to point at', () => {
   test('carries on forwards when the tour was going forwards', () => {
-    startTour()
+    startTour('basics')
     moveTour(1)
     const before = tour.index
     skipUnshowableStep()
@@ -188,7 +250,7 @@ describe('a step with nothing to point at', () => {
    * user into the step they just left, and they would never get past it.
    */
   test('carries on backwards when the tour was going backwards', () => {
-    startTour()
+    startTour('basics')
     moveTour(1)
     moveTour(1)
     moveTour(-1)
@@ -198,7 +260,7 @@ describe('a step with nothing to point at', () => {
   })
 
   test('a tour whose anchors are all missing walks off the end rather than spinning', () => {
-    startTour()
+    startTour('basics')
     // One more than there are steps: if skipping could ever fail to advance,
     // this would not terminate at the end and `running` would still be true.
     for (let i = 0; i <= TOUR_STEPS.length; i++) {
@@ -218,11 +280,11 @@ describe('a step with nothing to point at', () => {
  * testing is not "it cleans up" but "it never wrote".
  */
 describe('the example budget is only on loan', () => {
-  /** Walks forward until the step that asks for the example budget. */
-  function reachExample(): void {
-    startTour()
-    while (tour.running && !tour.step?.needsExampleBudget) moveTour(1)
-    expect(tour.step?.needsExampleBudget, 'no step asks for an example').toBe(true)
+  /** Walks a tour forward until the step that asks for an example budget. */
+  function reachExample(which: 'basics' | 'shared' = 'basics'): void {
+    startTour(which)
+    while (tour.running && !tour.step?.example) moveTour(1)
+    expect(tour.step?.example, 'no step asks for an example').toBeDefined()
   }
 
   test('the example appears while the tour is on it', () => {

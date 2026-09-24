@@ -1,7 +1,7 @@
-import { TOUR_STEPS, numbering, type TourStep } from './steps'
+import { TOURS, numbering, type TourId, type TourStep } from './steps'
 import { getVaultState, markDirty, beginPreview, endPreview } from '../crypto/vaultStore.svelte'
 import { recordCompleted, recordDismissed } from './tourState'
-import { resetBudget, seedDefaults } from '../budget/budgetEngine'
+import { resetBudget, seedDefaults, seedSharedDefaults } from '../budget/budgetEngine'
 import { getLocale } from '../i18n/index.svelte'
 
 /**
@@ -14,6 +14,20 @@ import { getLocale } from '../i18n/index.svelte'
  */
 let index = $state(0)
 let running = $state(false)
+
+/**
+ * Which of the two tours is running.
+ *
+ * Kept even while nothing is running, because every accessor below reads the
+ * step list through it and a null would mean writing the same fallback in each
+ * one. It is only meaningful when `running` is true.
+ */
+let which = $state<TourId>('basics')
+
+/** The steps of the tour currently selected. */
+function steps(): TourStep[] {
+  return TOURS[which]
+}
 
 /**
  * Which way the tour was last moving.
@@ -30,25 +44,29 @@ export function getTourState() {
     get running() {
       return running
     },
+    /** Which tour, for anything that has to say so — a test, mostly. */
+    get tour(): TourId {
+      return which
+    },
     get index() {
       return index
     },
     get step(): TourStep | null {
-      return running ? (TOUR_STEPS[index] ?? null) : null
+      return running ? (steps()[index] ?? null) : null
     },
     /** What the counter shows: "4", or "5.2" inside a group. See `numbering`. */
     get position() {
-      return numbering()[index]?.label ?? String(index + 1)
+      return numbering(steps())[index]?.label ?? String(index + 1)
     },
     /** Topics, not steps — five of them are parts of one. */
     get total() {
-      return numbering()[index]?.total ?? TOUR_STEPS.length
+      return numbering(steps())[index]?.total ?? steps().length
     },
     get atFirst() {
       return index === 0
     },
     get atLast() {
-      return index === TOUR_STEPS.length - 1
+      return index === steps().length - 1
     },
   }
 }
@@ -66,6 +84,9 @@ export function getTourState() {
  * someone's vault. A tutorial should not be able to give you a budget you did
  * not ask for.
  *
+ * Which example depends on the tour: the personal starter for the first, a
+ * two-person household for the second. See `example` on `TourStep`.
+ *
  * It replaces whatever is there, rather than only filling an empty budget,
  * and that is the second design. Only filling an empty one sounded kinder and
  * was worse in two ways. The step says in as many words that Swiss defaults
@@ -81,23 +102,32 @@ export function getTourState() {
  * otherwise.
  */
 function prepare(step: TourStep): void {
-  if (!step.needsExampleBudget) return
+  if (!step.example) return
   const vault = getVaultState().vault
   if (!vault) return
 
+  const seed = step.example === 'shared' ? seedSharedDefaults : seedDefaults
   const now = new Date()
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   beginPreview(copy => {
     resetBudget(copy)
-    seedDefaults(copy, getLocale(), month)
+    seed(copy, getLocale(), month)
   })
 }
 
-export function startTour(): void {
+/**
+ * Starts a tour.
+ *
+ * Takes the id explicitly rather than defaulting, because both call sites are
+ * buttons and `onclick={startTour}` would hand it a `MouseEvent` — a default
+ * parameter is no defence against an argument that is merely wrong.
+ */
+export function startTour(tour: TourId): void {
+  which = tour
   index = 0
   direction = 1
   running = true
-  prepare(TOUR_STEPS[0])
+  prepare(steps()[0])
 }
 
 /**
@@ -112,7 +142,7 @@ export function moveTour(delta: 1 | -1): void {
   if (!running) return
   direction = delta
   const next = index + delta
-  if (next >= TOUR_STEPS.length) {
+  if (next >= steps().length) {
     finishTour()
     return
   }
@@ -121,7 +151,7 @@ export function moveTour(delta: 1 | -1): void {
     return
   }
   index = next
-  prepare(TOUR_STEPS[next])
+  prepare(steps()[next])
 }
 
 /**
@@ -143,7 +173,7 @@ export function finishTour(): void {
   endPreview()
   const vault = getVaultState().vault
   if (vault) {
-    recordCompleted(vault)
+    recordCompleted(vault, which)
     markDirty()
   }
 }
@@ -162,16 +192,21 @@ export function abandonTour(): void {
   endPreview()
   const vault = getVaultState().vault
   if (vault) {
-    recordDismissed(vault)
+    recordDismissed(vault, which)
     markDirty()
   }
 }
 
-/** Turned down without being started. */
+/**
+ * Turned down without being started.
+ *
+ * Only the first tour is ever offered, so this records only that one — see
+ * `shouldOfferTour`.
+ */
 export function declineTour(): void {
   const vault = getVaultState().vault
   if (vault) {
-    recordDismissed(vault)
+    recordDismissed(vault, 'basics')
     markDirty()
   }
 }
@@ -180,6 +215,7 @@ export function declineTour(): void {
 export function resetTour(): void {
   endPreview()
   running = false
+  which = 'basics'
   index = 0
   direction = 1
 }

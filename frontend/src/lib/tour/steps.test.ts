@@ -1,8 +1,22 @@
 import { describe, test, expect } from 'vitest'
-import { TOUR_STEPS, numbering } from './steps'
+import { TOURS, TOUR_STEPS, numbering, type TourStep } from './steps'
 import { destinationsFor } from '../nav/destinations'
 import { createEmptyVault } from '../crypto/vault'
-import { seedDefaults } from '../budget/budgetEngine'
+import { seedDefaults, seedSharedDefaults } from '../budget/budgetEngine'
+
+/**
+ * Every tour, flattened, for the rules that hold of any step whatever tour it
+ * is in — and the tours separately, for the rules about a tour's shape.
+ *
+ * Derived from `TOURS` rather than written out, so a third walkthrough is
+ * covered by all of this the moment it is added rather than the moment
+ * somebody remembers this file.
+ */
+const EVERY_STEP: TourStep[] = Object.values(TOURS).flat()
+const EVERY_TOUR = Object.entries(TOURS)
+
+/** Which seeder a step's `example` names. */
+const SEEDERS = { personal: seedDefaults, shared: seedSharedDefaults }
 
 /**
  * That the tour goes somewhere real.
@@ -25,23 +39,25 @@ describe('every step goes somewhere a user can be', () => {
     return `/${screen}`
   }
 
-  test.each(TOUR_STEPS)('$id is on a real destination', ({ path }) => {
+  test.each(EVERY_STEP)('$id is on a real destination', ({ path }) => {
     expect(userPaths.has(screenOf(path))).toBe(true)
   })
 
-  test.each(TOUR_STEPS)('$id goes no deeper than a sub-tab', ({ path }) => {
+  test.each(EVERY_STEP)('$id goes no deeper than a sub-tab', ({ path }) => {
     // Three segments would be a place the router cannot name and the shell
     // cannot render — the hard stop the whole app is built on.
     expect(path.replace(/^\//, '').split('/').length).toBeLessThanOrEqual(2)
   })
 
-  test('step ids are unique', () => {
-    const ids = TOUR_STEPS.map(s => s.id)
+  test('step ids are unique across every tour', () => {
+    // Across, not within: copy is keyed by step id alone, so the same id in
+    // two tours would have them silently share a card.
+    const ids = EVERY_STEP.map(s => s.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  test('there are steps at all', () => {
-    expect(TOUR_STEPS.length).toBeGreaterThan(0)
+  test.each(EVERY_TOUR)('%s has steps at all', (_id, steps) => {
+    expect(steps.length).toBeGreaterThan(0)
   })
 })
 
@@ -61,7 +77,16 @@ describe('every step goes somewhere a user can be', () => {
  * and the edit toggle are in the document but not on the screen — the dial
  * itself is the anchor, and what is inside it is described rather than ringed.
  */
-const CHROME_ANCHORS = new Set(['nav', 'nav-knowledge', 'dial', 'accounts-tabs'])
+const CHROME_ANCHORS = new Set([
+  'nav',
+  'nav-knowledge',
+  'dial',
+  'accounts-tabs',
+  // The household card on Profile. Chrome by the same test as the rest: it is
+  // rendered whether or not there are any households, because a screen with
+  // nothing in it still explains what it is for.
+  'household',
+])
 
 /**
  * The one exception, and the terms it is allowed on.
@@ -82,44 +107,43 @@ const SEEDED_ANCHORS = new Set([
 ])
 
 describe('anchors survive an empty app', () => {
-  test.each(TOUR_STEPS.filter(s => s.anchor))('$id points at chrome or at seeded data', ({ anchor }) => {
+  test.each(EVERY_STEP.filter(s => s.anchor))('$id points at chrome or at seeded data', ({ anchor }) => {
     expect(CHROME_ANCHORS.has(anchor!) || SEEDED_ANCHORS.has(anchor!)).toBe(true)
   })
 
-  test('something earlier in the tour asks for the example budget', () => {
-    const seeds = TOUR_STEPS.findIndex(s => s.needsExampleBudget)
-    const firstSeeded = TOUR_STEPS.findIndex(s => s.anchor && SEEDED_ANCHORS.has(s.anchor))
+  test.each(EVERY_TOUR)('%s seeds its example before it points at one', (_id, steps) => {
+    const seeds = steps.findIndex(s => s.example)
+    const firstSeeded = steps.findIndex(s => s.anchor && SEEDED_ANCHORS.has(s.anchor))
+
+    // A tour that never points at budget content needs no example at all.
+    if (firstSeeded < 0) return
 
     expect(seeds, 'no step seeds the example budget').toBeGreaterThanOrEqual(0)
     expect(seeds).toBeLessThan(firstSeeded)
   })
 
-  test('each anchored type has a row the tour can single out', () => {
-    // The halo rings the heading plus the section's *first* row. A type with
-    // no entry at all would leave the step ringing a heading and nothing
-    // else, which reads as a mistake rather than as an example.
+  /**
+   * Both halves of the bargain, per tour and against the example that tour
+   * actually asks for.
+   *
+   * The halo rings a section heading plus its *first* row, so a type with no
+   * entry would leave the step ringing a heading and nothing else — which
+   * reads as a mistake rather than as an example. And if a type stops being
+   * seeded, its step disappears from the tour silently rather than failing
+   * anywhere, which is why the check runs from the seeder rather than from a
+   * list written beside it.
+   */
+  test.each(EVERY_TOUR)('%s rings only sections its own example fills', (_id, steps) => {
+    const example = steps.find(s => s.example)?.example
+    const anchored = steps.filter(s => s.anchor && SEEDED_ANCHORS.has(s.anchor))
+    if (anchored.length === 0) return
+
     const vault = createEmptyVault()
-    seedDefaults(vault)
+    SEEDERS[example!](vault)
 
-    for (const step of TOUR_STEPS) {
-      if (!step.anchor || !SEEDED_ANCHORS.has(step.anchor)) continue
-      const type = step.anchor.replace('type-', '')
-      const rows = vault.budget.entries.filter(e => e.type === type)
-      expect(rows.length, step.id).toBeGreaterThan(0)
-    }
-  })
-
-  test('the seeded defaults really do cover every anchored type', () => {
-    // The other half of the bargain. If a type stops being seeded, its step
-    // silently disappears from the tour rather than failing anywhere.
-    const vault = createEmptyVault()
-    seedDefaults(vault)
-    const seeded = new Set(vault.budget.entries.map(e => `type-${e.type}`))
-
-    for (const step of TOUR_STEPS) {
-      if (step.anchor && SEEDED_ANCHORS.has(step.anchor)) {
-        expect(seeded.has(step.anchor), step.id).toBe(true)
-      }
+    for (const step of anchored) {
+      const type = step.anchor!.replace('type-', '')
+      expect(vault.budget.entries.filter(e => e.type === type).length, step.id).toBeGreaterThan(0)
     }
   })
 
@@ -128,14 +152,14 @@ describe('anchors survive an empty app', () => {
    * to point at would leave the blocker whole and the promise of hovering
    * unkeepable — silently, since nothing fails.
    */
-  test.each(TOUR_STEPS.filter(s => s.permeable))('$id has something to point at', ({ anchor }) => {
+  test.each(EVERY_STEP.filter(s => s.permeable))('$id has something to point at', ({ anchor }) => {
     expect(anchor).toBeDefined()
   })
 
-  test('the tour ends where it can be restarted', () => {
+  test.each(EVERY_TOUR)('%s ends where it can be restarted', (_id, steps) => {
     // The one step whose absence would be a real failure of the feature: a
     // tour nobody can find again is a tour that has to be right first time.
-    expect(TOUR_STEPS.at(-1)?.anchor).toBe('nav-knowledge')
+    expect(steps.at(-1)?.anchor).toBe('nav-knowledge')
   })
 })
 
@@ -171,9 +195,9 @@ describe('numbering the steps', () => {
     expect(numbering()).toHaveLength(TOUR_STEPS.length)
   })
 
-  test('no sub-step opens the tour', () => {
+  test.each(EVERY_TOUR)('no sub-step opens %s', (_id, steps) => {
     // A step numbered 0.1 is what a stray `sub: true` on the first entry
     // would produce, and the counter would read nonsense from step one.
-    expect(TOUR_STEPS[0].sub).toBeUndefined()
+    expect(steps[0].sub).toBeUndefined()
   })
 })

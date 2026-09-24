@@ -77,8 +77,8 @@ export const fr: Messages = {
   'auth.signIn': 'Se connecter',
   'auth.createFirstAccount': 'Créer le premier compte',
   'auth.createAccount': 'Créer le compte',
-  'auth.noUsersYet': 'Aucun utilisateur n’existe encore. Créez le compte administrateur pour commencer.',
-  'auth.pleaseWait': 'Veuillez patienter...',
+  'auth.noUsersYet': 'Aucun utilisateur n’existe encore. Crée le compte administrateur pour commencer.',
+  'auth.pleaseWait': 'Un instant...',
   'auth.forgotHint': 'Mot de passe oublié? Contacte ton administrateur pour le réinitialiser. Tu auras besoin de ta clé de récupération pour rétablir tes données chiffrées.',
   'auth.backToLogin': 'Retour à la connexion',
 
@@ -94,7 +94,7 @@ export const fr: Messages = {
 
   // --- Account setup from an invitation ---
   'verify.invalidTitle': 'Lien non valable',
-  'verify.invalidHint': 'Ce lien de vérification n’est pas valable. Veuillez vérifier le lien reçu par courriel.',
+  'verify.invalidHint': 'Ce lien de vérification n’est pas valable. Vérifie le lien reçu par courriel.',
   'verify.usedTitle': 'Lien déjà utilisé',
   'verify.usedHint': 'Ce compte a déjà été configuré. Connecte-toi avec le mot de passe que tu as choisi.',
   'verify.goToSignIn': 'Aller à la connexion',
@@ -136,7 +136,7 @@ export const fr: Messages = {
   'household.duplicate': 'Tu as déjà un ménage portant ce nom.',
   'invite.leaveLast': 'Tu es seul ici — partir supprime {name} et tout ce qu’il contient. C’est irréversible.',
   'invite.leaveOwner': 'Tu gères {name}. Si tu pars, {successor} prend le relais.',
-  'invite.leaveConfirm': 'Partir',
+  'invite.leaveConfirm': 'Quitter',
   'invite.removeConfirm': 'Retirer {name}',
 
   'role.owner': 'Gère',
@@ -174,7 +174,7 @@ export const fr: Messages = {
   'invite.done': 'Terminé',
   'invite.pending': 'Invité, en attente',
   'invite.readyToConfirm': 'Accepté — prêt à être admis',
-  'invite.mismatch': 'La clé proposée ne correspond pas à l’invitation. Ne l’admets pas; invite à nouveau.',
+  'invite.mismatch': 'La clé proposée ne correspond pas à l’invitation. Ne l’admets pas : refais une invitation.',
   'invite.confirm': 'L’admettre',
   'invite.confirming': 'Admission…',
   'invite.withdraw': 'Retirer',
@@ -182,7 +182,7 @@ export const fr: Messages = {
   'invite.remove': 'Retirer',
   'invite.leave': 'Quitter',
   'invite.leaveWarning': 'Tu ne verras plus {name}. Quelqu’un qui y est encore peut t’inviter à nouveau.',
-  'invite.removeWarning': 'Ce qu’ils ont déjà vu leur reste. Les retirer empêche seulement de voir la suite.',
+  'invite.removeWarning': 'Ce que la personne a déjà vu lui reste. La retirer empêche seulement de voir la suite.',
   'invite.you': 'Toi',
 
   // --- Households ---
@@ -202,7 +202,7 @@ export const fr: Messages = {
   'household.switchLabel': 'Ouvrir un ménage',
   'household.personal': 'Personnel',
   'household.needsKeys': 'Configure d’abord le chiffrement.',
-  'household.failed': 'Cela n’a pas fonctionné. Réessayez.',
+  'household.failed': 'Cela n’a pas fonctionné. Réessaie.',
 
   'security.twofaTitle': 'Authentification à deux facteurs',
   'security.currentPasswordPlaceholder': 'Mot de passe actuel',
@@ -215,7 +215,7 @@ export const fr: Messages = {
   'security.regenerate': 'Régénérer les codes',
   'security.regenerating': 'Génération...',
   'security.regenerateCodes': 'Régénérer les codes de récupération',
-  'security.newCodesWarning': 'Conservez ces nouveaux codes de récupération. Les anciens codes ne sont plus valables.',
+  'security.newCodesWarning': 'Conserve ces nouveaux codes de récupération. Les anciens ne sont plus valables.',
   'security.passwordTitle': 'Mot de passe',
   'security.deleteAccountTitle': 'Supprimer le compte',
   'security.deleteAccountHint': 'Supprime définitivement ton compte et toutes les données associées. Cette action est irréversible.',
@@ -247,7 +247,7 @@ export const fr: Messages = {
   'recoveryKey.noReset': 'Il n’existe aucun moyen de réinitialiser ceci.',
   'recoveryKey.stakes': 'Si tu oublies ton mot de passe et que tu n’as plus cette clé, tout ce qui se trouve dans tes données est perdu — ton budget, tes comptes, la totalité.',
   'recoveryKey.noAdmin': 'Aucun administrateur ne peut la récupérer à ta place. Le serveur ne détient jamais tes données qu’en clair chiffré, et ne voit jamais la clé qui les ouvre.',
-  'recoveryKey.copyFailed': 'Le presse-papiers n’a pas pu être atteint. Sélectionnez la clé ci-dessus et copiez-la à la main, ou utilisez Télécharger.',
+  'recoveryKey.copyFailed': 'Le presse-papiers n’a pas pu être atteint. Sélectionne la clé ci-dessus et copie-la à la main, ou utilise Télécharger.',
   'recoveryKey.copied': 'Clé de récupération copiée dans le presse-papiers.',
 
   // --- Banners ---
@@ -428,7 +428,7 @@ export const fr: Messages = {
   'snapshot.blurb': 'Un instantané est une copie nommée du plan tel qu’il est maintenant. Il conserve les noms et les montants du moment où il a été pris, de sorte que tes modifications ultérieures ne le touchent pas.',
   'accounts.tabAccounts': 'Comptes',
   'accounts.tabAllocations': 'Affectations',
-  'alloc.noEntries': 'Aucune entrée de budget pour l’instant. Créez-les dans le module Budget et elles apparaîtront ici, prêtes à être affectées.',
+  'alloc.noEntries': 'Aucune entrée de budget pour l’instant. Crée-les dans le module Budget et elles apparaîtront ici, prêtes à être affectées.',
   'alloc.affordableNow': 'Abordable maintenant',
   'alloc.underCycleRate': 'Montant mensuel inférieur à ce que ce cycle exige ; la date recule.',
   'alloc.noMonthlyAmount': 'Aucun montant mensuel prévu — budgétez quelque chose pour obtenir une date',
@@ -451,7 +451,7 @@ export const fr: Messages = {
   'field.email': 'E-mail',
   'field.recoveryCode': 'Code de récupération',
   'update.notNow': 'Pas maintenant',
-  'twofa.codesCopyFailed': 'Le presse-papiers n’a pas pu être atteint. Sélectionnez les codes ci-dessus et copiez-les à la main, ou utilisez Télécharger.',
+  'twofa.codesCopyFailed': 'Le presse-papiers n’a pas pu être atteint. Sélectionne les codes ci-dessus et copie-les à la main, ou utilise Télécharger.',
   'twofa.codesCopied': 'Codes de récupération copiés dans le presse-papiers.',
   'recoveryKey.pasteHint': 'Recolle la clé, pour le découvrir maintenant plutôt que le jour où tu en auras besoin. Après cela, elle ne sera plus jamais affichée.',
   'recoveryKey.matches': 'Cela correspond. Conserve-la à un endroit où tu l’auras encore dans un an.',
@@ -463,7 +463,7 @@ export const fr: Messages = {
   'accountForm.holderHint': 'Nécessaire uniquement pour les QR-factures.',
   'accountDelete.noneRouted': 'Aucune entrée ne passe par lui.',
   'accountDelete.confirm': 'Supprimer et réaffecter',
-  'qrbill.noAddress': 'Ce compte n’a pas d’adresse de titulaire complète. Ajoutez-la dans les coordonnées de paiement du compte — une QR-facture en a besoin.',
+  'qrbill.noAddress': 'Ce compte n’a pas d’adresse de titulaire complète. Ajoute-la dans les coordonnées de paiement du compte — une QR-facture en a besoin.',
   'qrbill.shareHint': 'Partage l’image vers Fichiers, Photos ou une discussion. Les applications bancaires scannent avec l’appareil photo et ne la liront pas depuis ici.',
 
   'error.setupEncryption': 'Échec de la configuration du chiffrement',
@@ -500,10 +500,10 @@ export const fr: Messages = {
   'recoveryKey.saved': 'Clé sauvegardée',
   'twofa.codesSaved': 'J’ai sauvegardé mes codes',
   'twofa.qrAlt': 'Code QR',
-  'twofa.codesCopyFailedPlain': 'Le presse-papiers n’a pas pu être atteint. Sélectionnez les codes ci-dessus et copiez-les à la main.',
+  'twofa.codesCopyFailedPlain': 'Le presse-papiers n’a pas pu être atteint. Sélectionne les codes ci-dessus et copie-les à la main.',
   'accounts.lastCannotDelete': 'Le dernier compte restant ne peut pas être supprimé',
-  'accounts.errorAmount': 'Saisissez un montant comme 1234.50',
-  'accounts.errorDate': 'Saisissez la date à laquelle le solde était exact',
+  'accounts.errorAmount': 'Saisis un montant comme 1234.50',
+  'accounts.errorDate': 'Saisis la date à laquelle le solde était exact',
   'accountDelete.remove': 'Supprimer {account} ?',
   'accountDelete.routed.one': '{count} entrée passe par ce compte et doit être déplacée ailleurs.',
   'accountDelete.routed.other': '{count} entrées passent par ce compte et doivent être déplacées ailleurs.',
@@ -512,7 +512,7 @@ export const fr: Messages = {
   'error.saveCategory': 'cette catégorie n’a pas pu être enregistrée',
   'error.renameSnapshot': 'cet instantané n’a pas pu être renommé',
   'error.takeSnapshot': 'l’instantané n’a pas pu être pris',
-  'password.mustChange': 'Veuillez définir un nouveau mot de passe pour continuer.',
+  'password.mustChange': 'Définis un nouveau mot de passe pour continuer.',
 
   // --- Sentences assembled around their values ---
   'reserve.requiredNow': '{current} sur {target} devraient être provisionnés à ce jour',
@@ -543,6 +543,9 @@ export const fr: Messages = {
   'knowledge.tourBody': 'Un bref parcours des vues principales et de leurs commandes.',
   'knowledge.tourStart': 'Démarrer',
   'knowledge.tourAgain': 'Recommencer',
+  'knowledge.sharedTourTitle': 'Configurer les budgets partagés',
+  'knowledge.sharedTourAgainTitle': 'Budgets partagés, à nouveau',
+  'knowledge.sharedTourBody': 'Comment deux personnes tiennent un plan de ménage à côté du leur, et qui peut le modifier.',
   'knowledge.about': 'À propos de l’app',
   'knowledge.swiss': 'Bases suisses',
   'knowledge.sources': 'Sources officielles',

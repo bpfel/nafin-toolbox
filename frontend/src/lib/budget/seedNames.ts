@@ -30,6 +30,16 @@ export type SeedKey =
   | 'clothing' | 'entertainment' | 'diningOut'
   | 'savings' | 'pillar3a'
   | 'serafe' | 'laptop' | 'travelPass'
+  // The shared-household starter, seeded by `seedSharedDefaults`. Separate
+  // keys rather than reused ones because the words differ: a household's
+  // income line is a *contribution*, not a salary, and that distinction is the
+  // whole point of the example.
+  | 'cat.contributions' | 'contributionAlex' | 'contributionSam'
+  | 'jointReserve' | 'washingMachine'
+  //
+  // Alex and Sam stay Alex and Sam in every language. They are people in an
+  // example, not interface text, and translating a name would only make the
+  // same illustration harder to talk about across a bilingual household.
 
 type SeedNames = Record<SeedKey, string>
 
@@ -57,6 +67,11 @@ const en: SeedNames = {
   laptop: 'Laptop',
   savings: 'Savings',
   pillar3a: 'Pillar 3a',
+  'cat.contributions': 'Contributions',
+  contributionAlex: 'Alex — contribution',
+  contributionSam: 'Sam — contribution',
+  jointReserve: 'Joint reserve',
+  washingMachine: 'Washing machine',
 }
 
 const de: SeedNames = {
@@ -83,6 +98,11 @@ const de: SeedNames = {
   laptop: 'Laptop',
   savings: 'Sparen',
   pillar3a: 'Säule 3a',
+  'cat.contributions': 'Beiträge',
+  contributionAlex: 'Alex — Beitrag',
+  contributionSam: 'Sam — Beitrag',
+  jointReserve: 'Gemeinsame Reserve',
+  washingMachine: 'Waschmaschine',
 }
 
 const fr: SeedNames = {
@@ -109,6 +129,11 @@ const fr: SeedNames = {
   laptop: 'Ordinateur portable',
   savings: 'Épargne',
   pillar3a: 'Pilier 3a',
+  'cat.contributions': 'Contributions',
+  contributionAlex: 'Alex — contribution',
+  contributionSam: 'Sam — contribution',
+  jointReserve: 'Réserve commune',
+  washingMachine: 'Lave-linge',
 }
 
 const it: SeedNames = {
@@ -135,6 +160,11 @@ const it: SeedNames = {
   laptop: 'Computer portatile',
   savings: 'Risparmio',
   pillar3a: 'Pilastro 3a',
+  'cat.contributions': 'Contributi',
+  contributionAlex: 'Alex — contributo',
+  contributionSam: 'Sam — contributo',
+  jointReserve: 'Riserva comune',
+  washingMachine: 'Lavatrice',
 }
 
 /**

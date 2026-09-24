@@ -682,3 +682,101 @@ export function seedDefaults(vault: VaultData, locale: Locale = 'en', anchorMont
     setPlanned(vault, entry.id, d.amount)
   }
 }
+
+
+/**
+ * The other starter budget: a household shared by two people.
+ *
+ * Written for the shared-budgets walkthrough, and it is a different budget
+ * rather than the same one with two salaries in it, because a household plan
+ * is not a personal plan with company. Two things distinguish it, and the tour
+ * exists to say both:
+ *
+ * **Only what is actually shared.** Rent, the utilities, the food, the radio
+ * levy, the machine in the kitchen — costs that arrive once for the dwelling
+ * rather than once per person. The health insurance premium and the 3a payment
+ * are missing on purpose. They are per-person by law, not by preference, and a
+ * household budget that swallows them is the first step towards a couple who
+ * can no longer say what either of them owns. The tour does not stop to say
+ * so; the example simply does not contain them.
+ *
+ * **The income side is contributions, not wages.** Nobody's salary is paid
+ * into a household; each person pays a share of it in. So the two income lines
+ * are what Alex and Sam put in, and they add up to exactly what goes out —
+ * 2'337.92 either way. The split is 60/40, which is what proportional-to-income
+ * gives for this pair, and the odd rappen are the honest consequence of that
+ * rather than something to round away.
+ *
+ * The figures themselves are the same BFS household ones `bfsDefaults` uses,
+ * unchanged. That survey already measures a *household* of about two people,
+ * so no figure here has been doubled, invented or adjusted for a couple —
+ * which is what keeps this example as sourced as the other one.
+ *
+ * @param anchorMonth `YYYY-MM`, for the two reserves. See `seedDefaults`.
+ */
+export function seedSharedDefaults(
+  vault: VaultData,
+  locale: Locale = 'en',
+  anchorMonth = '2026-01',
+): void {
+  if (vault.budget.entries.length > 0) return
+
+  const name = seedNamesFor(locale)
+
+  for (const dc of sharedDefaultCategories()) {
+    createCategory(vault, name[dc.key], dc.type, dc.sortOrder)
+  }
+
+  for (const d of sharedDefaults()) {
+    const entry = createEntry(vault, {
+      name: name[d.key],
+      type: d.type,
+      categoryName: name[d.categoryKey],
+      sortOrder: d.sortOrder,
+      anchorMonth,
+      targetAmount: d.targetAmount,
+      periodMonths: d.periodMonths,
+    })
+    setPlanned(vault, entry.id, d.amount)
+  }
+}
+
+function sharedDefaultCategories(): DefaultCategory[] {
+  return [
+    { key: 'cat.contributions', type: 'income', sortOrder: 1 },
+    { key: 'cat.housing', type: 'expense', sortOrder: 10 },
+    { key: 'cat.living', type: 'expense', sortOrder: 20 },
+    { key: 'cat.savings', type: 'expense', sortOrder: 30 },
+  ]
+}
+
+function sharedDefaults(): DefaultEntry[] {
+  return [
+    // 60/40 of 2'327.92. Not halves: the two earn differently, and splitting a
+    // shared cost in half when the incomes are not equal is the thing the
+    // proportional arrangement exists to avoid.
+    { key: 'contributionAlex', type: 'income', sortOrder: 10, categoryKey: 'cat.contributions', amount: '1402.75' },
+    { key: 'contributionSam', type: 'income', sortOrder: 20, categoryKey: 'cat.contributions', amount: '935.17' },
+
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1350.00' },
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '150.00' },
+    // Serafe sits under Housing here rather than under Insurance and Taxes,
+    // where the personal starter puts it. The levy is charged per *dwelling*,
+    // which is exactly why it belongs in a shared budget at all — and the
+    // household plan has no insurance heading, because insurance is not shared.
+    { key: 'serafe', type: 'bill', sortOrder: 30, categoryKey: 'cat.housing', amount: '27.92', targetAmount: '335.00', periodMonths: 12 },
+
+    { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '500.00' },
+
+    // A shared set-aside, so the example has somewhere for a joint decision to
+    // land — a holiday, the excess on something that breaks.
+    { key: 'jointReserve', type: 'savings', sortOrder: 10, categoryKey: 'cat.savings', amount: '300.00' },
+    // And a `purchase`, so the step saying a household has the same entry
+    // types as a personal budget is backed by a screen that shows them. An
+    // appliance is the household case for the type: one machine for the flat,
+    // replaced every so often, rather than a bill that arrives. 1'200 over ten
+    // years is exactly 10.00 a month — a round figure reads as a decision, and
+    // the user overwrites it either way.
+    { key: 'washingMachine', type: 'purchase', sortOrder: 20, categoryKey: 'cat.savings', amount: '10.00', targetAmount: '1200.00', periodMonths: 120 },
+  ]
+}

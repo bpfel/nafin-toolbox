@@ -171,7 +171,7 @@ export const de: Messages = {
   'invite.remove': 'Entfernen',
   'invite.leave': 'Verlassen',
   'invite.leaveWarning': 'Du siehst {name} dann nicht mehr. Wer noch drin ist, kann dich wieder einladen.',
-  'invite.removeWarning': 'Was sie schon gesehen haben, bleibt ihnen. Entfernen verhindert nur, dass sie Neues sehen.',
+  'invite.removeWarning': 'Was die Person schon gesehen hat, bleibt ihr. Entfernen verhindert nur, dass sie Neues sieht.',
   'invite.you': 'Du',
 
   // --- Households ---
@@ -550,6 +550,9 @@ export const de: Messages = {
   'knowledge.tourBody': 'Ein kurzer Gang durch die wichtigsten Ansichten und ihre Bedienelemente.',
   'knowledge.tourStart': 'Start',
   'knowledge.tourAgain': 'Erneut',
+  'knowledge.sharedTourTitle': 'Gemeinsame Budgets einrichten',
+  'knowledge.sharedTourAgainTitle': 'Gemeinsame Budgets, noch einmal',
+  'knowledge.sharedTourBody': 'Wie zwei Personen einen Haushaltsplan neben dem eigenen führen — und wer ihn ändern darf.',
   'knowledge.about': 'Über diese App',
   'knowledge.swiss': 'Schweizer Grundlagen',
   'knowledge.sources': 'Offizielle Quellen',

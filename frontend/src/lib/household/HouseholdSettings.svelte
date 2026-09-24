@@ -130,7 +130,10 @@
   }
 </script>
 
-<div class="settings-card">
+<!-- `data-tour`: the shared-budgets walkthrough stops here twice, to create a
+     household and then to ask somebody into it. The card is always rendered,
+     empty state included, so the anchor survives the app it is written for. -->
+<div class="settings-card" data-tour="household">
   <h3>{t('household.title')}</h3>
   <p class="info">{t('household.hint')}</p>
 
