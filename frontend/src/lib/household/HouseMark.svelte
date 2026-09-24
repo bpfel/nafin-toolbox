@@ -31,19 +31,23 @@
   stroke-linejoin="round"
   aria-hidden="true"
 >
-  <!-- Roof and walls, left open at the foot so two letters have room to sit. -->
-  <path d="M3 10.5 12 3l9 7.5" />
-  <path d="M5 9.7V20h14V9.7" />
+  <!--
+    A low roof and tall walls, which is not how a house is usually drawn and is
+    the point: the letters are what distinguishes one household from another, so
+    the shape is sized around them rather than the other way round.
+  -->
+  <path d="M2.5 9.5 12 2.5l9.5 7" />
+  <path d="M4.5 8.6V21h15V8.6" />
   {#if initials}
     <text
       x="12"
-      y="17"
+      y="18.2"
       text-anchor="middle"
       stroke="none"
       fill="currentColor"
-      font-size={initials.length > 1 ? 7 : 9}
+      font-size={initials.length > 1 ? 9.5 : 12}
       font-weight="700"
-      letter-spacing="-0.3"
+      letter-spacing="-0.5"
     >{initials}</text>
   {/if}
 </svg>
@@ -56,7 +60,7 @@
   }
 
   .large {
-    width: 26px;
-    height: 26px;
+    width: 30px;
+    height: 30px;
   }
 </style>

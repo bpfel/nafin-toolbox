@@ -53,12 +53,18 @@ describe('the vault switch', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
   })
 
-  test('says Personal when the personal vault is on screen', () => {
+  // Naming it "Personal" stated the obvious — you are in your own budget unless
+  // something says otherwise — so on your own budget the control offers where
+  // you could go rather than describing where you are.
+  test('says nothing when the personal vault is on screen', () => {
     state.households = [{ id: 3, name: 'Flat with Anna', role: 'owner' }]
 
     render(VaultSwitch)
 
-    expect(screen.getByRole('button').textContent).toContain('Personal')
+    const trigger = screen.getByRole('button')
+    expect(trigger.textContent?.trim()).toBe('')
+    // But it still says what it does, because a symbol says nothing to a reader.
+    expect(trigger.getAttribute('aria-label')).toBe('Open a household')
   })
 
   test('lists the personal vault alongside every household', async () => {

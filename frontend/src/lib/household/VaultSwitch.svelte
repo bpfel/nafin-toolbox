@@ -43,7 +43,7 @@
 <svelte:window onkeydown={onKeydown} />
 
 {#if showing}
-  <div class="switch">
+  <div class="switch vault-switch">
     <button
       class="trigger"
       class:household={current !== null}
@@ -51,17 +51,25 @@
       type="button"
       aria-expanded={open}
       aria-haspopup="true"
+      aria-label={current ? current.name : t('household.switchLabel')}
+      title={current ? current.name : t('household.switchLabel')}
       onclick={() => (open = !open)}
     >
-      {#if current}
-        <HouseMark initials={initialsOf(current.name)} />
-      {/if}
       <!--
-        The name, not only the mark. Initials alone distinguish one household
-        from another; they do not say which of the two kinds of budget this is,
-        and that is the distinction a wrong entry turns on.
+        On a household: its mark and its name, because initials alone say which
+        household but not that you are in one, and that is the distinction a
+        wrong entry turns on.
+
+        On your own budget: an empty house and nothing else. Naming it "Personal"
+        stated the obvious — you are in your own budget unless something says
+        otherwise — so the control stops describing where you are and offers
+        where you could go instead. The accessible name still says what it does,
+        because a symbol says nothing to a reader.
       -->
-      <span class="label">{current ? current.name : t('household.personal')}</span>
+      <HouseMark initials={current ? initialsOf(current.name) : ''} />
+      {#if current}
+        <span class="label">{current.name}</span>
+      {/if}
     </button>
 
     {#if open}
@@ -97,6 +105,13 @@
 {/if}
 
 <style>
+  /*
+   * `vault-switch` is the name the dial reaches for. The strip turns pointer
+   * events off for itself and back on for each control it knows about, and
+   * hides those controls while it is folded — a class it does not recognise
+   * gets neither, which is how this arrived on a phone as a pill that could not
+   * be tapped and would not go away.
+   */
   .switch {
     position: relative;
     display: flex;

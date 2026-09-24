@@ -438,7 +438,8 @@
     }
 
     .dot,
-    .strip :global(.action) {
+    .strip :global(.action),
+    .strip :global(.vault-switch) {
       pointer-events: auto;
     }
 
@@ -466,7 +467,8 @@
      * off, which is the urgent one, would cost the same two taps as turning it
      * on. `.pressed` is what a toggle already wears when it is on.
      */
-    .dial:not(.expanded) .strip :global(.action:not(.pressed)) {
+    .dial:not(.expanded) .strip :global(.action:not(.pressed)),
+    .dial:not(.expanded) .strip :global(.vault-switch) {
       display: none;
     }
 

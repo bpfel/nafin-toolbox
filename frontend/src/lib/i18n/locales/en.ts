@@ -203,6 +203,7 @@ export const en = {
   'household.delete': 'Delete',
   'household.deletePrompt': 'Delete {name}? Everything in it is lost, for everyone in it.',
   'household.deleting': 'Deleting…',
+  'household.switchLabel': 'Open a household',
   'household.personal': 'Personal',
   'household.needsKeys': 'Set up encryption before starting a household.',
   'household.failed': 'That did not work. Try again.',
