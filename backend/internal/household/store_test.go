@@ -1177,3 +1177,51 @@ func TestStore_AnAddressIsOneAccount(t *testing.T) {
 		t.Fatal("a second account was created differing only in capitalisation")
 	}
 }
+
+// The means to re-deliver an invitation is the owner's alone.
+//
+// Everyone sees who has been asked — somebody about to join is not a secret
+// from the people they are joining. But a writer or a reader cannot invite,
+// confirm or withdraw, so handing them the sealed secret and token would make
+// "only the owner may invite" true of the buttons rather than of the system.
+func TestStore_OnlyTheOwnerCanRebuildALink(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-link@example.ch")
+	ben := makeUser(t, db, "ben-link@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMemberAs(t, db, id, ben, RoleWriter)
+
+	invite := anInvite("someone-link@example.ch")
+	invite.TokenSealed = "sealed-token"
+	if _, err := store.CreateInvite(ctx, id, anna, invite, hour()); err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+
+	owners, err := store.ListInvites(ctx, id, anna)
+	if err != nil {
+		t.Fatalf("ListInvites as owner: %v", err)
+	}
+	if owners[0].SecretSealed == "" || owners[0].TokenSealed == "" {
+		t.Error("the owner cannot rebuild the link they made")
+	}
+
+	writers, err := store.ListInvites(ctx, id, ben)
+	if err != nil {
+		t.Fatalf("ListInvites as writer: %v", err)
+	}
+	if len(writers) != 1 {
+		t.Fatalf("a writer sees %d invitations, want 1", len(writers))
+	}
+	if writers[0].InvitedEmail != "someone-link@example.ch" {
+		t.Error("a writer cannot see who has been asked")
+	}
+	if writers[0].SecretSealed != "" || writers[0].TokenSealed != "" {
+		t.Error("a writer was handed the means to re-deliver an invitation")
+	}
+}

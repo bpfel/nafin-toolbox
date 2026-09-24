@@ -150,6 +150,9 @@ export const it: Messages = {
   'invite.cancelAction': 'Annulla',
   'invite.doneAction': 'Fatto',
 
+  'invite.codeFor': 'Invito per {name}',
+  'invite.showCode': 'Mostra il codice per {name}',
+
   // --- Following an invitation link ---
   'join.working': 'Adesione…',
   'join.doneTitle': 'Invito accettato',

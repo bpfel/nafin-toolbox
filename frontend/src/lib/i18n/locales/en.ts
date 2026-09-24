@@ -154,6 +154,9 @@ export const en = {
   'invite.cancelAction': 'Cancel',
   'invite.doneAction': 'Done',
 
+  'invite.codeFor': 'Invitation for {name}',
+  'invite.showCode': 'Show the code for {name}',
+
   // --- Following an invitation link ---
   'join.working': 'Joining…',
   'join.doneTitle': 'Invitation accepted',

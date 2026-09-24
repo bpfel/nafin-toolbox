@@ -286,14 +286,15 @@ func (s *Store) CreateInvite(ctx context.Context, vaultID, userID int, req Creat
 	}
 	var id int
 	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO shared_vault_invites (vault_id, token_hash, invited_email, secret_sealed, expires_at, role)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO shared_vault_invites (vault_id, token_hash, invited_email, secret_sealed, token_sealed, expires_at, role)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (vault_id, lower(invited_email)) DO UPDATE
 		 SET token_hash = EXCLUDED.token_hash, secret_sealed = EXCLUDED.secret_sealed,
+		     token_sealed = EXCLUDED.token_sealed,
 		     expires_at = EXCLUDED.expires_at, created_at = NOW(), role = EXCLUDED.role,
 		     accepted_user_id = NULL, public_key_mac = NULL, accepted_at = NULL
 		 RETURNING id`,
-		vaultID, req.TokenHash, req.InvitedEmail, req.SecretSealed, expiresAt, req.Role,
+		vaultID, req.TokenHash, req.InvitedEmail, req.SecretSealed, req.TokenSealed, expiresAt, req.Role,
 	).Scan(&id)
 	return id, err
 }
@@ -305,12 +306,17 @@ func (s *Store) CreateInvite(ctx context.Context, vaultID, userID int, req Creat
 // the household, and somebody about to be handed a key is not a secret from the
 // people they are joining.
 func (s *Store) ListInvites(ctx context.Context, vaultID, userID int) ([]Invite, error) {
-	if _, err := s.Membership(ctx, vaultID, userID); err != nil {
+	role, err := s.Membership(ctx, vaultID, userID)
+	if err != nil {
 		return nil, err
 	}
+	// Everyone sees who has been asked — somebody about to join is not a secret
+	// from the people they are joining. Only the owner gets the means to
+	// re-deliver the invitation, because only the owner can do anything with it.
+	owner := role == RoleOwner
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT i.id, i.invited_email, i.secret_sealed, i.role, i.expires_at, i.created_at,
+		`SELECT i.id, i.invited_email, i.secret_sealed, i.token_sealed, i.role, i.expires_at, i.created_at,
 		        i.accepted_user_id, i.accepted_at, i.public_key_mac,
 		        COALESCE(u.public_key, ''), COALESCE(u.verifying_key, '')
 		 FROM shared_vault_invites i
@@ -330,7 +336,7 @@ func (s *Store) ListInvites(ctx context.Context, vaultID, userID int) ([]Invite,
 		var mac sql.NullString
 		var acceptedAt sql.NullTime
 		var acceptedBy sql.NullInt64
-		if err := rows.Scan(&in.ID, &in.InvitedEmail, &in.SecretSealed, &in.Role, &in.ExpiresAt, &in.CreatedAt,
+		if err := rows.Scan(&in.ID, &in.InvitedEmail, &in.SecretSealed, &in.TokenSealed, &in.Role, &in.ExpiresAt, &in.CreatedAt,
 			&acceptedBy, &acceptedAt, &mac, &in.PublicKey, &in.VerifyingKey); err != nil {
 			return nil, err
 		}
@@ -343,6 +349,10 @@ func (s *Store) ListInvites(ctx context.Context, vaultID, userID int) ([]Invite,
 			in.AcceptedAt = &t
 		}
 		in.PublicKeyMAC = mac.String
+		if !owner {
+			in.SecretSealed = ""
+			in.TokenSealed = ""
+		}
 		invites = append(invites, in)
 	}
 	return invites, rows.Err()

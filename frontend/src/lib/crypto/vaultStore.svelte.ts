@@ -792,17 +792,19 @@ if (typeof window !== 'undefined') {
 // --- inviting somebody into a household ---
 
 /**
- * A pending invitation, and whether it may be confirmed.
+ * A pending invitation, with its link rebuilt where that is possible.
  *
- * Deliberately carries no link. Only the token's hash was ever stored, so a
- * link cannot be recovered — it exists at the moment it is minted and nowhere
- * afterwards. That is the property that makes a leaked database useless, and a
- * field here that quietly returned an empty string would have hidden it.
- * Re-inviting mints a new one.
+ * The server still holds only the token's *hash*, so a leaked database hands
+ * nobody an invitation. The link comes back from the secret and the token
+ * sealed beside it, under the household key — which a member has and the server
+ * does not. Empty for anybody but the owner, who is the only one who could do
+ * anything with it.
  */
 export interface PendingInvite extends HouseholdInvite {
   /** The MAC checks out: the offered key really is the invitee's. */
   verified: boolean
+  /** Rebuilt from the sealed halves. Empty unless this user is the owner. */
+  link: string
 }
 
 /**
@@ -824,6 +826,10 @@ export async function inviteToHousehold(householdId: number, email: string, role
     token_hash: await hashInviteToken(token),
     invited_email: email,
     secret_sealed: await sealUnder(secret, household.key),
+    // Sealed too, so the code can be shown again. Show-once bought nothing:
+    // withdrawing and re-inviting always produced an equivalent link, so the
+    // restriction only ever cost somebody who got interrupted.
+    token_sealed: await sealUnder(new TextEncoder().encode(token), household.key),
     role,
   })
 
@@ -857,14 +863,57 @@ export async function loadInvites(householdId: number): Promise<PendingInvite[]>
   const invites = await fetchHouseholdInvites(householdId)
   return Promise.all(
     invites.map(async invite => {
+      // Absent for anybody but the owner, who is the only one who could use it.
+      if (!invite.secret_sealed) return { ...invite, verified: false, link: '' }
+
       const secret = await openUnder(invite.secret_sealed, household.key)
       const verified =
         !!invite.public_key_mac &&
         !!invite.public_key &&
         (await verifyPublicKeyMAC(secret, fromBase64(invite.public_key), invite.public_key_mac))
-      return { ...invite, verified }
+
+      const link = invite.token_sealed
+        ? inviteLink(new TextDecoder().decode(await openUnder(invite.token_sealed, household.key)), secret)
+        : ''
+
+      return { ...invite, verified, link }
     }),
   )
+}
+
+/**
+ * Let in everybody whose acceptance checks out, without being asked.
+ *
+ * The button this replaces was a leftover from a design we do not use. Its job
+ * in Bitwarden is to put a human in front of a fingerprint, because that
+ * comparison is the only thing catching a substituted key. Here the MAC does
+ * that, automatically, and cannot be rubber-stamped — so by the time anybody
+ * could have pressed the button, everything it was for had already happened.
+ *
+ * Nor could it catch the wrong person accepting: an invitation can only be
+ * taken up by the account at the address it names, so the row shows what was
+ * typed and can hold no surprise.
+ *
+ * What is *not* automatic is the failure. A MAC that does not verify grants
+ * nothing and stays on screen saying so, because that is the one case where
+ * somebody has to decide something.
+ */
+export async function letInWhoeverIsReady(householdId: number): Promise<number> {
+  const invites = await loadInvites(householdId)
+  let admitted = 0
+
+  for (const invite of invites) {
+    if (!invite.accepted_at || !invite.verified) continue
+    try {
+      await confirmMember(householdId, invite)
+      admitted++
+    } catch {
+      // Left pending rather than retried in a loop. The panel will try again
+      // the next time it is opened, and a failure that repeats is one the
+      // mismatch warning is already the right answer to.
+    }
+  }
+  return admitted
 }
 
 /**
@@ -880,6 +929,11 @@ export async function confirmMember(householdId: number, invite: HouseholdInvite
   if (!household || !identity) throw new Error('not ready')
   if (!invite.public_key || !invite.verifying_key || !invite.public_key_mac) {
     throw new Error('this invitation has not been accepted yet')
+  }
+  // Absent for anybody but the owner, and granting is the owner's alone — so
+  // its absence is a refusal rather than something to work around.
+  if (!invite.secret_sealed) {
+    throw new Error('only the owner may let somebody in')
   }
 
   const secret = await openUnder(invite.secret_sealed, household.key)

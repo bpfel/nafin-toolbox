@@ -335,8 +335,9 @@ export interface HouseholdInvite {
   invited_email: string
   /** What they become on confirmation. Never owner. */
   role: string
-  /** The invite secret, sealed under the household key. */
-  secret_sealed: string
+  /** Sealed under the household key, and served to the owner alone. */
+  secret_sealed?: string
+  token_sealed?: string
   expires_at: string
   created_at: string
   accepted_at?: string
@@ -357,7 +358,7 @@ export async function fetchHouseholdInvites(id: number): Promise<HouseholdInvite
 
 export async function createHouseholdInvite(
   id: number,
-  body: { token_hash: string; invited_email: string; secret_sealed: string; role: string },
+  body: { token_hash: string; invited_email: string; secret_sealed: string; token_sealed: string; role: string },
 ): Promise<{ id: number }> {
   return request<{ id: number }>(`/households/${id}/invites`, {
     method: 'POST',

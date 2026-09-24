@@ -1,11 +1,11 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
   import {
-    inviteToHousehold, loadInvites, confirmMember, withdrawInvite, listMembers, removeMember,
-    changeRole, type PendingInvite,
+    inviteToHousehold, loadInvites, withdrawInvite, listMembers, removeMember,
+    letInWhoeverIsReady, changeRole, type PendingInvite,
   } from '../crypto/vaultStore.svelte'
   import type { HouseholdMember } from '../api/client'
-  import InviteQR from './InviteQR.svelte'
+  import InviteCodeDialog from './InviteCodeDialog.svelte'
   import ActionButton from '../nav/ActionButton.svelte'
   import { autofocus } from '../util/autofocus'
 
@@ -54,9 +54,6 @@
     members.filter(m => m.user_id !== myUserId).sort((a, b) => a.joined_at.localeCompare(b.joined_at))[0],
   )
 
-  /** The link for an invitation just made. Shown once; never recoverable. */
-  let freshLink = $state<string | null>(null)
-  let copied = $state(false)
 
   let inviting = $state(false)
   let email = $state('')
@@ -66,28 +63,23 @@
   /** Whose role is being changed, and to what. */
   let changingRole = $state<number | null>(null)
 
-  /**
-   * Which address the link on screen belongs to.
-   *
-   * Kept so the code can disappear the moment that person accepts. A QR for an
-   * invitation somebody has already taken up is an offer that cannot be
-   * accepted twice, still sitting on the screen inviting a second try.
-   */
-  let freshLinkFor = $state<string | null>(null)
+  /** Which invitation's code is open, if any. */
+  let showingCode = $state<number | null>(null)
 
   async function refresh() {
     try {
+      // Anybody whose acceptance checks out is let in here rather than by a
+      // button. See `letInWhoeverIsReady` for why the button bought nothing.
+      if (isOwner) await letInWhoeverIsReady(householdId)
+
       members = await listMembers(householdId)
       invites = await loadInvites(householdId)
 
-      // The link is for somebody who has now answered, or for an invitation
-      // that is no longer there. Either way it has nothing left to offer.
-      if (freshLinkFor) {
-        const still = invites.find(i => i.invited_email === freshLinkFor)
-        if (!still || still.accepted_at) {
-          freshLink = null
-          freshLinkFor = null
-        }
+      // An invitation that has been taken up, or withdrawn, has no code left to
+      // show — and a code still on screen would be an offer nobody can accept.
+      if (showingCode !== null) {
+        const still = invites.find(i => i.id === showingCode)
+        if (!still || still.accepted_at) showingCode = null
       }
     } catch {
       error = t('household.failed')
@@ -105,28 +97,16 @@
     busy = true
     error = null
     try {
-      freshLink = await inviteToHousehold(householdId, address, inviteRole)
-      freshLinkFor = address
+      await inviteToHousehold(householdId, address, inviteRole)
       inviting = false
       email = ''
       inviteRole = 'writer'
       await refresh()
+      // Straight to the code, because making an invitation and handing it over
+      // are one act interrupted by a page.
+      showingCode = invites.find(i => i.invited_email === address)?.id ?? null
     } catch {
       error = t('household.failed')
-    } finally {
-      busy = false
-    }
-  }
-
-  async function letIn(invite: PendingInvite) {
-    if (busy) return
-    busy = true
-    error = null
-    try {
-      await confirmMember(householdId, invite)
-      await refresh()
-    } catch (e) {
-      error = e instanceof Error ? e.message : t('household.failed')
     } finally {
       busy = false
     }
@@ -136,10 +116,7 @@
     busy = true
     try {
       await withdrawInvite(householdId, inviteId)
-      // The link on screen opens the invitation that was just withdrawn, so
-      // leaving it up offers somebody a link that cannot work.
-      freshLink = null
-      freshLinkFor = null
+      showingCode = null
       await refresh()
     } catch {
       error = t('household.failed')
@@ -175,12 +152,6 @@
     }
   }
 
-  async function copy() {
-    if (!freshLink) return
-    await navigator.clipboard.writeText(freshLink)
-    copied = true
-    setTimeout(() => (copied = false), 2000)
-  }
 </script>
 
 <div class="people">
@@ -299,10 +270,20 @@
         <span class="tag">{t(`role.${invite.role}` as 'role.writer')}</span>
 
         {#if isOwner}
-          {#if invite.accepted_at && invite.verified}
-            <ActionButton label={t('invite.confirm')} disabled={busy} onclick={() => letIn(invite)}>
+          <!--
+            While it is still open. Once somebody has taken it up there is
+            nothing left to offer, and the row is about to become a member.
+          -->
+          {#if !invite.accepted_at && invite.link}
+            <ActionButton
+              label={t('invite.showCode').replace('{name}', invite.invited_email)}
+              onclick={() => (showingCode = invite.id)}
+            >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12" />
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <path d="M14 14h3v3h-3zM19 19h2v2h-2z" />
               </svg>
             </ActionButton>
           {/if}
@@ -327,32 +308,8 @@
     {/each}
   </ul>
 
-  {#if freshLink}
-    <div class="link-box">
-      <p>{t('invite.linkReady')}</p>
-      <InviteQR link={freshLink} />
-      <p class="why">{t('invite.linkWhy')}</p>
-      <div class="btn-row">
-        <!--
-          The one control here that keeps its words. Every other action in this
-          panel is a verb with an obvious mark; "copy this link" is a thing the
-          clipboard has no symbol for that anybody reads at a glance — and it is
-          the action somebody who cannot scan a code has to find.
-        -->
-        <button class="btn-secondary" onclick={copy}>
-          {copied ? t('invite.copied') : t('invite.copy')}
-        </button>
-        <ActionButton
-          label={t('invite.doneAction')}
-          onclick={() => { freshLink = null; freshLinkFor = null }}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </ActionButton>
-      </div>
-    </div>
-  {:else if isOwner}
+  {#if isOwner}
+
     {#if inviting}
       <form class="naming" onsubmit={e => { e.preventDefault(); invite() }}>
         <input
@@ -400,6 +357,17 @@
     <p class="error">{error}</p>
   {/if}
 </div>
+
+{#if showingCode !== null}
+  {@const invite = invites.find(i => i.id === showingCode)}
+  {#if invite?.link}
+    <InviteCodeDialog
+      link={invite.link}
+      email={invite.invited_email}
+      onclose={() => (showingCode = null)}
+    />
+  {/if}
+{/if}
 
 <style>
   /*
@@ -500,22 +468,8 @@
     font-weight: 600;
   }
 
-  .link-box {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
 
-  .link-box p {
-    margin: 0;
-    font-size: 0.875rem;
-  }
 
-  .why {
-    color: var(--ink-faint);
-  }
 
   .naming {
     display: flex;

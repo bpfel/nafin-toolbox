@@ -150,6 +150,9 @@ export const fr: Messages = {
   'invite.cancelAction': 'Annuler',
   'invite.doneAction': 'Terminé',
 
+  'invite.codeFor': 'Invitation pour {name}',
+  'invite.showCode': 'Afficher le code pour {name}',
+
   // --- Following an invitation link ---
   'join.working': 'Adhésion…',
   'join.doneTitle': 'Invitation acceptée',

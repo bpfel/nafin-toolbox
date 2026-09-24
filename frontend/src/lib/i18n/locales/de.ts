@@ -139,6 +139,9 @@ export const de: Messages = {
   'invite.cancelAction': 'Abbrechen',
   'invite.doneAction': 'Fertig',
 
+  'invite.codeFor': 'Einladung für {name}',
+  'invite.showCode': 'Code für {name} anzeigen',
+
   // --- Following an invitation link ---
   'join.working': 'Wird beigetreten…',
   'join.doneTitle': 'Einladung angenommen',

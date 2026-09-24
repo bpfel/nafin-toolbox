@@ -111,8 +111,15 @@ type Member struct {
 type Invite struct {
 	ID           int    `json:"id"`
 	InvitedEmail string `json:"invited_email"`
-	// The invite secret, sealed under the household key. Opaque to the server.
-	SecretSealed string `json:"secret_sealed"`
+	// The secret and the token, both sealed under the household key and both
+	// opaque to the server. Together they rebuild the link.
+	//
+	// Served to the owner alone. Nobody else can invite, confirm or withdraw, so
+	// nobody else has any use for the means to re-deliver an invitation — and
+	// handing it to them anyway would make "only the owner may invite" true of
+	// the buttons rather than of the system.
+	SecretSealed string `json:"secret_sealed,omitempty"`
+	TokenSealed  string `json:"token_sealed,omitempty"`
 	// What the invitee becomes on confirmation. Never owner: there is exactly
 	// one, and handing it over is its own act rather than a side effect.
 	Role       string     `json:"role"`
@@ -138,6 +145,7 @@ type CreateInviteRequest struct {
 	TokenHash    string `json:"token_hash"`
 	InvitedEmail string `json:"invited_email"`
 	SecretSealed string `json:"secret_sealed"`
+	TokenSealed  string `json:"token_sealed"`
 	// Decided when the invitation is sent rather than after somebody is already
 	// in, so nobody is briefly able to do more than was meant.
 	Role string `json:"role"`
