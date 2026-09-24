@@ -231,10 +231,17 @@
                   .replace('{name}', householdName)
                   .replace('{successor}', successor.email)}
               {:else}
-                <!-- Said to you, about you. The removal wording is about
-                     somebody else and reads as though it is happening to a
-                     third person who is not in the room. -->
-                {t('invite.leaveWarning')}
+                <!--
+                  What leaving actually does, rather than a caveat borrowed from
+                  removal. Removing somebody else has a residual risk worth
+                  stating — revoking access is server-side, so it stops them
+                  seeing what comes next but cannot take back what they hold.
+                  Leaving has no such residue: the household goes from the list,
+                  its key and its decrypted contents go with the slot, and
+                  nothing of it stays behind. Warning you that you remember
+                  things you have read is not a consequence you can act on.
+                -->
+                {t('invite.leaveWarning').replace('{name}', householdName)}
               {/if}
             </p>
             <div class="btn-row">

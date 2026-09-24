@@ -181,7 +181,7 @@ export const fr: Messages = {
   'invite.expires': 'Expire {when}',
   'invite.remove': 'Retirer',
   'invite.leave': 'Quitter',
-  'invite.leaveWarning': 'Ce que tu as déjà vu te reste. Partir t’empêche seulement de voir la suite.',
+  'invite.leaveWarning': 'Tu ne verras plus {name}. Quelqu’un qui y est encore peut t’inviter à nouveau.',
   'invite.removeWarning': 'Ce qu’ils ont déjà vu leur reste. Les retirer empêche seulement de voir la suite.',
   'invite.you': 'Toi',
 

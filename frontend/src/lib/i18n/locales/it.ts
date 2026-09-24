@@ -181,7 +181,7 @@ export const it: Messages = {
   'invite.expires': 'Scade {when}',
   'invite.remove': 'Rimuovi',
   'invite.leave': 'Esci',
-  'invite.leaveWarning': 'Quello che hai già visto ti resta. Uscire ti impedisce solo di vedere il resto.',
+  'invite.leaveWarning': 'Non vedrai più {name}. Chi è ancora dentro può invitarti di nuovo.',
   'invite.removeWarning': 'Quello che ha già visto gli resta. Rimuoverlo impedisce solo di vedere il resto.',
   'invite.you': 'Tu',
 

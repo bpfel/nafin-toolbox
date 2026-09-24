@@ -185,7 +185,7 @@ export const en = {
   'invite.expires': 'Expires {when}',
   'invite.remove': 'Remove',
   'invite.leave': 'Leave',
-  'invite.leaveWarning': 'You keep what you have already seen. Leaving only stops you seeing what comes next.',
+  'invite.leaveWarning': 'You will not see {name} any more. Somebody still in it can invite you back.',
   'invite.removeWarning': 'They keep what they have already seen. Removing them only stops them seeing what comes next.',
   'invite.you': 'You',
 
