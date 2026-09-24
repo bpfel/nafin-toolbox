@@ -24,7 +24,7 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
 
 import HouseholdSettings from './HouseholdSettings.svelte'
 
-/** The disclosure is the one button carrying a household's name. */
+/** The disclosure is the one button carrying a household's name as text. */
 function rowFor(name: string): HTMLElement {
   return screen.getAllByRole('button').find(b => b.textContent?.includes(name))!
 }
@@ -102,7 +102,9 @@ describe('only the owner may delete', () => {
   test('a household of theirs offers it', () => {
     render(HouseholdSettings)
 
-    // Two households, one owned: exactly one delete button.
-    expect(screen.getAllByText('Delete')).toHaveLength(1)
+    // Two households, one owned: exactly one delete button. Found by its
+    // accessible name rather than its text, because the symbol carries none —
+    // which is the property that has to hold for the icon to be legitimate.
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1)
   })
 })

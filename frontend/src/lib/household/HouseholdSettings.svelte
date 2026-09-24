@@ -4,6 +4,7 @@
   import { initialsOf } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import HouseholdPeople from './HouseholdPeople.svelte'
+  import ActionButton from '../nav/ActionButton.svelte'
 
   /**
    * Where a household is started, named, and given up.
@@ -163,18 +164,49 @@
 
               <span class="tag">{household.isOwner ? t('household.owner') : t('household.member')}</span>
 
-              <button
-                class="btn-secondary"
+              <!--
+                Symbols rather than words, for the reason an account's card
+                already gives: *Umbenennen* and *Löschen* are wide enough to wrap
+                a row that wraps already, and a fixed square does not grow when
+                the language does. `ActionButton` requires its label and puts it
+                on both `aria-label` and `title`, so nothing said in words is
+                lost — it is said on hover and to a reader. The same pencil and
+                bin an account wears, so one idiom covers both.
+              -->
+              <ActionButton
+                label={t('household.rename')}
                 onclick={() => { renamingId = household.id; renameTo = household.name }}
               >
-                {t('household.rename')}
-              </button>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </ActionButton>
 
               <!-- Only the owner may delete, which the server enforces too. -->
               {#if household.isOwner}
-                <button class="btn-danger" onclick={() => (confirmingId = household.id)}>
-                  {t('household.delete')}
-                </button>
+                <ActionButton danger label={t('household.delete')} onclick={() => (confirmingId = household.id)}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </ActionButton>
               {/if}
             </div>
 
