@@ -162,9 +162,6 @@
               </button>
 
               <span class="tag">{household.isOwner ? t('household.owner') : t('household.member')}</span>
-              {#if vaultState.currentVaultId === household.id}
-                <span class="tag current">{t('household.current')}</span>
-              {/if}
 
               <button
                 class="btn-secondary"
@@ -321,11 +318,6 @@
     font-size: 0.75rem;
     color: var(--ink-faint);
     white-space: nowrap;
-  }
-
-  .tag.current {
-    color: var(--accent);
-    font-weight: 600;
   }
 
   .naming {

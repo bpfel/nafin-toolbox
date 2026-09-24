@@ -88,11 +88,13 @@ describe('what a row no longer carries', () => {
     expect(screen.queryByText('Open')).toBeNull()
   })
 
-  test('but it still says which one you are in', () => {
+  // Nor which one is current. The dial says that on every screen, including
+  // this one, so a second badge here was a fact repeated rather than told.
+  test('nor which one is current', () => {
     state.currentVaultId = 3
     render(HouseholdSettings)
 
-    expect(screen.getByText('Open now')).toBeTruthy()
+    expect(screen.queryByText('Open now')).toBeNull()
   })
 })
 

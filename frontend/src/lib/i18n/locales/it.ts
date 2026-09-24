@@ -179,7 +179,6 @@ export const it: Messages = {
   'household.deletePrompt': 'Eliminare {name}? Tutto il contenuto andrà perso, per tutti.',
   'household.deleting': 'Eliminazione…',
   'household.personal': 'Personale',
-  'household.current': 'Aperta',
   'household.needsKeys': 'Configura prima la cifratura.',
   'household.failed': 'Non ha funzionato. Riprovate.',
 
