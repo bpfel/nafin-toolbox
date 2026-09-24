@@ -1154,3 +1154,26 @@ func TestStore_AnInvitationCannotGrantOwnership(t *testing.T) {
 		t.Errorf("inviting an owner = %v, want ErrInvalidRole", err)
 	}
 }
+
+// An address is one account, however it is typed.
+//
+// `email TEXT UNIQUE` is case-sensitive, so Anna@example.ch and anna@example.ch
+// could once both exist — and this comparison is case-insensitive, so one could
+// accept an invitation meant for the other. Demonstrated before it was
+// believed, then closed by a unique index on lower(email).
+func TestStore_AnAddressIsOneAccount(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO users (email, password_hash, role) VALUES ('case-a@example.ch', 'x', 'user')`); err != nil {
+		t.Fatalf("creating the first account: %v", err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec(`DELETE FROM users WHERE lower(email) = 'case-a@example.ch'`) })
+
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO users (email, password_hash, role) VALUES ('Case-A@example.ch', 'x', 'user')`)
+	if err == nil {
+		t.Fatal("a second account was created differing only in capitalisation")
+	}
+}

@@ -40,7 +40,7 @@ func (s *Store) CreateUser(ctx context.Context, email, passwordHash, role string
 
 func (s *Store) CreateUserFull(ctx context.Context, email, passwordHash, role string, mustChangePassword, emailVerified bool) (*User, error) {
 	u, err := scanUser(s.db.QueryRowContext(ctx,
-		`INSERT INTO users (email, password_hash, role, must_change_password, email_verified) VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO users (email, password_hash, role, must_change_password, email_verified) VALUES (lower($1), $2, $3, $4, $5)
 		 RETURNING `+userColumns,
 		email, passwordHash, role, mustChangePassword, emailVerified,
 	))
@@ -52,7 +52,10 @@ func (s *Store) CreateUserFull(ctx context.Context, email, passwordHash, role st
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	u, err := scanUser(s.db.QueryRowContext(ctx,
-		`SELECT `+userColumns+` FROM users WHERE email = $1`, email,
+		// Case-insensitive, matching idx_users_email_ci. An exact comparison
+		// here would let somebody sign in only with the capitalisation they
+		// happened to register with.
+		`SELECT `+userColumns+` FROM users WHERE lower(email) = lower($1)`, email,
 	))
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -231,7 +234,7 @@ func (s *Store) CreateFirstUser(ctx context.Context, email, passwordHash string)
 	}
 
 	u, err := scanUser(tx.QueryRowContext(ctx,
-		`INSERT INTO users (email, password_hash, role, must_change_password, email_verified) VALUES ($1, $2, $3, FALSE, TRUE)
+		`INSERT INTO users (email, password_hash, role, must_change_password, email_verified) VALUES (lower($1), $2, $3, FALSE, TRUE)
 		 RETURNING `+userColumns,
 		email, passwordHash, RoleAdmin,
 	))
