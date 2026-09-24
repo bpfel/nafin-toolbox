@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/svelte'
+import { render, screen, cleanup, waitFor } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 
 const state = {
@@ -155,5 +155,33 @@ describe('naming', () => {
     await userEvent.click(screen.getByText('Start a household'))
 
     expect(screen.getByLabelText('Name').getAttribute('data-autofocus')).not.toBeNull()
+  })
+})
+
+describe('after creating one', () => {
+  /**
+   * The next thing anybody does with a new household is ask somebody into it,
+   * and that lives behind the fold.
+   *
+   * Arranged awkwardly for two honest reasons. This mock's state is not
+   * reactive, so a household added mid-test would never appear — it has to be
+   * listed before the click. And the typed name has to differ from the listed
+   * one, or the duplicate check refuses it before anything is created. What is
+   * under test survives both: the id `createHousehold` hands back is the one
+   * that ends up unfolded.
+   */
+  test('it is unfolded, so the way to invite is already on screen', async () => {
+    const { createHousehold } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(createHousehold).mockResolvedValue(9)
+    state.households = [...state.households, { id: 9, name: 'The new one', role: 'owner' }]
+
+    render(HouseholdSettings)
+    await userEvent.click(screen.getByText('Start a household'))
+    await userEvent.type(screen.getByLabelText('Name'), 'Zuhause')
+    await userEvent.click(screen.getByRole('button', { name: 'Start a household' }))
+
+    await waitFor(() => expect(rowFor('The new one').getAttribute('aria-expanded')).toBe('true'))
+    // And the others are not, because only one is ever open.
+    expect(rowFor('Flat with Anna').getAttribute('aria-expanded')).toBe('false')
   })
 })

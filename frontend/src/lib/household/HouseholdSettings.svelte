@@ -83,7 +83,11 @@
     busy = true
     error = null
     try {
-      await createHousehold(trimmed)
+      // Unfolded straight away. The next thing anybody does with a household
+      // they have just made is ask somebody into it, and that lives behind the
+      // fold — so leaving it shut means the one step that follows creation is
+      // hidden by the step that created it.
+      unfolded = await createHousehold(trimmed)
       naming = false
       name = ''
     } catch {
