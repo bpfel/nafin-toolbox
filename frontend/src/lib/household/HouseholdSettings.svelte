@@ -5,6 +5,7 @@
   import HouseMark from './HouseMark.svelte'
   import HouseholdPeople from './HouseholdPeople.svelte'
   import ActionButton from '../nav/ActionButton.svelte'
+  import { autofocus } from '../util/autofocus'
 
   /**
    * Where a household is started, named, and given up.
@@ -55,9 +56,30 @@
   // every vault created before identities existed has none.
   const canCreate = $derived(vaultState.identity !== null)
 
+  /**
+   * Whether a name is already taken.
+   *
+   * On the client, because the server *cannot* do this: a household's name is
+   * sealed under its own key, so the only thing the server holds is ciphertext
+   * it has no way to compare. That makes this a courtesy rather than a
+   * guarantee — it catches the case that actually happens, somebody naming two
+   * of their own households alike, and cannot catch another member renaming
+   * theirs into a collision.
+   */
+  function taken(candidate: string, except: number | null = null): boolean {
+    const wanted = candidate.trim().toLocaleLowerCase()
+    return vaultState.households.some(
+      h => h.id !== except && h.name.trim().toLocaleLowerCase() === wanted,
+    )
+  }
+
   async function create() {
     const trimmed = name.trim()
     if (!trimmed || busy) return
+    if (taken(trimmed)) {
+      error = t('household.duplicate')
+      return
+    }
     busy = true
     error = null
     try {
@@ -74,6 +96,10 @@
   async function rename(id: number) {
     const trimmed = renameTo.trim()
     if (!trimmed || busy) return
+    if (taken(trimmed, id)) {
+      error = t('household.duplicate')
+      return
+    }
     busy = true
     error = null
     try {
@@ -112,7 +138,13 @@
         <li>
           {#if renamingId === household.id}
             <form class="naming" onsubmit={e => { e.preventDefault(); rename(household.id) }}>
-              <input bind:value={renameTo} aria-label={t('household.nameLabel')} maxlength="60" disabled={busy} />
+              <input
+                use:autofocus
+                bind:value={renameTo}
+                aria-label={t('household.nameLabel')}
+                maxlength="60"
+                disabled={busy}
+              />
               <button class="btn-secondary" type="submit" disabled={busy || !renameTo.trim()}>
                 {t('household.rename')}
               </button>
@@ -211,7 +243,12 @@
             </div>
 
             {#if unfolded === household.id}
-              <HouseholdPeople householdId={household.id} isOwner={household.isOwner} {myUserId} />
+              <HouseholdPeople
+                householdId={household.id}
+                isOwner={household.isOwner}
+                householdName={household.name}
+                {myUserId}
+              />
             {/if}
           {/if}
         </li>
@@ -229,6 +266,7 @@
         anybody means.
       -->
       <input
+        use:autofocus
         bind:value={name}
         placeholder={t('household.namePlaceholder')}
         aria-label={t('household.nameLabel')}

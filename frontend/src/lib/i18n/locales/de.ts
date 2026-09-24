@@ -122,6 +122,12 @@ export const de: Messages = {
   'action.more': 'Aktionen',
 
   // --- Security settings ---
+  'household.duplicate': 'Du hast bereits einen Haushalt mit diesem Namen.',
+  'invite.leaveLast': 'Du bist allein hier — beim Verlassen wird {name} mit allem darin gelöscht. Das lässt sich nicht rückgängig machen.',
+  'invite.leaveOwner': 'Du verwaltest {name}. Wenn du gehst, übernimmt {successor}.',
+  'invite.leaveConfirm': 'Verlassen',
+  'invite.removeConfirm': '{name} entfernen',
+
   // --- Following an invitation link ---
   'join.working': 'Wird beigetreten…',
   'join.doneTitle': 'Einladung angenommen',

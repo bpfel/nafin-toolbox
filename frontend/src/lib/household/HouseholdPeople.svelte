@@ -26,14 +26,31 @@
     isOwner: boolean
     /** This account, so it can be told apart from the others in the list. */
     myUserId: number | null
+    /** Named in the warning, since "this household" is not what anybody calls it. */
+    householdName: string
   }
 
-  let { householdId, isOwner, myUserId }: Props = $props()
+  let { householdId, isOwner, myUserId, householdName }: Props = $props()
 
   let members = $state<HouseholdMember[]>([])
   let invites = $state<PendingInvite[]>([])
   let busy = $state(false)
   let error = $state<string | null>(null)
+
+  /** Who has been asked about before anybody is actually removed. */
+  let confirmingRemoval = $state<number | null>(null)
+
+  /**
+   * What leaving costs, which differs enough to be worth three sentences.
+   *
+   * Alone: the household goes with you, and nothing brings it back. As the
+   * person looking after it: somebody else takes that on, and they should be
+   * named rather than left as "somebody". Otherwise: only that you stop seeing
+   * what comes next.
+   */
+  const successor = $derived(
+    members.filter(m => m.user_id !== myUserId).sort((a, b) => a.joined_at.localeCompare(b.joined_at))[0],
+  )
 
   /** The link for an invitation just made. Shown once; never recoverable. */
   let freshLink = $state<string | null>(null)
@@ -106,6 +123,7 @@
     busy = true
     try {
       await removeMember(householdId, userId)
+      confirmingRemoval = null
       await refresh()
     } catch {
       error = t('household.failed')
@@ -135,12 +153,45 @@
         {#if member.is_owner}
           <span class="tag">{t('household.owner')}</span>
         {/if}
-        {#if member.user_id === myUserId}
-          <button class="btn-secondary" onclick={() => remove(member.user_id)} disabled={busy}>
+
+        {#if confirmingRemoval === member.user_id}
+          <div class="confirm-box">
+            <!--
+              Leaving is not one thing. Alone it destroys the household; as the
+              person looking after it, it hands that on; otherwise it only stops
+              you seeing what comes next. Saying which is the difference between
+              a confirmation and a formality.
+            -->
+            <p class:grave={member.user_id === myUserId && members.length === 1}>
+              {#if member.user_id !== myUserId}
+                {t('invite.removeWarning')}
+              {:else if members.length === 1}
+                {t('invite.leaveLast').replace('{name}', householdName)}
+              {:else if member.is_owner && successor}
+                {t('invite.leaveOwner')
+                  .replace('{name}', householdName)
+                  .replace('{successor}', successor.email)}
+              {:else}
+                {t('invite.removeWarning')}
+              {/if}
+            </p>
+            <div class="btn-row">
+              <button class="btn-danger" onclick={() => remove(member.user_id)} disabled={busy}>
+                {member.user_id === myUserId
+                  ? t('invite.leaveConfirm')
+                  : t('invite.removeConfirm').replace('{name}', member.email)}
+              </button>
+              <button class="btn-secondary" onclick={() => (confirmingRemoval = null)}>
+                {t('action.cancel')}
+              </button>
+            </div>
+          </div>
+        {:else if member.user_id === myUserId}
+          <button class="btn-secondary" onclick={() => (confirmingRemoval = member.user_id)} disabled={busy}>
             {t('invite.leave')}
           </button>
         {:else if isOwner}
-          <button class="btn-secondary" onclick={() => remove(member.user_id)} disabled={busy}>
+          <button class="btn-secondary" onclick={() => (confirmingRemoval = member.user_id)} disabled={busy}>
             {t('invite.remove')}
           </button>
         {/if}
@@ -278,6 +329,16 @@
   .tag.ready {
     color: var(--accent);
     font-weight: 600;
+  }
+
+  /* The one case nothing undoes. */
+  .grave {
+    color: var(--alarm);
+    font-weight: 600;
+  }
+
+  .confirm-box {
+    flex: 1 1 100%;
   }
 
   .mismatch {

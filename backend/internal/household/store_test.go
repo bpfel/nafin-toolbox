@@ -864,3 +864,100 @@ func TestStore_RekeyAdvancesTheEpoch(t *testing.T) {
 		t.Errorf("epoch after a rekey = %d, want 2", after[0].KeyEpoch)
 	}
 }
+
+/**
+ * An owner who walks away must not strand the household.
+ *
+ * Before this, leaving as owner left everyone able to read and write and nobody
+ * able to invite, remove or delete — every one of those asks for an owner and
+ * there was none. The household could only end by each remaining member leaving
+ * one at a time.
+ */
+func TestStore_OwnershipPassesWhenTheOwnerLeaves(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-succ@example.ch")
+	ben := makeUser(t, db, "ben-succ@example.ch")
+	carl := makeUser(t, db, "carl-succ@example.ch")
+
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+	time.Sleep(5 * time.Millisecond)
+	addMember(t, db, id, carl)
+
+	if err := store.RemoveMember(ctx, id, anna, anna); err != nil {
+		t.Fatalf("owner leaving: %v", err)
+	}
+
+	// To the longest-standing, which needs nobody to choose in the moment they
+	// are walking away.
+	isOwner, err := store.Membership(ctx, id, ben)
+	if err != nil {
+		t.Fatalf("Membership for Ben: %v", err)
+	}
+	if !isOwner {
+		t.Error("the longest-standing remaining member did not become the owner")
+	}
+	if carlOwns, _ := store.Membership(ctx, id, carl); carlOwns {
+		t.Error("the newer member became the owner instead")
+	}
+
+	// And the household is administrable again, which is the whole point.
+	if _, err := store.CreateInvite(ctx, id, ben, anInvite("new-succ@example.ch"), hour()); err != nil {
+		t.Errorf("the new owner cannot invite: %v", err)
+	}
+}
+
+// Nothing to pass on, and the household goes with them.
+func TestStore_TheLastMemberTakesTheHouseholdWithThem(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-lastown@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if err := store.RemoveMember(ctx, id, anna, anna); err != nil {
+		t.Fatalf("last member leaving: %v", err)
+	}
+
+	var households int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM shared_vaults WHERE id = $1`, id).Scan(&households); err != nil {
+		t.Fatalf("counting: %v", err)
+	}
+	if households != 0 {
+		t.Errorf("%d households survived their last member", households)
+	}
+}
+
+// A member removed by the owner changes nothing about who owns it.
+func TestStore_RemovingAMemberLeavesTheOwnerAlone(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-keepown@example.ch")
+	ben := makeUser(t, db, "ben-keepown@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+
+	if err := store.RemoveMember(ctx, id, anna, ben); err != nil {
+		t.Fatalf("owner removing a member: %v", err)
+	}
+
+	isOwner, err := store.Membership(ctx, id, anna)
+	if err != nil || !isOwner {
+		t.Errorf("the owner stopped owning it: owner=%v err=%v", isOwner, err)
+	}
+}

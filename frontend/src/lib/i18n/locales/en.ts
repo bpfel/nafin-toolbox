@@ -137,6 +137,12 @@ export const en = {
   'action.more': 'Actions',
 
   // --- Security settings ---
+  'household.duplicate': 'You already have a household called that.',
+  'invite.leaveLast': 'You are the only one here, so leaving deletes {name} and everything in it. This cannot be undone.',
+  'invite.leaveOwner': 'You look after {name}. If you leave, {successor} takes it over.',
+  'invite.leaveConfirm': 'Leave',
+  'invite.removeConfirm': 'Remove {name}',
+
   // --- Following an invitation link ---
   'join.working': 'Joining…',
   'join.doneTitle': 'Invitation accepted',

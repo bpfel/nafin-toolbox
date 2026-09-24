@@ -133,6 +133,12 @@ export const fr: Messages = {
   'address.country': 'Pays',
 
   // --- Security settings ---
+  'household.duplicate': 'Tu as déjà un ménage portant ce nom.',
+  'invite.leaveLast': 'Tu es seul ici — partir supprime {name} et tout ce qu’il contient. C’est irréversible.',
+  'invite.leaveOwner': 'Tu gères {name}. Si tu pars, {successor} prend le relais.',
+  'invite.leaveConfirm': 'Partir',
+  'invite.removeConfirm': 'Retirer {name}',
+
   // --- Following an invitation link ---
   'join.working': 'Adhésion…',
   'join.doneTitle': 'Invitation acceptée',

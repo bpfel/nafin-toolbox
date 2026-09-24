@@ -108,3 +108,52 @@ describe('only the owner may delete', () => {
     expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1)
   })
 })
+
+/**
+ * Two households with the same name are two rows nobody can tell apart — and
+ * the server cannot prevent it, because a name is sealed under its own key and
+ * all the server holds is ciphertext it has no way to compare.
+ */
+describe('naming', () => {
+  test('refuses a name already in use', async () => {
+    render(HouseholdSettings)
+
+    await userEvent.click(screen.getByText('Start a household'))
+    await userEvent.type(screen.getByLabelText('Name'), 'Ski cabin')
+    await userEvent.click(screen.getByRole('button', { name: 'Start a household' }))
+
+    expect(screen.getByText('You already have a household called that.')).toBeTruthy()
+  })
+
+  test('ignores case and surrounding space, because people do', async () => {
+    render(HouseholdSettings)
+
+    await userEvent.click(screen.getByText('Start a household'))
+    await userEvent.type(screen.getByLabelText('Name'), '  ski CABIN  ')
+    await userEvent.click(screen.getByRole('button', { name: 'Start a household' }))
+
+    expect(screen.getByText('You already have a household called that.')).toBeTruthy()
+  })
+
+  test('lets a household keep its own name when renamed', async () => {
+    render(HouseholdSettings)
+
+    // The row's pencil, then the form's submit. Both are named Rename — the
+    // icon by its accessible name and the button by its text — so the form's
+    // is taken by position: it replaces the first row, which comes first.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Rename' })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: 'Rename' })[0])
+
+    expect(screen.queryByText('You already have a household called that.')).toBeNull()
+  })
+
+  // The field is the entire point of the form; asking for a click first is a
+  // step that is not about the name.
+  test('puts the cursor in the name field', async () => {
+    render(HouseholdSettings)
+
+    await userEvent.click(screen.getByText('Start a household'))
+
+    expect(screen.getByLabelText('Name').getAttribute('data-autofocus')).not.toBeNull()
+  })
+})

@@ -451,19 +451,52 @@ func (s *Store) RemoveMember(ctx context.Context, vaultID, userID, targetID int)
 		return err
 	}
 
-	res, err := s.db.ExecContext(ctx,
-		`DELETE FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2`, vaultID, targetID)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	var wasOwner bool
+	err = tx.QueryRowContext(ctx,
+		`DELETE FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2 RETURNING is_owner`,
+		vaultID, targetID,
+	).Scan(&wasOwner)
+	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotMember
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+
+	// Ownership passes rather than evaporating.
+	//
+	// Without this an owner who left a household that still had people in it
+	// stranded it: everybody could read and write, and nobody could ever invite,
+	// remove or delete again, because every one of those asks for an owner and
+	// there was none. The household could only end by each remaining member
+	// leaving one at a time.
+	//
+	// To the longest-standing, which is the least surprising rule available and
+	// needs nobody to choose in the moment they are walking away. If nobody is
+	// left the trigger from 007 takes the household with them, and there is
+	// nothing to pass on.
+	if wasOwner {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE shared_vault_members SET is_owner = TRUE
+			 WHERE vault_id = $1 AND user_id = (
+			     SELECT user_id FROM shared_vault_members
+			     WHERE vault_id = $1
+			     ORDER BY joined_at, user_id
+			     LIMIT 1
+			 )`,
+			vaultID,
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 // Rekey replaces the household key, everything encrypted under it, and every
