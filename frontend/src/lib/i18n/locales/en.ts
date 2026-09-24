@@ -182,7 +182,6 @@ export const en = {
   'household.delete': 'Delete',
   'household.deletePrompt': 'Delete {name}? Everything in it is lost, for everyone in it.',
   'household.deleting': 'Deleting…',
-  'household.switchTo': 'Open',
   'household.personal': 'Personal',
   'household.current': 'Open now',
   'household.needsKeys': 'Set up encryption before starting a household.',

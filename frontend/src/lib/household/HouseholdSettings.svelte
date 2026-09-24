@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { getVaultState, createHousehold, renameHousehold, deleteHousehold, switchTo } from '../crypto/vaultStore.svelte'
+  import { getVaultState, createHousehold, renameHousehold, deleteHousehold } from '../crypto/vaultStore.svelte'
   import { initialsOf } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import HouseholdPeople from './HouseholdPeople.svelte'
@@ -28,8 +28,15 @@
 
   const vaultState = getVaultState()
 
-  /** Which household has its people showing. One at a time; the list is short. */
-  let showingPeople = $state<number | null>(null)
+  /**
+   * Which household is unfolded. One at a time, which a single id enforces
+   * rather than a rule anybody has to keep.
+   *
+   * A list of households is short but each one has a lot behind it — who is in
+   * it, who has been asked, a code to scan. Unfolding one row reaches all of
+   * that without every row carrying a button to somewhere else.
+   */
+  let unfolded = $state<number | null>(null)
 
   let naming = $state(false)
   let name = $state('')
@@ -126,16 +133,37 @@
             </div>
           {:else}
             <div class="row">
-              <HouseMark initials={initialsOf(household.name)} />
-              <span class="name">{household.name}</span>
-              <span class="tag">{household.isOwner ? t('household.owner') : t('household.member')}</span>
+              <!--
+                The row itself is the control. A separate button to open a
+                household belongs on the screens that show money — the dial is
+                where you switch while working, and a second way to do it from
+                here only cost each row some width.
+              -->
+              <button
+                class="disclosure"
+                aria-expanded={unfolded === household.id}
+                onclick={() => (unfolded = unfolded === household.id ? null : household.id)}
+              >
+                <HouseMark initials={initialsOf(household.name)} />
+                <span class="name">{household.name}</span>
+                <svg
+                  class="chevron"
+                  class:down={unfolded === household.id}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="9 6 15 12 9 18" />
+                </svg>
+              </button>
 
+              <span class="tag">{household.isOwner ? t('household.owner') : t('household.member')}</span>
               {#if vaultState.currentVaultId === household.id}
                 <span class="tag current">{t('household.current')}</span>
-              {:else}
-                <button class="btn-secondary" onclick={() => switchTo(household.id)}>
-                  {t('household.switchTo')}
-                </button>
               {/if}
 
               <button
@@ -143,13 +171,6 @@
                 onclick={() => { renamingId = household.id; renameTo = household.name }}
               >
                 {t('household.rename')}
-              </button>
-
-              <button
-                class="btn-secondary"
-                onclick={() => (showingPeople = showingPeople === household.id ? null : household.id)}
-              >
-                {t('invite.title')}
               </button>
 
               <!-- Only the owner may delete, which the server enforces too. -->
@@ -160,7 +181,7 @@
               {/if}
             </div>
 
-            {#if showingPeople === household.id}
+            {#if unfolded === household.id}
               <HouseholdPeople householdId={household.id} isOwner={household.isOwner} {myUserId} />
             {/if}
           {/if}
@@ -231,13 +252,53 @@
     flex-wrap: wrap;
   }
 
-  .name {
-    font-weight: 600;
+  /* The name, its mark and the chevron are one target, so the whole of a
+     household's identity opens it rather than a caret somebody has to aim at. */
+  .disclosure {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     /* Takes the room, so the controls sit together at the end rather than
        drifting apart as names differ in length. */
     flex: 1 1 auto;
     min-width: 0;
+    padding: 0.25rem 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .disclosure:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 0.3rem;
+  }
+
+  .name {
+    font-weight: 600;
+    min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .chevron {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+  }
+
+  .chevron.down {
+    transform: rotate(90deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chevron {
+      transition: none;
+    }
   }
 
   .tag {
