@@ -378,7 +378,20 @@
       outline-offset: 3px;
     }
 
-    .dot :global(svg) {
+    /*
+     * The dot's own glyph, and only that.
+     *
+     * This was `:global(svg)`, which reached every svg inside the dot —
+     * including one a child component had sized for itself. Svelte scopes the
+     * `.dot`, so the rule landed at (0,2,1) and beat the child's own (0,2,0):
+     * the house mark was held at 22px no matter what it asked for, and three
+     * separate attempts to enlarge it changed nothing at all.
+     *
+     * Dropping `:global` is the whole fix. The dot's svg is written here, so a
+     * plain selector still finds it, and a component that brings its own glyph
+     * now keeps its own size.
+     */
+    .dot svg {
       width: 22px;
       height: 22px;
     }

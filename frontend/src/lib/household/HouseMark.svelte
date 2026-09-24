@@ -59,8 +59,16 @@
     flex: none;
   }
 
+  /*
+   * Most of the dot, not an emblem sitting in the middle of it.
+   *
+   * The dot is 56px and is hit without looking; what it is *for* while a
+   * household is open is saying which one, so the mark is sized like the thing
+   * it replaces — the three dots span nearly the whole face — rather than like
+   * a badge applied to it.
+   */
   .large {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
   }
 </style>
