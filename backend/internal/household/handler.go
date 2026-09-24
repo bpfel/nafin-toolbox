@@ -68,6 +68,7 @@ func RoutesWith(store InviteStorer) func(r chi.Router) {
 		r.Get("/{id}/members", handleListMembers(store))
 		r.Post("/{id}/members", handleConfirmInvite(store))
 		r.Delete("/{id}/members/{userId}", handleRemoveMember(store))
+		r.Put("/{id}/members/{userId}/role", handleChangeRole(store))
 
 		r.Put("/{id}/rekey", handleRekey(store))
 	}
@@ -330,6 +331,7 @@ type InviteStorer interface {
 	ConfirmInvite(ctx context.Context, vaultID, userID, inviteID int, wrappedKey string) error
 	ListMembers(ctx context.Context, vaultID, userID int) ([]Member, error)
 	RemoveMember(ctx context.Context, vaultID, userID, targetID int) error
+	ChangeRole(ctx context.Context, vaultID, userID, targetID int, role string) error
 	Rekey(ctx context.Context, vaultID, userID int, req RekeyRequest, ciphertext, nonce []byte) (time.Time, error)
 }
 
@@ -350,6 +352,10 @@ func writeMembershipError(w http.ResponseWriter, err error) bool {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such household"})
 	case errors.Is(err, ErrNotOwner):
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": "only the owner may do this"})
+	case errors.Is(err, ErrReadOnly):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "this household is read-only for you"})
+	case errors.Is(err, ErrInvalidRole):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "that is not a role somebody can be given"})
 	case errors.Is(err, ErrInviteInvalid):
 		// Missing, expired, used, or addressed to somebody else — all one
 		// answer, so a leaked link cannot be used to work out which.
@@ -374,6 +380,15 @@ func handleCreateInvite(store InviteStorer) http.HandlerFunc {
 		}
 		if req.TokenHash == "" || req.InvitedEmail == "" || req.SecretSealed == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "token_hash, invited_email and secret_sealed are required"})
+			return
+		}
+		// An invitation cannot make another owner, and an unstated role is the
+		// ordinary one rather than the most powerful one.
+		if req.Role == "" {
+			req.Role = RoleWriter
+		}
+		if !validGrantableRole(req.Role) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "that is not a role somebody can be given"})
 			return
 		}
 
@@ -587,5 +602,35 @@ func handleRekey(store InviteStorer) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, PutResponse{Status: "ok", UpdatedAt: updatedAt})
+	}
+}
+
+func handleChangeRole(store InviteStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, vaultID, ok := requester(w, r)
+		if !ok {
+			return
+		}
+		targetID, err := strconv.Atoi(chi.URLParam(r, "userId"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			return
+		}
+
+		var req ChangeRoleRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+
+		err = store.ChangeRole(r.Context(), vaultID, userID, targetID, req.Role)
+		if writeMembershipError(w, err) {
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to change role")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }

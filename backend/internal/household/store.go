@@ -54,9 +54,9 @@ func (s *Store) Create(ctx context.Context, userID int, req CreateRequest, ciphe
 	// The creator owns it, and holds their copy sealed under their own MEK —
 	// symmetric, because they are both sender and recipient here.
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
-		 VALUES ($1, $2, $3, $4, TRUE)`,
-		id, userID, req.WrappedKey, WrapSelf,
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		id, userID, req.WrappedKey, WrapSelf, RoleOwner,
 	)
 	if err != nil {
 		return 0, time.Time{}, err
@@ -74,7 +74,7 @@ func (s *Store) Create(ctx context.Context, userID int, req CreateRequest, ciphe
 // cost one decryption per entry.
 func (s *Store) ListForUser(ctx context.Context, userID int) ([]Household, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT v.id, v.encrypted_name, m.wrapped_key, m.wrap_kind, m.is_owner, v.version, v.key_epoch, v.updated_at
+		`SELECT v.id, v.encrypted_name, m.wrapped_key, m.wrap_kind, m.role, v.version, v.key_epoch, v.updated_at
 		 FROM shared_vaults v
 		 JOIN shared_vault_members m ON m.vault_id = v.id
 		 WHERE m.user_id = $1
@@ -91,7 +91,7 @@ func (s *Store) ListForUser(ctx context.Context, userID int) ([]Household, error
 	households := []Household{}
 	for rows.Next() {
 		var h Household
-		if err := rows.Scan(&h.ID, &h.EncryptedName, &h.WrappedKey, &h.WrapKind, &h.IsOwner, &h.Version, &h.KeyEpoch, &h.UpdatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.EncryptedName, &h.WrappedKey, &h.WrapKind, &h.Role, &h.Version, &h.KeyEpoch, &h.UpdatedAt); err != nil {
 			return nil, err
 		}
 		households = append(households, h)
@@ -105,15 +105,33 @@ func (s *Store) ListForUser(ctx context.Context, userID int) ([]Household, error
 // Every other method takes the user id and checks membership itself rather than
 // trusting a caller to have checked: authorisation that lives in the handler is
 // authorisation somebody can forget to write.
-func (s *Store) Membership(ctx context.Context, vaultID, userID int) (isOwner bool, err error) {
+func (s *Store) Membership(ctx context.Context, vaultID, userID int) (role string, err error) {
 	err = s.db.QueryRowContext(ctx,
-		`SELECT is_owner FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2`,
+		`SELECT role FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2`,
 		vaultID, userID,
-	).Scan(&isOwner)
+	).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, ErrNotMember
+		return "", ErrNotMember
 	}
-	return isOwner, err
+	return role, err
+}
+
+// ErrReadOnly means the user belongs to the household but may only look at it.
+//
+// Distinct from ErrNotMember for the same reason ErrNotOwner is: a reader
+// learning they cannot write discovers nothing they did not already know.
+var ErrReadOnly = errors.New("this household is read-only for you")
+
+// requireWriter admits an owner or a writer, and refuses a reader.
+func (s *Store) requireWriter(ctx context.Context, vaultID, userID int) error {
+	role, err := s.Membership(ctx, vaultID, userID)
+	if err != nil {
+		return err
+	}
+	if !mayWrite(role) {
+		return ErrReadOnly
+	}
+	return nil
 }
 
 // GetVault returns the payload, if the user is a member.
@@ -148,12 +166,15 @@ func (s *Store) PutVault(
 ) (time.Time, error) {
 	// Unlike a personal vault there is no INSERT branch: a household row is
 	// created with its payload, so by the time anyone writes, the row exists.
+	// The role test is part of the UPDATE rather than a query before it, so there
+	// is no window between deciding somebody may write and their write landing.
 	const base = `
 		UPDATE shared_vaults
 		SET ciphertext = $3, nonce = $4, version = $5, updated_at = NOW()
 		WHERE id = $1
 		  AND EXISTS (SELECT 1 FROM shared_vault_members
-		              WHERE vault_id = $1 AND user_id = $2)`
+		              WHERE vault_id = $1 AND user_id = $2
+		                AND role IN ('owner', 'writer'))`
 
 	query := base + ` RETURNING updated_at`
 	args := []any{vaultID, userID, ciphertext, nonce, version}
@@ -166,12 +187,14 @@ func (s *Store) PutVault(
 	var updatedAt time.Time
 	err := s.db.QueryRowContext(ctx, query, args...).Scan(&updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		// Nothing came back, and the two reasons are not the same. Ask whether
-		// they are a member at all: if they are, the row moved on and this is a
-		// conflict they can recover from by reloading; if they are not, saying
-		// "conflict" would confirm the household exists.
-		if _, memberErr := s.Membership(ctx, vaultID, userID); memberErr != nil {
-			return time.Time{}, memberErr
+		// Nothing came back, and the reasons are not the same. Not a member at
+		// all, a reader, a stale precondition, or a household that has gone —
+		// and only one of those is something reloading fixes.
+		//
+		// Asked in that order deliberately: a reader told "conflict" would
+		// reload, try again, and be told the same thing forever.
+		if err := s.requireWriter(ctx, vaultID, userID); err != nil {
+			return time.Time{}, err
 		}
 		if expectedUpdatedAt != nil {
 			return time.Time{}, ErrConflict
@@ -187,11 +210,18 @@ func (s *Store) PutVault(
 // Any member may, not only the owner. A household's name is what everybody in
 // it reads on every screen, and the owner is not a different kind of person.
 func (s *Store) Rename(ctx context.Context, vaultID, userID int, encryptedName string) error {
+	// Asked before the write rather than inferred from it, so a reader is told
+	// they may not rather than told the household does not exist.
+	if err := s.requireWriter(ctx, vaultID, userID); err != nil {
+		return err
+	}
+
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE shared_vaults SET encrypted_name = $3
 		 WHERE id = $1
 		   AND EXISTS (SELECT 1 FROM shared_vault_members
-		               WHERE vault_id = $1 AND user_id = $2)`,
+		               WHERE vault_id = $1 AND user_id = $2
+		                 AND role IN ('owner', 'writer'))`,
 		vaultID, userID, encryptedName,
 	)
 	if err != nil {
@@ -209,11 +239,11 @@ func (s *Store) Rename(ctx context.Context, vaultID, userID int, encryptedName s
 
 // Delete removes a household and, by cascade, its membership rows. Owner only.
 func (s *Store) Delete(ctx context.Context, vaultID, userID int) error {
-	isOwner, err := s.Membership(ctx, vaultID, userID)
+	role, err := s.Membership(ctx, vaultID, userID)
 	if err != nil {
 		return err
 	}
-	if !isOwner {
+	if role != RoleOwner {
 		return ErrNotMember
 	}
 	_, err = s.db.ExecContext(ctx, `DELETE FROM shared_vaults WHERE id = $1`, vaultID)
@@ -233,11 +263,11 @@ var ErrNotOwner = errors.New("only the owner may do this")
 var ErrInviteInvalid = errors.New("invitation is not valid")
 
 func (s *Store) requireOwner(ctx context.Context, vaultID, userID int) error {
-	isOwner, err := s.Membership(ctx, vaultID, userID)
+	role, err := s.Membership(ctx, vaultID, userID)
 	if err != nil {
 		return err
 	}
-	if !isOwner {
+	if role != RoleOwner {
 		return ErrNotOwner
 	}
 	return nil
@@ -248,16 +278,22 @@ func (s *Store) CreateInvite(ctx context.Context, vaultID, userID int, req Creat
 	if err := s.requireOwner(ctx, vaultID, userID); err != nil {
 		return 0, err
 	}
+	// Checked here as well as in the handler, so the rule lives with the data
+	// rather than with one of its callers. A column constraint would catch it
+	// too, but as a database error nobody can act on rather than as an answer.
+	if !validGrantableRole(req.Role) {
+		return 0, ErrInvalidRole
+	}
 	var id int
 	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO shared_vault_invites (vault_id, token_hash, invited_email, secret_sealed, expires_at)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO shared_vault_invites (vault_id, token_hash, invited_email, secret_sealed, expires_at, role)
+		 VALUES ($1, $2, $3, $4, $5, $6)
 		 ON CONFLICT (vault_id, lower(invited_email)) DO UPDATE
 		 SET token_hash = EXCLUDED.token_hash, secret_sealed = EXCLUDED.secret_sealed,
-		     expires_at = EXCLUDED.expires_at, created_at = NOW(),
+		     expires_at = EXCLUDED.expires_at, created_at = NOW(), role = EXCLUDED.role,
 		     accepted_user_id = NULL, public_key_mac = NULL, accepted_at = NULL
 		 RETURNING id`,
-		vaultID, req.TokenHash, req.InvitedEmail, req.SecretSealed, expiresAt,
+		vaultID, req.TokenHash, req.InvitedEmail, req.SecretSealed, expiresAt, req.Role,
 	).Scan(&id)
 	return id, err
 }
@@ -274,7 +310,7 @@ func (s *Store) ListInvites(ctx context.Context, vaultID, userID int) ([]Invite,
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT i.id, i.invited_email, i.secret_sealed, i.expires_at, i.created_at,
+		`SELECT i.id, i.invited_email, i.secret_sealed, i.role, i.expires_at, i.created_at,
 		        i.accepted_user_id, i.accepted_at, i.public_key_mac,
 		        COALESCE(u.public_key, ''), COALESCE(u.verifying_key, '')
 		 FROM shared_vault_invites i
@@ -294,7 +330,7 @@ func (s *Store) ListInvites(ctx context.Context, vaultID, userID int) ([]Invite,
 		var mac sql.NullString
 		var acceptedAt sql.NullTime
 		var acceptedBy sql.NullInt64
-		if err := rows.Scan(&in.ID, &in.InvitedEmail, &in.SecretSealed, &in.ExpiresAt, &in.CreatedAt,
+		if err := rows.Scan(&in.ID, &in.InvitedEmail, &in.SecretSealed, &in.Role, &in.ExpiresAt, &in.CreatedAt,
 			&acceptedBy, &acceptedAt, &mac, &in.PublicKey, &in.VerifyingKey); err != nil {
 			return nil, err
 		}
@@ -372,11 +408,12 @@ func (s *Store) ConfirmInvite(ctx context.Context, vaultID, userID, inviteID int
 	defer tx.Rollback() //nolint:errcheck // no-op once committed
 
 	var invitee int
+	var role string
 	err = tx.QueryRowContext(ctx,
-		`SELECT accepted_user_id FROM shared_vault_invites
+		`SELECT accepted_user_id, role FROM shared_vault_invites
 		 WHERE id = $1 AND vault_id = $2 AND expires_at > NOW() AND accepted_user_id IS NOT NULL`,
 		inviteID, vaultID,
-	).Scan(&invitee)
+	).Scan(&invitee, &role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrInviteInvalid
 	}
@@ -385,11 +422,11 @@ func (s *Store) ConfirmInvite(ctx context.Context, vaultID, userID, inviteID int
 	}
 
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
-		 VALUES ($1, $2, $3, $4, FALSE)
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role)
+		 VALUES ($1, $2, $3, $4, $5)
 		 ON CONFLICT (vault_id, user_id) DO UPDATE
 		 SET wrapped_key = EXCLUDED.wrapped_key, wrap_kind = EXCLUDED.wrap_kind`,
-		vaultID, invitee, wrappedKey, WrapGranted,
+		vaultID, invitee, wrappedKey, WrapGranted, role,
 	); err != nil {
 		return err
 	}
@@ -408,12 +445,12 @@ func (s *Store) ListMembers(ctx context.Context, vaultID, userID int) ([]Member,
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT m.user_id, u.email, m.is_owner, m.wrap_kind,
+		`SELECT m.user_id, u.email, m.role, m.wrap_kind,
 		        COALESCE(u.public_key, ''), COALESCE(u.verifying_key, ''), m.joined_at
 		 FROM shared_vault_members m
 		 JOIN users u ON u.id = m.user_id
 		 WHERE m.vault_id = $1
-		 ORDER BY m.is_owner DESC, m.joined_at`,
+		 ORDER BY (m.role = 'owner') DESC, m.joined_at`,
 		vaultID,
 	)
 	if err != nil {
@@ -424,7 +461,7 @@ func (s *Store) ListMembers(ctx context.Context, vaultID, userID int) ([]Member,
 	members := []Member{}
 	for rows.Next() {
 		var m Member
-		if err := rows.Scan(&m.UserID, &m.Email, &m.IsOwner, &m.WrapKind,
+		if err := rows.Scan(&m.UserID, &m.Email, &m.Role, &m.WrapKind,
 			&m.PublicKey, &m.VerifyingKey, &m.JoinedAt); err != nil {
 			return nil, err
 		}
@@ -457,11 +494,11 @@ func (s *Store) RemoveMember(ctx context.Context, vaultID, userID, targetID int)
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op once committed
 
-	var wasOwner bool
+	var leavingRole string
 	err = tx.QueryRowContext(ctx,
-		`DELETE FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2 RETURNING is_owner`,
+		`DELETE FROM shared_vault_members WHERE vault_id = $1 AND user_id = $2 RETURNING role`,
 		vaultID, targetID,
-	).Scan(&wasOwner)
+	).Scan(&leavingRole)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotMember
 	}
@@ -481,9 +518,9 @@ func (s *Store) RemoveMember(ctx context.Context, vaultID, userID, targetID int)
 	// needs nobody to choose in the moment they are walking away. If nobody is
 	// left the trigger from 007 takes the household with them, and there is
 	// nothing to pass on.
-	if wasOwner {
+	if leavingRole == RoleOwner {
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE shared_vault_members SET is_owner = TRUE
+			`UPDATE shared_vault_members SET role = 'owner'
 			 WHERE vault_id = $1 AND user_id = (
 			     SELECT user_id FROM shared_vault_members
 			     WHERE vault_id = $1
@@ -588,3 +625,44 @@ func pqIntArray(ids []int) string {
 	}
 	return string(append(out, '}'))
 }
+
+// ChangeRole moves somebody between writer and reader. Owner only.
+//
+// Ownership is not among the roles this can set. Passing it is a different act
+// with a different consequence — the person doing it stops being the owner —
+// and folding it in here would let it happen by the same gesture as a
+// demotion, from a menu, on a row that looks like every other row.
+func (s *Store) ChangeRole(ctx context.Context, vaultID, userID, targetID int, role string) error {
+	if err := s.requireOwner(ctx, vaultID, userID); err != nil {
+		return err
+	}
+	if !validGrantableRole(role) {
+		return ErrInvalidRole
+	}
+	// An owner demoting themselves would leave the household unable to invite,
+	// remove or promote anybody ever again — the stranding that succession
+	// exists to prevent, reached by a different door.
+	if userID == targetID {
+		return ErrNotOwner
+	}
+
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE shared_vault_members SET role = $3
+		 WHERE vault_id = $1 AND user_id = $2 AND role <> 'owner'`,
+		vaultID, targetID, role,
+	)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotMember
+	}
+	return nil
+}
+
+// ErrInvalidRole means a role was asked for that cannot be granted.
+var ErrInvalidRole = errors.New("that is not a role somebody can be given")

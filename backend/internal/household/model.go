@@ -14,7 +14,7 @@ type Household struct {
 	// This member's copy of that key, and how it is wrapped.
 	WrappedKey string `json:"wrapped_key"`
 	WrapKind   string `json:"wrap_kind"`
-	IsOwner    bool   `json:"is_owner"`
+	Role       string `json:"role"`
 	Version    int    `json:"version"`
 	// Which generation of the key `wrapped_key` is. A client refuses anything
 	// below the highest it has already accepted.
@@ -100,7 +100,7 @@ type RenameRequest struct {
 type Member struct {
 	UserID       int       `json:"user_id"`
 	Email        string    `json:"email"`
-	IsOwner      bool      `json:"is_owner"`
+	Role         string    `json:"role"`
 	WrapKind     string    `json:"wrap_kind"`
 	PublicKey    string    `json:"public_key"`
 	VerifyingKey string    `json:"verifying_key"`
@@ -112,10 +112,13 @@ type Invite struct {
 	ID           int    `json:"id"`
 	InvitedEmail string `json:"invited_email"`
 	// The invite secret, sealed under the household key. Opaque to the server.
-	SecretSealed string     `json:"secret_sealed"`
-	ExpiresAt    time.Time  `json:"expires_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	AcceptedAt   *time.Time `json:"accepted_at,omitempty"`
+	SecretSealed string `json:"secret_sealed"`
+	// What the invitee becomes on confirmation. Never owner: there is exactly
+	// one, and handing it over is its own act rather than a side effect.
+	Role       string     `json:"role"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	CreatedAt  time.Time  `json:"created_at"`
+	AcceptedAt *time.Time `json:"accepted_at,omitempty"`
 
 	// Present once accepted: who accepted, the MAC they posted over their own
 	// public key, and the keys themselves. The inviter checks the MAC against
@@ -135,6 +138,9 @@ type CreateInviteRequest struct {
 	TokenHash    string `json:"token_hash"`
 	InvitedEmail string `json:"invited_email"`
 	SecretSealed string `json:"secret_sealed"`
+	// Decided when the invitation is sent rather than after somebody is already
+	// in, so nobody is briefly able to do more than was meant.
+	Role string `json:"role"`
 }
 
 // AcceptInviteRequest is sent by POST /households/invites/accept.
@@ -185,4 +191,33 @@ type RekeyMember struct {
 	UserID     int    `json:"user_id"`
 	WrappedKey string `json:"wrapped_key"`
 	WrapKind   string `json:"wrap_kind"`
+}
+
+// ChangeRoleRequest is sent by PUT /households/{id}/members/{userId}/role.
+//
+// Owner is not among the values it accepts. Passing ownership is a different
+// act with a different consequence — the person doing it stops being the owner
+// — and folding it into "change somebody's role" would let it happen by the
+// same gesture as a demotion.
+type ChangeRoleRequest struct {
+	Role string `json:"role"`
+}
+
+// The roles a household knows.
+const (
+	RoleOwner  = "owner"
+	RoleWriter = "writer"
+	RoleReader = "reader"
+)
+
+// validGrantableRole reports whether a role may be handed out.
+//
+// Owner is excluded deliberately; see ChangeRoleRequest.
+func validGrantableRole(role string) bool {
+	return role == RoleWriter || role == RoleReader
+}
+
+// mayWrite reports whether a role may change what a household holds.
+func mayWrite(role string) bool {
+	return role == RoleOwner || role == RoleWriter
 }

@@ -97,8 +97,8 @@ func TestStore_CreateAndList(t *testing.T) {
 		t.Errorf("household came back as %+v", got[0])
 	}
 	// The creator owns it, and holds their copy sealed under their own MEK.
-	if !got[0].IsOwner {
-		t.Error("creator is not marked as owner")
+	if got[0].Role != RoleOwner {
+		t.Errorf("creator's role is %q, want owner", got[0].Role)
 	}
 	if got[0].WrapKind != WrapSelf {
 		t.Errorf("wrap_kind = %q, want %q", got[0].WrapKind, WrapSelf)
@@ -333,8 +333,8 @@ func TestStore_AHouseholdCannotHaveTwoOwners(t *testing.T) {
 	}
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
-		 VALUES ($1, $2, 'k', $3, TRUE)`,
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role)
+		 VALUES ($1, $2, 'k', $3, 'owner')`,
 		id, ben, WrapGranted,
 	)
 	if err == nil {
@@ -359,8 +359,8 @@ func TestStore_AMemberMayEverythingButDelete(t *testing.T) {
 	// Ben joins. Invitations do not exist yet, so the row goes in directly —
 	// which is exactly the shape one will produce.
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
-		 VALUES ($1, $2, 'granted-key', $3, FALSE)`,
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role)
+		 VALUES ($1, $2, 'granted-key', $3, 'writer')`,
 		id, ben, WrapGranted,
 	)
 	if err != nil {
@@ -385,7 +385,7 @@ func TestStore_AMemberMayEverythingButDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListForUser: %v", err)
 	}
-	if len(bens) != 1 || bens[0].WrappedKey != "granted-key" || bens[0].IsOwner {
+	if len(bens) != 1 || bens[0].WrappedKey != "granted-key" || bens[0].Role == RoleOwner {
 		t.Errorf("member's view of the household is %+v", bens)
 	}
 }
@@ -461,8 +461,8 @@ func TestStore_AHouseholdDiesWithItsLastMember(t *testing.T) {
 			t.Fatalf("Create: %v", err)
 		}
 		if _, err := db.Exec(
-			`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
-			 VALUES ($1, $2, 'k', $3, FALSE)`, id, ben, WrapGranted); err != nil {
+			`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role)
+			 VALUES ($1, $2, 'k', $3, 'writer')`, id, ben, WrapGranted); err != nil {
 			t.Fatalf("adding member: %v", err)
 		}
 
@@ -510,6 +510,7 @@ func anInvite(email string) CreateInviteRequest {
 		TokenHash:    "hash-" + email,
 		InvitedEmail: email,
 		SecretSealed: "sealed-secret",
+		Role:         RoleWriter,
 	}
 }
 
@@ -519,8 +520,8 @@ func hour() time.Time { return time.Now().Add(time.Hour) }
 func addMember(t *testing.T, db *sql.DB, vaultID, userID int) {
 	t.Helper()
 	if _, err := db.Exec(
-		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, is_owner)
-		 VALUES ($1, $2, 'granted-key', $3, FALSE)`, vaultID, userID, WrapGranted); err != nil {
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role)
+		 VALUES ($1, $2, 'granted-key', $3, 'writer')`, vaultID, userID, WrapGranted); err != nil {
 		t.Fatalf("adding member: %v", err)
 	}
 }
@@ -681,7 +682,7 @@ func TestStore_ConfirmingWritesTheMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListForUser: %v", err)
 	}
-	if len(bens) != 1 || bens[0].WrappedKey != "signcrypted-key" || bens[0].WrapKind != WrapGranted || bens[0].IsOwner {
+	if len(bens) != 1 || bens[0].WrappedKey != "signcrypted-key" || bens[0].WrapKind != WrapGranted || bens[0].Role == RoleOwner {
 		t.Errorf("member's view is %+v", bens)
 	}
 
@@ -896,14 +897,14 @@ func TestStore_OwnershipPassesWhenTheOwnerLeaves(t *testing.T) {
 
 	// To the longest-standing, which needs nobody to choose in the moment they
 	// are walking away.
-	isOwner, err := store.Membership(ctx, id, ben)
+	role, err := store.Membership(ctx, id, ben)
 	if err != nil {
 		t.Fatalf("Membership for Ben: %v", err)
 	}
-	if !isOwner {
-		t.Error("the longest-standing remaining member did not become the owner")
+	if role != RoleOwner {
+		t.Errorf("the longest-standing remaining member is %q, want owner", role)
 	}
-	if carlOwns, _ := store.Membership(ctx, id, carl); carlOwns {
+	if carlRole, _ := store.Membership(ctx, id, carl); carlRole == RoleOwner {
 		t.Error("the newer member became the owner instead")
 	}
 
@@ -956,8 +957,200 @@ func TestStore_RemovingAMemberLeavesTheOwnerAlone(t *testing.T) {
 		t.Fatalf("owner removing a member: %v", err)
 	}
 
-	isOwner, err := store.Membership(ctx, id, anna)
-	if err != nil || !isOwner {
-		t.Errorf("the owner stopped owning it: owner=%v err=%v", isOwner, err)
+	role, err := store.Membership(ctx, id, anna)
+	if err != nil || role != RoleOwner {
+		t.Errorf("the owner stopped owning it: role=%q err=%v", role, err)
+	}
+}
+
+// --- what a role actually buys ---
+//
+// Server-enforced rather than cryptographic: every member holds the same
+// household key, so `reader` means the server refuses their writes and not that
+// they are unable to write. For this permission that is sound — reading is
+// genuinely theirs — but it is the kind of guarantee a filesystem gives, not
+// the kind the vault boundary gives.
+
+func addMemberAs(t *testing.T, db *sql.DB, vaultID, userID int, role string) {
+	t.Helper()
+	if _, err := db.Exec(
+		`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role)
+		 VALUES ($1, $2, 'granted-key', $3, $4)`, vaultID, userID, WrapGranted, role); err != nil {
+		t.Fatalf("adding %s: %v", role, err)
+	}
+}
+
+func TestStore_AReaderMayOnlyRead(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-role@example.ch")
+	ben := makeUser(t, db, "ben-reader@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMemberAs(t, db, id, ben, RoleReader)
+
+	t.Run("reads", func(t *testing.T) {
+		if _, err := store.GetVault(ctx, id, ben); err != nil {
+			t.Errorf("a reader cannot read: %v", err)
+		}
+	})
+
+	// Told they may not, rather than told it is a conflict. A reader who
+	// reloaded on a conflict would try again and be refused forever.
+	t.Run("cannot write", func(t *testing.T) {
+		if _, err := store.PutVault(ctx, id, ben, []byte("theirs"), []byte("n"), 9, nil); err != ErrReadOnly {
+			t.Errorf("PutVault as reader = %v, want ErrReadOnly", err)
+		}
+		v, _ := store.GetVault(ctx, id, anna)
+		if string(v.Ciphertext) != "ct" {
+			t.Errorf("the payload changed to %q", v.Ciphertext)
+		}
+	})
+
+	t.Run("cannot rename", func(t *testing.T) {
+		if err := store.Rename(ctx, id, ben, "theirs"); err != ErrReadOnly {
+			t.Errorf("Rename as reader = %v, want ErrReadOnly", err)
+		}
+	})
+
+	t.Run("cannot invite", func(t *testing.T) {
+		if _, err := store.CreateInvite(ctx, id, ben, anInvite("x-role@example.ch"), hour()); err != ErrNotOwner {
+			t.Errorf("CreateInvite as reader = %v, want ErrNotOwner", err)
+		}
+	})
+}
+
+func TestStore_AWriterMayWriteButNotAdminister(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-w@example.ch")
+	ben := makeUser(t, db, "ben-writer@example.ch")
+	carl := makeUser(t, db, "carl-w@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMemberAs(t, db, id, ben, RoleWriter)
+	addMemberAs(t, db, id, carl, RoleReader)
+
+	if _, err := store.PutVault(ctx, id, ben, []byte("bens"), []byte("n"), 9, nil); err != nil {
+		t.Errorf("a writer cannot write: %v", err)
+	}
+	if err := store.Rename(ctx, id, ben, "bens-name"); err != nil {
+		t.Errorf("a writer cannot rename: %v", err)
+	}
+	if _, err := store.CreateInvite(ctx, id, ben, anInvite("x-w@example.ch"), hour()); err != ErrNotOwner {
+		t.Errorf("CreateInvite as writer = %v, want ErrNotOwner", err)
+	}
+	if err := store.RemoveMember(ctx, id, ben, carl); err != ErrNotOwner {
+		t.Errorf("a writer removed somebody: %v", err)
+	}
+	if err := store.ChangeRole(ctx, id, ben, carl, RoleWriter); err != ErrNotOwner {
+		t.Errorf("a writer changed a role: %v", err)
+	}
+}
+
+func TestStore_ChangingARole(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-cr@example.ch")
+	ben := makeUser(t, db, "ben-cr@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMemberAs(t, db, id, ben, RoleWriter)
+
+	t.Run("the owner may demote and promote", func(t *testing.T) {
+		if err := store.ChangeRole(ctx, id, anna, ben, RoleReader); err != nil {
+			t.Fatalf("demoting: %v", err)
+		}
+		if role, _ := store.Membership(ctx, id, ben); role != RoleReader {
+			t.Errorf("role is %q, want reader", role)
+		}
+		if err := store.ChangeRole(ctx, id, anna, ben, RoleWriter); err != nil {
+			t.Fatalf("promoting: %v", err)
+		}
+	})
+
+	// Ownership is not something this hands out. Passing it is a different act
+	// with a different consequence, and folding it in here would let it happen
+	// by the same gesture as a demotion.
+	t.Run("but cannot make a second owner", func(t *testing.T) {
+		if err := store.ChangeRole(ctx, id, anna, ben, RoleOwner); err != ErrInvalidRole {
+			t.Errorf("promoting to owner = %v, want ErrInvalidRole", err)
+		}
+	})
+
+	// The stranding that succession exists to prevent, reached by another door.
+	t.Run("and an owner cannot demote themselves", func(t *testing.T) {
+		if err := store.ChangeRole(ctx, id, anna, anna, RoleReader); err != ErrNotOwner {
+			t.Errorf("self-demotion = %v, want ErrNotOwner", err)
+		}
+		if role, _ := store.Membership(ctx, id, anna); role != RoleOwner {
+			t.Errorf("the owner is now %q", role)
+		}
+	})
+}
+
+// An invitation says what the person becomes, decided when it is sent rather
+// than after they are already in.
+func TestStore_AnInvitationCarriesItsRole(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-ir@example.ch")
+	ben := makeUser(t, db, "ben-ir@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	invite := anInvite("ben-ir@example.ch")
+	invite.Role = RoleReader
+	if _, err := store.CreateInvite(ctx, id, anna, invite, hour()); err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if _, err := store.AcceptInvite(ctx, "hash-ben-ir@example.ch", ben, "ben-ir@example.ch", "mac"); err != nil {
+		t.Fatalf("AcceptInvite: %v", err)
+	}
+	invites, _ := store.ListInvites(ctx, id, anna)
+	if invites[0].Role != RoleReader {
+		t.Fatalf("the invitation forgot its role: %q", invites[0].Role)
+	}
+	if err := store.ConfirmInvite(ctx, id, anna, invites[0].ID, "key"); err != nil {
+		t.Fatalf("ConfirmInvite: %v", err)
+	}
+
+	if role, _ := store.Membership(ctx, id, ben); role != RoleReader {
+		t.Errorf("joined as %q, want reader", role)
+	}
+}
+
+// An invitation cannot make another owner.
+func TestStore_AnInvitationCannotGrantOwnership(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-io@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	invite := anInvite("x-io@example.ch")
+	invite.Role = RoleOwner
+	if _, err := store.CreateInvite(ctx, id, anna, invite, hour()); err != ErrInvalidRole {
+		t.Errorf("inviting an owner = %v, want ErrInvalidRole", err)
 	}
 }

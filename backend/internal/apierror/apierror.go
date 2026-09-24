@@ -111,6 +111,7 @@ var codes = map[string]string{
 	Vault + "|failed to list members":        "VAULT-035",
 	Vault + "|failed to remove member":       "VAULT-036",
 	Vault + "|failed to rekey household":     "VAULT-037",
+	Vault + "|failed to change role":         "VAULT-038",
 
 	// --- Upkeep reminders ---
 	Upkeep + "|invalid request body":    "UPK-001",

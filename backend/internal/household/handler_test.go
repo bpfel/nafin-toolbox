@@ -44,6 +44,7 @@ type mockStore struct {
 	confirmErr      error
 	listMembersErr  error
 	removeMemberErr error
+	changeRoleErr   error
 	rekeyErr        error
 
 	// Captured so tests can assert what reached the store.
@@ -54,6 +55,7 @@ type mockStore struct {
 	lastEmail      string
 	lastMAC        string
 	lastWrappedKey string
+	lastRole       string
 	lastRekey      RekeyRequest
 	lastExpiresAt  time.Time
 	lastUserID     int
@@ -427,4 +429,9 @@ func (m *mockStore) RemoveMember(ctx context.Context, vaultID, userID, targetID 
 func (m *mockStore) Rekey(ctx context.Context, vaultID, userID int, req RekeyRequest, ciphertext, nonce []byte) (time.Time, error) {
 	m.lastUserID, m.lastVaultID, m.lastRekey = userID, vaultID, req
 	return m.updatedAt, m.rekeyErr
+}
+
+func (m *mockStore) ChangeRole(ctx context.Context, vaultID, userID, targetID int, role string) error {
+	m.lastUserID, m.lastVaultID, m.lastTargetID, m.lastRole = userID, vaultID, targetID, role
+	return m.changeRoleErr
 }
