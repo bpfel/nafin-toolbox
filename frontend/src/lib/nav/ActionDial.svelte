@@ -457,6 +457,27 @@
     }
 
     /*
+     * Which budget you are in goes to the far end of the stack, away from the
+     * thumb.
+     *
+     * It is the one thing here that is not an action: the rest of the column
+     * does something to the screen, and this says where the screen *is*. The
+     * rule the column is ordered by — what you reach for most, nearest the dot
+     * — puts it last for the same reason it puts the "+" first, and a row you
+     * open once a week sitting under the one you press constantly is how you
+     * end up switching household by accident.
+     *
+     * `order` rather than moving it in the markup, because the desktop wants
+     * the opposite: first in the strip, and therefore leftmost in the toolbar,
+     * with the screen's identity rather than among the things that act on it.
+     * In `column-reverse` the flow starts at the bottom, so a higher `order`
+     * is further from the dot — which is the top.
+     */
+    .strip :global(.vault-switch) {
+      order: 1;
+    }
+
+    /*
      * Reaching into the controls themselves.
      *
      * They are handed over as a snippet the screens built, so there is no prop
