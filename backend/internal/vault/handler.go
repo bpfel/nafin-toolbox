@@ -26,6 +26,7 @@ type VaultStorer interface {
 	GetIdentity(ctx context.Context, userID int) (Identity, error)
 	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string, identity Identity) error
 	UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error
+	SetIdentityIfAbsent(ctx context.Context, userID int, identity Identity) (bool, error)
 	GetRecoveryData(ctx context.Context, userID int) (string, string, error)
 }
 
@@ -37,6 +38,7 @@ func Routes(db *sql.DB) func(r chi.Router) {
 		r.Get("/keys", handleGetKeys(store))
 		r.Post("/keys", handleSetupKeys(store))
 		r.Put("/keys", handleUpdateKeys(store))
+		r.Post("/identity", handleSetupIdentity(store))
 		r.Post("/recovery", handleRecovery(store))
 	}
 }
@@ -217,6 +219,42 @@ func handleUpdateKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// handleSetupIdentity is how an account made before households gets the
+// keypair every newer account is born with. Without it such an account could
+// neither start a household nor accept an invitation, and nothing on screen
+// could have told it why. The client calls it once, on unlock, holding the
+// vault key it just opened; see SetIdentityIfAbsent for why it only ever adds.
+func handleSetupIdentity(store VaultStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := auth.UserFromContext(r.Context())
+		if user == nil {
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		var id Identity
+		if err := json.NewDecoder(r.Body).Decode(&id); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if id.PublicKey == "" || id.EncryptedPrivateKey == "" || id.VerifyingKey == "" || id.EncryptedSigningKey == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "all four identity keys are required"})
+			return
+		}
+
+		set, err := store.SetIdentityIfAbsent(r.Context(), user.ID, id)
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to save identity")
+			return
+		}
+		if !set {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "identity already set up"})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }

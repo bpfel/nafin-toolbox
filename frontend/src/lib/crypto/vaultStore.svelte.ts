@@ -1,7 +1,7 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
 import {
-  fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
+  fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
   fetchHouseholdMembers, fetchHouseholdInvites, createHouseholdInvite, deleteHouseholdInvite,
@@ -563,7 +563,7 @@ export async function tryRestoreVault(): Promise<boolean> {
     // this were left out, reloading the page would silently take away the
     // ability to share a household until the next real sign-in.
     const keys = await fetchVaultKeys()
-    identity = isComplete(keys) ? await openIdentity(keys, cachedMEK) : null
+    identity = await ensureIdentity(keys, cachedMEK)
     await loadHouseholds(cachedMEK)
     unlocked = true
     // After the households are known, so a remembered one can be checked
@@ -595,7 +595,7 @@ export async function initializeVault(password: string, email: string): Promise<
     const kek = await deriveKEK(password, email, keys.iterations)
     mek = await unwrapMEK(keys.encrypted_mek, kek)
     current.key = mek
-    identity = isComplete(keys) ? await openIdentity(keys, mek) : null
+    identity = await ensureIdentity(keys, mek)
 
     const vaultData = await fetchVault()
     if (vaultData) {
@@ -620,6 +620,41 @@ export async function initializeVault(password: string, email: string): Promise<
       return 'version-ahead'
     }
     return 'decrypt-failed'
+  }
+}
+
+/**
+ * This account's keypair, making one if it has none.
+ *
+ * Every account made since households existed was born with a keypair, in
+ * `setupKeys`. One made before them had none and no way to get one — so it
+ * could neither start a household nor accept an invitation, and the screen
+ * could only say "set up encryption" to somebody who had long since done so.
+ * Made here instead, on unlock, which is the one moment this client holds the
+ * vault key the private halves must be sealed under.
+ *
+ * Never fatal. A failure leaves the account without a keypair, which is where
+ * it already was, and the next unlock tries again. If the server refuses
+ * because a keypair has appeared in the meantime, it is read back rather than
+ * replaced: the server only ever adds one, and a key that could be swapped
+ * would break every pin other members hold on it.
+ */
+async function ensureIdentity(
+  keys: Partial<import('./identity').SealedIdentity> | null | undefined,
+  withMEK: CryptoKey,
+): Promise<OpenIdentity | null> {
+  try {
+    if (isComplete(keys)) return await openIdentity(keys, withMEK)
+    const sealed = await sealIdentity(await generateIdentity(), withMEK)
+    try {
+      await setupIdentity(sealed)
+      return await openIdentity(sealed, withMEK)
+    } catch {
+      const now = await fetchVaultKeys()
+      return isComplete(now) ? await openIdentity(now, withMEK) : null
+    }
+  } catch {
+    return null
   }
 }
 
@@ -847,7 +882,7 @@ export async function recoverVault(
   // reason: their keys are sealed under this MEK, which has not changed.
   mek = recoveredMEK
   current.key = recoveredMEK
-  identity = isComplete(result) ? await openIdentity(result, recoveredMEK) : null
+  identity = await ensureIdentity(result, recoveredMEK)
 
   const vaultData = await fetchVault()
   if (vaultData) {

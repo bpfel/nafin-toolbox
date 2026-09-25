@@ -32,6 +32,7 @@ type mockStore struct {
 
 	identity    Identity
 	getIdentErr error
+	setIdentErr error
 
 	// Captured so tests can assert the precondition reached the store.
 	lastExpectedUpdatedAt *time.Time
@@ -89,6 +90,18 @@ func (m *mockStore) SetEncryptedMEK(ctx context.Context, userID int, encryptedME
 	m.encryptedMEKRecov = encryptedMEKRecovery
 	m.identity = identity
 	return nil
+}
+
+// Mirrors the store's rule: only an account with no identity gets one.
+func (m *mockStore) SetIdentityIfAbsent(ctx context.Context, userID int, identity Identity) (bool, error) {
+	if m.setIdentErr != nil {
+		return false, m.setIdentErr
+	}
+	if m.identity.PublicKey != "" {
+		return false, nil
+	}
+	m.identity = identity
+	return true, nil
 }
 
 func (m *mockStore) UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error {
@@ -1380,5 +1393,64 @@ func TestHandleSetupKeys_AllowsAbsentIdentity(t *testing.T) {
 	}
 	if !store.identity.Empty() {
 		t.Errorf("identity = %+v, want empty", store.identity)
+	}
+}
+
+const fourKeys = `{"public_key":"p","encrypted_private_key":"ep","verifying_key":"v","encrypted_signing_key":"es"}`
+
+func postIdentity(store *mockStore, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/identity", strings.NewReader(body))
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+	handleSetupIdentity(store).ServeHTTP(w, req)
+	return w
+}
+
+// An account made before households had no way to get the keypair every newer
+// one is born with, so it could neither start a household nor accept an
+// invitation.
+func TestHandleSetupIdentity_GivesAnOlderAccountItsKeypair(t *testing.T) {
+	store := &mockStore{}
+
+	w := postIdentity(store, fourKeys)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if store.identity.PublicKey != "p" || store.identity.EncryptedSigningKey != "es" {
+		t.Errorf("identity not stored: %+v", store.identity)
+	}
+}
+
+// The security half: an identity is added, never replaced. Replacing one would
+// break every pin other members hold and let a stolen session swap in its own.
+func TestHandleSetupIdentity_NeverReplacesOne(t *testing.T) {
+	store := &mockStore{identity: Identity{PublicKey: "original"}}
+
+	w := postIdentity(store, fourKeys)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusConflict)
+	}
+	if store.identity.PublicKey != "original" {
+		t.Errorf("public key replaced with %q", store.identity.PublicKey)
+	}
+}
+
+func TestHandleSetupIdentity_RequiresAllFourKeys(t *testing.T) {
+	w := postIdentity(&mockStore{}, `{"public_key":"p","encrypted_private_key":"ep","verifying_key":"v"}`)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleSetupIdentity_RequiresAuth(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/identity", strings.NewReader(fourKeys))
+	w := httptest.NewRecorder()
+	handleSetupIdentity(&mockStore{}).ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusUnauthorized)
 	}
 }

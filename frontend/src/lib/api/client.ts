@@ -110,6 +110,21 @@ export async function fetchVaultKeys(): Promise<VaultKeysResponse | null> {
   }
 }
 
+/**
+ * Give an account made before households the keypair a newer one is born with.
+ *
+ * The server only ever adds one: an account that already has an identity gets
+ * a 409, and its keys are left alone. See `SetIdentityIfAbsent`.
+ */
+export async function setupIdentity(body: {
+  public_key: string
+  encrypted_private_key: string
+  verifying_key: string
+  encrypted_signing_key: string
+}): Promise<void> {
+  await request('/vault/identity', { method: 'POST', body: JSON.stringify(body) })
+}
+
 export async function setupVaultKeys(body: {
   encrypted_mek: string
   recovery_key_hash: string

@@ -131,6 +131,34 @@ func (s *Store) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, r
 	return err
 }
 
+// SetIdentityIfAbsent gives a keypair to an account that set its vault up
+// before identities existed, and to no other. Reports whether it did.
+//
+// Only if absent, and that is the whole of the security argument. A public key
+// that could be replaced would break every pin other members hold on it, and
+// would let anybody holding a stolen session swap in a key of their own — every
+// grant after that would be sealed to them. First-time setup refuses to run
+// twice for the same reason; this is its counterpart for accounts that ran it
+// before there was an identity to set up.
+//
+// Requires a vault key as well, because the private halves arrive sealed under
+// it: an account with no vault has nothing to seal them to.
+func (s *Store) SetIdentityIfAbsent(ctx context.Context, userID int, identity Identity) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE users
+		 SET public_key = $2, encrypted_private_key = $3,
+		     verifying_key = $4, encrypted_signing_key = $5
+		 WHERE id = $1 AND public_key IS NULL AND encrypted_mek IS NOT NULL`,
+		userID, identity.PublicKey, identity.EncryptedPrivateKey,
+		identity.VerifyingKey, identity.EncryptedSigningKey,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
 func (s *Store) UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE users SET encrypted_mek = $2 WHERE id = $1`,

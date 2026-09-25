@@ -10,6 +10,7 @@ import { generateHouseholdKey, sealKeyForSelf, sealName } from './household'
 vi.mock('../api/client', () => ({
   fetchVaultKeys: vi.fn(async () => ({ encrypted_mek: '', iterations: 600000 })),
   setupVaultKeys: vi.fn(),
+  setupIdentity: vi.fn(),
   updateVaultKeys: vi.fn(),
   fetchVault: vi.fn(async () => null),
   putVault: vi.fn(async () => ({ updated_at: '2026-01-01T00:00:00Z' })),
@@ -439,5 +440,52 @@ describe('leaving a household', () => {
     await removeMember(3, 99, false)
 
     expect(state.households).toHaveLength(1)
+  })
+})
+
+/**
+ * An account made before households had no keypair and no way to get one, so
+ * it could neither start a household nor accept an invitation. It gets one the
+ * next time it unlocks — the one moment the client holds the vault key the
+ * private halves are sealed under.
+ */
+describe('an account without a keypair', () => {
+  test('is given one on unlock, sealed and sent once', async () => {
+    await signIn()
+    api.fetchVaultKeys.mockResolvedValue({ encrypted_mek: '', iterations: 600000 })
+
+    expect(await tryRestoreVault()).toBe(true)
+
+    expect(api.setupIdentity).toHaveBeenCalledTimes(1)
+    const sent = api.setupIdentity.mock.calls[0][0]
+    for (const field of ['public_key', 'encrypted_private_key', 'verifying_key', 'encrypted_signing_key']) {
+      expect(sent[field], field).toBeTruthy()
+    }
+    expect(state.identity).not.toBeNull()
+  })
+
+  test('an account that has one is not given another', async () => {
+    const mek = await signIn()
+    const { generateIdentity, sealIdentity } = await import('./identity')
+    const sealed = await sealIdentity(await generateIdentity(), mek)
+    api.fetchVaultKeys.mockResolvedValue({ encrypted_mek: '', iterations: 600000, ...sealed })
+
+    await tryRestoreVault()
+
+    expect(api.setupIdentity).not.toHaveBeenCalled()
+    expect(state.identity).not.toBeNull()
+  })
+
+  // Never fatal: somebody whose keypair could not be made still has their own
+  // budget, and the next unlock tries again.
+  test('a refusal does not stop the vault from opening', async () => {
+    await signIn()
+    api.fetchVaultKeys.mockResolvedValue({ encrypted_mek: '', iterations: 600000 })
+    api.setupIdentity.mockRejectedValueOnce(new Error('identity already set up'))
+
+    expect(await tryRestoreVault()).toBe(true)
+
+    expect(state.identity).toBeNull()
+    expect(state.unlocked).toBe(true)
   })
 })
