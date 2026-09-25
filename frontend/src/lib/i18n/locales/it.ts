@@ -278,6 +278,7 @@ export const it: Messages = {
   'budget.reset': 'Reimposta il budget',
   'budget.setupTitle': 'Configura il tuo budget',
   'budget.setupHint': 'Inizia con voci svizzere predefinite, basate sull’indagine sul budget delle economie domestiche dell’UST (HABE 2023, persona sola). Potrai adattare tutto in seguito.',
+  'budget.setupHintHousehold': 'Inizia con voci svizzere predefinite per un’economia domestica di due persone, basate sull’indagine sul budget delle economie domestiche dell’UST (HABE 2020–2021, coppie sotto i 65 anni senza figli). Potrai adattare tutto in seguito.',
 
   // --- Entry dialog ---
   'entry.editTitle': 'Modifica la voce',

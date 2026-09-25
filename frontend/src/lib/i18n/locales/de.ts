@@ -265,6 +265,7 @@ export const de: Messages = {
   'budget.reset': 'Budget zurücksetzen',
   'budget.setupTitle': 'Budget einrichten',
   'budget.setupHint': 'Beginn mit Schweizer Standardeinträgen auf Basis der BFS-Haushaltsbudgeterhebung (HABE 2023, Einpersonenhaushalt). Du kannst später alles anpassen.',
+  'budget.setupHintHousehold': 'Beginn mit Schweizer Standardeinträgen für einen Zweipersonenhaushalt auf Basis der BFS-Haushaltsbudgeterhebung (HABE 2020–2021, Paare unter 65 ohne Kinder). Du kannst später alles anpassen.',
 
   // --- Entry dialog ---
   'entry.editTitle': 'Eintrag bearbeiten',

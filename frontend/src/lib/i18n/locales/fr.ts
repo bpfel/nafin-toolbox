@@ -278,6 +278,7 @@ export const fr: Messages = {
   'budget.reset': 'Réinitialiser le budget',
   'budget.setupTitle': 'Configurer ton budget',
   'budget.setupHint': 'Commence avec des entrées suisses par défaut, fondées sur l’enquête sur le budget des ménages de l’OFS (HABE 2023, personne seule). Tu pourras tout adapter par la suite.',
+  'budget.setupHintHousehold': 'Commence avec des entrées suisses par défaut pour un ménage de deux personnes, fondées sur l’enquête sur le budget des ménages de l’OFS (HABE 2020–2021, couples de moins de 65 ans sans enfants). Tu pourras tout adapter par la suite.',
 
   // --- Entry dialog ---
   'entry.editTitle': 'Modifier l’entrée',

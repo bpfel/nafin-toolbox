@@ -685,32 +685,44 @@ export function seedDefaults(vault: VaultData, locale: Locale = 'en', anchorMont
 
 
 /**
- * The other starter budget: a household shared by two people.
+ * The starter budget for a household shared by two people.
  *
- * Written for the shared-budgets walkthrough, and it is a different budget
- * rather than the same one with two salaries in it, because a household plan
- * is not a personal plan with company. Two things distinguish it, and the tour
- * exists to say both:
+ * Offered by the setup screen when the budget being set up belongs to a
+ * household, and shown by the shared-budgets walkthrough as a preview that is
+ * never written. A different budget from `seedDefaults` rather than the same
+ * one with two salaries in it, because a household plan is not a personal plan
+ * with company. Two things distinguish it:
  *
- * **Only what is actually shared.** Rent, the utilities, the food, the radio
- * levy, the machine in the kitchen — costs that arrive once for the dwelling
- * rather than once per person. The health insurance premium and the 3a payment
- * are missing on purpose. They are per-person by law, not by preference, and a
- * household budget that swallows them is the first step towards a couple who
- * can no longer say what either of them owns. The tour does not stop to say
- * so; the example simply does not contain them.
+ * **Only what arrives once for the dwelling.** Rent, the service charges, the
+ * power, the heating, the food, the radio levy, the insurance on the home and
+ * the stock of things in it. Not the GA, not the 3a payment, not a wardrobe —
+ * those are bought by a person, not by a flat.
  *
  * **The income side is contributions, not wages.** Nobody's salary is paid
- * into a household; each person pays a share of it in. So the two income lines
- * are what Alex and Sam put in, and they add up to exactly what goes out —
- * 2'337.92 either way. The split is 60/40, which is what proportional-to-income
- * gives for this pair, and the odd rappen are the honest consequence of that
+ * into a household; each person pays a share of theirs in. So the two income
+ * lines are what Alex and Sam put in, and they come to exactly what goes out.
+ * The split is 60/40, which is what proportional-to-income gives for a pair
+ * earning unequally, and the odd rappen are the honest consequence of that
  * rather than something to round away.
  *
- * The figures themselves are the same BFS household ones `bfsDefaults` uses,
- * unchanged. That survey already measures a *household* of about two people,
- * so no figure here has been doubled, invented or adjusted for a couple —
- * which is what keeps this example as sourced as the other one.
+ * **Where the figures come from.** BFS, *Detaillierte Haushaltsausgaben nach
+ * Haushaltstyp* (`je-d-20.02.01.02.13`), column **Paare unter 65 Jahren ohne
+ * Kinder** — a working-age couple with no children, which is the household
+ * this budget is for. Francs per month per household, so nothing here has been
+ * doubled or divided.
+ *
+ * It is the **2020–2021** wave, while `seedDefaults` uses HABE 2023. Not an
+ * oversight: the annual sample is about three thousand households, too small
+ * to break down by household type, so the BFS pools three years for these
+ * columns and 2020–2021 is the newest pooled wave published. The setup screen
+ * says which wave it is using, and the upkeep register carries both.
+ *
+ * Health insurance is in, at the household's own premium for two. An earlier
+ * version left it out on the grounds that a premium is personal by law, which
+ * is true of the contract and beside the point for the budget: a couple paying
+ * both premiums from a joint account is the ordinary case, and a shared plan
+ * that cannot hold the largest fixed bill either of them has is not much of a
+ * plan.
  *
  * @param anchorMonth `YYYY-MM`, for the two reserves. See `seedDefaults`.
  */
@@ -746,37 +758,60 @@ function sharedDefaultCategories(): DefaultCategory[] {
     { key: 'cat.contributions', type: 'income', sortOrder: 1 },
     { key: 'cat.housing', type: 'expense', sortOrder: 10 },
     { key: 'cat.living', type: 'expense', sortOrder: 20 },
-    { key: 'cat.savings', type: 'expense', sortOrder: 30 },
+    { key: 'cat.insurance', type: 'expense', sortOrder: 30 },
+    { key: 'cat.savings', type: 'expense', sortOrder: 40 },
   ]
 }
 
 function sharedDefaults(): DefaultEntry[] {
   return [
-    // 60/40 of 2'327.92. Not halves: the two earn differently, and splitting a
-    // shared cost in half when the incomes are not equal is the thing the
-    // proportional arrangement exists to avoid.
-    { key: 'contributionAlex', type: 'income', sortOrder: 10, categoryKey: 'cat.contributions', amount: '1402.75' },
-    { key: 'contributionSam', type: 'income', sortOrder: 20, categoryKey: 'cat.contributions', amount: '935.17' },
+    // 60/40 of 3'166.27, the total below. Not halves: the two earn
+    // differently, and splitting a shared cost down the middle when the
+    // incomes are not equal is the thing a proportional arrangement exists to
+    // avoid. Edit any figure below and these two have to move with it — a
+    // test holds them to it.
+    { key: 'contributionAlex', type: 'income', sortOrder: 10, categoryKey: 'cat.contributions', amount: '1899.76' },
+    { key: 'contributionSam', type: 'income', sortOrder: 20, categoryKey: 'cat.contributions', amount: '1266.51' },
 
-    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1350.00' },
-    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '150.00' },
-    // Serafe sits under Housing here rather than under Insurance and Taxes,
-    // where the personal starter puts it. The levy is charged per *dwelling*,
-    // which is exactly why it belongs in a shared budget at all — and the
-    // household plan has no insurance heading, because insurance is not shared.
-    { key: 'serafe', type: 'bill', sortOrder: 30, categoryKey: 'cat.housing', amount: '27.92', targetAmount: '335.00', periodMonths: 12 },
+    // 5711: net rent or mortgage interest on the main residence.
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1238.54' },
+    // 5712: Nebenkosten — the service charges a Swiss tenant pays beside the
+    // rent. Rubbish, water, drainage, and the flat-rate share of the rest.
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '145.12' },
+    // 5713.01. Split out from heating because the survey splits them, and
+    // because they arrive on different bills from different suppliers.
+    { key: 'electricity', type: 'expense', sortOrder: 30, categoryKey: 'cat.housing', amount: '70.58' },
+    // 5713.02 + 5713.03: gas and other fuels, plus central or district
+    // heating. The two together with electricity are exactly the survey's
+    // 106.59 for energy at the main residence, so the split reconciles.
+    { key: 'heating', type: 'expense', sortOrder: 40, categoryKey: 'cat.housing', amount: '36.02' },
+    // Serafe collects the federal radio and television levy. It is charged per
+    // *dwelling*, which is why it belongs in a shared budget at all, and it is
+    // the one bill that is the same for every household in the country — an
+    // amount known in advance, arriving on a known cycle.
+    //
+    // 335.00 a year is the rate set by the Federal Council, unchanged since
+    // 2021. It drops to 312.00 on 1 January 2027; the upkeep register has the
+    // date. Not a HABE figure, and the only line here that is not.
+    { key: 'serafe', type: 'bill', sortOrder: 50, categoryKey: 'cat.housing', amount: '27.92', targetAmount: '335.00', periodMonths: 12 },
 
-    { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '500.00' },
+    // 51: food and non-alcoholic drinks.
+    { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '715.63' },
 
-    // A shared set-aside, so the example has somewhere for a joint decision to
-    // land — a holiday, the excess on something that breaks.
-    { key: 'jointReserve', type: 'savings', sortOrder: 10, categoryKey: 'cat.savings', amount: '300.00' },
-    // And a `purchase`, so the step saying a household has the same entry
-    // types as a personal budget is backed by a screen that shows them. An
-    // appliance is the household case for the type: one machine for the flat,
-    // replaced every so often, rather than a bill that arrives. 1'200 over ten
-    // years is exactly 10.00 a month — a round figure reads as a decision, and
-    // the user overwrites it either way.
-    { key: 'washingMachine', type: 'purchase', sortOrder: 20, categoryKey: 'cat.savings', amount: '10.00', targetAmount: '1200.00', periodMonths: 120 },
+    // 33: the household's basic health insurance premiums, both people, plus
+    // the non-occupational accident cover the survey counts with them.
+    { key: 'healthInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insurance', amount: '688.67' },
+    // 4201: contents, liability, fire and building cover. Insurance on the
+    // home rather than on a person, and the clearest shared premium there is.
+    { key: 'householdInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insurance', amount: '41.95' },
+
+    // 581 + 582 + 583: furniture and furnishings, household textiles, and
+    // kitchen and household appliances. What a home is furnished and equipped
+    // with, which wears out and gets replaced — so it is a `purchase`, saved
+    // towards, rather than a cost that lands every month.
+    //
+    // The monthly figure is the survey's, added up; the five-year horizon is
+    // only how that figure is expressed as a target, and the user moves it.
+    { key: 'inventoryReserve', type: 'purchase', sortOrder: 10, categoryKey: 'cat.savings', amount: '201.84', targetAmount: '12110.40', periodMonths: 60 },
   ]
 }

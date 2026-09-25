@@ -1778,20 +1778,63 @@ describe('seedSharedDefaults', () => {
   })
 
   /**
-   * Nothing per-person. A premium or a 3a payment is personal by law rather
-   * than by preference, and the walkthrough does not stop to say so — the
-   * example simply never contains them, which is the whole of the argument.
+   * Nothing bought by a person rather than by the dwelling.
+   *
+   * Health insurance is the deliberate exception and is in: the contract is
+   * per person, but a couple paying both premiums from a joint account is the
+   * ordinary case, and a shared plan that cannot hold the largest fixed bill
+   * either of them has is not much of a plan. A 3a payment is different — it
+   * is somebody's retirement, in their name, and cannot be shared even in
+   * principle.
    */
-  test('holds no cost that is personal by law', () => {
+  test('holds nothing bought by a person rather than by the home', () => {
     const vault = createEmptyVault()
 
     seedSharedDefaults(vault)
     const names = listEntries(vault).map(e => e.name)
 
-    expect(names).not.toContain('Health Insurance')
+    expect(names).toContain('Health Insurance')
     expect(names).not.toContain('Pillar 3a')
-    // And the claim the entries step makes: every type a personal budget has.
-    expect(new Set(listEntries(vault).map(e => e.type)).size).toBe(5)
+    expect(names).not.toContain('GA travelcard')
+    expect(names).not.toContain('Clothing & Footwear')
+  })
+
+  /**
+   * That each figure is the survey's, unrounded.
+   *
+   * Written out rather than derived, because the point is that somebody read
+   * them off `je-d-20.02.01.02.13` — a test that recomputed them from the seed
+   * would agree with any typo the seed contained.
+   */
+  test('carries the BFS figures for a couple under 65 without children', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+    const planned = Object.fromEntries(
+      listEntries(vault).map(e => [e.name, plannedFor(vault, e.id)]),
+    )
+
+    expect(planned['Rent']).toBe('1238.54')
+    expect(planned['Utilities']).toBe('145.12')
+    expect(planned['Electricity']).toBe('70.58')
+    expect(planned['Heating']).toBe('36.02')
+    expect(planned['Food & Groceries']).toBe('715.63')
+    expect(planned['Health Insurance']).toBe('688.67')
+    expect(planned['Household insurance']).toBe('41.95')
+    expect(planned['Inventory reserve']).toBe('201.84')
+  })
+
+  // The survey reports 106.59 for energy at the main residence, and the seed
+  // shows it as two lines because it arrives on two bills. They have to still
+  // add up, or the split has quietly become an estimate.
+  test('electricity and heating reconcile with the survey’s energy line', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+    const at = (name: string) =>
+      Number(plannedFor(vault, listEntries(vault).find(e => e.name === name)!.id))
+
+    expect(at('Electricity') + at('Heating')).toBeCloseTo(106.6, 2)
   })
 
   test('writes a planned amount for every entry', () => {

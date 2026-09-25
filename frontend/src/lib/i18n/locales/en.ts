@@ -280,6 +280,10 @@ export const en = {
   'budget.reset': 'Reset budget',
   'budget.setupTitle': 'Set up your budget',
   'budget.setupHint': 'Start with default Swiss budget entries based on BFS household survey data (HABE 2023, single person). You can customize everything later.',
+  // The household variant. A different population and a different wave of
+  // the same survey, because the annual sample is too small to break down
+  // by household type and the BFS pools three years for those columns.
+  'budget.setupHintHousehold': 'Start with default Swiss entries for a two-person household, based on BFS household survey data (HABE 2020–2021, couples under 65 without children). You can customize everything later.',
 
   // --- Entry dialog ---
   'entry.editTitle': 'Edit entry',

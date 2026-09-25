@@ -35,7 +35,8 @@ export type SeedKey =
   // income line is a *contribution*, not a salary, and that distinction is the
   // whole point of the example.
   | 'cat.contributions' | 'contributionAlex' | 'contributionSam'
-  | 'jointReserve' | 'washingMachine'
+  | 'cat.insurance' | 'electricity' | 'heating'
+  | 'householdInsurance' | 'inventoryReserve'
   //
   // Alex and Sam stay Alex and Sam in every language. They are people in an
   // example, not interface text, and translating a name would only make the
@@ -70,8 +71,11 @@ const en: SeedNames = {
   'cat.contributions': 'Contributions',
   contributionAlex: 'Alex — contribution',
   contributionSam: 'Sam — contribution',
-  jointReserve: 'Joint reserve',
-  washingMachine: 'Washing machine',
+  'cat.insurance': 'Insurance',
+  electricity: 'Electricity',
+  heating: 'Heating',
+  householdInsurance: 'Household insurance',
+  inventoryReserve: 'Inventory reserve',
 }
 
 const de: SeedNames = {
@@ -101,8 +105,11 @@ const de: SeedNames = {
   'cat.contributions': 'Beiträge',
   contributionAlex: 'Alex — Beitrag',
   contributionSam: 'Sam — Beitrag',
-  jointReserve: 'Gemeinsame Reserve',
-  washingMachine: 'Waschmaschine',
+  'cat.insurance': 'Versicherungen',
+  electricity: 'Strom',
+  heating: 'Heizung',
+  householdInsurance: 'Hausratversicherung',
+  inventoryReserve: 'Hausrat-Reserve',
 }
 
 const fr: SeedNames = {
@@ -132,8 +139,11 @@ const fr: SeedNames = {
   'cat.contributions': 'Contributions',
   contributionAlex: 'Alex — contribution',
   contributionSam: 'Sam — contribution',
-  jointReserve: 'Réserve commune',
-  washingMachine: 'Lave-linge',
+  'cat.insurance': 'Assurances',
+  electricity: 'Électricité',
+  heating: 'Chauffage',
+  householdInsurance: 'Assurance ménage',
+  inventoryReserve: 'Réserve mobilier',
 }
 
 const it: SeedNames = {
@@ -163,8 +173,11 @@ const it: SeedNames = {
   'cat.contributions': 'Contributi',
   contributionAlex: 'Alex — contributo',
   contributionSam: 'Sam — contributo',
-  jointReserve: 'Riserva comune',
-  washingMachine: 'Lavatrice',
+  'cat.insurance': 'Assicurazioni',
+  electricity: 'Elettricità',
+  heating: 'Riscaldamento',
+  householdInsurance: 'Assicurazione economia domestica',
+  inventoryReserve: 'Riserva arredamento',
 }
 
 /**

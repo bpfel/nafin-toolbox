@@ -83,12 +83,31 @@ export const UPKEEP: UpkeepEntry[] = [
   {
     id: 'habe-survey',
     subject: 'Household budget figures',
-    current: 'HABE 2023, single person — rent, food, transport and the rest of the seeded plan',
+    current: 'HABE 2023, single person — rent, food, transport and the rest of the personal starter plan',
     cadence: 'The BFS publishes a new wave every few years; the setup screen names the one in use.',
     where: ['lib/budget/budgetEngine.ts'],
     source: {
       label: 'BFS — Haushaltsbudgeterhebung',
       url: 'https://www.bfs.admin.ch/bfs/de/home/statistiken/wirtschaftliche-soziale-situation-bevoelkerung/einkommen-verbrauch-vermoegen/haushaltsbudget.html',
+    },
+  },
+  {
+    id: 'habe-household',
+    subject: 'Household budget figures, two people',
+    current:
+      'HABE 2020–2021, couples under 65 without children — rent 1238.54, service charges 145.12, ' +
+      'electricity 70.58, heating 36.02, food 715.63, health insurance 688.67, household insurance 41.95, ' +
+      'inventory 201.84. Francs a month per household, from table je-d-20.02.01.02.13.',
+    // A separate entry from the one above, and a separate wave, because it has
+    // to be. The annual HABE sample is around three thousand households, too
+    // small to break down by household type, so the BFS pools three years for
+    // these columns — which means the household seed is always a wave or two
+    // behind the personal one and the two cannot be updated in one go.
+    cadence: 'Pooled over three years and republished as a new wave lands; worth a look when the annual HABE does.',
+    where: ['lib/budget/budgetEngine.ts', 'lib/budget/seedNames.ts'],
+    source: {
+      label: 'BFS — Detaillierte Haushaltsausgaben nach Haushaltstyp',
+      url: 'https://www.bfs.admin.ch/bfs/de/home/statistiken/wirtschaftliche-soziale-situation-bevoelkerung/einkommen-verbrauch-vermoegen/haushaltsbudget/haushaltsausgaben.html',
     },
   },
 ]

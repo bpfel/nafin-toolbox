@@ -41,9 +41,17 @@
     version++
   }
 
+  /**
+   * Which starter budget. A household gets the two-person one, whose income
+   * side is contributions rather than a salary — seeding a personal plan into
+   * a shared vault would put one person's wage in front of both of them.
+   */
+  const household = $derived(vaultState.currentHousehold !== null)
+
   function handleSeeded() {
     if (!vaultState.vault) return
-    engine.seedDefaults(vaultState.vault, getLocale())
+    const seed = household ? engine.seedSharedDefaults : engine.seedDefaults
+    seed(vaultState.vault, getLocale())
     markDirty()
     version++
   }
@@ -89,7 +97,7 @@
   {#if !vaultState.vault}
     <p class="loading">{t('state.loading')}</p>
   {:else if needsSetup}
-    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
+    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} {household} />
   {:else if summary}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">
