@@ -235,8 +235,16 @@ describe('a partial locale', () => {
 
     setLocale('rm')
 
-    expect(t('nav.accounts')).toBe('Accounts')
-    expect(t('state.loading')).toBe('Loading...')
+    // Chosen from what the catalogue lacks rather than named. The two slugs
+    // this used to name were translated in a later pass, and the test then
+    // failed for asserting a fact about a list rather than about fallback.
+    const { en } = await import('./locales/en')
+    const missing = (Object.keys(en) as (keyof typeof en)[]).filter(k => rm[k] === undefined)
+    expect(missing.length, 'Rumantsch is complete; this test needs another partial locale').toBeGreaterThan(0)
+    for (const key of missing.slice(0, 5)) {
+      if (en[key].includes('{')) continue
+      expect(t(key)).toBe(en[key])
+    }
     expect(tn('entries.count', 2)).toBe('2 entries')
   })
 
