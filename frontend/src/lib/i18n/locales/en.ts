@@ -204,6 +204,9 @@ export const en = {
   'household.deletePrompt': 'Delete {name}? Everything in it is lost, for everyone in it.',
   'household.deleting': 'Deleting…',
   'household.switchLabel': 'Open a household',
+  // Titles the sheet a phone gets, which lists the personal budget too — so
+  // not `switchLabel`, which only offers to open a household.
+  'household.chooseBudget': 'Choose a budget',
   'household.personal': 'Personal',
   'household.needsKeys': 'Set up encryption before starting a household.',
   'household.failed': 'That did not work. Try again.',

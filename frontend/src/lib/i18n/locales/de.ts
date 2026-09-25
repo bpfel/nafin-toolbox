@@ -189,6 +189,7 @@ export const de: Messages = {
   'household.deletePrompt': '{name} löschen? Alles darin geht verloren, für alle Beteiligten.',
   'household.deleting': 'Wird gelöscht…',
   'household.switchLabel': 'Einen Haushalt öffnen',
+  'household.chooseBudget': 'Budget wählen',
   'household.personal': 'Persönlich',
   'household.needsKeys': 'Richte zuerst die Verschlüsselung ein.',
   'household.failed': 'Das hat nicht geklappt. Bitte erneut versuchen.',

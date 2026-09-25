@@ -200,6 +200,7 @@ export const fr: Messages = {
   'household.deletePrompt': 'Supprimer {name} ? Tout son contenu sera perdu, pour tout le monde.',
   'household.deleting': 'Suppression…',
   'household.switchLabel': 'Ouvrir un ménage',
+  'household.chooseBudget': 'Choisir un budget',
   'household.personal': 'Personnel',
   'household.needsKeys': 'Configure d’abord le chiffrement.',
   'household.failed': 'Cela n’a pas fonctionné. Réessaie.',

@@ -16,6 +16,27 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
 
 import VaultSwitch from './VaultSwitch.svelte'
 
+/**
+ * jsdom does not implement `matchMedia`, and `Sheet` asks it on every
+ * pointerdown to decide whether a drag is a dismissal. Without this the sheet
+ * still renders and every assertion below still holds, but each click leaves
+ * an unhandled TypeError in the run — noise that would hide a real one later.
+ *
+ * A gap in the environment rather than a fault in `Sheet`: a browser has it.
+ * Any future test that clicks inside a sheet will want these two lines too,
+ * and at the third copy they belong in a shared setup file.
+ */
+if (!window.matchMedia) {
+  window.matchMedia = ((query: string) =>
+    ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as never
+}
+
+/** jsdom starts at 1024, which is the wide layout. */
+function widthIs(px: number) {
+  Object.defineProperty(window, 'innerWidth', { value: px, configurable: true, writable: true })
+  window.dispatchEvent(new Event('resize'))
+}
+
 beforeEach(() => {
   // No global auto-cleanup in this project, so a previous render would still be
   // in the document and every query would find two of everything.
@@ -24,6 +45,7 @@ beforeEach(() => {
   state.currentVaultId = 'personal'
   state.currentHousehold = null
   switchTo.mockClear()
+  widthIs(1024)
 })
 
 describe('the vault switch', () => {
@@ -108,5 +130,62 @@ describe('the vault switch', () => {
 
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     expect(switchTo).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * The list opens in two shapes, and the phone one is not a nicety.
+ *
+ * Below 768px this control lives inside the dial, which is pinned to the
+ * bottom-right corner. The dropdown is `top: 100%; left: 0`, so from there it
+ * opened downward into the navigation and rightward off the edge of the
+ * screen — both directions wrong, and not a number that could be tuned to fix
+ * them, because the two layouts want opposites.
+ */
+describe('where the list opens', () => {
+  async function openIt() {
+    state.households = [{ id: 3, name: 'Flat with Anna', role: 'owner' }]
+    render(VaultSwitch)
+    await userEvent.click(screen.getByRole('button'))
+  }
+
+  test('a phone gets a sheet, which brings its own backdrop and bounds', async () => {
+    widthIs(390)
+    await openIt()
+
+    // The sheet names itself; the dropdown is a bare list with no role.
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  test('a desktop keeps the dropdown, which is beside the control', async () => {
+    widthIs(1024)
+    await openIt()
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  // One snippet renders both, so they cannot drift into offering different
+  // budgets — which is the failure a second copy of this list would invite.
+  test('both shapes offer the same budgets', async () => {
+    widthIs(390)
+    await openIt()
+    const onPhone = screen.getAllByRole('button').map(b => b.textContent?.trim())
+
+    cleanup()
+    widthIs(1024)
+    await openIt()
+    const onDesktop = screen.getAllByRole('button').map(b => b.textContent?.trim())
+
+    expect(onPhone).toEqual(onDesktop)
+  })
+
+  test('picking from the sheet switches, and closes it', async () => {
+    widthIs(390)
+    await openIt()
+
+    await userEvent.click(screen.getByText('Flat with Anna'))
+
+    expect(switchTo).toHaveBeenCalledWith(3)
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
