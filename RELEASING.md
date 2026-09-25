@@ -46,8 +46,12 @@ given `APP_VERSION`.
      anything that used to be created only at sign-up?
 5. **Fix on the release branch** whatever that turns up, as ordinary commits.
 6. **Open a pull request into `main`** and let CI pass.
-7. **Merge with a merge commit**, not a rebase. A rebase-merge rewrites every
-   commit, so `develop` and `main` would stop sharing history.
+7. **Rebase-merge** the pull request. `main` is protected by a ruleset that
+   requires linear history and forbids force-pushes, so a merge commit is
+   refused — and so is a plain fast-forward, because `develop` carries the
+   merge commits of its feature pull requests. A rebase-merge replays the
+   commits without them. It also gives every commit a new hash, which is why
+   step 9 exists.
 8. **Tag** the merge commit on `main` and publish a GitHub release whose notes
    are the changelog entry:
 
@@ -56,8 +60,20 @@ given `APP_VERSION`.
    git push origin vx.y.z
    gh release create vx.y.z --title "vx.y.z" --notes-file <entry>
    ```
-9. **Bring `develop` level with `main`** — a fast-forward, since the merge commit
-   is the only thing `main` has that `develop` lacks — and push it.
+9. **Realign `develop` to `main`.** After a rebase-merge the two hold the same
+   code under different hashes, and the next release would replay everything
+   again. First check nothing has landed on `develop` since the release was
+   cut and that the trees match, then reset and force-push:
+
+   ```sh
+   git fetch origin
+   git diff --quiet origin/main release/x.y.z && echo "same tree"
+   git rev-list --count <cut point>..origin/develop   # 0: nothing new
+   git push --force-with-lease=develop:<old develop tip> origin origin/main:develop
+   ```
+
+   Every other checkout of `develop` then needs `git reset --hard
+   origin/develop`, not a pull.
 10. **Remove the release branch** and its worktree.
 
 ## Building a release
