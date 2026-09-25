@@ -170,6 +170,7 @@ export const en = {
   'invite.title': 'People',
   'invite.add': 'Invite someone',
   'invite.emailLabel': 'Their email address',
+  'invite.emailInvalid': 'That doesn’t look like an email address.',
   'invite.send': 'Create invitation',
   'invite.creating': 'Creating…',
   'invite.linkReady': 'Send them this link yourself. It is shown once and cannot be recovered.',

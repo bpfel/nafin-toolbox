@@ -386,6 +386,14 @@ func handleCreateInvite(store InviteStorer) http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "token_hash, invited_email and secret_sealed are required"})
 			return
 		}
+		// The same test an account's address has to pass, because an
+		// invitation is only ever accepted by an account: an address that could
+		// never have signed up is an invitation nobody can take up, sitting on
+		// the list until it expires.
+		if auth.ValidateEmail(req.InvitedEmail) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid email address"})
+			return
+		}
 		// An invitation cannot make another owner, and an unstated role is the
 		// ordinary one rather than the most powerful one.
 		if req.Role == "" {

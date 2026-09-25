@@ -8,6 +8,7 @@
   import InviteCodeDialog from './InviteCodeDialog.svelte'
   import ActionButton from '../nav/ActionButton.svelte'
   import { autofocus } from '../util/autofocus'
+  import { isPlausibleEmail } from '../util/email'
 
   /**
    * Who is in a household, and how somebody else gets in.
@@ -90,6 +91,14 @@
 
   let inviting = $state(false)
   let email = $state('')
+
+  /**
+   * Said once somebody has tried to send it, not while they are typing: every
+   * address is invalid until its last few characters, and a warning that
+   * flickers on with the first keystroke is one people learn to ignore.
+   */
+  let triedInvalid = $state(false)
+  const emailValid = $derived(isPlausibleEmail(email.trim()))
   /** What the invitee becomes. Never owner; there is exactly one of those. */
   let inviteRole = $state('writer')
 
@@ -127,12 +136,17 @@
   async function invite() {
     const address = email.trim()
     if (!address || busy) return
+    if (!isPlausibleEmail(address)) {
+      triedInvalid = true
+      return
+    }
     busy = true
     error = null
     try {
       await inviteToHousehold(householdId, address, inviteRole)
       inviting = false
       email = ''
+      triedInvalid = false
       inviteRole = 'writer'
       await refresh()
       // Straight to the code, because making an invitation and handing it over
@@ -339,6 +353,8 @@
           type="email"
           bind:value={email}
           aria-label={t('invite.emailLabel')}
+          aria-invalid={triedInvalid && !emailValid}
+          aria-describedby={triedInvalid && !emailValid ? `invite-email-error-${householdId}` : undefined}
           placeholder={t('invite.emailLabel')}
           disabled={busy}
         />
@@ -363,13 +379,16 @@
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </ActionButton>
-        <ActionButton danger label={t('invite.cancelAction')} onclick={() => { inviting = false; email = '' }}>
+        <ActionButton danger label={t('invite.cancelAction')} onclick={() => { inviting = false; email = ''; triedInvalid = false }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <polyline points="3 6 5 6 21 6" />
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
           </svg>
         </ActionButton>
         </div>
+        {#if triedInvalid && !emailValid}
+          <p class="field-error" id="invite-email-error-{householdId}">{t('invite.emailInvalid')}</p>
+        {/if}
       </form>
   {:else}
     <!--
@@ -559,6 +578,17 @@
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
+  .naming input[aria-invalid='true'] {
+    border-color: var(--alarm);
+  }
+
+  .field-error {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--alarm);
   }
 
   .form-actions {

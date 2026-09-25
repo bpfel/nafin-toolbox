@@ -163,6 +163,7 @@ export const fr: Messages = {
   'invite.title': 'Personnes',
   'invite.add': 'Inviter quelqu’un',
   'invite.emailLabel': 'Adresse e-mail',
+  'invite.emailInvalid': 'Ça ne ressemble pas à une adresse e-mail.',
   'invite.send': 'Créer l’invitation',
   'invite.creating': 'Création…',
   'invite.linkReady': 'Envoie-lui ce lien toi-même. Il s’affiche une fois et ne peut pas être récupéré.',

@@ -152,6 +152,7 @@ export const de: Messages = {
   'invite.title': 'Personen',
   'invite.add': 'Jemanden einladen',
   'invite.emailLabel': 'E-Mail-Adresse',
+  'invite.emailInvalid': 'Das sieht nicht nach einer E-Mail-Adresse aus.',
   'invite.send': 'Einladung erstellen',
   'invite.creating': 'Wird erstellt…',
   'invite.linkReady': 'Schick ihnen diesen Link selbst. Er wird einmal angezeigt und lässt sich nicht wiederherstellen.',

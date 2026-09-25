@@ -462,3 +462,16 @@ func TestHandlers_ARoleRefusalIs403(t *testing.T) {
 		})
 	}
 }
+
+// Held to the rule an account's address is, since only an account can accept.
+func TestHandleCreateInvite_RefusesAnAddressNoAccountCouldHave(t *testing.T) {
+	for _, address := range []string{"a@a", "@example.ch", "anna", "anna@example."} {
+		t.Run(address, func(t *testing.T) {
+			body := `{"token_hash":"h","invited_email":"` + address + `","secret_sealed":"s"}`
+			w := serve(&mockStore{}, http.MethodPost, "/households/5/invites", body, userCtx(7))
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
+			}
+		})
+	}
+}

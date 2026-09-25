@@ -294,3 +294,51 @@ describe('the people in a household', () => {
     expect(screen.queryByText('me@example.ch')).toBeNull()
   })
 })
+
+/**
+ * The address is held to the rule an account's is, before it is sent. It used
+ * to be sent as typed: the tick called the invite directly, which skipped the
+ * browser's own check on the field, and the server took any string.
+ */
+describe('inviting', () => {
+  async function openForm() {
+    const { listMembers } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(listMembers).mockResolvedValue([] as never)
+    render(HouseholdSettings, { myUserId: 7 })
+    await userEvent.click(rowFor('Flat with Anna'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite someone' }))
+  }
+
+  test('an address no account could have is not sent, and says why', async () => {
+    const { inviteToHousehold } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(inviteToHousehold).mockClear()
+    await openForm()
+
+    await userEvent.type(screen.getByLabelText('Their email address'), 'a@a')
+    await userEvent.click(screen.getByRole('button', { name: 'Create the invitation' }))
+
+    expect(inviteToHousehold).not.toHaveBeenCalled()
+    expect(screen.getByText('That doesn’t look like an email address.')).toBeTruthy()
+    expect(screen.getByLabelText('Their email address').getAttribute('aria-invalid')).toBe('true')
+  })
+
+  test('nothing is said while the address is still being typed', async () => {
+    await openForm()
+
+    await userEvent.type(screen.getByLabelText('Their email address'), 'anna@exa')
+
+    expect(screen.queryByText('That doesn’t look like an email address.')).toBeNull()
+  })
+
+  test('a good address goes through', async () => {
+    const { inviteToHousehold } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(inviteToHousehold).mockClear()
+    vi.mocked(inviteToHousehold).mockResolvedValue('https://x/join#t=1&s=2')
+    await openForm()
+
+    await userEvent.type(screen.getByLabelText('Their email address'), 'anna@example.ch')
+    await userEvent.click(screen.getByRole('button', { name: 'Create the invitation' }))
+
+    expect(inviteToHousehold).toHaveBeenCalledWith(3, 'anna@example.ch', 'writer')
+  })
+})
