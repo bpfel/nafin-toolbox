@@ -26,9 +26,9 @@
   interface Props {
     householdId: number
     isOwner: boolean
-    /** This account, so it can be told apart from the others in the list. */
+    /** This account, so it can be left out of the list. */
     myUserId: number | null
-    /** Named in the warning, since "this household" is not what anybody calls it. */
+    /** Named when leaving, since "this household" is not what anybody calls it. */
     householdName: string
   }
 
@@ -43,16 +43,49 @@
   let confirmingRemoval = $state<number | null>(null)
 
   /**
-   * What leaving costs, which differs enough to be worth three sentences.
+   * Everybody but you.
    *
-   * Alone: the household goes with you, and nothing brings it back. As the
-   * person looking after it: somebody else takes that on, and they should be
-   * named rather than left as "somebody". Otherwise: only that you stop seeing
-   * what comes next.
+   * You were listed too, tagged "You" and your role, which said twice what the
+   * household's own row already says once — its role tag is your role. The
+   * list is who *else* is in it, which is the question this panel answers.
+   * Leaving, which used to be the bin on your own row, is on the household's
+   * row now, beside the rename.
+   */
+  const others = $derived(members.filter(m => m.user_id !== myUserId))
+
+  /**
+   * Who takes over if the owner leaves: the longest-standing of the others,
+   * which is the rule the server applies. Named in the confirmation, because
+   * "somebody takes it over" is not a thing you can agree to.
    */
   const successor = $derived(
-    members.filter(m => m.user_id !== myUserId).sort((a, b) => a.joined_at.localeCompare(b.joined_at))[0],
+    [...others].sort((a, b) => a.joined_at.localeCompare(b.joined_at) || a.user_id - b.user_id)[0],
   )
+
+  /**
+   * Leaving, beside inviting.
+   *
+   * Anybody but the owner may always leave. The owner may leave only while
+   * somebody else is in the household to hand it to — alone, leaving and
+   * deleting are the same act, and the bin on the household's row already is
+   * that act with the right warning on it.
+   */
+  const mayLeave = $derived(!isOwner || others.length > 0)
+  let confirmingLeave = $state(false)
+
+  async function leave() {
+    if (myUserId === null) return
+    busy = true
+    error = null
+    try {
+      // The household leaves the list, and this panel with it — there is
+      // nothing to refresh afterwards, and we could not list it if we tried.
+      await removeMember(householdId, myUserId, true)
+    } catch {
+      error = t('household.failed')
+      busy = false
+    }
+  }
 
 
   let inviting = $state(false)
@@ -126,15 +159,11 @@
   }
 
   async function remove(userId: number) {
-    const leaving = userId === myUserId
     busy = true
     try {
-      await removeMember(householdId, userId, leaving)
+      await removeMember(householdId, userId)
       confirmingRemoval = null
-      // Not refreshed when it was us: we are no longer allowed to list the
-      // members, so asking would fail and report the leave as an error — which
-      // is exactly what it used to do.
-      if (!leaving) await refresh()
+      await refresh()
     } catch {
       error = t('household.failed')
     } finally {
@@ -175,12 +204,9 @@
   </div>
 
   <ul class="list">
-    {#each members as member (member.user_id)}
+    {#each others as member (member.user_id)}
       <li class="row">
         <span class="who">{member.email}</span>
-        {#if member.user_id === myUserId}
-          <span class="tag">{t('invite.you')}</span>
-        {/if}
         <span class="tag">{t(`role.${member.role}` as 'role.owner')}</span>
 
         <!--
@@ -215,50 +241,20 @@
 
         {#if confirmingRemoval === member.user_id}
           <div class="confirm-box">
-            <!--
-              Leaving is not one thing. Alone it destroys the household; as the
-              person looking after it, it hands that on; otherwise it only stops
-              you seeing what comes next. Saying which is the difference between
-              a confirmation and a formality.
-            -->
-            <p class:grave={member.user_id === myUserId && members.length === 1}>
-              {#if member.user_id !== myUserId}
-                {t('invite.removeWarning')}
-              {:else if members.length === 1}
-                {t('invite.leaveLast').replace('{name}', householdName)}
-              {:else if member.role === 'owner' && successor}
-                {t('invite.leaveOwner')
-                  .replace('{name}', householdName)
-                  .replace('{successor}', successor.email)}
-              {:else}
-                <!--
-                  What leaving actually does, rather than a caveat borrowed from
-                  removal. Removing somebody else has a residual risk worth
-                  stating — revoking access is server-side, so it stops them
-                  seeing what comes next but cannot take back what they hold.
-                  Leaving has no such residue: the household goes from the list,
-                  its key and its decrypted contents go with the slot, and
-                  nothing of it stays behind. Warning you that you remember
-                  things you have read is not a consequence you can act on.
-                -->
-                {t('invite.leaveWarning').replace('{name}', householdName)}
-              {/if}
-            </p>
+            <p>{t('invite.removeWarning')}</p>
             <div class="btn-row">
               <button class="btn-danger" onclick={() => remove(member.user_id)} disabled={busy}>
-                {member.user_id === myUserId
-                  ? t('invite.leaveConfirm')
-                  : t('invite.removeConfirm').replace('{name}', member.email)}
+                {t('invite.removeConfirm').replace('{name}', member.email)}
               </button>
               <button class="btn-secondary" onclick={() => (confirmingRemoval = null)}>
                 {t('action.cancel')}
               </button>
             </div>
           </div>
-        {:else if member.user_id === myUserId || isOwner}
+        {:else if isOwner}
           <ActionButton
             danger
-            label={member.user_id === myUserId ? t('invite.leave') : t('invite.remove')}
+            label={t('invite.remove')}
             disabled={busy}
             onclick={() => (confirmingRemoval = member.user_id)}
           >
@@ -322,9 +318,21 @@
     {/each}
   </ul>
 
-  {#if isOwner}
-
-    {#if inviting}
+  {#if confirmingLeave}
+    <div class="confirm-box">
+      <p>
+        {#if isOwner && successor}
+          {t('invite.leaveOwner').replace('{name}', householdName).replace('{successor}', successor.email)}
+        {:else}
+          {t('invite.leaveWarning').replace('{name}', householdName)}
+        {/if}
+      </p>
+      <div class="btn-row">
+        <button class="btn-danger" onclick={leave} disabled={busy}>{t('invite.leaveConfirm')}</button>
+        <button class="btn-secondary" onclick={() => (confirmingLeave = false)}>{t('action.cancel')}</button>
+      </div>
+    </div>
+  {:else if isOwner && inviting}
       <form class="naming" onsubmit={e => { e.preventDefault(); invite() }}>
         <input
           use:autofocus
@@ -363,16 +371,33 @@
         </ActionButton>
         </div>
       </form>
-    {:else}
-      <ActionButton label={t('invite.inviteAction')} onclick={() => (inviting = true)}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <line x1="19" y1="8" x2="19" y2="14" />
-          <line x1="22" y1="11" x2="16" y2="11" />
-        </svg>
-      </ActionButton>
-    {/if}
+  {:else}
+    <!--
+      Joining and leaving, side by side: the two things you do *to* the list
+      rather than to somebody on it. The door is danger-coloured like the bins,
+      because it ends something — your part in the household.
+    -->
+    <div class="panel-actions">
+      {#if isOwner}
+        <ActionButton label={t('invite.inviteAction')} onclick={() => (inviting = true)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" />
+            <line x1="22" y1="11" x2="16" y2="11" />
+          </svg>
+        </ActionButton>
+      {/if}
+      {#if mayLeave}
+        <ActionButton danger label={t('invite.leave')} disabled={busy} onclick={() => (confirmingLeave = true)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </ActionButton>
+      {/if}
+    </div>
   {/if}
 
   {#if error}
@@ -441,11 +466,28 @@
     gap: 0.4rem;
   }
 
+  /*
+   * Each person is a card of their own on the household's recessed panel, so
+   * an address and the controls acting on it read as one thing. On the flat
+   * panel the address sat at the left and its bin at the far right with
+   * nothing between them, and at a glance the bin belonged to the row, or the
+   * panel, or the person below — whichever the eye landed on.
+   */
   .row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    padding: 0.35rem 0.35rem 0.35rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+
+  .panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
   }
 
   .who {
@@ -466,12 +508,6 @@
 
   .tag.ready {
     color: var(--accent);
-    font-weight: 600;
-  }
-
-  /* The one case nothing undoes. */
-  .grave {
-    color: var(--alarm);
     font-weight: 600;
   }
 

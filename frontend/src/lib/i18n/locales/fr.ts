@@ -134,8 +134,6 @@ export const fr: Messages = {
 
   // --- Security settings ---
   'household.duplicate': 'Tu as déjà un ménage portant ce nom.',
-  'invite.leaveLast': 'Tu es seul ici — partir supprime {name} et tout ce qu’il contient. C’est irréversible.',
-  'invite.leaveOwner': 'Tu gères {name}. Si tu pars, {successor} prend le relais.',
   'invite.leaveConfirm': 'Quitter',
   'invite.removeConfirm': 'Retirer {name}',
 
@@ -180,8 +178,8 @@ export const fr: Messages = {
   'invite.remove': 'Retirer',
   'invite.leave': 'Quitter',
   'invite.leaveWarning': 'Tu ne verras plus {name}. Quelqu’un qui y est encore peut t’inviter à nouveau.',
+  'invite.leaveOwner': 'Tu gères {name}. Si tu pars, {successor} prend le relais.',
   'invite.removeWarning': 'Ce que la personne a déjà vu lui reste. La retirer empêche seulement de voir la suite.',
-  'invite.you': 'Toi',
 
   // --- Households ---
   'household.title': 'Ménages',

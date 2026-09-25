@@ -241,7 +241,8 @@
                 </svg>
               </ActionButton>
 
-              <!-- Only the owner may delete, which the server enforces too. -->
+              <!-- Only the owner may delete, which the server enforces too. Leaving
+                   is inside the fold, beside inviting. -->
               {#if household.role === 'owner'}
                 <ActionButton danger label={t('household.delete')} onclick={() => (confirmingId = household.id)}>
                   <svg
@@ -406,6 +407,17 @@
     font-size: 0.75rem;
     color: var(--ink-faint);
     white-space: nowrap;
+  }
+
+  /*
+   * Every control here that ends something — deleting a household, removing a
+   * person, withdrawing an invitation, leaving — is red before it is pointed
+   * at, not only on hover. A phone has no hover, so on the device this screen
+   * is most used on they were grey until the moment they had been pressed.
+   * Scoped to this card: elsewhere the app keeps its quieter convention.
+   */
+  .households :global(.action.danger:not(:disabled)) {
+    color: var(--alarm);
   }
 
   .naming {

@@ -123,8 +123,6 @@ export const de: Messages = {
 
   // --- Security settings ---
   'household.duplicate': 'Du hast bereits einen Haushalt mit diesem Namen.',
-  'invite.leaveLast': 'Du bist allein hier — beim Verlassen wird {name} mit allem darin gelöscht. Das lässt sich nicht rückgängig machen.',
-  'invite.leaveOwner': 'Du verwaltest {name}. Wenn du gehst, übernimmt {successor}.',
   'invite.leaveConfirm': 'Verlassen',
   'invite.removeConfirm': '{name} entfernen',
 
@@ -169,8 +167,8 @@ export const de: Messages = {
   'invite.remove': 'Entfernen',
   'invite.leave': 'Verlassen',
   'invite.leaveWarning': 'Du siehst {name} dann nicht mehr. Wer noch drin ist, kann dich wieder einladen.',
+  'invite.leaveOwner': 'Du verwaltest {name}. Wenn du gehst, übernimmt {successor}.',
   'invite.removeWarning': 'Was die Person schon gesehen hat, bleibt ihr. Entfernen verhindert nur, dass sie Neues sieht.',
-  'invite.you': 'Du',
 
   // --- Households ---
   'household.title': 'Haushalte',

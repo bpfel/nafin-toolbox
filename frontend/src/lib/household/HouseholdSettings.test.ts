@@ -20,6 +20,11 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
   withdrawInvite: vi.fn(),
   listMembers: vi.fn(async () => []),
   removeMember: vi.fn(),
+  // Called by an owner's panel on the way in. Absent, it threw inside the
+  // refresh, which catches everything — so the member list silently never
+  // loaded and every assertion about it failed for the wrong reason.
+  letInWhoeverIsReady: vi.fn(async () => 0),
+  changeRole: vi.fn(),
 }))
 
 import HouseholdSettings from './HouseholdSettings.svelte'
@@ -210,5 +215,82 @@ describe('a household name', () => {
 
     const input = screen.getByLabelText('Name') as HTMLInputElement
     expect(input.maxLength).toBe(HOUSEHOLD_NAME_MAX)
+  })
+})
+
+/**
+ * Leaving sits inside the fold, beside inviting — the two things you do to the
+ * list rather than to somebody on it. Anybody but the owner may always leave;
+ * the owner only while there is somebody to hand the household to.
+ */
+describe('leaving', () => {
+  test('a household you do not own offers a way out once unfolded', async () => {
+    render(HouseholdSettings, { myUserId: 7 })
+    expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull()
+
+    await userEvent.click(rowFor('Ski cabin'))
+
+    expect(await screen.findByRole('button', { name: 'Leave' })).toBeTruthy()
+  })
+
+  test('leaving asks first, then removes you and nobody else', async () => {
+    const { removeMember } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(removeMember).mockClear()
+    render(HouseholdSettings, { myUserId: 7 })
+    await userEvent.click(rowFor('Ski cabin'))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave' }))
+    expect(removeMember).not.toHaveBeenCalled()
+    expect(screen.getByText(/You will not see Ski cabin any more/)).toBeTruthy()
+
+    const confirm = screen.getAllByRole('button', { name: 'Leave' }).find(b => b.classList.contains('btn-danger'))!
+    await userEvent.click(confirm)
+
+    expect(removeMember).toHaveBeenCalledWith(4, 7, true)
+  })
+
+  test('an owner alone may not leave — deleting is the same act, and says so', async () => {
+    const { listMembers } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(listMembers).mockResolvedValue([
+      { user_id: 7, email: 'me@example.ch', role: 'owner', joined_at: '2026-01-01' },
+    ] as never)
+    render(HouseholdSettings, { myUserId: 7 })
+
+    await userEvent.click(rowFor('Flat with Anna'))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Invite someone' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull()
+  })
+
+  test('an owner with company may leave, and is told who takes over', async () => {
+    const { listMembers } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(listMembers).mockResolvedValue([
+      { user_id: 7, email: 'me@example.ch', role: 'owner', joined_at: '2026-01-01' },
+      { user_id: 9, email: 'later@example.ch', role: 'writer', joined_at: '2026-03-01' },
+      { user_id: 8, email: 'anna@example.ch', role: 'writer', joined_at: '2026-02-01' },
+    ] as never)
+    render(HouseholdSettings, { myUserId: 7 })
+    await userEvent.click(rowFor('Flat with Anna'))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave' }))
+
+    // The longest-standing of the others, which is the rule the server applies.
+    expect(screen.getByText(/anna@example\.ch takes it over/)).toBeTruthy()
+  })
+})
+
+describe('the people in a household', () => {
+  test('are the others — you are not listed', async () => {
+    const { listMembers } = await import('../crypto/vaultStore.svelte')
+    vi.mocked(listMembers).mockResolvedValue([
+      { user_id: 7, email: 'me@example.ch', role: 'owner', joined_at: '2026-01-01' },
+      { user_id: 8, email: 'anna@example.ch', role: 'writer', joined_at: '2026-02-01' },
+    ] as never)
+    render(HouseholdSettings, { myUserId: 7 })
+
+    await userEvent.click(rowFor('Flat with Anna'))
+
+    await waitFor(() => expect(screen.getByText('anna@example.ch')).toBeTruthy())
+    expect(screen.queryByText('me@example.ch')).toBeNull()
   })
 })

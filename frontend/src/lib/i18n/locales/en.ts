@@ -138,8 +138,6 @@ export const en = {
 
   // --- Security settings ---
   'household.duplicate': 'You already have a household called that.',
-  'invite.leaveLast': 'You are the only one here, so leaving deletes {name} and everything in it. This cannot be undone.',
-  'invite.leaveOwner': 'You look after {name}. If you leave, {successor} takes it over.',
   'invite.leaveConfirm': 'Leave',
   'invite.removeConfirm': 'Remove {name}',
 
@@ -192,8 +190,8 @@ export const en = {
   'invite.remove': 'Remove',
   'invite.leave': 'Leave',
   'invite.leaveWarning': 'You will not see {name} any more. Somebody still in it can invite you back.',
+  'invite.leaveOwner': 'You look after {name}. If you leave, {successor} takes it over.',
   'invite.removeWarning': 'They keep what they have already seen. Removing them only stops them seeing what comes next.',
-  'invite.you': 'You',
 
   // --- Households ---
   'household.title': 'Households',

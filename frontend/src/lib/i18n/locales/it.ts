@@ -134,8 +134,6 @@ export const it: Messages = {
 
   // --- Security settings ---
   'household.duplicate': 'Hai già un’economia domestica con questo nome.',
-  'invite.leaveLast': 'Sei solo qui — uscendo, {name} e tutto il suo contenuto vengono eliminati. Non si può annullare.',
-  'invite.leaveOwner': 'Gestisci tu {name}. Se esci, subentra {successor}.',
   'invite.leaveConfirm': 'Esci',
   'invite.removeConfirm': 'Rimuovi {name}',
 
@@ -180,8 +178,8 @@ export const it: Messages = {
   'invite.remove': 'Rimuovi',
   'invite.leave': 'Esci',
   'invite.leaveWarning': 'Non vedrai più {name}. Chi è ancora dentro può invitarti di nuovo.',
+  'invite.leaveOwner': 'Gestisci tu {name}. Se esci, subentra {successor}.',
   'invite.removeWarning': 'Quello che ha già visto resta suo. Rimuovere la persona impedisce solo di vedere il resto.',
-  'invite.you': 'Tu',
 
   // --- Households ---
   'household.title': 'Economie domestiche',

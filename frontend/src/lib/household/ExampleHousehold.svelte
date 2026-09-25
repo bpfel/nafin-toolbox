@@ -43,10 +43,6 @@
 
   <h4>{t('invite.title')}</h4>
   <ul class="list">
-    <li class="row">
-      <span class="who">{t('invite.you')}</span>
-      <span class="tag">{t('role.owner')}</span>
-    </li>
     <li class="row invite">
       <span class="who">{EMAIL}</span>
       <span class="tag">{t('invite.pending')}</span>
