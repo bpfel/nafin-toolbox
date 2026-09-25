@@ -46,34 +46,33 @@ given `APP_VERSION`.
      anything that used to be created only at sign-up?
 5. **Fix on the release branch** whatever that turns up, as ordinary commits.
 6. **Open a pull request into `main`** and let CI pass.
-7. **Rebase-merge** the pull request. `main` is protected by a ruleset that
-   requires linear history and forbids force-pushes, so a merge commit is
-   refused — and so is a plain fast-forward, because `develop` carries the
-   merge commits of its feature pull requests. A rebase-merge replays the
-   commits without them. It also gives every commit a new hash, which is why
-   step 9 exists.
-8. **Tag** the merge commit on `main` and publish a GitHub release whose notes
+7. **Squash-merge** the pull request, titled `Release x.y.z`. `main` is protected
+   by a ruleset requiring linear history and refusing force-pushes. That rules
+   out a merge commit, and a fast-forward too, since `develop` carries its
+   feature pull requests' merge commits. A rebase-merge fails as well: GitHub
+   cannot replay that many commits across merged branches. A squash is one
+   commit per release on `main`, which is what `main` is for; the individual
+   commits stay on `develop`, unrewritten.
+8. **Tag** the squash commit on `main` and publish a GitHub release whose notes
    are the changelog entry:
 
    ```sh
+   git fetch origin
    git tag -a vx.y.z -m "vx.y.z" origin/main
    git push origin vx.y.z
    gh release create vx.y.z --title "vx.y.z" --notes-file <entry>
    ```
-9. **Realign `develop` to `main`.** After a rebase-merge the two hold the same
-   code under different hashes, and the next release would replay everything
-   again. First check nothing has landed on `develop` since the release was
-   cut and that the trees match, then reset and force-push:
+9. **Bring `develop` level.** Fast-forward it to the release branch, which adds
+   the release commits under their original hashes, then merge `main` back in.
+   The merge changes no file — both sides hold the same tree — but it makes the
+   squash commit an ancestor of `develop`, so the next release squashes from
+   here rather than from the release before:
 
    ```sh
-   git fetch origin
-   git diff --quiet origin/main release/x.y.z && echo "same tree"
-   git rev-list --count <cut point>..origin/develop   # 0: nothing new
-   git push --force-with-lease=develop:<old develop tip> origin origin/main:develop
+   git switch develop && git merge --ff-only origin/release/x.y.z
+   git merge --no-edit origin/main
+   git diff --quiet origin/main develop && git push origin develop
    ```
-
-   Every other checkout of `develop` then needs `git reset --hard
-   origin/develop`, not a pull.
 10. **Remove the release branch** and its worktree.
 
 ## Building a release
