@@ -278,7 +278,7 @@
         {#if !invite.accepted_at}
           <span class="tag">{t('invite.pending')}</span>
         {:else if invite.verified}
-          <span class="tag ready">{t('invite.readyToConfirm')}</span>
+          <span class="tag ready">{t('invite.accepted')}</span>
         {/if}
 
         <span class="tag">{t(`role.${invite.role}` as 'role.writer')}</span>

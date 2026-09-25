@@ -176,11 +176,14 @@ export const en = {
   'invite.copy': 'Copy link',
   'invite.copied': 'Copied',
   'invite.done': 'Done',
-  'invite.pending': 'Invited, waiting for them',
-  'invite.readyToConfirm': 'Accepted — ready to let in',
+  // One word each. They sit in a row beside an address, a role and two
+  // symbols, and at 400px the long forms — "Invited, waiting for them",
+  // "Accepted — ready to let in" — pushed the buttons onto lines of their own.
+  // The second was also describing a button that no longer exists: an
+  // acceptance whose key checks out is let in without anybody being asked.
+  'invite.pending': 'Invited',
+  'invite.accepted': 'Accepted',
   'invite.mismatch': 'The key offered for this person does not match the invitation. Do not let them in; invite them again.',
-  'invite.confirm': 'Let them in',
-  'invite.confirming': 'Letting them in…',
   'invite.withdraw': 'Withdraw',
   'invite.expires': 'Expires {when}',
   'invite.remove': 'Remove',
