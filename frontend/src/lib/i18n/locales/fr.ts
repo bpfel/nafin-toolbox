@@ -156,7 +156,7 @@ export const fr: Messages = {
   // --- Following an invitation link ---
   'join.working': 'Adhésion…',
   'join.doneTitle': 'Invitation acceptée',
-  'join.doneHint': 'Il reste à t’admettre. Le ménage apparaîtra ensuite.',
+  'join.doneHint': 'Le ménage arrivera à la prochaine ouverture de l’app par la personne qui t’a invité.',
   'join.failedTitle': 'Cette invitation n’a pas fonctionné',
   'join.failedHint': 'Elle a peut-être expiré, été retirée, ou visait une autre adresse. Demandes-en une nouvelle.',
   'join.continue': 'Continuer',

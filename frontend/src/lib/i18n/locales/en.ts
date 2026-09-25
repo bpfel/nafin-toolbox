@@ -160,7 +160,10 @@ export const en = {
   // --- Following an invitation link ---
   'join.working': 'Joining…',
   'join.doneTitle': 'Invitation accepted',
-  'join.doneHint': 'They still have to let you in. The household appears once they do.',
+  // Names what has to happen, because it is not instant and not theirs to
+  // hurry: the key can only be wrapped by a member's device. Saying "they
+  // still have to let you in" implied a button somebody was ignoring.
+  'join.doneHint': 'The household arrives the next time whoever invited you opens the app.',
   'join.failedTitle': 'That invitation did not work',
   'join.failedHint': 'It may have expired, been withdrawn, or been meant for a different address. Ask for a new one.',
   'join.continue': 'Continue',

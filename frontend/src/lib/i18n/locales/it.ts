@@ -156,7 +156,7 @@ export const it: Messages = {
   // --- Following an invitation link ---
   'join.working': 'Adesione…',
   'join.doneTitle': 'Invito accettato',
-  'join.doneHint': 'Devi ancora essere fatto entrare. Poi l’economia domestica comparirà.',
+  'join.doneHint': 'L’economia domestica arriverà quando chi ti ha invitato riaprirà l’app.',
   'join.failedTitle': 'Questo invito non ha funzionato',
   'join.failedHint': 'Potrebbe essere scaduto, ritirato, o destinato a un altro indirizzo. Chiedine uno nuovo.',
   'join.continue': 'Continua',

@@ -350,6 +350,45 @@ async function loadHouseholds(withMEK: CryptoKey): Promise<void> {
     // own vault, and refusing to unlock over it would be the wrong trade.
     households = []
   }
+
+  // Deliberately not awaited: nobody should wait on other people's paperwork
+  // to see their own budget.
+  void admitWhoeverAccepted()
+}
+
+/**
+ * Hand the key to anybody who accepted an invitation while nobody was looking.
+ *
+ * **Why this has to happen on somebody's device at all.** The server cannot do
+ * it: wrapping the household key for a new member needs the household key, and
+ * the server has never had it. So the last step of joining is taken by an
+ * owner's browser, and until it runs the invitee has accepted and can read
+ * nothing.
+ *
+ * It used to run only while the People fold was open — the one screen almost
+ * nobody is on when the invitation is accepted, because accepting happens on
+ * somebody else's device at a time of their choosing. The result looked exactly
+ * like a broken link: the invitee was told the invitation was accepted, and the
+ * household never arrived. It had not failed; it was waiting for a screen.
+ *
+ * Now every unlock sweeps every household this account owns. One request each,
+ * only for owners, and only where an invitation is outstanding — and the fold
+ * still does the same on the way in, for the case where both people are looking
+ * at once.
+ *
+ * Silent either way. An acceptance whose key does not check out is left alone
+ * and shows as a mismatch on the People panel, which is the one place it can be
+ * acted on; a request that simply failed is retried by the next unlock.
+ */
+async function admitWhoeverAccepted(): Promise<void> {
+  for (const household of households) {
+    if (household.role !== 'owner') continue
+    try {
+      await letInWhoeverIsReady(household.id)
+    } catch {
+      // Next unlock.
+    }
+  }
 }
 
 /**

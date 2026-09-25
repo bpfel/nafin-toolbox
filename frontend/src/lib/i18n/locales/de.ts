@@ -145,7 +145,7 @@ export const de: Messages = {
   // --- Following an invitation link ---
   'join.working': 'Wird beigetreten…',
   'join.doneTitle': 'Einladung angenommen',
-  'join.doneHint': 'Du musst noch freigegeben werden. Danach erscheint der Haushalt.',
+  'join.doneHint': 'Der Haushalt kommt an, sobald die einladende Person die App wieder öffnet.',
   'join.failedTitle': 'Diese Einladung hat nicht funktioniert',
   'join.failedHint': 'Sie ist vielleicht abgelaufen, zurückgezogen worden oder war für eine andere Adresse gedacht. Bitte um eine neue.',
   'join.continue': 'Weiter',
