@@ -104,6 +104,21 @@ export interface TourStep {
    */
   example?: 'personal' | 'shared'
   /**
+   * Stand an example household on the Profile card while this step shows.
+   *
+   * The budget's counterpart is `example` above, and the two work differently
+   * for a reason. A budget lives in the vault, so the store can hand the
+   * screens a filled copy of it. A household lives on the server — a row, a
+   * membership, an invitation — and there is no copy to hand anybody. Faking
+   * one would mean writing server state the rest of the app could then act on.
+   *
+   * So this is a picture instead: `ExampleHousehold.svelte`, inert, drawn in
+   * place of the real list. It matters because the step it belongs to explains
+   * inviting somebody, and the reader most likely to need that explanation is
+   * looking at "You have none yet."
+   */
+  exampleHousehold?: true
+  /**
    * Let the pointer reach the thing being ringed.
    *
    * The blocker is otherwise a sheet over the whole page, so the mouse never
@@ -172,7 +187,7 @@ export const TOUR_STEPS: TourStep[] = [
 export const SHARED_STEPS: TourStep[] = [
   { id: 'sharedWhat', path: '/budget' },
   { id: 'sharedStart', path: '/profile', anchor: 'household' },
-  { id: 'sharedInvite', path: '/profile', anchor: 'household' },
+  { id: 'sharedInvite', path: '/profile', anchor: 'household', exampleHousehold: true },
   // Seeds here rather than one step later, at `sharedPlan`: this step is about
   // moving between two budgets, and an empty one behind it is a poor
   // advertisement for having a second.

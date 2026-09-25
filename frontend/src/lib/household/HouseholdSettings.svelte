@@ -4,6 +4,8 @@
   import { initialsOf } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import HouseholdPeople from './HouseholdPeople.svelte'
+  import ExampleHousehold from './ExampleHousehold.svelte'
+  import { getTourState } from '../tour/tourStore.svelte'
   import ActionButton from '../nav/ActionButton.svelte'
   import { autofocus } from '../util/autofocus'
 
@@ -29,6 +31,7 @@
   let { myUserId = null }: Props = $props()
 
   const vaultState = getVaultState()
+  const tour = getTourState()
 
   /**
    * Which household is unfolded. One at a time, which a single id enforces
@@ -137,7 +140,15 @@
   <h3>{t('household.title')}</h3>
   <p class="info">{t('household.hint')}</p>
 
-  {#if vaultState.households.length === 0}
+  {#if tour.showingExampleHousehold}
+    <!--
+      The walkthrough is standing here. It replaces the list rather than
+      joining it, for the reason the example budget replaces a real one: a
+      step that says "unfold a household to invite somebody" has to be able
+      to point at a household, and most readers of that sentence have none.
+    -->
+    <ExampleHousehold />
+  {:else if vaultState.households.length === 0}
     <p class="none">{t('household.none')}</p>
   {:else}
     <ul class="households">

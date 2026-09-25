@@ -6,9 +6,7 @@
   import { articlesIn, type ArticleMeta, type ArticleSection } from '../lib/knowledge/registry'
   import { loadContent, type LoadedContent } from '../lib/knowledge/content'
   import { en } from '../lib/knowledge/content/en'
-  import { getVaultState } from '../lib/crypto/vaultStore.svelte'
   import { startTour } from '../lib/tour/tourStore.svelte'
-  import { hasTakenTour } from '../lib/tour/tourState'
   import type { TourId } from '../lib/tour/steps'
 
   /**
@@ -24,8 +22,6 @@
    * is a hard stop, and a library of short pieces is exactly the case that
    * tempts you into a third.
    */
-  const vaultState = getVaultState()
-
   let loaded = $state<LoadedContent>({ content: en, translated: new Set() })
   let open = $state<ArticleMeta | null>(null)
 
@@ -46,23 +42,23 @@
    * Basics first because it is what a lost person needs; shared second because
    * it describes an arrangement you go looking for. Data rather than two
    * hand-written cards, so a third walkthrough is a row here.
+   *
+   * Each card says the same thing every time it is seen. There was a second
+   * title and a second button label for somebody who had already been through
+   * one — "Take the tour again", "Start again" — and they bought nothing: a
+   * returning reader knows they have been here, and the card that greeted them
+   * differently was reporting a fact the app had to keep in the vault in order
+   * to have. A walkthrough is a thing you run, not a thing you have done.
    */
-  const TOURS: {
-    id: TourId
-    title: () => string
-    againTitle: () => string
-    body: () => string
-  }[] = [
+  const TOURS: { id: TourId; title: () => string; body: () => string }[] = [
     {
       id: 'basics',
       title: () => t('knowledge.tourTitle'),
-      againTitle: () => t('knowledge.tourAgainTitle'),
       body: () => t('knowledge.tourBody'),
     },
     {
       id: 'shared',
       title: () => t('knowledge.sharedTourTitle'),
-      againTitle: () => t('knowledge.sharedTourAgainTitle'),
       body: () => t('knowledge.sharedTourBody'),
     },
   ]
@@ -87,16 +83,15 @@
   -->
   <div class="tours">
     {#each TOURS as tour (tour.id)}
-      {@const taken = hasTakenTour(vaultState.vault, tour.id)}
       <section class="settings-card tour-card">
         <div class="tour-text">
-          <h2>{taken ? tour.againTitle() : tour.title()}</h2>
+          <h2>{tour.title()}</h2>
           <p>{tour.body()}</p>
         </div>
-        <!-- The label is the same for both, and deliberately generic: what is
-             being started is the heading two lines up. -->
+        <!-- One label, on every card and every visit. Deliberately generic:
+             what is being started is the heading two lines up. -->
         <button class="start" onclick={() => startTour(tour.id)}>
-          {taken ? t('knowledge.tourAgain') : t('knowledge.tourStart')}
+          {t('knowledge.tourStart')}
         </button>
       </section>
     {/each}

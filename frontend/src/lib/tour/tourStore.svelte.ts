@@ -62,6 +62,16 @@ export function getTourState() {
     get total() {
       return numbering(steps())[index]?.total ?? steps().length
     },
+    /**
+     * Whether the Profile card should show an example household right now.
+     *
+     * Read by `HouseholdSettings` rather than pushed to it, because there is
+     * nothing to push: the example is a drawing, not data. See
+     * `exampleHousehold` on `TourStep`.
+     */
+    get showingExampleHousehold() {
+      return running && steps()[index]?.exampleHousehold === true
+    },
     get atFirst() {
       return index === 0
     },
@@ -165,15 +175,24 @@ export function skipUnshowableStep(): void {
   moveTour(direction)
 }
 
-/** Reached the end. Records it, so the offer is not made again. */
+/**
+ * Reached the end. Records it, so the offer is not made again.
+ *
+ * Only for the first walkthrough. Nothing asks whether a tour has been taken —
+ * Knowledge offers every one of them with the same Start button — so the only
+ * thing worth writing down is that the offer has been answered, and only the
+ * first tour is ever offered. Recording the second here would put a dismissal
+ * against the first and rob somebody of an offer they never saw.
+ */
 export function finishTour(): void {
   running = false
   // Before the vault is read, so what gets stamped is the user's own vault
   // and not the copy the tour was showing.
   endPreview()
+  if (which !== 'basics') return
   const vault = getVaultState().vault
   if (vault) {
-    recordCompleted(vault, which)
+    recordCompleted(vault)
     markDirty()
   }
 }
@@ -181,18 +200,19 @@ export function finishTour(): void {
 /**
  * Left partway through — Skip, Escape, or Back off the first step.
  *
- * Recorded as dismissed rather than completed. The distinction is what lets
- * Knowledge offer the tour rather than offer it *again*, and it keeps the app
- * from claiming someone has seen material they walked out of.
+ * Recorded as dismissed rather than completed. Both close the offer; keeping
+ * them apart is what stops the vault claiming somebody has seen material they
+ * walked out of.
  */
 export function abandonTour(): void {
   running = false
   // Before the vault is read, so what gets stamped is the user's own vault
   // and not the copy the tour was showing.
   endPreview()
+  if (which !== 'basics') return
   const vault = getVaultState().vault
   if (vault) {
-    recordDismissed(vault, which)
+    recordDismissed(vault)
     markDirty()
   }
 }
@@ -200,13 +220,13 @@ export function abandonTour(): void {
 /**
  * Turned down without being started.
  *
- * Only the first tour is ever offered, so this records only that one — see
+ * Only the first tour is ever offered, so this is about that one — see
  * `shouldOfferTour`.
  */
 export function declineTour(): void {
   const vault = getVaultState().vault
   if (vault) {
-    recordDismissed(vault, 'basics')
+    recordDismissed(vault)
     markDirty()
   }
 }

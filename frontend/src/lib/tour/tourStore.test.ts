@@ -206,33 +206,39 @@ describe('the shared-budgets walkthrough', () => {
   })
 
   /**
-   * The two tours are recorded apart. Sharing one pair of timestamps would
-   * have finishing either one tell Knowledge that both had been taken, and the
-   * card for the one you never opened would offer to run it "again".
+   * Nothing is written down about it, at either end.
+   *
+   * The vault remembers one thing — whether the offer has been made — and only
+   * the first tour is ever offered. Recording this one against those same two
+   * timestamps would close an offer the reader never saw, and there is no
+   * second pair to record it in because nothing would read one: Knowledge
+   * offers every walkthrough with the same Start button, however many times it
+   * has been run.
    */
-  test('finishing it does not mark the first tour as taken', () => {
+  test('finishing it writes nothing to the vault', () => {
     startTour('shared')
     for (let i = 0; i < SHARED_STEPS.length; i++) moveTour(1)
 
-    expect(vaultState.vault?.tour.shared?.completedAt).not.toBeNull()
+    expect(tour.running).toBe(false)
     expect(vaultState.vault?.tour.completedAt).toBeNull()
+    expect(vaultState.vault?.tour.dismissedAt).toBeNull()
+    expect(markDirty).not.toHaveBeenCalled()
   })
 
-  test('and finishing the first does not mark this one', () => {
-    startTour('basics')
-    for (let i = 0; i < TOUR_STEPS.length; i++) moveTour(1)
-
-    expect(vaultState.vault?.tour.completedAt).not.toBeNull()
-    expect(vaultState.vault?.tour.shared?.completedAt ?? null).toBeNull()
-  })
-
-  test('abandoning it is dismissed against its own record', () => {
+  test('abandoning it writes nothing either', () => {
     startTour('shared')
     moveTour(1)
     abandonTour()
 
-    expect(vaultState.vault?.tour.shared?.dismissedAt).not.toBeNull()
     expect(vaultState.vault?.tour.dismissedAt).toBeNull()
+    expect(markDirty).not.toHaveBeenCalled()
+  })
+
+  test('the first tour is still recorded', () => {
+    startTour('basics')
+    for (let i = 0; i < TOUR_STEPS.length; i++) moveTour(1)
+
+    expect(vaultState.vault?.tour.completedAt).not.toBeNull()
   })
 })
 

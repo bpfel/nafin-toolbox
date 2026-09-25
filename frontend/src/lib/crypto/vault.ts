@@ -64,37 +64,22 @@ export interface VaultTrust {
 /**
  * What the app knows about the tour having been offered.
  *
- * Two timestamps rather than one flag, because "finished it" and "said no
- * thanks" are different answers and the Knowledge screen says different things
- * about them — one offers the tour again, the other offers it for the first
- * time. Both null is the only state in which the app volunteers anything.
+ * Both null is the only state in which the app volunteers anything, and that
+ * is the only question anything asks of this. The two timestamps are kept
+ * apart rather than collapsed into one because they record different answers
+ * to the offer — finished, and turned down — and an audit of one's own vault
+ * should be able to tell them apart. Nothing in the interface branches on it:
+ * Knowledge offers every walkthrough with the same Start button whatever has
+ * gone before, so there is no "take it again" to distinguish.
  *
  * In the vault rather than localStorage so it follows the user to a new device.
  * The cost is that it cannot be read before the vault is unlocked, which is no
  * cost at all: every screen the tour walks needs an unlocked vault anyway, and
  * an administrator — who has no vault — correctly gets no offer.
  */
-export interface TourProgress {
+export interface TourState {
   completedAt: string | null
   dismissedAt: string | null
-}
-
-export interface TourState extends TourProgress {
-  /**
-   * The same two timestamps for the shared-budgets walkthrough.
-   *
-   * Optional, and that is precisely what keeps it out of the version number.
-   * An absent field and a pair of nulls say the identical thing here — never
-   * started — so there is nothing for a migration to write and a vault saved
-   * before this field existed is already correct rather than merely tolerated.
-   * Every other key added to this file carried information only a migration
-   * could supply, which is why each of those cost a version and this one does
-   * not.
-   *
-   * Not offered unprompted, unlike the tour above, so it needs no third state:
-   * it is started from Knowledge or not at all.
-   */
-  shared?: TourProgress
 }
 
 export interface BudgetVaultData {
