@@ -50,6 +50,42 @@ export const en: Content = {
       title: 'You can come back',
       body: 'The tour starts again from here, beside articles on each view and on Swiss money. Nothing you have just seen has to be remembered.',
     },
+    // --- The shared-budgets walkthrough ---
+    //
+    // Written for somebody who already uses the app, so it explains the
+    // arrangement rather than the screens. `sharedSwitch` carries a
+    // `wideBody` because the control it describes is the dial's dot on a
+    // phone and the header on a desktop.
+    sharedWhat: {
+      title: 'Share the joy',
+      body: 'A household is a secondary budget you can share with others.',
+    },
+    sharedStart: {
+      title: 'Setup',
+      body: 'Households are managed in the Profile view.',
+    },
+    sharedInvite: {
+      title: 'Inviting others',
+      body: 'Unfold a household entry to invite other people. To extend an invitation, use their account e-mail and give them the sharing link — either by copying it or via QR code. You can decide whether they are only able to read the shared budget, or whether they can write to it as well.',
+    },
+    sharedSwitch: {
+      title: 'How to switch budgets',
+      body: 'Once you belong to a household you have several budgets to manage. The dot indicates which one you are currently working on, and lets you switch.',
+      wideBody: 'Once you belong to a household you have several budgets to manage. The header indicates which one you are currently working on, and lets you switch.',
+    },
+    sharedEntries: {
+      title: 'The different entries',
+      body: 'Very much like your personal budget, a household offers the same entry types. Use the ones you need to plan your shared expenses.',
+      note: 'The figures here are an example, for a household of two.',
+    },
+    sharedContributions: {
+      title: 'Household income',
+      body: 'The positive side of a household budget is most probably the sum of individual contributions, rather than a full salary.',
+    },
+    sharedKnowledge: {
+      title: 'You can come back',
+      body: 'This walkthrough starts again from here, beside the tour and the articles. Nothing you have just seen has to be remembered.',
+    },
   },
 
   articles: {

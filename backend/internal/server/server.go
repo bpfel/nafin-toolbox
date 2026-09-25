@@ -12,6 +12,7 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/email"
+	"github.com/bpfel/nafin-toolbox/internal/household"
 	"github.com/bpfel/nafin-toolbox/internal/upkeep"
 	"github.com/bpfel/nafin-toolbox/internal/vault"
 	"github.com/go-chi/chi/v5"
@@ -121,6 +122,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Post("/upkeep/remind", upkeep.Handle(deps, remindLimiter))
 
 			r.Route("/vault", vault.Routes(s.db))
+			r.Route("/households", household.Routes(s.db))
 		})
 	})
 }

@@ -41,9 +41,17 @@
     version++
   }
 
+  /**
+   * Which starter budget. A household gets the two-person one, whose income
+   * side is contributions rather than a salary — seeding a personal plan into
+   * a shared vault would put one person's wage in front of both of them.
+   */
+  const household = $derived(vaultState.currentHousehold !== null)
+
   function handleSeeded() {
     if (!vaultState.vault) return
-    engine.seedDefaults(vaultState.vault, getLocale())
+    const seed = household ? engine.seedSharedDefaults : engine.seedDefaults
+    seed(vaultState.vault, getLocale())
     markDirty()
     version++
   }
@@ -88,8 +96,16 @@
 <div class="budget-module">
   {#if !vaultState.vault}
     <p class="loading">{t('state.loading')}</p>
+  {:else if needsSetup && vaultState.readOnly}
+    <!--
+      The setup screen offers to write the defaults, which a reader cannot do —
+      and pressing it used to end in "Something broke". An empty budget they
+      may only look at still needs saying so, or it reads as a page that failed
+      to load.
+    -->
+    <p class="read-only-empty">{t('budget.readOnlyEmpty')}</p>
   {:else if needsSetup}
-    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
+    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} {household} />
   {:else if summary}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">
@@ -123,6 +139,14 @@
 </div>
 
 <style>
+  .read-only-empty {
+    margin: 2rem auto;
+    max-width: 28rem;
+    text-align: center;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+
   .budget-module {
     display: flex;
     flex-direction: column;

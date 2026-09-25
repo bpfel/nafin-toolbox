@@ -53,6 +53,36 @@ export const fr: PartialContent = {
       title: 'Tu peux revenir',
       body: 'La visite repart d’ici, à côté des articles sur chaque vue et sur l’argent suisse. Rien de ce que tu viens de voir n’est à mémoriser.',
     },
+    sharedWhat: {
+      title: 'Partage le plaisir',
+      body: 'Un ménage est un budget secondaire que tu peux partager avec d’autres.',
+    },
+    sharedStart: {
+      title: 'Mise en place',
+      body: 'Les ménages se gèrent dans le profil.',
+    },
+    sharedInvite: {
+      title: 'Inviter d’autres personnes',
+      body: 'Déplie un ménage pour y inviter quelqu’un. Pour l’invitation, utilise son e-mail de compte et donne-lui le lien de partage — copié, ou sous forme de QR code. Tu décides si la personne peut seulement lire le budget partagé ou aussi le modifier.',
+    },
+    sharedSwitch: {
+      title: 'Changer de budget',
+      body: 'Dès que tu appartiens à un ménage, tu gères plusieurs budgets. Le point indique celui sur lequel tu travailles et permet d’en changer.',
+      wideBody: 'Dès que tu appartiens à un ménage, tu gères plusieurs budgets. La barre du haut indique celui sur lequel tu travailles et permet d’en changer.',
+    },
+    sharedEntries: {
+      title: 'Les différentes entrées',
+      body: 'Tout comme ton budget personnel, un ménage propose les mêmes types d’entrée. Prends ceux dont tu as besoin pour planifier les dépenses communes.',
+      note: 'Les chiffres présentés sont un exemple, pour un ménage de deux personnes.',
+    },
+    sharedContributions: {
+      title: 'Recettes du ménage',
+      body: 'Le côté recettes d’un budget de ménage est le plus souvent la somme de contributions individuelles, et non un salaire entier.',
+    },
+    sharedKnowledge: {
+      title: 'Tu peux revenir',
+      body: 'Ce parcours recommence depuis ici, à côté de la visite guidée et des articles. Rien de ce que tu viens de voir n’est à retenir.',
+    },
   },
   articles: {
     'about-budget': {

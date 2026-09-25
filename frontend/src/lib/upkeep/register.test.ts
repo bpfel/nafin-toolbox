@@ -143,10 +143,16 @@ describe('the register as it actually stands', () => {
   })
 
   test('every seeded figure that carries a date is listed', () => {
-    // Not a count for its own sake: these four are what `budgetEngine` and
-    // `seedNames` compile in, and an unlisted fifth is one nobody is watching.
+    // Not a count for its own sake: these five are what `budgetEngine` and
+    // `seedNames` compile in, and an unlisted sixth is one nobody is watching.
+    //
+    // Two HABE entries rather than one, because the two starter budgets cannot
+    // be updated together: the annual sample is too small to break down by
+    // household type, so the household figures come from a three-year pooled
+    // wave that lags the personal ones.
     expect(UPKEEP.map(e => e.id).sort()).toEqual([
       'ga-travelcard',
+      'habe-household',
       'habe-survey',
       'pillar-3a-cap',
       'serafe',

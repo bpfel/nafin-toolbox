@@ -50,6 +50,20 @@ export interface TourCopy {
    */
   note?: string
   /**
+   * The body to use instead, at the wide layout.
+   *
+   * For a step that describes a control the shell draws in two different
+   * places. Switching budgets is the case it exists for: below 768px it is the
+   * dial's dot in the corner, above it the toolbar at the top of the screen,
+   * and one sentence cannot name both without naming neither. The anchor is
+   * the same either way — see the comment on `data-tour` in `ActionDial` — so
+   * it is only the words that fork.
+   *
+   * `body` is what a phone gets, and stands alone when this is absent. Keyed
+   * off the same 768px layout as `hoverNote` below, for the same reason.
+   */
+  wideBody?: string
+  /**
    * A sentence shown only at the wide layout.
    *
    * It exists for one thing — telling someone they can hover a control to

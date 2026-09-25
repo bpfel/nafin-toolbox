@@ -1,16 +1,32 @@
 import type { AccountKind, VaultAccount } from '../crypto/vault'
+import { t } from '../i18n/index.svelte'
+import type { MessageKey } from '../i18n/locales/en'
 
 /**
- * Human labels for account kinds. Single source of truth — the card, the account
- * form and the allocation controls all name a kind the same way.
+ * Which catalogue entry names each account kind.
+ *
+ * This was a map of English words, and so was a second copy of it inside the
+ * account card — both written before the catalogue had these entries, and
+ * neither moved when it did. So "Transactional" stayed English on the card and
+ * in the routing picker in every language, while the account form beside them
+ * said *Zahlungsverkehr* from the catalogue. Now there is one list, and it
+ * holds slugs.
+ *
+ * Written out rather than built from the kind, because they do not match:
+ * the kind is `retirement_3a` and the slug is `accountKind.retirement3a`.
  */
-export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
-  transactional: 'Transactional',
-  reserves: 'Reserves',
-  savings: 'Savings',
-  cash: 'Cash',
-  retirement_3a: 'Pillar 3a',
-  investment: 'Investment',
+const KIND_SLUGS: Record<AccountKind, MessageKey> = {
+  transactional: 'accountKind.transactional',
+  reserves: 'accountKind.reserves',
+  savings: 'accountKind.savings',
+  cash: 'accountKind.cash',
+  retirement_3a: 'accountKind.retirement3a',
+  investment: 'accountKind.investment',
+}
+
+/** An account kind, named in the interface language. */
+export function accountKindLabel(kind: AccountKind): string {
+  return t(KIND_SLUGS[kind])
 }
 
 /**
@@ -21,7 +37,7 @@ export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
  * rather than a dash, which reads better against names that contain dashes.
  */
 export function accountLabel(account: VaultAccount): string {
-  const parts = [account.name, ACCOUNT_KIND_LABELS[account.kind]]
+  const parts = [account.name, accountKindLabel(account.kind)]
   if (account.bankName) parts.push(account.bankName)
   return parts.join(' · ')
 }

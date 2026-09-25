@@ -26,7 +26,11 @@ describe('every dialog can be scrolled to its own buttons', () => {
 
     for (const [path, source] of Object.entries(COMPONENTS)) {
       if (!source.includes('role="dialog"')) continue
-      const bounded = /max-height:\s*\d/.test(source)
+      // `calc(...)` counts. The check is whether the height is bounded at all,
+      // and calc is how a dialog leaves room for the browser's own chrome —
+      // rejecting it would flag a correct answer, and a guard that does that
+      // eventually gets deleted rather than obeyed.
+      const bounded = /max-height:\s*(\d|calc\()/.test(source)
       const scrolls = /overflow-y:\s*auto/.test(source)
       if (bounded && scrolls) continue
 

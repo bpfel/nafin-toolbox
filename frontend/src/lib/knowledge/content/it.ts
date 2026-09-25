@@ -52,6 +52,36 @@ export const it: PartialContent = {
       title: 'Puoi tornare qui',
       body: 'Il tour riparte da qui, accanto agli articoli su ogni vista e sul franco svizzero. Non devi ricordare nulla di ciò che hai appena visto.',
     },
+    sharedWhat: {
+      title: 'Condividi la gioia',
+      body: 'Un’economia domestica è un secondo budget che puoi condividere con altri.',
+    },
+    sharedStart: {
+      title: 'Configurazione',
+      body: 'Le economie domestiche si gestiscono nel profilo.',
+    },
+    sharedInvite: {
+      title: 'Invitare altre persone',
+      body: 'Apri un’economia domestica per invitare qualcuno. Per l’invito usa l’e-mail del suo account e passa il link di condivisione — copiato, oppure come codice QR. Decidi tu se può solo leggere il budget condiviso o anche modificarlo.',
+    },
+    sharedSwitch: {
+      title: 'Cambiare budget',
+      body: 'Appena appartieni a un’economia domestica gestisci più budget. Il punto indica quello su cui stai lavorando e permette di cambiare.',
+      wideBody: 'Appena appartieni a un’economia domestica gestisci più budget. La barra in alto indica quello su cui stai lavorando e permette di cambiare.',
+    },
+    sharedEntries: {
+      title: 'Le diverse voci',
+      body: 'Proprio come nel budget personale, un’economia domestica offre gli stessi tipi di voce. Usa quelli che ti servono per pianificare le spese comuni.',
+      note: 'Le cifre mostrate sono un esempio, per un’economia domestica di due persone.',
+    },
+    sharedContributions: {
+      title: 'Entrate dell’economia domestica',
+      body: 'Il lato entrate di un budget domestico è il più delle volte la somma dei contributi individuali, non un salario intero.',
+    },
+    sharedKnowledge: {
+      title: 'Puoi tornare',
+      body: 'Questo percorso riparte da qui, accanto alla visita guidata e agli articoli. Niente di ciò che hai appena visto va ricordato.',
+    },
   },
   articles: {
     'about-budget': {

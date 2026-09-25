@@ -1,53 +1,193 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
-import { fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError } from '../api/client'
+import {
+  fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
+  fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
+  renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
+  fetchHouseholdMembers, fetchHouseholdInvites, createHouseholdInvite, deleteHouseholdInvite,
+  acceptHouseholdInvite, confirmHouseholdInvite, removeHouseholdMember, changeHouseholdRole,
+  type HouseholdMember, type HouseholdInvite,
+} from '../api/client'
+import { generateIdentity, sealIdentity, openIdentity, isComplete, type OpenIdentity } from './identity'
+import {
+  generateHouseholdKey, sealKeyForSelf, sealName, openName, openListedHousehold, openGrantedKey,
+  HOUSEHOLD_NAME_MAX,
+  type OpenHousehold,
+} from './household'
+import {
+  sealGrant, macPublicKey, verifyPublicKeyMAC, generateInviteSecret, generateInviteToken,
+  hashInviteToken,
+} from './grant'
+import { fromBase64, toBase64, importPublicKey, openUnder, sealUnder } from './identity'
+import { seedNamesFor } from '../budget/seedNames'
+import { getLocale } from '../i18n/index.svelte'
 
-let vault = $state<VaultData | null>(null)
+/**
+ * Which vault the screens are looking at.
+ *
+ * `'personal'` is the one everybody has and nobody can leave. A number is a
+ * household's id.
+ */
+export type VaultId = 'personal' | number
+
+/**
+ * Everything that belongs to *a vault* rather than to the session.
+ *
+ * One object rather than a dozen loose variables, because switching context
+ * means putting one of these aside and picking another up — and a field-by-field
+ * stash is a field somebody eventually forgets, which would show one household's
+ * unsaved-changes warning over another household's budget.
+ */
+interface VaultSlot {
+  data: VaultData | null
+  /** The MEK for the personal vault; the household key for a household. */
+  key: CryptoKey | null
+  /**
+   * The updated_at last seen from the server. Sent back on save so a stale write
+   * is refused rather than silently replacing a newer vault. Null means "nothing
+   * on the server yet", which is the only case that may write unconditionally.
+   */
+  lastUpdatedAt: string | null
+  dirty: boolean
+  saving: boolean
+  lastSaved: Date | null
+  /**
+   * Set when the server refuses a save because the vault moved on. Sticky: the
+   * in-memory vault is now known to be stale, and every further save would fail
+   * the same way, so the UI must tell the user to reload rather than retry.
+   */
+  conflicted: boolean
+  /**
+   * Set when the in-memory vault does not match the version it declares. Sticky
+   * for the same reason as `conflicted`: every further save would be the same bad
+   * write, and writing it is worse than not saving at all.
+   */
+  shapeInvalid: boolean
+  /**
+   * Set when the stored vault was written by a newer build. Distinct from a
+   * decryption failure: the key is fine and the data is fine, this build simply
+   * cannot read the shape. Nothing may be saved while it is set.
+   */
+  versionAhead: boolean
+  /**
+   * The real vault, parked while a throwaway copy is on screen.
+   *
+   * The guided tour wants to *show* an example budget without the user ending
+   * up with one. Seeding for real and undoing afterwards cannot be made safe —
+   * an interrupted tour leaves the data behind, and the autosave would have
+   * persisted it seconds earlier — so nothing is written at all: the store
+   * hands the screens a copy, and puts the original back when the tour ends.
+   *
+   * Non-null is the whole flag. While it is set the vault on screen is not the
+   * user's, and `saveVault` refuses on that basis — which is the one guard that
+   * matters, because every write in the app funnels through it: the debounced
+   * autosave, the flush on logout, and any direct call alike.
+   */
+  parked: VaultData | null
+}
+
+function emptySlot(): VaultSlot {
+  return {
+    data: null,
+    key: null,
+    lastUpdatedAt: null,
+    dirty: false,
+    saving: false,
+    lastSaved: null,
+    conflicted: false,
+    shapeInvalid: false,
+    versionAhead: false,
+    parked: null,
+  }
+}
+
+/** The vault on screen. Reassigned wholesale when the context switches. */
+let current = $state<VaultSlot>(emptySlot())
+let currentId = $state<VaultId>('personal')
+
+/**
+ * The slots not on screen.
+ *
+ * A plain Map rather than `$state`: nothing renders from it. A slot only ever
+ * becomes visible by being assigned to `current`, and that assignment is what
+ * the screens react to.
+ */
+const stashed = new Map<VaultId, VaultSlot>()
+
+// --- session-wide, and therefore not in a slot ---
+
+/**
+ * The personal MEK.
+ *
+ * Also the personal slot's `key`, but kept here as well because it does a second
+ * job no household key can do: every household key is sealed under it, so
+ * opening one needs it whatever vault happens to be on screen.
+ */
 let mek = $state<CryptoKey | null>(null)
-let dirty = $state(false)
-let saving = $state(false)
-let lastSaved = $state<Date | null>(null)
+
+/**
+ * The user's own keypairs, once unsealed.
+ *
+ * Null for anyone whose vault predates identities, and null before unlock —
+ * both private halves are sealed under the MEK, so there is nothing to hold
+ * until the MEK is in hand.
+ */
+let identity = $state<OpenIdentity | null>(null)
+
 let unlocked = $state(false)
 
-// The updated_at last seen from the server. Sent back on save so a stale write
-// is refused rather than silently replacing a newer vault. Null means "nothing
-// on the server yet", which is the only case that may write unconditionally.
-let lastUpdatedAt = $state<string | null>(null)
-
-// Set when the server refuses a save because the vault moved on. Sticky: the
-// in-memory vault is now known to be stale, and every further save would fail
-// the same way, so the UI must tell the user to reload rather than retry.
-let conflicted = $state(false)
-
-// Set when the in-memory vault does not match the version it declares. Sticky
-// for the same reason as `conflicted`: every further save would be the same bad
-// write, and writing it is worse than not saving at all.
-let shapeInvalid = $state(false)
-
-// Set when the stored vault was written by a newer build. Distinct from a
-// decryption failure: the key is fine and the data is fine, this build simply
-// cannot read the shape. Nothing may be saved while it is set.
-let versionAhead = $state(false)
+/**
+ * Every household the user belongs to, with its name already readable.
+ *
+ * Loaded at unlock because the switch has to list them; their *payloads* are
+ * not, and are fetched on first switch. That is the whole reason a household's
+ * name is its own small ciphertext rather than something inside the payload.
+ */
+let households = $state<OpenHousehold[]>([])
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
-/**
- * The real vault, parked while a throwaway copy is on screen.
- *
- * The guided tour wants to *show* an example budget without the user ending
- * up with one. Seeding for real and undoing afterwards cannot be made safe —
- * an interrupted tour leaves the data behind, and the autosave would have
- * persisted it seconds earlier — so nothing is written at all: the store
- * hands the screens a copy, and puts the original back when the tour ends.
- *
- * Non-null is the whole flag. While it is set the vault on screen is not the
- * user's, and `saveVault` refuses on that basis — which is the one guard that
- * matters, because every write in the app funnels through it: the debounced
- * autosave, the flush on logout, and any direct call alike.
- */
-let parked: VaultData | null = null
-
 const MEK_STORAGE_KEY = 'vault_mek'
+
+/**
+ * Which vault was on screen, remembered across a reload.
+ *
+ * Beside the MEK rather than in the vault, because it has the MEK's lifetime
+ * exactly: this tab, this session, gone at sign-out. It is also not a fact
+ * about the person — two tabs may reasonably sit on two different households —
+ * so putting it in the vault would have made one tab's choice overwrite the
+ * other's.
+ *
+ * Without it, every refresh dropped the user back on their personal budget and
+ * they had to find their household again. That is a small annoyance once and an
+ * infuriating one daily.
+ */
+const CURRENT_VAULT_KEY = 'vault_current'
+
+function rememberCurrent(id: VaultId): void {
+  try {
+    sessionStorage.setItem(CURRENT_VAULT_KEY, String(id))
+  } catch {
+    // Private mode, blocked storage, a quota. Remembering is a convenience and
+    // failing to remember is not worth a broken switch.
+  }
+}
+
+/** What was on screen last, if it is still somewhere this user can go. */
+function recallCurrent(): VaultId {
+  let stored: string | null = null
+  try {
+    stored = sessionStorage.getItem(CURRENT_VAULT_KEY)
+  } catch {
+    return 'personal'
+  }
+  if (!stored || stored === 'personal') return 'personal'
+
+  const id = Number(stored)
+  // A household that has since been left, deleted, or whose grant no longer
+  // opens is not somewhere to land. Personal is always there.
+  return Number.isInteger(id) && households.some(h => h.id === id) ? id : 'personal'
+}
 
 /** Export MEK to sessionStorage so it survives page refreshes. */
 async function cacheMEK(key: CryptoKey): Promise<void> {
@@ -69,21 +209,45 @@ function clearCachedMEK(): void {
 
 export function getVaultState() {
   return {
-    get vault() { return vault },
-    set vault(v: VaultData | null) { vault = v },
+    get vault() { return current.data },
+    set vault(v: VaultData | null) { current.data = v },
     get mek() { return mek },
-    get dirty() { return dirty },
+    get dirty() { return current.dirty },
     /** True once the server refused a save because the vault changed elsewhere. */
-    get conflicted() { return conflicted },
+    get conflicted() { return current.conflicted },
     /** True when the stored vault is newer than this build can read. */
-    get versionAhead() { return versionAhead },
+    get versionAhead() { return current.versionAhead },
     /** True when the vault in memory contradicts its own version, so saving is refused. */
-    get shapeInvalid() { return shapeInvalid },
-    get saving() { return saving },
-    get lastSaved() { return lastSaved },
+    get shapeInvalid() { return current.shapeInvalid },
+    get saving() { return current.saving },
+    get lastSaved() { return current.lastSaved },
     get unlocked() { return unlocked },
     /** True while the screens are showing a throwaway copy. See `parked`. */
-    get previewing() { return parked !== null },
+    get previewing() { return current.parked !== null },
+    /**
+     * The user's own keypairs, or null if they have none — which is every vault
+     * created before identities existed. A household cannot be shared without
+     * one.
+     */
+    get identity() { return identity },
+    /** Which vault the screens are showing. */
+    get currentVaultId() { return currentId },
+    /** Every household the user belongs to, names already readable. */
+    get households() { return households },
+    /** The household on screen, or null when the personal vault is. */
+    get currentHousehold() {
+      return currentId === 'personal' ? null : households.find(h => h.id === currentId) ?? null
+    },
+    /**
+     * Whether the vault on screen may be looked at and not changed.
+     *
+     * A reader in a household, and nobody else — your own vault is always
+     * yours. Read by the screens to leave out every control that edits, so a
+     * reader is never offered a change the server will refuse.
+     */
+    get readOnly() {
+      return isReadOnly()
+    },
   }
 }
 
@@ -95,24 +259,285 @@ export function getVaultState() {
  * running, so a caller cannot nest one and lose the original.
  */
 export function beginPreview(fill: (copy: VaultData) => void): boolean {
-  if (!vault || parked) return false
+  if (!current.data || current.parked) return false
 
-  if (dirty) void saveVault()
+  if (current.dirty) void saveVault()
 
-  parked = vault
+  current.parked = current.data
   // `$state.snapshot` rather than the proxy itself: the copy must be plain and
   // deep, or editing it would reach through into the user's own vault.
-  const copy = $state.snapshot(vault) as VaultData
+  const copy = $state.snapshot(current.data) as VaultData
   fill(copy)
-  vault = copy
+  current.data = copy
   return true
 }
 
 /** Puts the real vault back. Safe to call when no preview is running. */
 export function endPreview(): void {
-  if (!parked) return
-  vault = parked
-  parked = null
+  if (!current.parked) return
+  current.data = current.parked
+  current.parked = null
+}
+
+// --- switching between vaults ---
+
+/**
+ * Put the vault on screen aside and bring another forward.
+ *
+ * Flushes *before* stashing: a slot put away while still dirty, with a live
+ * timer, would try to save itself once a different vault was on screen — and
+ * `saveVault` writes whatever `current` holds.
+ *
+ * A household's payload is fetched the first time it is switched to rather than
+ * at unlock, because there is no reason to pull a blob nobody has opened.
+ */
+export async function switchTo(id: VaultId): Promise<void> {
+  if (id === currentId) return
+  if (id !== 'personal' && !households.some(h => h.id === id)) return
+
+  await putCurrentAside()
+  currentId = id
+  rememberCurrent(id)
+
+  const waiting = stashed.get(id)
+  if (waiting) {
+    current = waiting
+    stashed.delete(id)
+    return
+  }
+
+  current = emptySlot()
+  // Reaching here for the personal vault would mean it was never loaded, which
+  // unlock does; there is nothing to fetch.
+  if (id === 'personal') return
+
+  const household = households.find(h => h.id === id)
+  if (!household) return
+  current.key = household.key
+
+  try {
+    const payload = await fetchHouseholdVault(id)
+    if (!payload) {
+      // Gone, or never ours — the server answers the same either way, and so
+      // does this. Dropped from the list rather than left as a name that opens
+      // nothing.
+      households = households.filter(h => h.id !== id)
+      await switchTo('personal')
+      return
+    }
+    current.data = await decryptVault(payload.ciphertext, payload.nonce, household.key)
+    current.lastUpdatedAt = payload.updated_at
+  } catch (e) {
+    if (e instanceof VaultVersionAheadError) {
+      current.versionAhead = true
+      return
+    }
+    throw e
+  }
+}
+
+/**
+ * Read the list of households and open their names.
+ *
+ * Names only. Every payload stays on the server until somebody switches to it.
+ */
+async function loadHouseholds(withMEK: CryptoKey): Promise<void> {
+  try {
+    const listed = await fetchHouseholds()
+    const opened = await Promise.all(
+      listed.map(async l => {
+        try {
+          if (l.wrap_kind !== 'granted') return await openListedHousehold(l, withMEK)
+          return await openGranted(l)
+        } catch {
+          // A household whose key will not open is dropped rather than shown as
+          // a name leading nowhere. That includes one whose grant fails its
+          // checks — a refused grant is not a household, it is a question.
+          return null
+        }
+      }),
+    )
+    households = opened.filter((h): h is OpenHousehold => h !== null)
+  } catch {
+    // Not fatal. Someone whose households could not be listed still has their
+    // own vault, and refusing to unlock over it would be the wrong trade.
+    households = []
+  }
+
+  // Deliberately not awaited: nobody should wait on other people's paperwork
+  // to see their own budget.
+  void admitWhoeverAccepted()
+}
+
+/**
+ * Hand the key to anybody who accepted an invitation while nobody was looking.
+ *
+ * **Why this has to happen on somebody's device at all.** The server cannot do
+ * it: wrapping the household key for a new member needs the household key, and
+ * the server has never had it. So the last step of joining is taken by an
+ * owner's browser, and until it runs the invitee has accepted and can read
+ * nothing.
+ *
+ * It used to run only while the People fold was open — the one screen almost
+ * nobody is on when the invitation is accepted, because accepting happens on
+ * somebody else's device at a time of their choosing. The result looked exactly
+ * like a broken link: the invitee was told the invitation was accepted, and the
+ * household never arrived. It had not failed; it was waiting for a screen.
+ *
+ * Now every unlock sweeps every household this account owns. One request each,
+ * only for owners, and only where an invitation is outstanding — and the fold
+ * still does the same on the way in, for the case where both people are looking
+ * at once.
+ *
+ * Silent either way. An acceptance whose key does not check out is left alone
+ * and shows as a mismatch on the People panel, which is the one place it can be
+ * acted on; a request that simply failed is retried by the next unlock.
+ */
+async function admitWhoeverAccepted(): Promise<void> {
+  for (const household of households) {
+    if (household.role !== 'owner') continue
+    try {
+      await letInWhoeverIsReady(household.id)
+    } catch {
+      // Next unlock.
+    }
+  }
+}
+
+/**
+ * Open a household whose key somebody else wrapped for us.
+ *
+ * Costs one extra request — the member list, to learn the granter's verifying
+ * key. Only for granted households, and only once per unlock, which is the
+ * price of not taking the server's word for who signed something.
+ *
+ * What is learned is written back: the granter's key is pinned, so a later
+ * change is a substitution rather than a surprise, and the epoch becomes the
+ * floor for every future grant on this household.
+ */
+async function openGranted(listing: {
+  id: number
+  encrypted_name: string
+  wrapped_key: string
+  role: string
+  updated_at: string
+}): Promise<OpenHousehold | null> {
+  if (!identity || !current.data) return null
+
+  const members = await fetchHouseholdMembers(listing.id)
+  const { key, epoch, pin } = await openGrantedKey({
+    grant: listing.wrapped_key,
+    householdId: listing.id,
+    members,
+    trust: current.data.trust,
+    identity,
+  })
+
+  rememberTrust(pin.userId, pin.verifyingKey, listing.id, epoch)
+
+  return {
+    id: listing.id,
+    name: await openName(listing.encrypted_name, key),
+    key,
+    role: listing.role,
+    updatedAt: listing.updated_at,
+  }
+}
+
+/**
+ * Write down what a verified grant taught us.
+ *
+ * In the personal vault, because it is this person's record of what they have
+ * accepted and nobody else's. Saved rather than merely held, or the next unlock
+ * would start over and accept whatever key was there then.
+ */
+function rememberTrust(userId: number, verifyingKey: string, householdId: number, epoch: number): void {
+  const trust = current.data?.trust
+  if (!trust) return
+
+  let changed = false
+  if (trust.pins[String(userId)] !== verifyingKey) {
+    trust.pins[String(userId)] = verifyingKey
+    changed = true
+  }
+  if ((trust.epochs[String(householdId)] ?? 0) < epoch) {
+    trust.epochs[String(householdId)] = epoch
+    changed = true
+  }
+  if (changed) markDirty()
+}
+
+/**
+ * Flush whatever is on screen and put it in the stash.
+ *
+ * The flush comes first on purpose: a slot put away while still dirty, with a
+ * live timer, would try to save itself once a different vault was on screen —
+ * and `saveVault` writes whatever `current` holds.
+ */
+async function putCurrentAside(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (current.dirty) await saveVault()
+  stashed.set(currentId, current)
+}
+
+/** Make a household, with its own key, and switch to it. */
+export async function createHousehold(name: string): Promise<number> {
+  if (!mek) throw new Error('Vault not unlocked')
+  assertNameFits(name)
+
+  const key = await generateHouseholdKey()
+  const empty = createEmptyVault(mainAccountName())
+  const payload = await encryptVault(empty, key)
+
+  const created = await postHousehold({
+    encrypted_name: await sealName(name, key),
+    // Sealed under the creator's own MEK rather than wrapped to their own
+    // public key. See `sealKeyForSelf` for why that distinction matters.
+    wrapped_key: await sealKeyForSelf(key, mek),
+    ciphertext: payload.ciphertext,
+    nonce: payload.nonce,
+    version: empty.version,
+  })
+
+  households = [{ id: created.id, name, key, role: 'owner', updatedAt: created.updated_at }, ...households]
+
+  // Installed directly rather than through `switchTo`, which would fetch the
+  // payload back from the server — a round trip to be told the thing we just
+  // encrypted and sent. It would also make creating a household depend on that
+  // fetch succeeding, and a `null` answer drops a household from the list.
+  await putCurrentAside()
+  currentId = created.id
+  rememberCurrent(created.id)
+  current = { ...emptySlot(), data: empty, key, lastUpdatedAt: created.updated_at }
+
+  return created.id
+}
+
+/** Rename a household. Its name is a ciphertext, so this re-seals it. */
+export async function renameHousehold(id: number, name: string): Promise<void> {
+  const household = households.find(h => h.id === id)
+  if (!household) return
+  assertNameFits(name)
+
+  await putHouseholdName(id, await sealName(name, household.key))
+  households = households.map(h => (h.id === id ? { ...h, name } : h))
+}
+
+/** Delete a household. Owner only, which the server enforces. */
+export async function deleteHousehold(id: number): Promise<void> {
+  await removeHousehold(id)
+  households = households.filter(h => h.id !== id)
+  stashed.delete(id)
+
+  if (currentId === id) {
+    currentId = 'personal'
+    rememberCurrent('personal')
+    current = stashed.get('personal') ?? emptySlot()
+    stashed.delete('personal')
+  }
 }
 
 /**
@@ -126,20 +551,30 @@ export async function tryRestoreVault(): Promise<boolean> {
   try {
     const vaultData = await fetchVault()
     if (vaultData) {
-      vault = await decryptVault(vaultData.ciphertext, vaultData.nonce, cachedMEK)
-      lastUpdatedAt = vaultData.updated_at
+      current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, cachedMEK)
+      current.lastUpdatedAt = vaultData.updated_at
     } else {
-      vault = createEmptyVault()
-      lastUpdatedAt = null
+      current.data = createEmptyVault(mainAccountName())
+      current.lastUpdatedAt = null
     }
     mek = cachedMEK
+    current.key = cachedMEK
+    // A restored session has to be as capable as a freshly unlocked one. If
+    // this were left out, reloading the page would silently take away the
+    // ability to share a household until the next real sign-in.
+    const keys = await fetchVaultKeys()
+    identity = isComplete(keys) ? await openIdentity(keys, cachedMEK) : null
+    await loadHouseholds(cachedMEK)
     unlocked = true
+    // After the households are known, so a remembered one can be checked
+    // against them rather than switched to on faith.
+    await switchTo(recallCurrent())
     return true
   } catch (e) {
     if (e instanceof VaultVersionAheadError) {
       // The cached key is not the problem, so it stays: clearing it would make
       // the user sign in again to reach the same wall.
-      versionAhead = true
+      current.versionAhead = true
       return false
     }
     clearCachedMEK()
@@ -159,25 +594,29 @@ export async function initializeVault(password: string, email: string): Promise<
   try {
     const kek = await deriveKEK(password, email, keys.iterations)
     mek = await unwrapMEK(keys.encrypted_mek, kek)
+    current.key = mek
+    identity = isComplete(keys) ? await openIdentity(keys, mek) : null
 
     const vaultData = await fetchVault()
     if (vaultData) {
-      vault = await decryptVault(vaultData.ciphertext, vaultData.nonce, mek)
-      lastUpdatedAt = vaultData.updated_at
+      current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, mek)
+      current.lastUpdatedAt = vaultData.updated_at
     } else {
-      vault = createEmptyVault()
+      current.data = createEmptyVault(mainAccountName())
       await saveVault()
     }
 
+    await loadHouseholds(mek)
     await cacheMEK(mek)
     unlocked = true
+    await switchTo(recallCurrent())
     return 'ok'
   } catch (e) {
     mek = null
-    vault = null
+    current = emptySlot()
     unlocked = false
     if (e instanceof VaultVersionAheadError) {
-      versionAhead = true
+      current.versionAhead = true
       return 'version-ahead'
     }
     return 'decrypt-failed'
@@ -199,67 +638,122 @@ export async function setupKeys(password: string, email: string): Promise<string
   // Hash the recovery key for server-side verification
   const recoveryKeyHash = await hashRecoveryKey(recoveryKey)
 
+  // Generated for everyone, sharing or not. A keypair that only appears when
+  // somebody first wants to share is a keypair that is missing at the moment an
+  // invitation arrives — and generating one then would need the password again,
+  // which by then has been typed and forgotten.
+  const freshIdentity = await generateIdentity()
+  const sealed = await sealIdentity(freshIdentity, newMEK)
+
   await setupVaultKeys({
     encrypted_mek: encryptedMEK,
     recovery_key_hash: recoveryKeyHash,
     encrypted_mek_recovery: encryptedMEKRecovery,
+    ...sealed,
   })
 
+  identity = await openIdentity(sealed, newMEK)
   mek = newMEK
-  vault = createEmptyVault()
+  current.key = newMEK
+  current.data = createEmptyVault(mainAccountName())
   await saveVault()
-  await cacheMEK(mek)
+  await cacheMEK(newMEK)
   unlocked = true
 
   return recoveryKey
 }
 
 /**
+ * What a new vault's first account is called, in the language in use when the
+ * vault is made. It was always "Main" — English written into a French user's
+ * vault as data, where no catalogue could reach it.
+ */
+function mainAccountName(): string {
+  return seedNamesFor(getLocale()).mainAccount
+}
+
+/** The vault on screen belongs to a household this account may only read. */
+function isReadOnly(): boolean {
+  if (currentId === 'personal') return false
+  return households.find(h => h.id === currentId)?.role === 'reader'
+}
+
+/**
+ * The input stops at the limit already; this is for anything that reaches the
+ * store without passing through it. See `HOUSEHOLD_NAME_MAX`.
+ */
+function assertNameFits(name: string): void {
+  if (name.length > HOUSEHOLD_NAME_MAX) {
+    throw new Error(`a household name is at most ${HOUSEHOLD_NAME_MAX} characters`)
+  }
+}
+
+/**
  * Save the current vault (encrypt + PUT to server).
  */
 export async function saveVault(): Promise<void> {
-  if (!vault || !mek) return
+  // Captured before the first await: the user may switch vaults while the
+  // request is in flight, and both the answer and the flags belong to the vault
+  // that sent it rather than to whichever one is on screen when it returns.
+  const slot = current
+  const id = currentId
+
+  if (!slot.data || !slot.key) return
   // The vault on screen is a throwaway copy, not the user's. Refused here
   // rather than at each call site because this is where they all arrive.
-  if (parked) return
+  if (slot.parked) return
   // Once the server has told us we are stale, retrying can only fail again — and
   // the auto-save runs every couple of seconds, so retrying would hammer it.
-  if (conflicted || shapeInvalid) return
+  if (slot.conflicted || slot.shapeInvalid) return
+  // The screens offer a reader nothing that edits. This is for anything that
+  // gets here anyway, so it stops at the door rather than at the server.
+  if (isReadOnly()) return
 
   // Checked before the write, not after the read: a vault that cannot describe
   // itself must not be allowed over one that can. `dirty` stays set, so the UI
   // keeps saying the edits are unsaved rather than implying they landed.
   try {
-    assertVaultShape(vault)
+    assertVaultShape(slot.data)
   } catch {
-    shapeInvalid = true
+    slot.shapeInvalid = true
     return
   }
 
-  saving = true
+  slot.saving = true
   try {
-    const { ciphertext, nonce } = await encryptVault(vault, mek)
-    const result = await putVault({
+    const { ciphertext, nonce } = await encryptVault(slot.data, slot.key)
+    const body = {
       ciphertext,
       nonce,
-      version: vault.version,
+      version: slot.data.version,
       // Omitted when there is no server copy yet: the first save has nothing to
       // conflict with, and sending a token we never received would be a lie.
-      ...(lastUpdatedAt === null ? {} : { expected_updated_at: lastUpdatedAt }),
-    })
-    lastUpdatedAt = result.updated_at
-    dirty = false
-    lastSaved = new Date()
+      ...(slot.lastUpdatedAt === null ? {} : { expected_updated_at: slot.lastUpdatedAt }),
+    }
+
+    const result = id === 'personal' ? await putVault(body) : await putHouseholdVault(id, body)
+    slot.lastUpdatedAt = result.updated_at
+    slot.dirty = false
+    slot.lastSaved = new Date()
   } catch (e) {
     if (e instanceof VaultConflictError) {
       // Leave `dirty` set: the edits are still unsaved, and the user needs to
       // know they will be lost on reload rather than believing they persisted.
-      conflicted = true
+      slot.conflicted = true
+      return
+    }
+    if (e instanceof VaultReadOnlyError && typeof id === 'number') {
+      // The owner made this account a reader while it was editing. What this
+      // client believed about its role was out of date, so it takes the
+      // server's word, and the screens drop their editing controls. Not
+      // thrown: a permission changing under you is news, not a crash, and it
+      // used to arrive as "Something broke and the page stopped updating".
+      households = households.map(h => (h.id === id ? { ...h, role: 'reader' } : h))
       return
     }
     throw e
   } finally {
-    saving = false
+    slot.saving = false
   }
 }
 
@@ -269,8 +763,10 @@ export async function saveVault(): Promise<void> {
 export function markDirty(): void {
   // Nothing in a preview is worth saving, and setting the flag would put an
   // "unsaved" warning on the screen about edits that do not exist.
-  if (parked) return
-  dirty = true
+  if (current.parked) return
+  // Nor in a vault that cannot be saved: the warning would never clear.
+  if (isReadOnly()) return
+  current.dirty = true
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     saveVault()
@@ -289,17 +785,24 @@ export function clearVault(): void {
     saveTimer = null
   }
   // Save if dirty before clearing
-  if (dirty && vault && mek) {
+  if (current.dirty && current.data && current.key) {
     saveVault()
   }
-  vault = null
+  current = emptySlot()
+  currentId = 'personal'
+  try {
+    sessionStorage.removeItem(CURRENT_VAULT_KEY)
+  } catch { /* see rememberCurrent */ }
+  // Every vault, not only the one on screen. A stashed slot holds a household's
+  // decrypted budget and its key, and letting that outlive a sign-out would be
+  // the same mistake as leaving the MEK behind.
+  stashed.clear()
+  households = []
   mek = null
-  dirty = false
-  saving = false
-  lastSaved = null
+  // With the MEK, and for the same reason: two unsealed private keys are worth
+  // no less than the vault they can open.
+  identity = null
   unlocked = false
-  lastUpdatedAt = null
-  conflicted = false
   clearCachedMEK()
 }
 
@@ -338,17 +841,25 @@ export async function recoverVault(
   const newEncryptedMEK = await wrapMEK(recoveredMEK, newKEK)
   await updateVaultKeys(newEncryptedMEK)
 
-  // Decrypt vault
+  // The identity is sealed under the MEK rather than under the password, so a
+  // password reset leaves it untouched — and the user keeps the keypairs their
+  // households already wrapped keys to. The households come back for the same
+  // reason: their keys are sealed under this MEK, which has not changed.
   mek = recoveredMEK
+  current.key = recoveredMEK
+  identity = isComplete(result) ? await openIdentity(result, recoveredMEK) : null
+
   const vaultData = await fetchVault()
   if (vaultData) {
-    vault = await decryptVault(vaultData.ciphertext, vaultData.nonce, mek)
+    current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, recoveredMEK)
+    current.lastUpdatedAt = vaultData.updated_at
   } else {
-    vault = createEmptyVault()
+    current.data = createEmptyVault(mainAccountName())
     await saveVault()
   }
 
-  await cacheMEK(mek)
+  await loadHouseholds(recoveredMEK)
+  await cacheMEK(recoveredMEK)
   unlocked = true
 }
 
@@ -363,10 +874,233 @@ async function hashRecoveryKey(recoveryKey: string): Promise<string> {
 // Save on beforeunload if dirty
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', (e) => {
-    if (dirty && vault && mek) {
+    if (current.dirty && current.data && current.key) {
       // Try to save synchronously via sendBeacon is not great for this.
       // The navigator.sendBeacon approach is limited. Instead, show a warning.
       e.preventDefault()
     }
   })
 }
+
+// --- inviting somebody into a household ---
+
+/**
+ * A pending invitation, with its link rebuilt where that is possible.
+ *
+ * The server still holds only the token's *hash*, so a leaked database hands
+ * nobody an invitation. The link comes back from the secret and the token
+ * sealed beside it, under the household key — which a member has and the server
+ * does not. Empty for anybody but the owner, who is the only one who could do
+ * anything with it.
+ */
+export interface PendingInvite extends HouseholdInvite {
+  /** The MAC checks out: the offered key really is the invitee's. */
+  verified: boolean
+  /** Rebuilt from the sealed halves. Empty unless this user is the owner. */
+  link: string
+}
+
+/**
+ * Ask somebody to join, and produce the link to hand them.
+ *
+ * The secret is generated here, travels in the link, and is *never* sent to the
+ * server — only a copy sealed under the household key, so a member can read it
+ * back at confirm time. Without that, confirming would only work from the tab
+ * that created the invitation.
+ */
+export async function inviteToHousehold(householdId: number, email: string, role: string): Promise<string> {
+  const household = households.find(h => h.id === householdId)
+  if (!household) throw new Error('no such household')
+
+  const token = generateInviteToken()
+  const secret = generateInviteSecret()
+
+  await createHouseholdInvite(householdId, {
+    token_hash: await hashInviteToken(token),
+    invited_email: email,
+    secret_sealed: await sealUnder(secret, household.key),
+    // Sealed too, so the code can be shown again. Show-once bought nothing:
+    // withdrawing and re-inviting always produced an equivalent link, so the
+    // restriction only ever cost somebody who got interrupted.
+    token_sealed: await sealUnder(new TextEncoder().encode(token), household.key),
+    role,
+  })
+
+  return inviteLink(token, secret)
+}
+
+/**
+ * The link itself.
+ *
+ * Both halves in the fragment rather than the query string: a fragment is not
+ * sent to the server on navigation and does not turn up in its logs, which for
+ * the secret is the entire point.
+ */
+function inviteLink(token: string, secret: Uint8Array): string {
+  const base = typeof window === 'undefined' ? '' : window.location.origin
+  return `${base}/join#t=${encodeURIComponent(token)}&s=${encodeURIComponent(toBase64(secret))}`
+}
+
+/**
+ * The invitations on a household, with each one's link and whether it may be
+ * confirmed.
+ *
+ * "May be confirmed" means the MAC checks out: the key the server is offering
+ * really does belong to whoever held the link. A pending invitation that fails
+ * this is the one thing in the app that should stop somebody in their tracks.
+ */
+export async function loadInvites(householdId: number): Promise<PendingInvite[]> {
+  const household = households.find(h => h.id === householdId)
+  if (!household) return []
+
+  const invites = await fetchHouseholdInvites(householdId)
+  return Promise.all(
+    invites.map(async invite => {
+      // Absent for anybody but the owner, who is the only one who could use it.
+      if (!invite.secret_sealed) return { ...invite, verified: false, link: '' }
+
+      const secret = await openUnder(invite.secret_sealed, household.key)
+      const verified =
+        !!invite.public_key_mac &&
+        !!invite.public_key &&
+        (await verifyPublicKeyMAC(secret, fromBase64(invite.public_key), invite.public_key_mac))
+
+      const link = invite.token_sealed
+        ? inviteLink(new TextDecoder().decode(await openUnder(invite.token_sealed, household.key)), secret)
+        : ''
+
+      return { ...invite, verified, link }
+    }),
+  )
+}
+
+/**
+ * Let in everybody whose acceptance checks out, without being asked.
+ *
+ * The button this replaces was a leftover from a design we do not use. Its job
+ * in Bitwarden is to put a human in front of a fingerprint, because that
+ * comparison is the only thing catching a substituted key. Here the MAC does
+ * that, automatically, and cannot be rubber-stamped — so by the time anybody
+ * could have pressed the button, everything it was for had already happened.
+ *
+ * Nor could it catch the wrong person accepting: an invitation can only be
+ * taken up by the account at the address it names, so the row shows what was
+ * typed and can hold no surprise.
+ *
+ * What is *not* automatic is the failure. A MAC that does not verify grants
+ * nothing and stays on screen saying so, because that is the one case where
+ * somebody has to decide something.
+ */
+export async function letInWhoeverIsReady(householdId: number): Promise<number> {
+  const invites = await loadInvites(householdId)
+  let admitted = 0
+
+  for (const invite of invites) {
+    if (!invite.accepted_at || !invite.verified) continue
+    try {
+      await confirmMember(householdId, invite)
+      admitted++
+    } catch {
+      // Left pending rather than retried in a loop. The panel will try again
+      // the next time it is opened, and a failure that repeats is one the
+      // mismatch warning is already the right answer to.
+    }
+  }
+  return admitted
+}
+
+/**
+ * Hand over the household key, signed so the recipient can tell it was us.
+ *
+ * Refuses unless the MAC checks out. The MAC is the only thing standing between
+ * this and wrapping the household key to a key the server chose — so it is
+ * checked here, at the moment of granting, rather than trusted from a flag
+ * something else computed earlier.
+ */
+export async function confirmMember(householdId: number, invite: HouseholdInvite): Promise<void> {
+  const household = households.find(h => h.id === householdId)
+  if (!household || !identity) throw new Error('not ready')
+  if (!invite.public_key || !invite.verifying_key || !invite.public_key_mac) {
+    throw new Error('this invitation has not been accepted yet')
+  }
+  // Absent for anybody but the owner, and granting is the owner's alone — so
+  // its absence is a refusal rather than something to work around.
+  if (!invite.secret_sealed) {
+    throw new Error('only the owner may let somebody in')
+  }
+
+  const secret = await openUnder(invite.secret_sealed, household.key)
+  const publicKey = fromBase64(invite.public_key)
+  if (!(await verifyPublicKeyMAC(secret, publicKey, invite.public_key_mac))) {
+    throw new Error('the key offered for this person does not match the invitation')
+  }
+
+  const listing = (await fetchHouseholds()).find(h => h.id === householdId)
+  const grant = await sealGrant({
+    householdKey: household.key,
+    householdId,
+    epoch: listing?.key_epoch ?? 1,
+    recipientPublicKey: await importPublicKey(invite.public_key),
+    recipientVerifyingKey: fromBase64(invite.verifying_key),
+    senderSigningKey: identity.signingKey,
+    senderVerifyingKey: identity.verifyingKey,
+  })
+
+  await confirmHouseholdInvite(householdId, { invite_id: invite.id, wrapped_key: grant })
+}
+
+/**
+ * Take an invitation link and bind this account to it.
+ *
+ * Grants nothing. Afterwards the household is still unreadable — a member has
+ * to confirm before any key exists for us. What this does is prove, to whoever
+ * invited us, that the public key the server will offer them is really ours.
+ */
+export async function acceptInvite(token: string, secret: Uint8Array): Promise<number> {
+  if (!identity) throw new Error('Vault not unlocked')
+
+  const keys = await fetchVaultKeys()
+  if (!keys?.public_key) throw new Error('no identity to prove')
+
+  const mac = await macPublicKey(secret, fromBase64(keys.public_key))
+  const { household_id } = await acceptHouseholdInvite(token, mac)
+  return household_id
+}
+
+/** Move somebody between writer and reader. Owner only, which the server holds. */
+export async function changeRole(householdId: number, userId: number, role: string): Promise<void> {
+  await changeHouseholdRole(householdId, userId, role)
+}
+
+export async function withdrawInvite(householdId: number, inviteId: number): Promise<void> {
+  await deleteHouseholdInvite(householdId, inviteId)
+}
+
+export async function listMembers(householdId: number): Promise<HouseholdMember[]> {
+  return fetchHouseholdMembers(householdId)
+}
+
+/**
+ * Remove somebody, or leave.
+ *
+ * `leaving` rather than a comparison inside here: this module has no idea which
+ * account is signed in, and the version that tried to keep one never had it set
+ * — so leaving deleted the membership, left the household on screen, and then
+ * failed its own refresh because the person doing it was no longer allowed to
+ * list the members. It worked and reported failure, which is worse than not
+ * working.
+ *
+ * Note what removal does not do: it stops the server serving them new
+ * ciphertext, it does not take back the key they already hold. Only a rekey
+ * does that, and only for what is written afterwards.
+ */
+export async function removeMember(householdId: number, userId: number, leaving = false): Promise<void> {
+  await removeHouseholdMember(householdId, userId)
+  if (!leaving) return
+
+  // Nothing here is ours any more, so it goes rather than being reloaded.
+  households = households.filter(h => h.id !== householdId)
+  stashed.delete(householdId)
+  if (currentId === householdId) await switchTo('personal')
+}
+

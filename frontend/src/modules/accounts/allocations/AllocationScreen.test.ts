@@ -39,8 +39,9 @@ function entry(overrides: Partial<VaultEntry> & { id: string; name: string }): V
 
 function makeVault(): VaultData {
   return {
-    version: 8,
+    version: 9,
     tour: { completedAt: null, dismissedAt: null },
+    trust: { pins: {}, epochs: {} },
     accounts: [
       {
         id: 'main',

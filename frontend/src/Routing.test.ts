@@ -60,8 +60,18 @@ vi.mock('./lib/crypto/vaultStore.svelte', () => ({
     conflicted: false,
     lastSaved: null,
     versionAhead: false,
+    // Somebody who has never started a household. The switch draws nothing in
+    // that state, which is what every assertion below about the shell assumes.
+    identity: null,
+    households: [],
+    currentVaultId: 'personal',
+    currentHousehold: null,
   }),
   markDirty: vi.fn(),
+  switchTo: vi.fn(),
+  createHousehold: vi.fn(),
+  renameHousehold: vi.fn(),
+  deleteHousehold: vi.fn(),
 }))
 
 vi.mock('./lib/util/buildVersion.svelte', () => ({
@@ -233,6 +243,34 @@ describe('the shell', () => {
 
     await waitFor(() => expect(window.location.pathname).toBe('/budget'))
     expect(screen.queryByText('User Management')).toBeNull()
+  })
+
+  /**
+   * An invitation link has no button pointing at it anywhere, which is exactly
+   * why it was broken: the shell replaces any screen that is not a navigation
+   * destination, so every invitation link in existence quietly opened the
+   * budget instead. Arriving somewhere is not the same as navigating to it.
+   */
+  test('an invitation link opens the join screen rather than the budget', async () => {
+    currentUser = user
+    at('/join')
+
+    render(App)
+
+    // The point is the absence of a redirect: it stays where it was sent.
+    await waitFor(() => expect(window.location.pathname).toBe('/join'))
+  })
+
+  // An administrator has no vault, so no keypair, so nothing an invitation
+  // could ever be wrapped to. Their own landing screen beats one that could
+  // only fail.
+  test('but an administrator following one lands on their own screen', async () => {
+    currentUser = admin
+    at('/join')
+
+    render(App)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/users'))
   })
 
   test('an unrecognised address lands on the same place as /', async () => {

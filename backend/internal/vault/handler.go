@@ -23,7 +23,8 @@ type VaultStorer interface {
 	GetVault(ctx context.Context, userID int) (*Vault, error)
 	PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int, expectedUpdatedAt *time.Time) (time.Time, error)
 	GetEncryptedMEK(ctx context.Context, userID int) (string, int, error)
-	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string) error
+	GetIdentity(ctx context.Context, userID int) (Identity, error)
+	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string, identity Identity) error
 	UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error
 	GetRecoveryData(ctx context.Context, userID int) (string, string, error)
 }
@@ -125,9 +126,15 @@ func handleGetKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		// A failure here is not fatal: an identity is something a vault can be
+		// missing, and refusing to hand over the MEK because of it would lock a
+		// user out of a vault they can otherwise open perfectly well.
+		identity, _ := store.GetIdentity(r.Context(), user.ID)
+
 		writeJSON(w, http.StatusOK, KeysResponse{
 			EncryptedMEK: encMEK,
 			Iterations:   iterations,
+			Identity:     identity,
 		})
 	}
 }
@@ -158,6 +165,18 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		// All four halves or none. A public key stored without its private half
+		// would invite other users to wrap a shared vault key for someone who
+		// can never unwrap it — a failure that would surface much later, to the
+		// wrong person, as a vault that will not open.
+		//
+		// None is still allowed, because a client too old to send them must
+		// still be able to set a vault up.
+		if !req.Identity.Empty() && !req.Identity.Complete() {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "identity must be complete or absent"})
+			return
+		}
+
 		// The client sends the raw recovery key; we bcrypt-hash it for storage
 		hashedRecoveryKey, err := bcrypt.GenerateFromPassword([]byte(req.RecoveryKeyHash), bcrypt.DefaultCost)
 		if err != nil {
@@ -165,7 +184,7 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		if err := store.SetEncryptedMEK(r.Context(), user.ID, req.EncryptedMEK, string(hashedRecoveryKey), req.EncryptedMEKRecovery); err != nil {
+		if err := store.SetEncryptedMEK(r.Context(), user.ID, req.EncryptedMEK, string(hashedRecoveryKey), req.EncryptedMEKRecovery, req.Identity); err != nil {
 			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to save keys")
 			return
 		}
@@ -232,8 +251,11 @@ func handleRecovery(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		identity, _ := store.GetIdentity(r.Context(), user.ID)
+
 		writeJSON(w, http.StatusOK, RecoveryResponse{
 			EncryptedMEKRecovery: encMEKRecovery,
+			Identity:             identity,
 		})
 	}
 }

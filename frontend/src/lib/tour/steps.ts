@@ -1,7 +1,7 @@
 import type { EntryType } from '../crypto/vault'
 
 /**
- * The tour, as data.
+ * The two tours, as data.
  *
  * A step says *where*, *what to point at*, and — for the five that explain a
  * budget type — *which existing explanation to borrow*. What the rest of them
@@ -16,12 +16,22 @@ import type { EntryType } from '../crypto/vault'
  * therefore chrome — navigation, the dial, a sub-tab — which the shell renders
  * whether or not the vault holds anything.
  *
- * The five type sections are the deliberate exception, and they are only safe
- * because of `needsExampleBudget` below: the tour fills an empty budget with
- * the Swiss defaults before it reaches them, and those defaults now carry one
- * entry of every type. A user who already has a budget of their own keeps it,
- * and any type they happen not to use is skipped rather than shown empty.
+ * Sections of the budget are the deliberate exception, and they are only safe
+ * because of `example` below: from that step on the screens are shown a
+ * throwaway copy of the vault with an example budget in it, so the rows the
+ * step rings are there for everybody and the user's own figures are neither
+ * touched nor put on display.
  */
+/**
+ * Which walkthrough. There are two, and they are two rather than one long one
+ * because they answer different questions at different moments: the first is
+ * for somebody who has just signed in and does not know where anything is, the
+ * second for somebody who already uses the app and now wants to share part of
+ * it with another person. Bolting the second onto the end of the first would
+ * make every new user sit through an arrangement most of them do not have.
+ */
+export type TourId = 'basics' | 'shared'
+
 export type TourStepId =
   | 'welcome'
   | 'places'
@@ -36,6 +46,14 @@ export type TourStepId =
   | 'accounts'
   | 'allocations'
   | 'knowledge'
+  // The shared-budgets walkthrough.
+  | 'sharedWhat'
+  | 'sharedStart'
+  | 'sharedInvite'
+  | 'sharedSwitch'
+  | 'sharedEntries'
+  | 'sharedContributions'
+  | 'sharedKnowledge'
 
 export interface TourStep {
   id: TourStepId
@@ -69,14 +87,37 @@ export interface TourStep {
    */
   guideType?: EntryType
   /**
-   * Fill an empty budget with the Swiss defaults before showing this step.
+   * Show an example budget from this step on, instead of the user's own.
    *
-   * Set on the first step that wants a budget worth looking at, and it stays
-   * set for the rest of the tour — the five type steps after it point at real
-   * rows, and an empty budget has none. It never overwrites a budget that
-   * already has entries.
+   * Set on the first step that wants a budget worth looking at, and it holds
+   * for the rest of the tour — the steps after it point at real rows, and an
+   * empty budget has none. Nothing is written: the vault store hands the
+   * screens a throwaway copy, and it is the copy that gets seeded. See
+   * `prepare` in the store.
+   *
+   * Which example, because the two tours need different ones. `personal` is
+   * the starter budget a new user would be offered; `shared` is a household of
+   * two, whose income lines are contributions rather than salaries and whose
+   * expenses are only the ones two people genuinely share. Pointing the shared
+   * tour at the personal budget would have it explain a split over a plan that
+   * has nothing to split.
    */
-  needsExampleBudget?: true
+  example?: 'personal' | 'shared'
+  /**
+   * Stand an example household on the Profile card while this step shows.
+   *
+   * The budget's counterpart is `example` above, and the two work differently
+   * for a reason. A budget lives in the vault, so the store can hand the
+   * screens a filled copy of it. A household lives on the server — a row, a
+   * membership, an invitation — and there is no copy to hand anybody. Faking
+   * one would mean writing server state the rest of the app could then act on.
+   *
+   * So this is a picture instead: `ExampleHousehold.svelte`, inert, drawn in
+   * place of the real list. It matters because the step it belongs to explains
+   * inviting somebody, and the reader most likely to need that explanation is
+   * looking at "You have none yet."
+   */
+  exampleHousehold?: true
   /**
    * Let the pointer reach the thing being ringed.
    *
@@ -102,7 +143,7 @@ export const TOUR_STEPS: TourStep[] = [
   // anything at all, and explaining the plan first means explaining it to
   // someone who is still looking for the edit button.
   { id: 'controls', path: '/budget', anchor: 'dial', permeable: true },
-  { id: 'budget', path: '/budget', needsExampleBudget: true },
+  { id: 'budget', path: '/budget', example: 'personal' },
 
   { id: 'types', path: '/budget' },
   { id: 'typeIncome', path: '/budget', anchor: 'type-income', sub: true, guideType: 'income' },
@@ -120,6 +161,58 @@ export const TOUR_STEPS: TourStep[] = [
   // leave the user unable to find.
   { id: 'knowledge', path: '/knowledge', anchor: 'nav-knowledge' },
 ]
+
+/**
+ * The shared-budgets walkthrough.
+ *
+ * Shorter than the first on purpose. Its reader already knows what the budget
+ * screen is; what they do not know is that there can be more than one of them,
+ * where the second comes from, and what belongs in it.
+ *
+ * The order is the order somebody actually does this in — make it, ask the
+ * other person in, then learn to tell the two plans apart — and only then does
+ * it show a filled household plan. Explaining the shape of a shared budget
+ * before the reader has anywhere to put one leaves the interesting half
+ * sounding hypothetical.
+ *
+ * It says nothing about what a household plan should *not* hold. The example
+ * carries no premium and no 3a payment, because those are personal by law
+ * rather than by preference, but that is a fact about the example rather than
+ * a lesson the tour stops to teach — see `seedSharedDefaults`.
+ *
+ * Two steps ring the same card on Profile. Not an oversight: starting a
+ * household and asking somebody into it are deliberately separate acts, taken
+ * minutes or weeks apart, and they happen in the one place.
+ */
+export const SHARED_STEPS: TourStep[] = [
+  { id: 'sharedWhat', path: '/budget' },
+  { id: 'sharedStart', path: '/profile', anchor: 'household' },
+  { id: 'sharedInvite', path: '/profile', anchor: 'household', exampleHousehold: true },
+  // Seeds here rather than one step later, at `sharedPlan`: this step is about
+  // moving between two budgets, and an empty one behind it is a poor
+  // advertisement for having a second.
+  // The one step whose words fork by width: the switch is the dial's dot on a
+  // phone and the toolbar at the top of the screen on a desktop. One anchor
+  // covers both — see `data-tour` in `ActionDial` — and `wideBody` covers the
+  // sentence.
+  { id: 'sharedSwitch', path: '/budget', anchor: 'dial', permeable: true, example: 'shared' },
+  { id: 'sharedEntries', path: '/budget' },
+  { id: 'sharedContributions', path: '/budget', anchor: 'type-income' },
+  // Ends where it can be started again, for the reason the first tour does.
+  { id: 'sharedKnowledge', path: '/knowledge', anchor: 'nav-knowledge' },
+]
+
+/**
+ * Both walkthroughs, by id.
+ *
+ * The store reads this rather than either array, so a third would be a row
+ * here and a card on Knowledge — and the tests walk every tour in it rather
+ * than the one that happened to be written first.
+ */
+export const TOURS: Record<TourId, TourStep[]> = {
+  basics: TOUR_STEPS,
+  shared: SHARED_STEPS,
+}
 
 /**
  * What the counter shows for each step: `4`, or `5.2`.

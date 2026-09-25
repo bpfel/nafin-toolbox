@@ -3,6 +3,10 @@
   import { t } from '../i18n/index.svelte'
   import { getRoute } from './router.svelte'
   import { markDial } from './dial'
+  import { getVaultState } from '../crypto/vaultStore.svelte'
+  import { initialsOf } from '../crypto/household'
+  import HouseMark from '../household/HouseMark.svelte'
+  import VaultSwitch from '../household/VaultSwitch.svelte'
 
   /**
    * The controls that act on the whole screen: a toolbar on a desktop, a dial
@@ -43,6 +47,16 @@
   markDial()
 
   const route = getRoute()
+  const vaultState = getVaultState()
+
+  /**
+   * The household on screen, if any.
+   *
+   * The dot wears its mark instead of the three dots while one is open, because
+   * on a phone the dot is the only thing always visible — and which budget is
+   * being edited has to be answerable without opening anything.
+   */
+  const household = $derived(vaultState.currentHousehold)
 
   /**
    * Unique per dial, because there is more than one in the document.
@@ -144,6 +158,17 @@
       {saving ? t('state.saving') : dirty ? t('state.unsaved') : ''}
     </span>
 
+    <!--
+      Which budget this is, first in the strip and therefore leftmost on a
+      desktop toolbar. Before the spacer, so it stays with the screen's identity
+      rather than drifting into the row of things that act on it.
+
+      It draws nothing until a household exists: somebody who has never started
+      one has a single budget, and a control offering to switch to the only
+      thing there is would be furniture.
+    -->
+    <VaultSwitch />
+
     <span class="spacer"></span>
 
     {@render children()}
@@ -157,29 +182,43 @@
     type="button"
     aria-expanded={expanded}
     aria-controls={stripId}
-    aria-label={expanded ? t('action.close') : t('action.more')}
+    aria-label={expanded
+      ? t('action.close')
+      : household
+        ? `${t('action.more')} — ${household.name}`
+        : t('action.more')}
     title={expanded ? t('action.close') : t('action.more')}
     onclick={() => (expanded = !expanded)}
   >
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      {#if expanded}
-        <line x1="18" y1="6" x2="6" y2="18" />
-        <line x1="6" y1="6" x2="18" y2="18" />
-      {:else}
-        <!-- Three dots stacked the way the controls will be. -->
-        <circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" />
-        <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
-        <circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" />
-      {/if}
-    </svg>
+    {#if household && !expanded}
+      <!--
+        The house replaces the three dots rather than joining them. The dot is
+        56px and already carries the save ring on its rim; a mark and a glyph
+        together would be the fourth thing on a target meant to be hit without
+        looking.
+      -->
+      <HouseMark initials={initialsOf(household.name)} large />
+    {:else}
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        {#if expanded}
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        {:else}
+          <!-- Three dots stacked the way the controls will be. -->
+          <circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" />
+        {/if}
+      </svg>
+    {/if}
   </button>
 </div>
 
@@ -339,7 +378,20 @@
       outline-offset: 3px;
     }
 
-    .dot :global(svg) {
+    /*
+     * The dot's own glyph, and only that.
+     *
+     * This was `:global(svg)`, which reached every svg inside the dot —
+     * including one a child component had sized for itself. Svelte scopes the
+     * `.dot`, so the rule landed at (0,2,1) and beat the child's own (0,2,0):
+     * the house mark was held at 22px no matter what it asked for, and three
+     * separate attempts to enlarge it changed nothing at all.
+     *
+     * Dropping `:global` is the whole fix. The dot's svg is written here, so a
+     * plain selector still finds it, and a component that brings its own glyph
+     * now keeps its own size.
+     */
+    .dot svg {
       width: 22px;
       height: 22px;
     }
@@ -399,8 +451,30 @@
     }
 
     .dot,
-    .strip :global(.action) {
+    .strip :global(.action),
+    .strip :global(.vault-switch) {
       pointer-events: auto;
+    }
+
+    /*
+     * Which budget you are in goes to the far end of the stack, away from the
+     * thumb.
+     *
+     * It is the one thing here that is not an action: the rest of the column
+     * does something to the screen, and this says where the screen *is*. The
+     * rule the column is ordered by — what you reach for most, nearest the dot
+     * — puts it last for the same reason it puts the "+" first, and a row you
+     * open once a week sitting under the one you press constantly is how you
+     * end up switching household by accident.
+     *
+     * `order` rather than moving it in the markup, because the desktop wants
+     * the opposite: first in the strip, and therefore leftmost in the toolbar,
+     * with the screen's identity rather than among the things that act on it.
+     * In `column-reverse` the flow starts at the bottom, so a higher `order`
+     * is further from the dot — which is the top.
+     */
+    .strip :global(.vault-switch) {
+      order: 1;
     }
 
     /*
@@ -427,7 +501,8 @@
      * off, which is the urgent one, would cost the same two taps as turning it
      * on. `.pressed` is what a toggle already wears when it is on.
      */
-    .dial:not(.expanded) .strip :global(.action:not(.pressed)) {
+    .dial:not(.expanded) .strip :global(.action:not(.pressed)),
+    .dial:not(.expanded) .strip :global(.vault-switch) {
       display: none;
     }
 

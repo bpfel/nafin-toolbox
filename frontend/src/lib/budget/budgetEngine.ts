@@ -406,6 +406,24 @@ export interface PlanSummary {
  * the budget is built around: every franc of income is meant to be assigned, so
  * a balanced plan reads 0.00 rather than "some surplus somewhere".
  */
+/**
+ * Two decimals, and never negative nothing.
+ *
+ * These totals are accumulated as floats, so a plan that balances exactly to
+ * the rappen lands a hair either side of zero — and `(-4.5e-13).toFixed(2)` is
+ * the string `'-0.00'`. A household budget whose contributions are worked out
+ * from its own outgoings balances exactly by construction, so this is not a
+ * corner: it is the case the seeded household plan hits on first sight, and it
+ * would have shown the user a shortfall of minus nothing.
+ *
+ * Only the sign of a value that has already rounded to zero is touched. Any
+ * real shortfall, down to one rappen, still reads as one.
+ */
+function money(value: number): string {
+  const fixed = value.toFixed(2)
+  return fixed === '-0.00' ? '0.00' : fixed
+}
+
 export function getPlanSummary(vault: VaultData): PlanSummary {
   const categories = vault.budget.categories
 
@@ -453,17 +471,17 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
 
   return {
     entries,
-    totalPlannedIncome: totalPlannedIncome.toFixed(2),
-    totalPlannedExpenses: totalPlannedExpenses.toFixed(2),
+    totalPlannedIncome: money(totalPlannedIncome),
+    totalPlannedExpenses: money(totalPlannedExpenses),
     // Savings, bills and purchases: out of what is spendable, but still yours.
     // Nothing could add this up before — the three were disguised as expenses,
     // and the allocation screen inferred it from routing on every keystroke.
-    totalPlannedSavings: totalPlannedSavings.toFixed(2),
-    plannedBalance: (totalPlannedIncome - totalPlannedExpenses - totalPlannedSavings).toFixed(2),
-    yearlyIncome: yearlyIncome.toFixed(2),
-    yearlyExpenses: yearlyExpenses.toFixed(2),
-    yearlySavings: yearlySavings.toFixed(2),
-    yearlyBalance: (yearlyIncome - yearlyExpenses - yearlySavings).toFixed(2),
+    totalPlannedSavings: money(totalPlannedSavings),
+    plannedBalance: money(totalPlannedIncome - totalPlannedExpenses - totalPlannedSavings),
+    yearlyIncome: money(yearlyIncome),
+    yearlyExpenses: money(yearlyExpenses),
+    yearlySavings: money(yearlySavings),
+    yearlyBalance: money(yearlyIncome - yearlyExpenses - yearlySavings),
   }
 }
 
@@ -681,4 +699,137 @@ export function seedDefaults(vault: VaultData, locale: Locale = 'en', anchorMont
     })
     setPlanned(vault, entry.id, d.amount)
   }
+}
+
+
+/**
+ * The starter budget for a household shared by two people.
+ *
+ * Offered by the setup screen when the budget being set up belongs to a
+ * household, and shown by the shared-budgets walkthrough as a preview that is
+ * never written. A different budget from `seedDefaults` rather than the same
+ * one with two salaries in it, because a household plan is not a personal plan
+ * with company. Two things distinguish it:
+ *
+ * **Only what arrives once for the dwelling.** Rent, the service charges, the
+ * power, the heating, the food, the radio levy, the insurance on the home and
+ * the stock of things in it. Not the GA, not the 3a payment, not a health
+ * insurance premium, not a wardrobe — those are bought by a person, not by a
+ * flat.
+ *
+ * **The income side is contributions, not wages.** Nobody's salary is paid
+ * into a household; each person pays a share of theirs in. So the two income
+ * lines are what Alex and Sam put in, and they come to exactly what goes out.
+ * The split is 60/40, which is what proportional-to-income gives for a pair
+ * earning unequally, and the odd rappen are the honest consequence of that
+ * rather than something to round away.
+ *
+ * **Where the figures come from.** BFS, *Detaillierte Haushaltsausgaben nach
+ * Haushaltstyp* (`je-d-20.02.01.02.13`), column **Paare unter 65 Jahren ohne
+ * Kinder** — a working-age couple with no children, which is the household
+ * this budget is for. Francs per month per household, so nothing here has been
+ * doubled or divided.
+ *
+ * It is the **2020–2021** wave, while `seedDefaults` uses HABE 2023. Not an
+ * oversight: the annual sample is about three thousand households, too small
+ * to break down by household type, so the BFS pools three years for these
+ * columns and 2020–2021 is the newest pooled wave published. The setup screen
+ * says which wave it is using, and the upkeep register carries both.
+ *
+ * **Health insurance is not seeded**, though the survey reports 688.67 a month
+ * for this household. The Grundversicherung is contracted per person, priced
+ * per person, and subsidised per person, and putting it in the shared plan by
+ * default would quietly decide something that is the couple's to decide. A
+ * pair who do pay both premiums from a joint account add a line in a few
+ * seconds; a pair who do not would have to notice the line was wrong, work out
+ * why, and delete it. The default belongs where being wrong costs less.
+ *
+ * @param anchorMonth `YYYY-MM`, for the two reserves. See `seedDefaults`.
+ */
+export function seedSharedDefaults(
+  vault: VaultData,
+  locale: Locale = 'en',
+  anchorMonth = '2026-01',
+): void {
+  if (vault.budget.entries.length > 0) return
+
+  const name = seedNamesFor(locale)
+
+  for (const dc of sharedDefaultCategories()) {
+    createCategory(vault, name[dc.key], dc.type, dc.sortOrder)
+  }
+
+  for (const d of sharedDefaults()) {
+    const entry = createEntry(vault, {
+      name: name[d.key],
+      type: d.type,
+      categoryName: name[d.categoryKey],
+      sortOrder: d.sortOrder,
+      anchorMonth,
+      targetAmount: d.targetAmount,
+      periodMonths: d.periodMonths,
+    })
+    setPlanned(vault, entry.id, d.amount)
+  }
+}
+
+function sharedDefaultCategories(): DefaultCategory[] {
+  return [
+    { key: 'cat.contributions', type: 'income', sortOrder: 1 },
+    { key: 'cat.housing', type: 'expense', sortOrder: 10 },
+    { key: 'cat.living', type: 'expense', sortOrder: 20 },
+    { key: 'cat.insurance', type: 'expense', sortOrder: 30 },
+    { key: 'cat.savings', type: 'expense', sortOrder: 40 },
+  ]
+}
+
+function sharedDefaults(): DefaultEntry[] {
+  return [
+    // 60/40 of 2'477.60, the total below. Not halves: the two earn
+    // differently, and splitting a shared cost down the middle when the
+    // incomes are not equal is the thing a proportional arrangement exists to
+    // avoid. Edit any figure below and these two have to move with it — a
+    // test holds them to it.
+    { key: 'contributionAlex', type: 'income', sortOrder: 10, categoryKey: 'cat.contributions', amount: '1486.56' },
+    { key: 'contributionSam', type: 'income', sortOrder: 20, categoryKey: 'cat.contributions', amount: '991.04' },
+
+    // 5711: net rent or mortgage interest on the main residence.
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1238.54' },
+    // 5712: Nebenkosten — the service charges a Swiss tenant pays beside the
+    // rent. Rubbish, water, drainage, and the flat-rate share of the rest.
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '145.12' },
+    // 5713.01. Split out from heating because the survey splits them, and
+    // because they arrive on different bills from different suppliers.
+    { key: 'electricity', type: 'expense', sortOrder: 30, categoryKey: 'cat.housing', amount: '70.58' },
+    // 5713.02 + 5713.03: gas and other fuels, plus central or district
+    // heating. The two together with electricity are exactly the survey's
+    // 106.59 for energy at the main residence, so the split reconciles.
+    { key: 'heating', type: 'expense', sortOrder: 40, categoryKey: 'cat.housing', amount: '36.02' },
+    // Serafe collects the federal radio and television levy. It is charged per
+    // *dwelling*, which is why it belongs in a shared budget at all, and it is
+    // the one bill that is the same for every household in the country — an
+    // amount known in advance, arriving on a known cycle.
+    //
+    // 335.00 a year is the rate set by the Federal Council, unchanged since
+    // 2021. It drops to 312.00 on 1 January 2027; the upkeep register has the
+    // date. Not a HABE figure, and the only line here that is not.
+    { key: 'serafe', type: 'bill', sortOrder: 50, categoryKey: 'cat.housing', amount: '27.92', targetAmount: '335.00', periodMonths: 12 },
+
+    // 51: food and non-alcoholic drinks.
+    { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '715.63' },
+
+    // 4201: contents, liability, fire and building cover. Insurance on the
+    // home rather than on a person, and the only premium here for that reason
+    // — the survey's 688.67 of health insurance is not seeded. See above.
+    { key: 'householdInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insurance', amount: '41.95' },
+
+    // 581 + 582 + 583: furniture and furnishings, household textiles, and
+    // kitchen and household appliances. What a home is furnished and equipped
+    // with, which wears out and gets replaced — so it is a `purchase`, saved
+    // towards, rather than a cost that lands every month.
+    //
+    // The monthly figure is the survey's, added up; the five-year horizon is
+    // only how that figure is expressed as a target, and the user moves it.
+    { key: 'inventoryReserve', type: 'purchase', sortOrder: 10, categoryKey: 'cat.savings', amount: '201.84', targetAmount: '12110.40', periodMonths: 60 },
+  ]
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { accountKindLabel } from '../../../lib/accounts/labels'
   import { t } from '../../../lib/i18n/index.svelte'
-  import type { AccountKind, VaultAccount } from '../../../lib/crypto/vault'
+  import type { VaultAccount } from '../../../lib/crypto/vault'
   import { formatAmount, moneyInput } from '../../../lib/util/money'
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
@@ -29,15 +30,6 @@
   }
 
   let { account, projected, required, available, currentMonth, canDelete, canReorder, onedit, ondelete, onqrbill, onallocated, oncorrect }: Props = $props()
-
-  const KIND_LABELS: Record<AccountKind, string> = {
-    transactional: 'Transactional',
-    reserves: 'Reserves',
-    savings: 'Savings',
-    cash: 'Cash',
-    retirement_3a: 'Pillar 3a',
-    investment: 'Investment',
-  }
 
   // QR capability follows from having an IBAN, never from the kind. A `cash`
   // account simply never has one.
@@ -117,7 +109,7 @@
     <div class="identity">
       <h3>{account.name}</h3>
       <p class="meta">
-        <span class="kind">{KIND_LABELS[account.kind]}</span>
+        <span class="kind">{accountKindLabel(account.kind)}</span>
         {#if account.bankName}<span class="bank">· {account.bankName}</span>{/if}
       </p>
     </div>

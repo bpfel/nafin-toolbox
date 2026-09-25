@@ -86,7 +86,12 @@
         note: guide.note ? t(guide.note) : undefined,
       }
     }
-    return copy[step.id] ?? null
+    const written = copy[step.id]
+    if (!written) return null
+    // A step whose control lives in two places at two widths. `wide` is
+    // already maintained for the placement maths, so this costs no new
+    // listener and follows exactly the breakpoint the shell switches on.
+    return written.wideBody && wide ? { ...written, body: written.wideBody } : written
   })
 
   // The tour's own words come from the article content modules, not the

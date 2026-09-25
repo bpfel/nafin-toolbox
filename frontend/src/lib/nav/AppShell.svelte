@@ -11,6 +11,7 @@
   import { getVaultState } from '../crypto/vaultStore.svelte'
   import { shouldOfferTour } from '../tour/tourState'
   import ProfileScreen from '../../screens/ProfileScreen.svelte'
+  import JoinHousehold from '../household/JoinHousehold.svelte'
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
   import UpkeepScreen from '../../screens/UpkeepScreen.svelte'
@@ -27,10 +28,12 @@
   interface Props {
     email: string
     role: string
+    /** Passed through to Profile, where a household's member list needs it. */
+    userId?: number | null
     onlogout: () => void
   }
 
-  let { email, role, onlogout }: Props = $props()
+  let { email, role, userId = null, onlogout }: Props = $props()
 
   const route = getRoute()
   const vaultState = getVaultState()
@@ -49,7 +52,23 @@
   let offerTour = $derived(
     !isAdmin && route.screen === 'budget' && shouldOfferTour(vaultState.vault),
   )
-  let reachable = $derived(new Set(destinationsFor(role).map((d) => d.screen)))
+  /**
+   * Screens you can arrive at but cannot navigate to.
+   *
+   * `join` is reached by following an invitation link and has no button
+   * anywhere, by design — there is nothing to go back to and nobody browses to
+   * it. Without this it was treated as a typo and replaced with the landing
+   * screen, so every invitation link in existence quietly opened the budget.
+   *
+   * Not for an administrator: they have no vault, so no keypair, so nothing an
+   * invitation could ever be wrapped to. Sending them to their own landing
+   * screen is the right answer rather than a screen that could only fail.
+   */
+  let arrivable = $derived<Screen[]>(isAdmin ? [] : ['join'])
+
+  let reachable = $derived(
+    new Set([...destinationsFor(role).map((d) => d.screen), ...arrivable]),
+  )
 
   /**
    * Sends `/`, a typo, and another role's address to wherever this role starts.
@@ -103,7 +122,9 @@
       {:else if route.screen === 'upkeep'}
         <UpkeepScreen />
       {:else if route.screen === 'profile'}
-        <ProfileScreen {email} {role} {onlogout} />
+        <ProfileScreen {email} {role} {userId} {onlogout} />
+      {:else if route.screen === 'join'}
+        <JoinHousehold />
       {/if}
     {:else}
       <!--
@@ -139,7 +160,11 @@
       {/if}
 
       {#if route.screen === 'profile'}
-        <ProfileScreen {email} {role} {onlogout} />
+        <ProfileScreen {email} {role} {userId} {onlogout} />
+      {/if}
+
+      {#if route.screen === 'join'}
+        <JoinHousehold />
       {/if}
     {/if}
   </main>

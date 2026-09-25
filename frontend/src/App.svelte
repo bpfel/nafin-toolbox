@@ -321,6 +321,7 @@
   <AppShell
     email={authState.currentUser.email}
     role={authState.currentUser.role}
+    userId={authState.currentUser.id}
     onlogout={handleLogout}
   />
 {/if}

@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest'
 import { loadContent, type PartialContent } from './content'
 import { en } from './content/en'
 import { ARTICLES } from './registry'
-import { TOUR_STEPS, type TourStepId } from '../tour/steps'
+import { TOURS, type TourStepId } from '../tour/steps'
 
 /**
  * Guards the translated content modules.
@@ -26,14 +26,20 @@ function translations(): [string, PartialContent][] {
     .map(([path, module]) => [path.replace('./content/', '').replace('.ts', ''), module.default])
 }
 
-const STEP_IDS = new Set<string>(TOUR_STEPS.map(s => s.id))
+/**
+ * Every step of every walkthrough. Copy is keyed by step id with no note of
+ * which tour it belongs to, so both tours draw on the one pool and both are
+ * checked against it.
+ */
+const ALL_STEPS = Object.values(TOURS).flat()
+const STEP_IDS = new Set<string>(ALL_STEPS.map(s => s.id))
 
 /**
  * The steps whose words live here at all. The five type steps take theirs
  * from `TYPE_GUIDES` in the catalogue, so a locale that does not mention them
  * is complete rather than lacking.
  */
-const WRITTEN_STEPS = TOUR_STEPS.filter(s => !s.guideType)
+const WRITTEN_STEPS = ALL_STEPS.filter(s => !s.guideType)
 const ARTICLE_IDS = new Set<string>(ARTICLES.map(a => a.id))
 
 describe('every translation is wired to something real', () => {

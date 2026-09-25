@@ -6,9 +6,8 @@
   import { articlesIn, type ArticleMeta, type ArticleSection } from '../lib/knowledge/registry'
   import { loadContent, type LoadedContent } from '../lib/knowledge/content'
   import { en } from '../lib/knowledge/content/en'
-  import { getVaultState } from '../lib/crypto/vaultStore.svelte'
   import { startTour } from '../lib/tour/tourStore.svelte'
-  import { hasTakenTour } from '../lib/tour/tourState'
+  import type { TourId } from '../lib/tour/steps'
 
   /**
    * Where the app explains itself.
@@ -23,8 +22,6 @@
    * is a hard stop, and a library of short pieces is exactly the case that
    * tempts you into a third.
    */
-  const vaultState = getVaultState()
-
   let loaded = $state<LoadedContent>({ content: en, translated: new Set() })
   let open = $state<ArticleMeta | null>(null)
 
@@ -39,7 +36,32 @@
     }
   })
 
-  let taken = $derived(hasTakenTour(vaultState.vault))
+  /**
+   * The walkthroughs, in the order they are useful.
+   *
+   * Basics first because it is what a lost person needs; shared second because
+   * it describes an arrangement you go looking for. Data rather than two
+   * hand-written cards, so a third walkthrough is a row here.
+   *
+   * Each card says the same thing every time it is seen. There was a second
+   * title and a second button label for somebody who had already been through
+   * one — "Take the tour again", "Start again" — and they bought nothing: a
+   * returning reader knows they have been here, and the card that greeted them
+   * differently was reporting a fact the app had to keep in the vault in order
+   * to have. A walkthrough is a thing you run, not a thing you have done.
+   */
+  const TOURS: { id: TourId; title: () => string; body: () => string }[] = [
+    {
+      id: 'basics',
+      title: () => t('knowledge.tourTitle'),
+      body: () => t('knowledge.tourBody'),
+    },
+    {
+      id: 'shared',
+      title: () => t('knowledge.sharedTourTitle'),
+      body: () => t('knowledge.sharedTourBody'),
+    },
+  ]
 
   const SECTIONS: { id: ArticleSection; heading: () => string }[] = [
     { id: 'about', heading: () => t('knowledge.about') },
@@ -51,19 +73,29 @@
 
 <div class="knowledge">
   <!--
-    The tour, first and on its own. It is the only thing on this screen that
-    does something rather than says something, so it does not sit in a list of
-    articles pretending to be one.
+    The walkthroughs, first and on their own. They are the only things on this
+    screen that do something rather than say something, so they do not sit in a
+    list of articles pretending to be articles.
+
+    No heading over the pair. Two cards that each name themselves need no label
+    saying they are two cards, and the section headings below earn theirs by
+    separating things that would otherwise run together.
   -->
-  <section class="settings-card tour-card">
-    <div class="tour-text">
-      <h2>{taken ? t('knowledge.tourAgainTitle') : t('knowledge.tourTitle')}</h2>
-      <p>{t('knowledge.tourBody')}</p>
-    </div>
-    <button class="start" onclick={startTour}>
-      {taken ? t('knowledge.tourAgain') : t('knowledge.tourStart')}
-    </button>
-  </section>
+  <div class="tours">
+    {#each TOURS as tour (tour.id)}
+      <section class="settings-card tour-card">
+        <div class="tour-text">
+          <h2>{tour.title()}</h2>
+          <p>{tour.body()}</p>
+        </div>
+        <!-- One label, on every card and every visit. Deliberately generic:
+             what is being started is the heading two lines up. -->
+        <button class="start" onclick={() => startTour(tour.id)}>
+          {t('knowledge.tourStart')}
+        </button>
+      </section>
+    {/each}
+  </div>
 
   {#each SECTIONS as section (section.id)}
     {@const articles = articlesIn(section.id)}
@@ -109,12 +141,39 @@
     gap: 1.5rem;
   }
 
+  /* Tighter between the two walkthroughs than between them and the library:
+     they are one group, and equal spacing everywhere would say otherwise. */
+  .tours {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  /*
+   * The button sits in the same place on every card, which needs saying in CSS
+   * because it does not follow from the flex row on its own.
+   *
+   * `flex-wrap: wrap` was how the row coped with a narrow screen, and with two
+   * cards it became a bug you could see: one body ran a few characters longer
+   * than the other, the row wrapped, and that card's Start dropped to a line of
+   * its own while its neighbour's stayed on the right. A control that moves
+   * because of the length of the sentence above it reads as two different
+   * kinds of card.
+   *
+   * `min-width: 0` on the text is what replaces the wrap. Without it a flex
+   * item refuses to shrink past its longest word, which is what pushed the
+   * button out of the row in the first place; with it the sentence takes as
+   * many lines as it needs and the button never leaves the right-hand edge.
+   */
   .tour-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    flex-wrap: wrap;
+  }
+
+  .tour-text {
+    min-width: 0;
   }
 
   .tour-text h2 {

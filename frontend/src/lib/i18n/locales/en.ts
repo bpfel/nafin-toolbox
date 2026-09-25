@@ -137,6 +137,85 @@ export const en = {
   'action.more': 'Actions',
 
   // --- Security settings ---
+  'household.duplicate': 'You already have a household called that.',
+  'invite.leaveConfirm': 'Leave',
+  'invite.removeConfirm': 'Remove {name}',
+
+  'role.owner': 'Owner',
+  'role.writer': 'Can edit',
+  'role.reader': 'Can view',
+  'invite.roleLabel': 'They may',
+  'invite.changeRole': 'Change what {name} may do',
+  'invite.refresh': 'Check for an answer',
+  'invite.inviteAction': 'Invite someone',
+  'invite.createAction': 'Create the invitation',
+  'invite.cancelAction': 'Cancel',
+  'invite.doneAction': 'Done',
+
+  'invite.codeFor': 'Invitation for {name}',
+  'invite.showCode': 'Show the code for {name}',
+
+  // --- Following an invitation link ---
+  'join.working': 'Joining…',
+  'join.doneTitle': 'Invitation accepted',
+  // Names what has to happen, because it is not instant and not theirs to
+  // hurry: the key can only be wrapped by a member's device. Saying "they
+  // still have to let you in" implied a button somebody was ignoring.
+  'join.doneHint': 'The household arrives the next time whoever invited you opens the app.',
+  'join.failedTitle': 'That invitation did not work',
+  'join.failedHint': 'It may have expired, been withdrawn, or been meant for a different address. Ask for a new one.',
+  'join.continue': 'Continue',
+
+  // --- Inviting somebody in ---
+  'invite.title': 'People',
+  'invite.add': 'Invite someone',
+  'invite.emailLabel': 'Their email address',
+  'invite.emailInvalid': 'That doesn’t look like an email address.',
+  'invite.send': 'Create invitation',
+  'invite.creating': 'Creating…',
+  'invite.linkReady': 'Send them this link yourself. It is shown once and cannot be recovered.',
+  'invite.linkWhy': 'Sending it yourself is what lets the app check their key for you. Scanning the code is the surest way.',
+  'invite.copy': 'Copy link',
+  'invite.copied': 'Copied',
+  'invite.done': 'Done',
+  // One word each. They sit in a row beside an address, a role and two
+  // symbols, and at 400px the long forms — "Invited, waiting for them",
+  // "Accepted — ready to let in" — pushed the buttons onto lines of their own.
+  // The second was also describing a button that no longer exists: an
+  // acceptance whose key checks out is let in without anybody being asked.
+  'invite.pending': 'Invited',
+  'invite.accepted': 'Accepted',
+  'invite.mismatch': 'The key offered for this person does not match the invitation. Do not let them in; invite them again.',
+  'invite.withdraw': 'Withdraw',
+  'invite.expires': 'Expires {when}',
+  'invite.remove': 'Remove',
+  'invite.leave': 'Leave',
+  'invite.leaveWarning': 'You will not see {name} any more. Somebody still in it can invite you back.',
+  'invite.leaveOwner': 'You look after {name}. If you leave, {successor} takes it over.',
+  'invite.removeWarning': 'They keep what they have already seen. Removing them only stops them seeing what comes next.',
+
+  // --- Households ---
+  'household.title': 'Households',
+  'household.hint': 'A household is a budget you can share. Nothing is shared until you invite someone.',
+  'household.none': 'You have none yet.',
+  'household.create': 'Start a household',
+  'household.nameLabel': 'Name',
+  'household.namePlaceholder': 'Zuhause, Flat with Anna…',
+  'household.creating': 'Creating…',
+  'household.owner': 'Yours',
+  'household.member': 'Shared with you',
+  'household.rename': 'Rename',
+  'household.delete': 'Delete',
+  'household.deletePrompt': 'Delete {name}? Everything in it is lost, for everyone in it.',
+  'household.deleting': 'Deleting…',
+  'household.switchLabel': 'Open a household',
+  // Titles the sheet a phone gets, which lists the personal budget too — so
+  // not `switchLabel`, which only offers to open a household.
+  'household.chooseBudget': 'Choose a budget',
+  'household.personal': 'Personal',
+  'household.needsKeys': 'Set up encryption before starting a household.',
+  'household.failed': 'That did not work. Try again.',
+
   'security.twofaTitle': 'Two-Factor Authentication',
   'security.currentPasswordPlaceholder': 'Current password',
   'security.disablePrompt': 'Enter your password to disable 2FA:',
@@ -209,6 +288,11 @@ export const en = {
   'budget.reset': 'Reset budget',
   'budget.setupTitle': 'Set up your budget',
   'budget.setupHint': 'Start with default Swiss budget entries based on BFS household survey data (HABE 2023, single person). You can customize everything later.',
+  // The household variant. A different population and a different wave of
+  // the same survey, because the annual sample is too small to break down
+  // by household type and the BFS pools three years for those columns.
+  'budget.setupHintHousehold': 'Start with default Swiss entries for a two-person household, based on BFS household survey data (HABE 2020–2021, couples under 65 without children). You can customize everything later.',
+  'budget.readOnlyEmpty': 'Nothing is planned here yet. You can view this household but not change it, so setting it up is for somebody who can.',
 
   // --- Entry dialog ---
   'entry.editTitle': 'Edit entry',
@@ -501,10 +585,12 @@ export const en = {
 
   // --- Knowledge: the library, and the guided tour that lives in it ---
   'knowledge.tourTitle': 'Take the tour',
-  'knowledge.tourAgainTitle': 'Take the tour again',
   'knowledge.tourBody': 'A short walk through the main views and the controls on them.',
   'knowledge.tourStart': 'Start',
-  'knowledge.tourAgain': 'Start again',
+  // The second walkthrough. Its own title and body; the buttons are shared
+  // with the first, because "Start" says all a button needs to.
+  'knowledge.sharedTourTitle': 'Set up shared budgets',
+  'knowledge.sharedTourBody': 'How two people keep a household plan beside their own, and who may change it.',
   'knowledge.about': 'About this app',
   'knowledge.swiss': 'Swiss basics',
   'knowledge.sources': 'Official sources',

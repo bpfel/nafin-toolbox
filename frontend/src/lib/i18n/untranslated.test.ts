@@ -231,3 +231,50 @@ describe('no English left in the interface', () => {
     expect(offenders.length, `\n${offenders.join('\n')}\n`).toBe(0)
   })
 })
+
+/**
+ * English kept in a keyed map: `transactional: 'Transactional'`.
+ *
+ * The shape the scan above could not see, in two places at once. Its object-
+ * literal rule looks for a property *named* for text — `label:`, `title:` —
+ * and this one is named after the value it maps. And one copy lived in a `.ts`
+ * module, which the scan never read at all. So "Transactional" stayed English
+ * on the account card and in the routing picker in every language, while the
+ * catalogue beside it had carried *Zahlungsverkehr* the whole time.
+ *
+ * A lowercase key and a capitalised word or phrase as its value, in components
+ * and in the library modules they draw on. Anything that means to be English —
+ * the admin screens, the catalogues, prose content, names seeded as data — is
+ * excluded by path, below, rather than by a pattern that would also excuse the
+ * next map like this.
+ */
+const MODULES = import.meta.glob(['/src/lib/**/*.ts', '/src/modules/**/*.ts'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+const MEANT_TO_BE_ENGLISH = [
+  '.test.ts',
+  '/i18n/locales/',
+  '/knowledge/content/',
+  '/budget/seedNames.ts', // data, written once in the user's language
+  '/upkeep/register.ts', // read on the admin-only upkeep screen
+]
+
+const KEYED_ENGLISH = /^\s+[a-z_0-9]+\s*:\s*'([A-Z][a-z]{2,}(?: [A-Za-z0-9]+)*)',/gm
+
+describe('no English is kept in a keyed map', () => {
+  test('in components or the modules they use', () => {
+    const sources: [string, string][] = [
+      ...scannable().map(([path, src]) => [path, scriptOf(src)] as [string, string]),
+      ...Object.entries(MODULES).filter(([path]) => !MEANT_TO_BE_ENGLISH.some(p => path.includes(p))),
+    ]
+
+    const offenders = sources.flatMap(([file, src]) =>
+      [...src.matchAll(KEYED_ENGLISH)].map(m => `${file} ${m[1]}`),
+    )
+
+    expect(offenders.length, `\n${offenders.join('\n')}\n`).toBe(0)
+  })
+})

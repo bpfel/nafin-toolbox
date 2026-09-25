@@ -21,6 +21,7 @@ import {
   resetBudget,
   deleteSnapshot,
   seedDefaults,
+  seedSharedDefaults,
 } from './budgetEngine'
 import { createEmptyVault, holdsMoney, savesTowardsTarget, type VaultData } from '../crypto/vault'
 import { isLegalEntryRouting, isLegalRouting, primaryAccountId } from '../accounts/routing'
@@ -1726,5 +1727,176 @@ describe('seedDefaults in another language', () => {
     updateEntry(vault, rent.id, { name: 'Miete WG' })
 
     expect(listEntries(vault).find(e => e.id === rent.id)!.name).toBe('Miete WG')
+  })
+})
+
+/**
+ * The household example, which the shared-budgets walkthrough puts on screen.
+ *
+ * Two claims are worth holding here, because both are things a reader is told
+ * in as many words and would have no way to check.
+ */
+describe('a plan that balances exactly', () => {
+  /**
+   * The bug the household seed found on its first run.
+   *
+   * Its contributions are worked out from its own outgoings, so it balances to
+   * the rappen by construction — and the totals are accumulated as floats, so
+   * the subtraction lands a hair below zero and `toFixed(2)` keeps the sign.
+   * The screen said the plan was short by minus nothing.
+   */
+  test('reports zero rather than minus zero', () => {
+    const vault = createEmptyVault()
+    const income = createEntry(vault, { name: 'In', type: 'income', categoryName: 'A' })
+    const a = createEntry(vault, { name: 'A', type: 'expense', categoryName: 'B' })
+    const b = createEntry(vault, { name: 'B', type: 'expense', categoryName: 'B' })
+    setPlanned(vault, income.id, '2477.60')
+    setPlanned(vault, a.id, '2247.84')
+    setPlanned(vault, b.id, '229.76')
+
+    const summary = getPlanSummary(vault)
+
+    expect(summary.plannedBalance).toBe('0.00')
+    expect(summary.yearlyBalance).toBe('0.00')
+  })
+
+  // The sign is only taken off a value that has already rounded to zero.
+  test('one rappen short is still one rappen short', () => {
+    const vault = createEmptyVault()
+    const income = createEntry(vault, { name: 'In', type: 'income', categoryName: 'A' })
+    const out = createEntry(vault, { name: 'Out', type: 'expense', categoryName: 'B' })
+    setPlanned(vault, income.id, '100.00')
+    setPlanned(vault, out.id, '100.01')
+
+    expect(getPlanSummary(vault).plannedBalance).toBe('-0.01')
+  })
+})
+
+describe('seedSharedDefaults', () => {
+  test('the two contributions come to exactly what goes out', () => {
+    // The point of the example is a household that is funded, so a figure
+    // edited without the others would leave the tour showing a shared budget
+    // that does not add up — and nothing else would notice.
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+    const summary = getPlanSummary(vault)
+
+    // Expenses *and* what is only being held: the Serafe reserve and the joint
+    // set-aside leave the shared account every month like anything else, and a
+    // contribution that covered only `expense` would come up short every year.
+    const out = Number(summary.totalPlannedExpenses) + Number(summary.totalPlannedSavings)
+    expect(Number(summary.totalPlannedIncome)).toBeCloseTo(out, 2)
+    expect(summary.plannedBalance).toBe('0.00')
+  })
+
+  test('the split is 60/40, not halves', () => {
+    // Equal shares would quietly undo the point of the example — that people
+    // who earn differently need not pay the same. Not stated in the copy, so
+    // this is the only thing holding it.
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+    const [alex, sam] = listEntries(vault)
+      .filter(e => e.type === 'income')
+      .map(e => Number(plannedFor(vault, e.id)))
+
+    expect(alex).not.toBe(sam)
+    expect(alex / (alex + sam)).toBeCloseTo(0.6, 4)
+  })
+
+  test('income arrives as two contributions rather than one salary', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+
+    expect(listEntries(vault).filter(e => e.type === 'income')).toHaveLength(2)
+  })
+
+  /**
+   * Nothing bought by a person rather than by the dwelling.
+   *
+   * Health insurance is the one the survey would have let us seed — it reports
+   * 688.67 a month for this household — and it stays out: the premium is
+   * contracted, priced and subsidised per person, so seeding it would decide
+   * something that is the couple's to decide. The insurance heading is there
+   * for the cover on the home, which is shared by construction.
+   */
+  test('holds nothing bought by a person rather than by the home', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+    const names = listEntries(vault).map(e => e.name)
+
+    expect(names).not.toContain('Health Insurance')
+    expect(names).not.toContain('Pillar 3a')
+    expect(names).not.toContain('GA travelcard')
+    expect(names).not.toContain('Clothing & Footwear')
+    expect(names).toContain('Household insurance')
+  })
+
+  /**
+   * That each figure is the survey's, unrounded.
+   *
+   * Written out rather than derived, because the point is that somebody read
+   * them off `je-d-20.02.01.02.13` — a test that recomputed them from the seed
+   * would agree with any typo the seed contained.
+   */
+  test('carries the BFS figures for a couple under 65 without children', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+    const planned = Object.fromEntries(
+      listEntries(vault).map(e => [e.name, plannedFor(vault, e.id)]),
+    )
+
+    expect(planned['Rent']).toBe('1238.54')
+    expect(planned['Utilities']).toBe('145.12')
+    expect(planned['Electricity']).toBe('70.58')
+    expect(planned['Heating']).toBe('36.02')
+    expect(planned['Food & Groceries']).toBe('715.63')
+    expect(planned['Household insurance']).toBe('41.95')
+    expect(planned['Inventory reserve']).toBe('201.84')
+  })
+
+  // The survey reports 106.59 for energy at the main residence, and the seed
+  // shows it as two lines because it arrives on two bills. They have to still
+  // add up, or the split has quietly become an estimate.
+  test('electricity and heating reconcile with the survey’s energy line', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+    const at = (name: string) =>
+      Number(plannedFor(vault, listEntries(vault).find(e => e.name === name)!.id))
+
+    expect(at('Electricity') + at('Heating')).toBeCloseTo(106.6, 2)
+  })
+
+  test('writes a planned amount for every entry', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault)
+
+    expect(vault.budget.plan).toHaveLength(vault.budget.entries.length)
+    for (const entry of vault.budget.entries) {
+      expect(plannedFor(vault, entry.id)).not.toBe('0.00')
+    }
+  })
+
+  test('is named in the chosen language', () => {
+    const vault = createEmptyVault()
+
+    seedSharedDefaults(vault, 'de')
+
+    expect(listCategories(vault).map(c => c.name)).toContain('Beiträge')
+  })
+
+  test('does not seed over a budget that already has entries', () => {
+    const vault = createEmptyVault()
+    createEntry(vault, { name: 'Existing', type: 'income', categoryName: 'Category' })
+
+    seedSharedDefaults(vault)
+
+    expect(vault.budget.entries).toHaveLength(1)
   })
 })

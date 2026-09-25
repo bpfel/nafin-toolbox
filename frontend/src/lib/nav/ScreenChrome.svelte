@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { t } from '../i18n/index.svelte'
-  import { isEditing, toggleEditing } from '../util/editMode.svelte'
+  import { isEditing, toggleEditing, clearEditing } from '../util/editMode.svelte'
   import { getVaultState } from '../crypto/vaultStore.svelte'
   import ActionButton from './ActionButton.svelte'
   import ActionDial from './ActionDial.svelte'
@@ -58,6 +58,17 @@
 
   const vaultState = getVaultState()
 
+  /**
+   * A reader has nothing to edit, so no edit toggle — and no edit mode left on
+   * from the vault they were in before switching. Cleared rather than merely
+   * hidden, because every row and card reads the mode for itself, and a mode
+   * that is on with no button to turn it off is a screen full of controls the
+   * server will refuse.
+   */
+  $effect(() => {
+    if (vaultState.readOnly) clearEditing()
+  })
+
   // Hold to look, rather than tapping twice and having to remember to tap back.
   // 250ms: long enough that an ordinary tap never trips it, short enough that a
   // deliberate hold does not feel like it has been ignored.
@@ -107,14 +118,14 @@
   own, so a dial with nothing in it but a ring would be reporting on work that
   happened on a screen the user has already left.
 -->
-{#if eye || editKey || screenControls}
+{#if eye || (editKey && !vaultState.readOnly) || screenControls}
   <ActionDial saving={vaultState.saving} dirty={vaultState.dirty}>
     {#snippet children()}
       {#if screenControls}
         {@render screenControls()}
       {/if}
 
-      {#if editKey}
+      {#if editKey && !vaultState.readOnly}
         <ActionButton
           label={isEditing(editKey) ? t('action.done') : t('action.edit')}
           pressed={isEditing(editKey)}

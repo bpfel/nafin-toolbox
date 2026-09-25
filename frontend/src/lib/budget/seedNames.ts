@@ -30,6 +30,21 @@ export type SeedKey =
   | 'clothing' | 'entertainment' | 'diningOut'
   | 'savings' | 'pillar3a'
   | 'serafe' | 'laptop' | 'travelPass'
+  // The shared-household starter, seeded by `seedSharedDefaults`. Separate
+  // keys rather than reused ones because the words differ: a household's
+  // income line is a *contribution*, not a salary, and that distinction is the
+  // whole point of the example.
+  | 'cat.contributions' | 'contributionAlex' | 'contributionSam'
+  | 'cat.insurance' | 'electricity' | 'heating'
+  | 'householdInsurance' | 'inventoryReserve'
+  // Not a budget line: the account every vault is created with. Here because
+  // it is the same kind of thing — a name written into the vault once, in the
+  // language it was made in, and the user's to change from then on.
+  | 'mainAccount'
+  //
+  // Alex and Sam stay Alex and Sam in every language. They are people in an
+  // example, not interface text, and translating a name would only make the
+  // same illustration harder to talk about across a bilingual household.
 
 type SeedNames = Record<SeedKey, string>
 
@@ -57,6 +72,15 @@ const en: SeedNames = {
   laptop: 'Laptop',
   savings: 'Savings',
   pillar3a: 'Pillar 3a',
+  'cat.contributions': 'Contributions',
+  contributionAlex: 'Alex — contribution',
+  contributionSam: 'Sam — contribution',
+  'cat.insurance': 'Insurance',
+  electricity: 'Electricity',
+  heating: 'Heating',
+  householdInsurance: 'Household insurance',
+  inventoryReserve: 'Inventory reserve',
+  mainAccount: 'Main',
 }
 
 const de: SeedNames = {
@@ -83,6 +107,15 @@ const de: SeedNames = {
   laptop: 'Laptop',
   savings: 'Sparen',
   pillar3a: 'Säule 3a',
+  'cat.contributions': 'Beiträge',
+  contributionAlex: 'Alex — Beitrag',
+  contributionSam: 'Sam — Beitrag',
+  'cat.insurance': 'Versicherungen',
+  electricity: 'Strom',
+  heating: 'Heizung',
+  householdInsurance: 'Hausratversicherung',
+  inventoryReserve: 'Hausrat-Reserve',
+  mainAccount: 'Hauptkonto',
 }
 
 const fr: SeedNames = {
@@ -109,6 +142,15 @@ const fr: SeedNames = {
   laptop: 'Ordinateur portable',
   savings: 'Épargne',
   pillar3a: 'Pilier 3a',
+  'cat.contributions': 'Contributions',
+  contributionAlex: 'Alex — contribution',
+  contributionSam: 'Sam — contribution',
+  'cat.insurance': 'Assurances',
+  electricity: 'Électricité',
+  heating: 'Chauffage',
+  householdInsurance: 'Assurance ménage',
+  inventoryReserve: 'Réserve mobilier',
+  mainAccount: 'Compte principal',
 }
 
 const it: SeedNames = {
@@ -135,6 +177,15 @@ const it: SeedNames = {
   laptop: 'Computer portatile',
   savings: 'Risparmio',
   pillar3a: 'Pilastro 3a',
+  'cat.contributions': 'Contributi',
+  contributionAlex: 'Alex — contributo',
+  contributionSam: 'Sam — contributo',
+  'cat.insurance': 'Assicurazioni',
+  electricity: 'Elettricità',
+  heating: 'Riscaldamento',
+  householdInsurance: 'Assicurazione economia domestica',
+  inventoryReserve: 'Riserva arredamento',
+  mainAccount: 'Conto principale',
 }
 
 /**

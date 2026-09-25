@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { focusTrap } from '../util/focusTrap'
+  import { portal } from '../util/portal'
 
   /**
    * A surface over the screen: rising from the bottom edge on a phone, centred
@@ -15,6 +16,11 @@
    * Bottom-anchored on a phone for the same reason the navigation is: the foot
    * of the screen is what a thumb reaches. The actions a sheet offers belong at
    * its foot too, which is where every caller already puts them.
+   *
+   * It moves itself to `<body>` on the way up — see `portal`. A sheet covers
+   * the screen, so it cannot afford to be sorted or switched off by whatever
+   * happened to render it, and callers should not have to know which parents
+   * are safe to be opened from.
    */
   interface Props {
     /** Names the surface for anything reading the document rather than seeing it. */
@@ -91,7 +97,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="backdrop" role="presentation" onclick={handleBackdrop}>
+<div class="backdrop" use:portal role="presentation" onclick={handleBackdrop}>
   <div
     bind:this={surface}
     class="surface"
