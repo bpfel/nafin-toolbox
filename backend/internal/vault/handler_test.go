@@ -1,13 +1,16 @@
 package vault
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"golang.org/x/crypto/bcrypt"
@@ -26,6 +29,13 @@ type mockStore struct {
 	setMEKErr          error
 	updateMEKErr       error
 	getRecoveryDataErr error
+
+	identity    Identity
+	getIdentErr error
+	setIdentErr error
+
+	// Captured so tests can assert the precondition reached the store.
+	lastExpectedUpdatedAt *time.Time
 }
 
 func (m *mockStore) GetVault(ctx context.Context, userID int) (*Vault, error) {
@@ -35,17 +45,26 @@ func (m *mockStore) GetVault(ctx context.Context, userID int) (*Vault, error) {
 	return m.vault, nil
 }
 
-func (m *mockStore) PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int) error {
+func (m *mockStore) PutVault(
+	ctx context.Context,
+	userID int,
+	ciphertext, nonce []byte,
+	version int,
+	expectedUpdatedAt *time.Time,
+) (time.Time, error) {
+	m.lastExpectedUpdatedAt = expectedUpdatedAt
 	if m.putVaultErr != nil {
-		return m.putVaultErr
+		return time.Time{}, m.putVaultErr
 	}
+	updatedAt := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 	m.vault = &Vault{
 		UserID:     userID,
 		Ciphertext: ciphertext,
 		Nonce:      nonce,
 		Version:    version,
+		UpdatedAt:  updatedAt,
 	}
-	return nil
+	return updatedAt, nil
 }
 
 func (m *mockStore) GetEncryptedMEK(ctx context.Context, userID int) (string, int, error) {
@@ -55,14 +74,34 @@ func (m *mockStore) GetEncryptedMEK(ctx context.Context, userID int) (string, in
 	return m.encryptedMEK, m.iterations, nil
 }
 
-func (m *mockStore) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string) error {
+func (m *mockStore) GetIdentity(ctx context.Context, userID int) (Identity, error) {
+	if m.getIdentErr != nil {
+		return Identity{}, m.getIdentErr
+	}
+	return m.identity, nil
+}
+
+func (m *mockStore) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string, identity Identity) error {
 	if m.setMEKErr != nil {
 		return m.setMEKErr
 	}
 	m.encryptedMEK = encryptedMEK
 	m.recoveryKeyHash = recoveryKeyHash
 	m.encryptedMEKRecov = encryptedMEKRecovery
+	m.identity = identity
 	return nil
+}
+
+// Mirrors the store's rule: only an account with no identity gets one.
+func (m *mockStore) SetIdentityIfAbsent(ctx context.Context, userID int, identity Identity) (bool, error) {
+	if m.setIdentErr != nil {
+		return false, m.setIdentErr
+	}
+	if m.identity.PublicKey != "" {
+		return false, nil
+	}
+	m.identity = identity
+	return true, nil
 }
 
 func (m *mockStore) UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error {
@@ -870,7 +909,7 @@ func TestHandleRecovery_NoRecoveryKeyConfigured(t *testing.T) {
 func TestHandleRecovery_EmptyRecoveryHash(t *testing.T) {
 	// Test when query succeeds but hash is empty
 	store := &mockStore{
-		recoveryKeyHash: "",
+		recoveryKeyHash:   "",
 		encryptedMEKRecov: "some-data",
 	}
 	handler := handleRecovery(store)
@@ -1104,5 +1143,314 @@ func TestHandlePutVault_LargeVersion(t *testing.T) {
 
 	if store.vault.Version != largeVersion {
 		t.Errorf("version = %d, want %d", store.vault.Version, largeVersion)
+	}
+}
+
+// --- Optimistic locking ---
+//
+// The vault is one opaque blob, so a stale client's write does not merge badly —
+// it replaces the newer vault entirely. These cover the handler half of refusing
+// that; the conditional SQL itself is exercised by the integration tests.
+
+func TestHandlePutVault_PassesPreconditionToStore(t *testing.T) {
+	store := &mockStore{}
+	handler := handlePutVault(store)
+
+	body := `{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3,"expected_updated_at":"2026-08-16T10:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/vault", strings.NewReader(body)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if store.lastExpectedUpdatedAt == nil {
+		t.Fatal("precondition was not passed to the store")
+	}
+	want := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
+	if !store.lastExpectedUpdatedAt.Equal(want) {
+		t.Errorf("precondition = %v, want %v", *store.lastExpectedUpdatedAt, want)
+	}
+}
+
+func TestHandlePutVault_OmittedPreconditionIsNil(t *testing.T) {
+	// First save after key setup, and recovery, have nothing to conflict with.
+	store := &mockStore{}
+	handler := handlePutVault(store)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/vault",
+		strings.NewReader(`{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3}`)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if store.lastExpectedUpdatedAt != nil {
+		t.Errorf("precondition = %v, want nil", *store.lastExpectedUpdatedAt)
+	}
+}
+
+func TestHandlePutVault_ConflictReturns409(t *testing.T) {
+	store := &mockStore{putVaultErr: ErrVaultConflict}
+	handler := handlePutVault(store)
+
+	body := `{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3,"expected_updated_at":"2026-08-16T10:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/vault", strings.NewReader(body)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	// 409, not 500: the client can recover by reloading, and the distinction is
+	// what lets the UI say something useful instead of "failed to save".
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusConflict)
+	}
+}
+
+func TestHandlePutVault_ReturnsNewUpdatedAt(t *testing.T) {
+	// The response carries the token for the client's next write; without it the
+	// client could only save once before going stale against itself.
+	store := &mockStore{}
+	handler := handlePutVault(store)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/vault",
+		strings.NewReader(`{"ciphertext":"dGVzdA==","nonce":"bm9uY2U=","version":3}`)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	var got PutVaultResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.UpdatedAt.IsZero() {
+		t.Error("response did not carry updated_at")
+	}
+}
+
+// --- Identity tests ---
+//
+// An identity is the pair of keypairs that lets one user wrap a shared vault's
+// key for another. The rule the handler enforces is that it arrives whole or
+// not at all; a half-stored identity would invite other users to encrypt to a
+// key this user can never unwrap, and the failure would surface much later, to
+// somebody else, as a vault that will not open.
+
+func completeIdentity() Identity {
+	return Identity{
+		PublicKey:           "cHVibGlj",
+		EncryptedPrivateKey: "cHJpdmF0ZQ==",
+		VerifyingKey:        "dmVyaWZ5",
+		EncryptedSigningKey: "c2lnbg==",
+	}
+}
+
+func TestHandleGetKeys_ReturnsIdentity(t *testing.T) {
+	store := &mockStore{
+		encryptedMEK: "bWVr",
+		iterations:   600000,
+		identity:     completeIdentity(),
+	}
+	handler := handleGetKeys(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/vault/keys", nil)
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	var got KeysResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if got.Identity != completeIdentity() {
+		t.Errorf("identity = %+v, want %+v", got.Identity, completeIdentity())
+	}
+}
+
+// A user who set their vault up before identities existed has none, and must
+// still be handed their MEK — refusing would lock them out of a vault they can
+// open perfectly well.
+func TestHandleGetKeys_NoIdentityIsNotAnError(t *testing.T) {
+	store := &mockStore{
+		encryptedMEK: "bWVr",
+		iterations:   600000,
+		getIdentErr:  errors.New("no identity"),
+	}
+	handler := handleGetKeys(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/vault/keys", nil)
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	var got KeysResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if got.EncryptedMEK != "bWVr" {
+		t.Errorf("encrypted_mek = %q, want %q", got.EncryptedMEK, "bWVr")
+	}
+	if !got.Identity.Empty() {
+		t.Errorf("identity = %+v, want empty", got.Identity)
+	}
+}
+
+func TestHandleSetupKeys_StoresIdentity(t *testing.T) {
+	store := &mockStore{}
+	handler := handleSetupKeys(store)
+
+	body := `{"encrypted_mek":"bWVr","recovery_key_hash":"cms=","encrypted_mek_recovery":"cmVj",
+	          "public_key":"cHVibGlj","encrypted_private_key":"cHJpdmF0ZQ==",
+	          "verifying_key":"dmVyaWZ5","encrypted_signing_key":"c2lnbg=="}`
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if store.identity != completeIdentity() {
+		t.Errorf("stored identity = %+v, want %+v", store.identity, completeIdentity())
+	}
+}
+
+func TestHandleSetupKeys_RejectsPartialIdentity(t *testing.T) {
+	// Every one of the four halves missing on its own, so no single field can
+	// quietly stop being required.
+	full := map[string]string{
+		"public_key":            "cHVibGlj",
+		"encrypted_private_key": "cHJpdmF0ZQ==",
+		"verifying_key":         "dmVyaWZ5",
+		"encrypted_signing_key": "c2lnbg==",
+	}
+
+	for omitted := range full {
+		t.Run("without "+omitted, func(t *testing.T) {
+			fields := map[string]string{
+				"encrypted_mek":          "bWVr",
+				"recovery_key_hash":      "cms=",
+				"encrypted_mek_recovery": "cmVj",
+			}
+			for k, v := range full {
+				if k != omitted {
+					fields[k] = v
+				}
+			}
+			body, err := json.Marshal(fields)
+			if err != nil {
+				t.Fatalf("marshalling body: %v", err)
+			}
+
+			store := &mockStore{}
+			handler := handleSetupKeys(store)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(userCtx(1))
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want %d; body %s", w.Code, http.StatusBadRequest, w.Body.String())
+			}
+			if store.encryptedMEK != "" {
+				t.Errorf("MEK was stored despite a partial identity")
+			}
+		})
+	}
+}
+
+// A client too old to send an identity must still be able to set a vault up.
+func TestHandleSetupKeys_AllowsAbsentIdentity(t *testing.T) {
+	store := &mockStore{}
+	handler := handleSetupKeys(store)
+
+	body := `{"encrypted_mek":"bWVr","recovery_key_hash":"cms=","encrypted_mek_recovery":"cmVj"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if !store.identity.Empty() {
+		t.Errorf("identity = %+v, want empty", store.identity)
+	}
+}
+
+const fourKeys = `{"public_key":"p","encrypted_private_key":"ep","verifying_key":"v","encrypted_signing_key":"es"}`
+
+func postIdentity(store *mockStore, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/identity", strings.NewReader(body))
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+	handleSetupIdentity(store).ServeHTTP(w, req)
+	return w
+}
+
+// An account made before households had no way to get the keypair every newer
+// one is born with, so it could neither start a household nor accept an
+// invitation.
+func TestHandleSetupIdentity_GivesAnOlderAccountItsKeypair(t *testing.T) {
+	store := &mockStore{}
+
+	w := postIdentity(store, fourKeys)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if store.identity.PublicKey != "p" || store.identity.EncryptedSigningKey != "es" {
+		t.Errorf("identity not stored: %+v", store.identity)
+	}
+}
+
+// The security half: an identity is added, never replaced. Replacing one would
+// break every pin other members hold and let a stolen session swap in its own.
+func TestHandleSetupIdentity_NeverReplacesOne(t *testing.T) {
+	store := &mockStore{identity: Identity{PublicKey: "original"}}
+
+	w := postIdentity(store, fourKeys)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusConflict)
+	}
+	if store.identity.PublicKey != "original" {
+		t.Errorf("public key replaced with %q", store.identity.PublicKey)
+	}
+}
+
+func TestHandleSetupIdentity_RequiresAllFourKeys(t *testing.T) {
+	w := postIdentity(&mockStore{}, `{"public_key":"p","encrypted_private_key":"ep","verifying_key":"v"}`)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleSetupIdentity_RequiresAuth(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/identity", strings.NewReader(fourKeys))
+	w := httptest.NewRecorder()
+	handleSetupIdentity(&mockStore{}).ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusUnauthorized)
 	}
 }

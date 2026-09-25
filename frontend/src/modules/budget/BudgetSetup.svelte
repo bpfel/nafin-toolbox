@@ -1,21 +1,36 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n/index.svelte'
+
+  /**
+   * The one screen an empty budget shows.
+   *
+   * It names the survey the seeded figures come from, and that is not
+   * decoration: a starter budget is a set of claims about what things cost,
+   * and a reader who cannot see whose claims they are has no way to judge
+   * them. Which is why a household gets its own sentence rather than the same
+   * one — those figures are a different population *and* a different wave of
+   * the same survey, and saying "HABE 2023, single person" over a two-person
+   * budget would be false in both halves.
+   */
   interface Props {
     onseeded: () => void
     onstartblank: () => void
+    /** Whether this budget belongs to a household rather than to one person. */
+    household?: boolean
   }
 
-  let { onseeded, onstartblank }: Props = $props()
+  let { onseeded, onstartblank, household = false }: Props = $props()
 </script>
 
 <div class="setup">
-  <h3>Set up your budget</h3>
-  <p>Start with default Swiss budget categories based on BFS household survey data (HABE 2023, single person). You can customize everything later.</p>
+  <h3>{t('budget.setupTitle')}</h3>
+  <p>{household ? t('budget.setupHintHousehold') : t('budget.setupHint')}</p>
   <div class="actions">
     <button class="primary" onclick={onseeded}>
-      Load Swiss defaults
+      {t('budget.loadDefaults')}
     </button>
     <button class="secondary" onclick={onstartblank}>
-      Start blank
+      {t('budget.startBlank')}
     </button>
   </div>
 </div>
@@ -26,7 +41,7 @@
     padding: 3rem 2rem;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
   h3 {
     margin-bottom: 0.75rem;

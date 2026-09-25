@@ -260,7 +260,7 @@ func TestRenderInviteEmail_NoErrors(t *testing.T) {
 	}{
 		{"https://app.com", "token"},
 		{"http://localhost:3000", "test123"},
-		{"", ""}, // even with empty strings, should not error
+		{"", ""},                                       // even with empty strings, should not error
 		{"https://app.com", strings.Repeat("a", 1000)}, // very long token
 	}
 

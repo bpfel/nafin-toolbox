@@ -1,11 +1,27 @@
 <script lang="ts">
   import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, type User, getAuthState } from './authStore.svelte'
+  import DeleteUserModal from './DeleteUserModal.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
 
   const authState = getAuthState()
 
   let users = $state<User[]>([])
+
+  /**
+   * The last admin cannot be deleted, and the server refuses it whatever this
+   * says — see DeleteUserGuardingLastAdmin. This only stops the button being
+   * offered for something that is going to be turned down.
+   *
+   * An app with no admin has no invitations, no user administration and no way
+   * to promote anybody, because a role is fixed when the account is made. It is
+   * repairable only in the database by hand.
+   */
+  let lastAdmin = $derived(
+    users.filter(u => u.role === 'admin').length <= 1
+      ? (users.find(u => u.role === 'admin')?.id ?? null)
+      : null,
+  )
   let email = $state('')
   let role = $state<'admin' | 'user'>('user')
   let error = $state<string | null>(null)
@@ -13,9 +29,11 @@
   let submitting = $state(false)
   let resending = $state<number | null>(null)
   let deleting = $state<number | null>(null)
+  let pendingDelete = $state<User | null>(null)
+  let deleteError = $state<string | null>(null)
   let confirmingReset = $state<number | null>(null)
   let resettingPassword = $state<number | null>(null)
-  let tempPassword = $state<{ userId: number; password: string } | null>(null)
+  let tempPassword = $state<{ email: string; password: string } | null>(null)
 
   async function loadUsers() {
     users = await listUsers()
@@ -55,26 +73,43 @@
     }
   }
 
-  async function handleResetPassword(userId: number) {
-    resettingPassword = userId
-    const result = await adminResetPassword(userId)
+  async function handleResetPassword(user: User) {
+    resettingPassword = user.id
+    const result = await adminResetPassword(user.id)
     resettingPassword = null
     confirmingReset = null
     if ('error' in result) {
       error = result.error
     } else {
-      tempPassword = { userId, password: result.temp_password }
+      // The email is captured here rather than looked up while rendering: the box
+      // has to keep naming the right person across the reload on the next line.
+      tempPassword = { email: user.email, password: result.temp_password }
       await loadUsers()
     }
   }
 
-  async function handleDelete(userId: number) {
-    deleting = userId
-    const result = await deleteUser(userId)
+  function askDelete(user: User) {
+    deleteError = null
+    pendingDelete = user
+  }
+
+  async function handleDelete() {
+    const target = pendingDelete
+    if (!target) return
+
+    deleting = target.id
+    deleteError = null
+    const result = await deleteUser(target.id)
     deleting = null
+
     if (result) {
-      error = result
+      // Kept on screen next to the button that failed, rather than reported
+      // somewhere further down the page.
+      deleteError = result
     } else {
+      pendingDelete = null
+      error = null
+      success = `${target.email} deleted`
       await loadUsers()
     }
   }
@@ -130,7 +165,7 @@
                       <span class="confirm-label">Reset?</span>
                       <button
                         class="btn-small btn-danger-small"
-                        onclick={() => handleResetPassword(u.id)}
+                        onclick={() => handleResetPassword(u)}
                         disabled={resettingPassword === u.id}
                       >
                         {resettingPassword === u.id ? 'Resetting...' : 'Confirm'}
@@ -154,8 +189,11 @@
                 {#if u.id !== authState.currentUser?.id}
                   <button
                     class="btn-small btn-danger-small"
-                    onclick={() => handleDelete(u.id)}
-                    disabled={deleting === u.id}
+                    onclick={() => askDelete(u)}
+                    disabled={deleting === u.id || u.id === lastAdmin}
+                    title={u.id === lastAdmin
+                      ? 'The last administrator cannot be deleted'
+                      : undefined}
                   >
                     {deleting === u.id ? 'Deleting...' : 'Delete'}
                   </button>
@@ -168,10 +206,19 @@
     </table>
   </div>
 
+  {#if pendingDelete}
+    <DeleteUserModal
+      user={pendingDelete}
+      deleting={deleting === pendingDelete.id}
+      error={deleteError}
+      ondelete={handleDelete}
+      onclose={() => { pendingDelete = null; deleteError = null }}
+    />
+  {/if}
+
   {#if tempPassword}
-    {@const user = users.find(u => u.id === tempPassword.userId)}
     <div class="temp-password-box">
-      <p><strong>Temporary password for {user?.email ?? 'user'}:</strong></p>
+      <p><strong>Temporary password for {tempPassword.email}:</strong></p>
       <code class="temp-password">{tempPassword.password}</code>
       <p class="temp-password-hint">Share this with the user securely. They will be asked to set a new password on next login.</p>
       <button class="btn-small" onclick={() => tempPassword = null}>Dismiss</button>
@@ -212,7 +259,7 @@
     background: white;
     border-radius: 8px;
     padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
   }
 
   .panel-header {
@@ -251,7 +298,7 @@
     text-align: left;
     padding: 0.5rem 0.75rem;
     border-bottom: 2px solid #eee;
-    font-weight: 600;
+    font-weight: 500;
     color: #555;
   }
 
@@ -332,7 +379,7 @@
 
   .confirm-label {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     color: #dc3545;
   }
 

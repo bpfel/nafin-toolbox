@@ -1,14 +1,25 @@
 <script lang="ts">
-  import { fetchModules, enableModule, disableModule, setOnUnauthorized, type ModuleInfo } from './lib/api/client'
+  import { setOnUnauthorized } from './lib/api/client'
   import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
   import { getVaultState } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
-  import InvitePanel from './lib/auth/InvitePanel.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
   import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
-  import SecuritySettings from './lib/auth/SecuritySettings.svelte'
+  import RecoveryKeyScreen from './lib/auth/RecoveryKeyScreen.svelte'
   import TwoFactorSetup from './lib/auth/TwoFactorSetup.svelte'
-  import BudgetModule from './modules/budget/BudgetModule.svelte'
+  import { clearEditing } from './lib/util/editMode.svelte'
+  import { autofocus } from './lib/util/autofocus'
+  import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
+  import UpdateBanner from './lib/util/UpdateBanner.svelte'
+  import VersionTag from './lib/util/VersionTag.svelte'
+  import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
+  import TourOverlay from './lib/tour/TourOverlay.svelte'
+  import { resetTour } from './lib/tour/tourStore.svelte'
+  import AppShell from './lib/nav/AppShell.svelte'
+  import { getRoute, navigate, replace, startRouting, syncFromLocation } from './lib/nav/router.svelte'
+  import { gateFor } from './lib/nav/gate'
+  import LanguagePicker from './lib/nav/LanguagePicker.svelte'
+  import { t } from './lib/i18n/index.svelte'
 
   const authState = getAuthState()
   const vaultState = getVaultState()
@@ -17,15 +28,9 @@
     logout()
   })
 
-  let isVerifyPage = $state(window.location.pathname === '/verify')
+  const route = getRoute()
 
-  let modules = $state<ModuleInfo[]>([])
   let error = $state<string | null>(null)
-  let showConfig = $state(false)
-  let showUsers = $state(false)
-  let showSecurity = $state(false)
-  let toggling = $state<string | null>(null)
-  let menuOpen = $state(false)
 
   let require2FA = $state(false)
   let show2FAEnforcement = $state(false)
@@ -43,80 +48,27 @@
   let recovering = $state(false)
   let recoveryError = $state<string | null>(null)
 
-  const isAdmin = $derived(authState.currentUser?.role === 'admin')
-
-  const availableModules = [
-    { id: 'budget', name: 'Budget', description: 'Track income and expenses by category' },
-    { id: 'accounts', name: 'Accounts', description: 'Manage bank and savings accounts' },
-    { id: 'allocations', name: 'Allocations', description: 'Plan monthly money allocation' },
-    { id: 'provision3a', name: 'Pillar 3a', description: 'Swiss retirement savings (3a)' },
-    { id: 'investments', name: 'Investments', description: 'Track stocks, ETFs, and other assets' },
-  ]
-
-  async function loadModules() {
-    try {
-      modules = await fetchModules()
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load modules'
-    }
-  }
-
-  function isEnabled(id: string): boolean {
-    return modules.some(m => m.id === id)
-  }
-
-  async function toggleModule(id: string) {
-    toggling = id
-    try {
-      if (isEnabled(id)) {
-        await disableModule(id)
-      } else {
-        await enableModule(id)
-      }
-      await loadModules()
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to update module'
-    } finally {
-      toggling = null
-    }
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (showConfig && e.key === 'Escape') showConfig = false
-    if (menuOpen && e.key === 'Escape') menuOpen = false
-  }
-
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) showConfig = false
-  }
-
-  function handleMenuBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) menuOpen = false
-  }
-
-  function navigateTo(view: 'users' | 'security' | 'modules') {
-    menuOpen = false
-    if (view === 'users') {
-      showUsers = true; showSecurity = false; showConfig = false
-    } else if (view === 'security') {
-      showUsers = false; showSecurity = true; showConfig = false
-    } else if (view === 'modules') {
-      showUsers = false; showSecurity = false; showConfig = true
-    }
-  }
-
-  function navigateBack() {
-    showUsers = false
-    showSecurity = false
-  }
-
   $effect(() => {
     checkAuth()
   })
 
+  // A verification link opened again by someone already signed in is just a link
+  // to the app. Drop the spent token from the URL and carry on, rather than
+  // showing a set-up form the session has plainly outgrown.
+  $effect(() => {
+    if (route.screen === 'verify' && authState.currentUser) {
+      replace('/')
+    }
+  })
+
+  // Listen for the back and forward buttons.
+  $effect(() => startRouting())
+
+  // Watch for deploys that leave this tab running chunks the server no longer has.
+  $effect(() => startBuildVersionWatch())
+
   $effect(() => {
     if (authState.currentUser) {
-      loadModules()
       checkRequire2FA()
     }
   })
@@ -130,18 +82,18 @@
   }
 
   function handleLoginSuccess() {
-    loadModules()
     checkRequire2FA()
   }
 
   async function handleLogout() {
     await logout()
-    modules = []
     error = null
-    showUsers = false
-    showConfig = false
-    showSecurity = false
     show2FAEnforcement = false
+    clearEditing()
+    // A tour left running would otherwise still be running over the next
+    // person's sign-in, pointing at a screen that is no longer theirs.
+    resetTour()
+    navigate('/')
   }
 
   async function handleVaultSetup() {
@@ -149,7 +101,7 @@
     try {
       await completeVaultSetup()
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to set up encryption'
+      error = e instanceof Error ? e.message : t('error.setupEncryption')
     } finally {
       settingUpVault = false
     }
@@ -169,7 +121,7 @@
         unlockError = err
       }
     } catch (e) {
-      unlockError = e instanceof Error ? e.message : 'Failed to unlock vault'
+      unlockError = e instanceof Error ? e.message : t('error.unlockVault')
     } finally {
       unlocking = false
       unlockPassword = ''
@@ -186,60 +138,110 @@
         recoveryError = err
       }
     } catch (e) {
-      recoveryError = e instanceof Error ? e.message : 'Recovery failed'
+      recoveryError = e instanceof Error ? e.message : t('error.recoveryFailed')
     } finally {
       recovering = false
     }
   }
+  /** Which enforcement screen stands in the way, if any. See lib/nav/gate.ts. */
+  let gate = $derived(
+    gateFor({
+      loading: authState.loading,
+      onVerifyPath: route.screen === 'verify',
+      user: authState.currentUser
+        ? {
+            role: authState.currentUser.role,
+            mustChangePassword: authState.currentUser.must_change_password,
+          }
+        : null,
+      enforce2FA: show2FAEnforcement,
+      recoveryKeyPending: authState.recoveryKeyToShow != null,
+      vaultVersionAhead: vaultState.versionAhead,
+      vaultNeedsSetup: authState.vaultNeedsSetup,
+      vaultDecryptFailed: authState.vaultDecryptFailed,
+      vaultLocked: authState.vaultLocked,
+      vaultUnlocked: vaultState.unlocked,
+    }),
+  )
+
+  /**
+   * Every gate renders its own centred card instead of the app's top bar, which
+   * makes it exactly the set of screens with nowhere to put the language picker
+   * in flow — so it floats there instead.
+   *
+   * This was a twelve-term boolean restating the branch chain by hand, and a
+   * gate added to one and not the other lost the picker silently. There is one
+   * statement of it now, and this reads it.
+   */
+  let chromeless = $derived(gate !== null)
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+{#if chromeless}
+  <div class="floating-language">
+    <LanguagePicker />
+  </div>
+{/if}
 
-{#if isVerifyPage}
-  <VerifyEmailPage onVerified={() => { isVerifyPage = false }} />
-{:else if authState.loading}
+
+{#if gate === 'loading'}
   <main>
-    <p class="loading">Loading...</p>
+    <p class="loading">{t('state.loading')}</p>
   </main>
-{:else if !authState.currentUser}
+{:else if gate === 'verify'}
+  <!-- The page rewrites the address itself as it finishes, and neither
+       pushState nor replaceState raises an event, so it has to say so. -->
+  <VerifyEmailPage
+    onVerified={syncFromLocation}
+    onLeave={syncFromLocation}
+  />
+{:else if gate === 'login' || !authState.currentUser}
   <LoginPage onSuccess={handleLoginSuccess} />
-{:else if authState.currentUser.must_change_password}
+{:else if gate === 'mustChangePassword'}
   <ChangePasswordForm
-    message="Please set a new password to continue."
+    message={t('password.mustChange')}
     showLogout={true}
   />
-{:else if show2FAEnforcement}
+{:else if gate === 'enforce2FA'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Two-Factor Authentication Required</h1>
-        <p class="hint">Your administrator requires all users to enable two-factor authentication before continuing.</p>
+        <h1>{t('twofa.requiredTitle')}</h1>
+        <p class="hint">{t('twofa.requiredHint')}</p>
         <TwoFactorSetup onDone={() => { show2FAEnforcement = false; window.location.reload() }} />
       </div>
     </div>
   </main>
-{:else if authState.recoveryKeyToShow && !isAdmin}
+{:else if gate === 'recoveryKey' && authState.recoveryKeyToShow}
+  <RecoveryKeyScreen
+    recoveryKey={authState.recoveryKeyToShow}
+    onconfirmed={handleRecoveryKeyDismiss}
+  />
+{:else if gate === 'vaultAhead'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Save Your Recovery Key</h1>
-        <p class="hint">This key is the only way to recover your encrypted data if you forget your password. Save it in a secure location. It will not be shown again.</p>
-        <div class="recovery-key-box">
-          <code class="recovery-key">{authState.recoveryKeyToShow}</code>
-        </div>
-        <button class="btn-primary" onclick={handleRecoveryKeyDismiss}>I've saved my recovery key</button>
+        <h1>{t('vault.outOfDateTitle')}</h1>
+        <p class="hint">
+          {t('vault.outOfDateHint')}
+        </p>
+        <p class="hint">
+          {t('vault.outOfDateSafe')}
+        </p>
+
+        <button class="btn-primary" onclick={() => location.reload()}>{t('action.reload')}</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
-{:else if authState.vaultNeedsSetup && !isAdmin}
+{:else if gate === 'vaultSetup'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Set Up Encryption</h1>
-        <p class="hint">Your data will be encrypted end-to-end. Only you can read it — the server never sees your data in plain text.</p>
+        <h1>{t('vault.setupTitle')}</h1>
+        <p class="hint">{t('vault.setupHint')}</p>
 
         <button class="btn-primary" onclick={handleVaultSetup} disabled={settingUpVault}>
-          {settingUpVault ? 'Setting up encryption...' : 'Set up encryption'}
+          {settingUpVault ? t('vault.setupBusy') : t('vault.setupAction')}
         </button>
 
         {#if error}
@@ -248,17 +250,18 @@
       </div>
     </div>
   </main>
-{:else if authState.vaultDecryptFailed && !isAdmin}
+{:else if gate === 'vaultDecryptFailed'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Vault Decryption Failed</h1>
-        <p class="hint">Your encrypted vault could not be decrypted with your current password. This can happen if your password was reset by an admin. Use your recovery key to restore access.</p>
+        <h1>{t('vault.decryptFailedTitle')}</h1>
+        <p class="hint">{t('vault.decryptFailedHint')}</p>
 
         <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleRecovery() }}>
           <label>
-            Recovery Key
+            {t('vault.recoveryKeyLabel')}
             <input
+              use:autofocus
               type="text"
               bind:value={recoveryKey}
               placeholder="XXXX-XXXX-XXXX-..."
@@ -273,25 +276,26 @@
           {/if}
 
           <button class="btn-primary" type="submit" disabled={recovering || !recoveryKey.trim()}>
-            {recovering ? 'Recovering...' : 'Recover vault'}
+            {recovering ? t('vault.recoverBusy') : t('vault.recoverAction')}
           </button>
         </form>
 
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
-{:else if (authState.vaultLocked || !vaultState.unlocked) && !isAdmin}
+{:else if gate === 'vaultLocked'}
   <main>
     <div class="enforcement-container">
       <div class="enforcement-card">
-        <h1>Unlock Vault</h1>
-        <p class="hint">Enter your password to decrypt your data.</p>
+        <h1>{t('vault.unlockTitle')}</h1>
+        <p class="hint">{t('vault.unlockHint')}</p>
 
         <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleUnlock() }}>
           <label>
-            Password
+            {t('field.password')}
             <input
+              use:autofocus
               type="password"
               bind:value={unlockPassword}
               disabled={unlocking}
@@ -305,131 +309,43 @@
           {/if}
 
           <button class="btn-primary" type="submit" disabled={unlocking || !unlockPassword}>
-            {unlocking ? 'Unlocking...' : 'Unlock'}
+            {unlocking ? t('vault.unlockBusy') : t('vault.unlockAction')}
           </button>
         </form>
 
-        <button class="link-btn" onclick={() => handleLogout()}>Logout</button>
+        <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>
     </div>
   </main>
-{:else}
-
-  <main>
-    <div class="top-bar">
-      <h1>Finance Tracker</h1>
-      <div class="user-info">
-        <span class="role-tag">{authState.currentUser.role}</span>
-        <span class="user-email">{authState.currentUser.email}</span>
-        {#if !isAdmin}
-          {#if vaultState.saving}
-            <span class="save-indicator">Saving...</span>
-          {:else if vaultState.dirty}
-            <span class="save-indicator unsaved">Unsaved</span>
-          {/if}
-        {/if}
-        {#if authState.currentUser.role === 'admin'}
-          <button class="btn-secondary" onclick={() => navigateTo('users')}>Users</button>
-        {/if}
-        <button class="btn-secondary" onclick={() => navigateTo('security')}>Security</button>
-        <button class="btn-secondary" onclick={() => navigateTo('modules')}>Modules</button>
-        <button class="btn-secondary" onclick={() => { handleLogout() }}>Logout</button>
-      </div>
-      <button class="hamburger-btn" onclick={() => (menuOpen = !menuOpen)} aria-label="Toggle menu">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
-    </div>
-
-    {#if menuOpen}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="backdrop menu-backdrop" onclick={handleMenuBackdrop}>
-        <div class="menu-modal" role="dialog" aria-label="Navigation menu">
-          <div class="menu-header">
-            <span class="role-tag">{authState.currentUser.role}</span>
-            <span class="user-email">{authState.currentUser.email}</span>
-          </div>
-          <div class="menu-items">
-            {#if authState.currentUser.role === 'admin'}
-              <button class="menu-item" onclick={() => navigateTo('users')}>Users</button>
-            {/if}
-            <button class="menu-item" onclick={() => navigateTo('security')}>Security</button>
-            <button class="menu-item" onclick={() => navigateTo('modules')}>Modules</button>
-            <button class="menu-item menu-item-danger" onclick={() => { handleLogout(); menuOpen = false }}>Logout</button>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    {#if showSecurity}
-      <SecuritySettings onDone={navigateBack} />
-    {:else if showUsers}
-      <InvitePanel onDone={navigateBack} />
-    {:else if error}
-      <p class="error">{error}</p>
-    {:else if modules.length === 0}
-      <div class="empty-state">
-        <p>No modules enabled yet.</p>
-        <button onclick={() => (showConfig = true)}>Configure modules</button>
-      </div>
-    {:else}
-      {#each modules as mod}
-        <section class="module-section">
-          <h2>{mod.name}</h2>
-          {#if isAdmin}
-            <div class="module-card admin-notice">
-              <p>Sign in with a regular account to use encrypted modules.</p>
-            </div>
-          {:else if mod.id === 'budget'}
-            <BudgetModule />
-          {:else}
-            <div class="module-card">
-              <span class="module-id">{mod.id}</span>
-              <p>Coming soon.</p>
-            </div>
-          {/if}
-        </section>
-      {/each}
-    {/if}
-
-    {#if showConfig}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="backdrop" onclick={handleBackdrop}>
-        <div class="modal" role="dialog" aria-label="Configure modules">
-          <h3>Modules</h3>
-          <p class="modal-hint">Enable or disable modules. Data is kept when disabling.</p>
-          <div class="module-list">
-            {#each availableModules as mod}
-              <div class="module-row" class:enabled={isEnabled(mod.id)}>
-                <div class="module-info">
-                  <span class="module-name">{mod.name}</span>
-                  <span class="module-desc">{mod.description}</span>
-                </div>
-                <button
-                  class="toggle"
-                  class:active={isEnabled(mod.id)}
-                  disabled={toggling === mod.id}
-                  onclick={() => toggleModule(mod.id)}
-                  aria-label="{isEnabled(mod.id) ? 'Disable' : 'Enable'} {mod.name}"
-                >
-                  <span class="toggle-track">
-                    <span class="toggle-thumb"></span>
-                  </span>
-                </button>
-              </div>
-            {/each}
-          </div>
-          <button class="close-btn" onclick={() => (showConfig = false)}>Done</button>
-        </div>
-      </div>
-    {/if}
-  </main>
+{:else if authState.currentUser}
+  <AppShell
+    email={authState.currentUser.email}
+    role={authState.currentUser.role}
+    userId={authState.currentUser.id}
+    onlogout={handleLogout}
+  />
 {/if}
+
+<!--
+  The build, on the screens that have no profile page to put it on.
+
+  `chromeless` is exactly the gate chain — signing in, unlocking, a vault the
+  build cannot read — and those are the screens someone is looking at when
+  they most need to say which build they are on, because they cannot get past
+  them to look anywhere else. Everywhere else it sits at the foot of the
+  profile page instead of under every screen.
+-->
+{#if chromeless}
+  <VersionTag />
+{/if}
+
+<!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
+<UpdateBanner />
+<UnsavedBanner />
+<!-- Here rather than inside a screen: the tour walks across screens, and a
+     component owned by one of them would be destroyed halfway through. It
+     renders nothing unless the tour is running. -->
+<TourOverlay />
 
 <style>
   .loading {
@@ -438,63 +354,13 @@
     color: #666;
   }
 
-  .top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-  }
-  .top-bar h1 {
-    margin: 0;
-  }
-
-  .hamburger-btn {
-    display: none;
-    background: none;
-    border: none;
-    color: #666;
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    align-items: center;
-  }
-  .hamburger-btn:hover {
-    color: #333;
-    background: #f1f3f5;
-  }
-
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 0.9rem;
-    color: #666;
-  }
-
-  .user-email {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .save-indicator {
-    font-size: 0.75rem;
-    color: #2d6a4f;
-    font-weight: 500;
-  }
-  .save-indicator.unsaved {
-    color: #e67e22;
-  }
-
-  .btn-secondary {
-    background: #e0e0e0;
-    color: #333;
-    padding: 0.35rem 1rem;
-    font-size: 0.85rem;
-  }
-
-  .btn-secondary:hover {
-    background: #ccc;
+  /* Anchored to the viewport, because these screens centre a card and have no
+     bar to sit in. */
+  .floating-language {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
   }
 
   .btn-primary {
@@ -554,34 +420,6 @@
   }
   .link-btn:hover { color: #245a42; }
 
-  .role-tag {
-    display: inline-block;
-    padding: 0.1rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background: #d4edda;
-    color: #155724;
-  }
-
-  .recovery-key-box {
-    background: #f8f9fa;
-    border: 2px dashed #dee2e6;
-    border-radius: 8px;
-    padding: 1.25rem;
-    margin: 1rem 0;
-    text-align: center;
-  }
-  .recovery-key {
-    font-size: 0.85rem;
-    font-family: monospace;
-    word-break: break-all;
-    line-height: 1.8;
-    color: #333;
-    user-select: all;
-  }
-
   .error {
     color: #c0392b;
     font-size: 0.9rem;
@@ -591,94 +429,6 @@
     margin-top: 1rem;
   }
 
-  /* Mobile menu overlay */
-  .menu-backdrop {
-    align-items: flex-start;
-    justify-content: flex-end;
-    padding-top: 3.5rem;
-  }
-  .menu-modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.25rem;
-    width: 100%;
-    max-width: 280px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-    margin: 0 1rem;
-  }
-  .menu-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #eee;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-    color: #666;
-  }
-  .menu-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  .menu-item {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    padding: 0.65rem 0.75rem;
-    background: none;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    color: #333;
-    cursor: pointer;
-    text-align: left;
-    min-height: 44px;
-  }
-  .menu-item:hover {
-    background: #f1f3f5;
-  }
-  .menu-item-danger {
-    color: #c0392b;
-  }
-  .menu-item-danger:hover {
-    background: #fdecea;
-  }
-
-  @media (max-width: 768px) {
-    .top-bar h1 {
-      font-size: 1.2rem;
-    }
-    .hamburger-btn {
-      display: flex;
-    }
-    .user-info {
-      display: none;
-    }
-  }
-  .module-section {
-    margin-bottom: 2rem;
-  }
-  .module-section h2 {
-    margin-bottom: 1rem;
-  }
-  .module-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  .module-id {
-    color: #888;
-    font-size: 0.85rem;
-  }
-  .admin-notice {
-    color: #666;
-    font-style: italic;
-    text-align: center;
-  }
-
-  /* 2FA Enforcement */
   .enforcement-container {
     display: flex;
     align-items: center;
@@ -690,7 +440,7 @@
     background: white;
     border-radius: 12px;
     padding: 2.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     width: 100%;
     max-width: 500px;
     text-align: center;
@@ -707,130 +457,4 @@
     margin-bottom: 1.5rem;
   }
 
-  /* Modal */
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 1rem;
-  }
-  .modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 420px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-  }
-  .modal h3 {
-    margin: 0 0 0.25rem;
-    font-size: 1.1rem;
-  }
-  .modal-hint {
-    margin: 0 0 1.25rem;
-    font-size: 0.85rem;
-    color: #888;
-  }
-  .module-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-  }
-  .module-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.65rem 0.75rem;
-    border-radius: 8px;
-    background: #f8f9fa;
-    border: 1px solid #eee;
-  }
-  .module-row.enabled {
-    background: #f0fdf4;
-    border-color: #bbf7d0;
-  }
-  .module-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-  .module-name {
-    font-weight: 500;
-    font-size: 0.95rem;
-  }
-  .module-desc {
-    font-size: 0.8rem;
-    color: #888;
-  }
-
-  /* Toggle switch */
-  .toggle {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    flex-shrink: 0;
-  }
-  .toggle:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .toggle-track {
-    display: block;
-    width: 40px;
-    height: 22px;
-    background: #ccc;
-    border-radius: 11px;
-    position: relative;
-    transition: background 0.2s;
-  }
-  .toggle.active .toggle-track {
-    background: #2d6a4f;
-  }
-  .toggle-thumb {
-    display: block;
-    width: 18px;
-    height: 18px;
-    background: white;
-    border-radius: 50%;
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    transition: transform 0.2s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  }
-  .toggle.active .toggle-thumb {
-    transform: translateX(18px);
-  }
-
-  .close-btn {
-    width: 100%;
-    padding: 0.6rem;
-    background: #2d6a4f;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .close-btn:hover {
-    background: #245a42;
-  }
-
-  @media (max-width: 480px) {
-    .backdrop {
-      align-items: flex-end;
-      padding: 0;
-    }
-    .modal {
-      max-width: 100%;
-      border-radius: 16px 16px 0 0;
-      padding: 1.5rem 1.25rem 2rem;
-    }
-  }
 </style>

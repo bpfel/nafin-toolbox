@@ -1,11 +1,15 @@
 <script lang="ts">
+  import { t } from '../i18n/index.svelte'
   import { verifyEmail } from './authStore.svelte'
+  import { autofocus } from '../util/autofocus'
 
   interface Props {
     onVerified?: () => void
+    /** Leave the page without having verified — the link was already used. */
+    onLeave?: () => void
   }
 
-  let { onVerified }: Props = $props()
+  let { onVerified, onLeave }: Props = $props()
 
   let token = $state('')
   let password = $state('')
@@ -13,6 +17,7 @@
   let error = $state<string | null>(null)
   let submitting = $state(false)
   let success = $state(false)
+  let spent = $state(false)
 
   // Extract token from URL on mount
   $effect(() => {
@@ -21,12 +26,17 @@
     if (t) token = t
   })
 
+  function leave() {
+    window.history.replaceState({}, '', '/')
+    onLeave?.()
+  }
+
   async function handleSubmit(e: Event) {
     e.preventDefault()
     error = null
 
     if (password !== confirmPassword) {
-      error = 'Passwords do not match'
+      error = t('password.mismatch')
       return
     }
 
@@ -36,6 +46,10 @@
 
     if (result) {
       error = result
+      // The one failure the user can act on. A link that has already been used
+      // is not a form to try again — the account exists, so the way on is to
+      // sign in to it.
+      spent = /token/i.test(result)
     } else {
       success = true
       // Return to main app flow (shows recovery key screen if vault was set up)
@@ -50,19 +64,24 @@
 <div class="verify-container">
   <div class="verify-card">
     {#if !token}
-      <h1>Invalid Link</h1>
-      <p class="error-msg">This verification link is invalid. Please check your email for the correct link.</p>
+      <h1>{t('verify.invalidTitle')}</h1>
+      <p class="error-msg">{t('verify.invalidHint')}</p>
+    {:else if spent}
+      <h1>{t('verify.usedTitle')}</h1>
+      <p class="hint">{t('verify.usedHint')}</p>
+      <button class="leave" onclick={leave}>{t('verify.goToSignIn')}</button>
     {:else if success}
-      <h1>Account Verified</h1>
-      <p class="success-msg">Your account has been set up. Redirecting...</p>
+      <h1>{t('verify.doneTitle')}</h1>
+      <p class="success-msg">{t('verify.doneHint')}</p>
     {:else}
-      <h1>Set Up Your Account</h1>
-      <p class="hint">Choose a password to complete your account setup.</p>
+      <h1>{t('verify.setupTitle')}</h1>
+      <p class="hint">{t('verify.setupHint')}</p>
 
       <form onsubmit={handleSubmit}>
         <label>
-          Password
+          {t('field.password')}
           <input
+            use:autofocus
             type="password"
             bind:value={password}
             required
@@ -73,7 +92,7 @@
         </label>
 
         <label>
-          Confirm Password
+          {t('field.confirmPassword')}
           <input
             type="password"
             bind:value={confirmPassword}
@@ -89,7 +108,7 @@
         {/if}
 
         <button type="submit" disabled={submitting}>
-          {submitting ? 'Setting up...' : 'Set Password & Sign In'}
+          {submitting ? t('verify.settingUp') : t('verify.setPassword')}
         </button>
       </form>
     {/if}
@@ -109,7 +128,7 @@
     background: white;
     border-radius: 12px;
     padding: 2.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
     width: 100%;
     max-width: 400px;
   }
@@ -170,6 +189,11 @@
     padding: 0.5rem 0.75rem;
     background: #fdecea;
     border-radius: 6px;
+  }
+
+  /* The submit button is laid out by the form; this one stands alone. */
+  .leave {
+    margin-top: 1rem;
   }
 
   button:disabled {

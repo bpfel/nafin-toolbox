@@ -1,0 +1,127 @@
+<script lang="ts">
+  import { t, tAround } from '../../lib/i18n/index.svelte'
+  import { focusTrap } from '../../lib/util/focusTrap'
+
+  interface Props {
+    entryId: string
+    entryName: string
+    ondeleted: () => void
+    onclose: () => void
+  }
+
+  let { entryId, entryName, ondeleted, onclose }: Props = $props()
+
+  // Split rather than concatenated, so the sentence stays one translatable
+  // whole and only its rendering puts the name in bold.
+  let explain = $derived(tAround('entry.deleteExplain', 'name'))
+
+  function confirm() {
+    ondeleted()
+    onclose()
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') onclose()
+  }
+
+  function handleBackdrop(e: MouseEvent) {
+    if (e.target === e.currentTarget) onclose()
+  }
+</script>
+
+<svelte:window onkeydown={handleKeydown} />
+
+<div class="backdrop" role="presentation" onclick={handleBackdrop}>
+  <div class="modal" role="dialog" aria-label={t('entry.deleteTitle')} use:focusTrap>
+    <h3>{t('entry.deleteTitle')}</h3>
+    <!-- v4 replaced monthly periods with one plan plus named snapshots, so there
+         is no longer a set of periods to be removed from. What actually happens:
+         the entry and its planned amount go, and snapshots keep the copy they
+         recorded, because they hold names rather than references to it. -->
+    <p>
+      {explain[0]}<strong>{entryName}</strong>{explain[1]}
+    </p>
+
+    <div class="actions">
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
+      <button class="btn delete" onclick={confirm}>
+        {t('action.delete')}
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+  .modal {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 400px;
+    /* A dialog taller than the screen is a dialog whose buttons cannot be
+       reached. `dvh` rather than `vh`: on a phone the two disagree by exactly
+       the height of the browser's own chrome, which is the margin that decides
+       whether the last row is on screen. */
+    max-height: 88dvh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-modal);
+  }
+  h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+  }
+  p {
+    margin: 0 0 1rem;
+    color: #555;
+    line-height: 1.4;
+  }
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 0.5rem 1.25rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .cancel {
+    background: #f1f3f5;
+    border: 1px solid #dee2e6;
+    color: #333;
+  }
+  .cancel:hover:not(:disabled) {
+    background: #e9ecef;
+  }
+  .delete {
+    background: #c0392b;
+    border: none;
+    color: white;
+  }
+  .delete:hover:not(:disabled) {
+    background: #a93226;
+  }
+
+  @media (max-width: 480px) {
+    .backdrop {
+      align-items: flex-end;
+      padding: 0;
+    }
+    .modal {
+      max-width: 100%;
+      border-radius: 16px 16px 0 0;
+      padding: 1.5rem 1.25rem 2rem;
+    }
+  }
+</style>

@@ -5,6 +5,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"testing"
 
@@ -40,7 +41,7 @@ func truncateTables(t *testing.T) {
 	t.Helper()
 	tables := []string{
 		"audit_log", "recovery_codes", "totp_secrets", "mfa_challenges",
-		"verification_tokens", "app_settings", "sessions", "modules", "users",
+		"verification_tokens", "app_settings", "sessions", "users",
 	}
 	for _, table := range tables {
 		if _, err := testDB.Exec("TRUNCATE " + table + " RESTART IDENTITY CASCADE"); err != nil {
@@ -338,6 +339,109 @@ func TestDeleteUser(t *testing.T) {
 	found, _ := store.GetUserByID(ctx, user.ID)
 	if found != nil {
 		t.Error("expected user to be deleted")
+	}
+}
+
+// --- DeleteUserGuardingLastAdmin ---
+//
+// The state being guarded against is unrecoverable through the API: a role is
+// fixed at creation, so an app with no admin cannot promote anyone back.
+
+func TestDeleteUserGuardingLastAdmin_RefusesTheOnlyAdmin(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	hash, _ := HashPassword("test1234")
+	admin, _ := store.CreateUser(ctx, "only-admin@test.com", hash, RoleAdmin, false)
+	// A plain user alongside: it is the admin *roster* that must not empty,
+	// not the users table.
+	store.CreateUser(ctx, "member@test.com", hash, RoleUser, false)
+
+	err := store.DeleteUserGuardingLastAdmin(ctx, admin.ID)
+	if !errors.Is(err, ErrLastAdmin) {
+		t.Fatalf("err = %v, want ErrLastAdmin", err)
+	}
+
+	found, _ := store.GetUserByID(ctx, admin.ID)
+	if found == nil {
+		t.Error("the admin was deleted anyway")
+	}
+}
+
+func TestDeleteUserGuardingLastAdmin_AllowsOneOfTwo(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	hash, _ := HashPassword("test1234")
+	first, _ := store.CreateUser(ctx, "admin-a@test.com", hash, RoleAdmin, false)
+	store.CreateUser(ctx, "admin-b@test.com", hash, RoleAdmin, false)
+
+	if err := store.DeleteUserGuardingLastAdmin(ctx, first.ID); err != nil {
+		t.Fatalf("DeleteUserGuardingLastAdmin: %v", err)
+	}
+
+	found, _ := store.GetUserByID(ctx, first.ID)
+	if found != nil {
+		t.Error("expected the admin to be deleted")
+	}
+}
+
+func TestDeleteUserGuardingLastAdmin_LeavesExactlyOneAdminAfterBothAreTried(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	hash, _ := HashPassword("test1234")
+	a, _ := store.CreateUser(ctx, "admin-a@test.com", hash, RoleAdmin, false)
+	b, _ := store.CreateUser(ctx, "admin-b@test.com", hash, RoleAdmin, false)
+
+	// Two admins deleting each other in turn. The second must be refused: this
+	// is the sequence the guard exists for, and the one an advisory lock makes
+	// behave the same way when the two arrive at once.
+	if err := store.DeleteUserGuardingLastAdmin(ctx, a.ID); err != nil {
+		t.Fatalf("deleting the first admin: %v", err)
+	}
+	if err := store.DeleteUserGuardingLastAdmin(ctx, b.ID); !errors.Is(err, ErrLastAdmin) {
+		t.Fatalf("deleting the second admin: err = %v, want ErrLastAdmin", err)
+	}
+
+	var admins int
+	testDB.QueryRow(`SELECT COUNT(*) FROM users WHERE role = $1`, RoleAdmin).Scan(&admins)
+	if admins != 1 {
+		t.Errorf("admins remaining = %d, want 1", admins)
+	}
+}
+
+func TestDeleteUserGuardingLastAdmin_DeletesAPlainUserWhenTheyAreTheOnlyUser(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	hash, _ := HashPassword("test1234")
+	// No admin at all. The guard is about the admin roster and must not start
+	// refusing ordinary deletions in an app that has none.
+	user, _ := store.CreateUser(ctx, "lonely@test.com", hash, RoleUser, false)
+
+	if err := store.DeleteUserGuardingLastAdmin(ctx, user.ID); err != nil {
+		t.Fatalf("DeleteUserGuardingLastAdmin: %v", err)
+	}
+
+	found, _ := store.GetUserByID(ctx, user.ID)
+	if found != nil {
+		t.Error("expected the user to be deleted")
+	}
+}
+
+func TestDeleteUserGuardingLastAdmin_IsQuietAboutAUserAlreadyGone(t *testing.T) {
+	truncateTables(t)
+	store := NewStore(testDB)
+	ctx := context.Background()
+
+	// Matches DeleteUser, which no-ops rather than reporting a missing row.
+	if err := store.DeleteUserGuardingLastAdmin(ctx, 999999); err != nil {
+		t.Fatalf("deleting a user that is not there: %v", err)
 	}
 }
 
@@ -837,41 +941,6 @@ func TestAuditLog_PreservedOnUserDelete(t *testing.T) {
 		string(AuditLoginSuccess)).Scan(&count)
 	if count != 1 {
 		t.Errorf("expected audit entry preserved with null user_id, got count=%d", count)
-	}
-}
-
-// --- User-scoped module isolation ---
-
-func TestModuleIsolationBetweenUsers(t *testing.T) {
-	truncateTables(t)
-	ctx := context.Background()
-	store := NewStore(testDB)
-
-	hash, _ := HashPassword("test1234")
-	user1, _ := store.CreateUser(ctx, "user1@test.com", hash, RoleUser, false)
-	user2, _ := store.CreateUser(ctx, "user2@test.com", hash, RoleUser, false)
-
-	testDB.ExecContext(ctx,
-		"INSERT INTO modules (user_id, id, name) VALUES ($1, 'budget', 'Budget')",
-		user1.ID,
-	)
-	testDB.ExecContext(ctx,
-		"INSERT INTO modules (user_id, id, name) VALUES ($1, 'accounts', 'Accounts')",
-		user2.ID,
-	)
-
-	rows, _ := testDB.QueryContext(ctx,
-		"SELECT id FROM modules WHERE user_id = $1", user1.ID)
-	defer rows.Close()
-
-	var ids []string
-	for rows.Next() {
-		var id string
-		rows.Scan(&id)
-		ids = append(ids, id)
-	}
-	if len(ids) != 1 || ids[0] != "budget" {
-		t.Errorf("user1 modules = %v, want [budget]", ids)
 	}
 }
 

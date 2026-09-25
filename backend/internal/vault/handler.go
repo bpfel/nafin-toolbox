@@ -5,7 +5,11 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
+
+	"github.com/bpfel/nafin-toolbox/internal/apierror"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/go-chi/chi/v5"
@@ -17,10 +21,12 @@ const maxVaultSize = 512 * 1024 // 512KB
 // VaultStorer defines the storage operations needed by vault handlers.
 type VaultStorer interface {
 	GetVault(ctx context.Context, userID int) (*Vault, error)
-	PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int) error
+	PutVault(ctx context.Context, userID int, ciphertext, nonce []byte, version int, expectedUpdatedAt *time.Time) (time.Time, error)
 	GetEncryptedMEK(ctx context.Context, userID int) (string, int, error)
-	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string) error
+	GetIdentity(ctx context.Context, userID int) (Identity, error)
+	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string, identity Identity) error
 	UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error
+	SetIdentityIfAbsent(ctx context.Context, userID int, identity Identity) (bool, error)
 	GetRecoveryData(ctx context.Context, userID int) (string, string, error)
 }
 
@@ -32,6 +38,7 @@ func Routes(db *sql.DB) func(r chi.Router) {
 		r.Get("/keys", handleGetKeys(store))
 		r.Post("/keys", handleSetupKeys(store))
 		r.Put("/keys", handleUpdateKeys(store))
+		r.Post("/identity", handleSetupIdentity(store))
 		r.Post("/recovery", handleRecovery(store))
 	}
 }
@@ -40,7 +47,7 @@ func handleGetVault(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -62,7 +69,7 @@ func handlePutVault(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -88,12 +95,22 @@ func handlePutVault(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		if err := store.PutVault(r.Context(), user.ID, ciphertext, nonce, payload.Version); err != nil {
-			http.Error(w, `{"error":"failed to save vault"}`, http.StatusInternalServerError)
+		updatedAt, err := store.PutVault(r.Context(), user.ID, ciphertext, nonce, payload.Version, payload.ExpectedUpdatedAt)
+		if errors.Is(err, ErrVaultConflict) {
+			// The client is working from a vault that has since been replaced.
+			// Refusing is the only safe answer: the vault is one opaque blob, so
+			// the server cannot merge, and overwriting would discard the newer copy.
+			writeJSON(w, http.StatusConflict, map[string]string{
+				"error": "vault was modified elsewhere — reload before saving again",
+			})
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to save vault")
 			return
 		}
 
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, PutVaultResponse{Status: "ok", UpdatedAt: updatedAt})
 	}
 }
 
@@ -101,7 +118,7 @@ func handleGetKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -111,9 +128,15 @@ func handleGetKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		// A failure here is not fatal: an identity is something a vault can be
+		// missing, and refusing to hand over the MEK because of it would lock a
+		// user out of a vault they can otherwise open perfectly well.
+		identity, _ := store.GetIdentity(r.Context(), user.ID)
+
 		writeJSON(w, http.StatusOK, KeysResponse{
 			EncryptedMEK: encMEK,
 			Iterations:   iterations,
+			Identity:     identity,
 		})
 	}
 }
@@ -122,7 +145,7 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -144,15 +167,27 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		// The client sends the raw recovery key; we bcrypt-hash it for storage
-		hashedRecoveryKey, err := bcrypt.GenerateFromPassword([]byte(req.RecoveryKeyHash), bcrypt.DefaultCost)
-		if err != nil {
-			http.Error(w, `{"error":"failed to hash recovery key"}`, http.StatusInternalServerError)
+		// All four halves or none. A public key stored without its private half
+		// would invite other users to wrap a shared vault key for someone who
+		// can never unwrap it — a failure that would surface much later, to the
+		// wrong person, as a vault that will not open.
+		//
+		// None is still allowed, because a client too old to send them must
+		// still be able to set a vault up.
+		if !req.Identity.Empty() && !req.Identity.Complete() {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "identity must be complete or absent"})
 			return
 		}
 
-		if err := store.SetEncryptedMEK(r.Context(), user.ID, req.EncryptedMEK, string(hashedRecoveryKey), req.EncryptedMEKRecovery); err != nil {
-			http.Error(w, `{"error":"failed to save keys"}`, http.StatusInternalServerError)
+		// The client sends the raw recovery key; we bcrypt-hash it for storage
+		hashedRecoveryKey, err := bcrypt.GenerateFromPassword([]byte(req.RecoveryKeyHash), bcrypt.DefaultCost)
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to hash recovery key")
+			return
+		}
+
+		if err := store.SetEncryptedMEK(r.Context(), user.ID, req.EncryptedMEK, string(hashedRecoveryKey), req.EncryptedMEKRecovery, req.Identity); err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to save keys")
 			return
 		}
 
@@ -164,7 +199,7 @@ func handleUpdateKeys(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -180,10 +215,46 @@ func handleUpdateKeys(store VaultStorer) http.HandlerFunc {
 		}
 
 		if err := store.UpdateEncryptedMEK(r.Context(), user.ID, req.EncryptedMEK); err != nil {
-			http.Error(w, `{"error":"failed to update keys"}`, http.StatusInternalServerError)
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to update keys")
 			return
 		}
 
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// handleSetupIdentity is how an account made before households gets the
+// keypair every newer account is born with. Without it such an account could
+// neither start a household nor accept an invitation, and nothing on screen
+// could have told it why. The client calls it once, on unlock, holding the
+// vault key it just opened; see SetIdentityIfAbsent for why it only ever adds.
+func handleSetupIdentity(store VaultStorer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := auth.UserFromContext(r.Context())
+		if user == nil {
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		var id Identity
+		if err := json.NewDecoder(r.Body).Decode(&id); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if id.PublicKey == "" || id.EncryptedPrivateKey == "" || id.VerifyingKey == "" || id.EncryptedSigningKey == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "all four identity keys are required"})
+			return
+		}
+
+		set, err := store.SetIdentityIfAbsent(r.Context(), user.ID, id)
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to save identity")
+			return
+		}
+		if !set {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "identity already set up"})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
@@ -192,7 +263,7 @@ func handleRecovery(store VaultStorer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			apierror.Write(w, apierror.Vault, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -218,8 +289,11 @@ func handleRecovery(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		identity, _ := store.GetIdentity(r.Context(), user.ID)
+
 		writeJSON(w, http.StatusOK, RecoveryResponse{
 			EncryptedMEKRecovery: encMEKRecovery,
+			Identity:             identity,
 		})
 	}
 }

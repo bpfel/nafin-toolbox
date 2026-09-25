@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"net/http"
+
+	"github.com/bpfel/nafin-toolbox/internal/apierror"
 )
 
 type contextKey string
@@ -14,19 +16,19 @@ func RequireAuth(store *Store) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("session")
 			if err != nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 
 			sess, err := store.GetSession(r.Context(), cookie.Value)
 			if err != nil || sess == nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 
 			user, err := store.GetUserByID(r.Context(), sess.UserID)
 			if err != nil || user == nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 

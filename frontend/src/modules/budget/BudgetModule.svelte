@@ -1,131 +1,179 @@
 <script lang="ts">
+  import { t, getLocale } from '../../lib/i18n/index.svelte'
   import { getVaultState, markDirty } from '../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
-  import MonthSelector from './MonthSelector.svelte'
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
+  import SnapshotPanel from './SnapshotPanel.svelte'
+  import ResetBudgetModal from './ResetBudgetModal.svelte'
+  import { isEditing } from '../../lib/util/editMode.svelte'
 
   const vaultState = getVaultState()
 
-  let now = new Date()
-  let currentYear = now.getFullYear()
-  let currentMonth = now.getMonth() + 1
-  let maxYear = currentMonth === 12 ? currentYear + 1 : currentYear
-  let maxMonth = currentMonth === 12 ? 1 : currentMonth + 1
-
-  let year = $state(currentYear)
-  let month = $state(currentMonth)
-
-  // Trigger reactivity: increment on mutations so $derived recomputes
+  // Trigger reactivity: increment on mutations so $derived recomputes, since the
+  // engine mutates the vault in place where runes cannot see it.
   let version = $state(0)
 
-  let isPastMonth = $derived(year < currentYear || (year === currentYear && month < currentMonth))
+  // "Start blank" has nothing to create — there is one plan and it already
+  // exists — so it only means "stop offering me the defaults".
+  let dismissedSetup = $state(false)
 
   let needsSetup = $derived(
-    vaultState.vault ? vaultState.vault.budget.categories.length === 0 && version >= 0 : false
+    vaultState.vault
+      ? vaultState.vault.budget.entries.length === 0 && !dismissedSetup && version >= 0
+      : false
   )
 
   let summary = $derived(
-    vaultState.vault && version >= 0 ? engine.getPeriodSummary(vaultState.vault, year, month) : null
+    vaultState.vault && version >= 0 ? engine.getPlanSummary(vaultState.vault) : null
   )
 
-  let periodNotFound = $derived(!summary && !needsSetup && isPastMonth)
-
-  function changeMonth(y: number, m: number) {
-    year = y
-    month = m
-  }
-
-  // Auto-create period for current/future months
-  $effect(() => {
+  function handleSave(entryId: string, amount: string) {
     if (!vaultState.vault) return
-    const s = engine.getPeriodSummary(vaultState.vault, year, month)
-    if (!s && !isPastMonth && vaultState.vault.budget.categories.length > 0) {
-      let prevYear = month === 1 ? year - 1 : year
-      let prevMonth = month === 1 ? 12 : month - 1
-      engine.copyPeriod(vaultState.vault, year, month, prevYear, prevMonth)
-      if (!engine.getPeriod(vaultState.vault, year, month)) {
-        engine.createPeriod(vaultState.vault, year, month)
-      }
-      markDirty()
-      version++
-    }
-  })
-
-  function handleSave(categoryId: string, field: 'planned' | 'actual', amount: string) {
-    if (!vaultState.vault) return
-    engine.upsertEntry(vaultState.vault, year, month, categoryId, field, amount)
+    engine.setPlanned(vaultState.vault, entryId, amount)
     markDirty()
     version++
   }
 
-  function handleCategoryChange() {
+  function handleEntryChange() {
     markDirty()
     version++
   }
+
+  /**
+   * Which starter budget. A household gets the two-person one, whose income
+   * side is contributions rather than a salary — seeding a personal plan into
+   * a shared vault would put one person's wage in front of both of them.
+   */
+  const household = $derived(vaultState.currentHousehold !== null)
 
   function handleSeeded() {
     if (!vaultState.vault) return
-    engine.seedDefaults(vaultState.vault)
+    const seed = household ? engine.seedSharedDefaults : engine.seedDefaults
+    seed(vaultState.vault, getLocale())
     markDirty()
     version++
   }
 
   function handleStartBlank() {
+    dismissedSetup = true
+  }
+
+  // Monthly or yearly, owned by the screen: the control that flips it sits in
+  // the action strip, and the summary and the table both answer to it.
+  interface Props {
+    viewMode?: 'monthly' | 'yearly'
+  }
+
+  let { viewMode = $bindable('monthly') }: Props = $props()
+
+  /**
+   * Passed straight through from the screen's "+" to the table that owns the
+   * form. The module is in the middle of that chain and holds nothing of its
+   * own here — the button belongs with the screen's other controls, the form
+   * belongs with the vault it writes to.
+   */
+  let table = $state<{ openAddEntry: () => void } | null>(null)
+
+  export function openAddEntry() {
+    table?.openAddEntry()
+  }
+
+  let confirmingReset = $state(false)
+
+  function handleReset() {
     if (!vaultState.vault) return
-    engine.createPeriod(vaultState.vault, currentYear, currentMonth)
+    engine.resetBudget(vaultState.vault)
+    // An empty budget is exactly the state the setup screen exists for, so the
+    // offer of the defaults comes back rather than leaving a blank table.
+    dismissedSetup = false
     markDirty()
     version++
   }
 </script>
 
 <div class="budget-module">
-  <MonthSelector {year} {month} {maxYear} {maxMonth} onchange={changeMonth} />
-
   {#if !vaultState.vault}
-    <p class="loading">Loading...</p>
+    <p class="loading">{t('state.loading')}</p>
+  {:else if needsSetup && vaultState.readOnly}
+    <!--
+      The setup screen offers to write the defaults, which a reader cannot do —
+      and pressing it used to end in "Something broke". An empty budget they
+      may only look at still needs saying so, or it reads as a page that failed
+      to load.
+    -->
+    <p class="read-only-empty">{t('budget.readOnlyEmpty')}</p>
   {:else if needsSetup}
-    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} />
-  {:else if periodNotFound}
-    <div class="no-period">
-      <p>No budget was recorded for this month.</p>
-    </div>
+    <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} {household} />
   {:else if summary}
+    {#if isEditing('budget') && summary.entries.length > 0}
+      <div class="module-actions">
+        <button class="btn-reset" onclick={() => confirmingReset = true}>{t('budget.reset')}</button>
+      </div>
+    {/if}
     {#if summary.entries.length > 0}
-      <BudgetSummary {summary} />
+      <BudgetSummary {summary} {viewMode} />
     {/if}
     <BudgetTable
+      bind:this={table}
+      bind:viewMode
       entries={summary.entries}
       vault={vaultState.vault}
-      {year}
-      {month}
       onsave={handleSave}
-      oncategorycreated={handleCategoryChange}
-      oncategorydeleted={handleCategoryChange}
+      onentrycreated={handleEntryChange}
+      onentrydeleted={handleEntryChange}
+      oncategorychanged={handleEntryChange}
     />
+    <SnapshotPanel vault={vaultState.vault} />
+
+    {#if confirmingReset}
+      <ResetBudgetModal
+        entryCount={vaultState.vault.budget.entries.length}
+        snapshotCount={vaultState.vault.budget.snapshots.length}
+        onreset={handleReset}
+        onclose={() => confirmingReset = false}
+      />
+    {/if}
   {/if}
 </div>
 
 <style>
+  .read-only-empty {
+    margin: 2rem auto;
+    max-width: 28rem;
+    text-align: center;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+
   .budget-module {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
   }
+  .module-actions {
+    display: flex;
+    justify-content: flex-end;
+    /* The module already spaces its children generously; the bar belongs to the
+       table below it rather than floating alone. */
+    margin-bottom: -1rem;
+  }
+  .btn-reset {
+    background: white;
+    color: #c0392b;
+    border: 1px solid #c0392b;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .btn-reset:hover {
+    background: #fdecea;
+  }
   .loading {
-    color: #888;
+    color: var(--ink-faint);
     text-align: center;
     padding: 2rem;
-  }
-  .no-period {
-    text-align: center;
-    padding: 3rem 2rem;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  .no-period p {
-    color: #666;
   }
 </style>

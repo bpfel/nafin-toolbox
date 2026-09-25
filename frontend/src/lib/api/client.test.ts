@@ -1,8 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
-  fetchModules,
-  enableModule,
-  disableModule,
+  VaultConflictError,
   healthCheck,
   fetchVaultKeys,
   setupVaultKeys,
@@ -11,245 +9,20 @@ import {
   putVault,
   recoverVaultKeys,
   setOnUnauthorized,
-  type ModuleInfo,
   type VaultKeysResponse,
   type VaultPayloadResponse,
+  withCode,
 } from './client'
 
 // Mock global fetch
 const mockFetch = vi.fn()
-global.fetch = mockFetch
+globalThis.fetch = mockFetch
 
 describe('setOnUnauthorized', () => {
   test('sets the unauthorized callback', () => {
     const callback = vi.fn()
     setOnUnauthorized(callback)
     // Callback will be tested indirectly via 401 responses
-  })
-})
-
-describe('fetchModules', () => {
-  beforeEach(() => {
-    mockFetch.mockClear()
-  })
-
-  test('fetches modules successfully', async () => {
-    const modules: ModuleInfo[] = [
-      { id: 'budget', name: 'Budget', enabled_at: '2024-01-01T00:00:00Z' },
-      { id: 'vault', name: 'Vault', enabled_at: '2024-01-02T00:00:00Z' },
-    ]
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => modules,
-    })
-
-    const result = await fetchModules()
-
-    expect(result).toEqual(modules)
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    })
-  })
-
-  test('handles empty array response', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => [],
-    })
-
-    const result = await fetchModules()
-
-    expect(result).toEqual([])
-  })
-
-  test('throws error on non-200 response', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      json: async () => ({}),
-    })
-
-    await expect(fetchModules()).rejects.toThrow('API error: 500 Internal Server Error')
-  })
-
-  test('throws error with message from response body', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      json: async () => ({ error: 'Module not found' }),
-    })
-
-    await expect(fetchModules()).rejects.toThrow('Module not found')
-  })
-
-  test('handles network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-    await expect(fetchModules()).rejects.toThrow('Network error')
-  })
-
-  test('calls unauthorized callback on 401', async () => {
-    const onUnauth = vi.fn()
-    setOnUnauthorized(onUnauth)
-
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      statusText: 'Unauthorized',
-    })
-
-    await expect(fetchModules()).rejects.toThrow('Unauthorized')
-    expect(onUnauth).toHaveBeenCalled()
-  })
-})
-
-describe('enableModule', () => {
-  beforeEach(() => {
-    mockFetch.mockClear()
-  })
-
-  test('enables a module successfully', async () => {
-    const module: ModuleInfo = {
-      id: 'budget',
-      name: 'Budget',
-      enabled_at: '2024-01-01T00:00:00Z',
-    }
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => module,
-    })
-
-    const result = await enableModule('budget')
-
-    expect(result).toEqual(module)
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      method: 'POST',
-      body: JSON.stringify({ id: 'budget' }),
-    })
-  })
-
-  test('handles empty module id', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      json: async () => ({ error: 'Invalid module id' }),
-    })
-
-    await expect(enableModule('')).rejects.toThrow('Invalid module id')
-  })
-
-  test('handles unknown module id', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      json: async () => ({ error: 'Module not found' }),
-    })
-
-    await expect(enableModule('unknown')).rejects.toThrow('Module not found')
-  })
-
-  test('handles special characters in module id', async () => {
-    const module: ModuleInfo = {
-      id: 'test-module_123',
-      name: 'Test',
-      enabled_at: '2024-01-01T00:00:00Z',
-    }
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => module,
-    })
-
-    const result = await enableModule('test-module_123')
-
-    expect(result).toEqual(module)
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      method: 'POST',
-      body: JSON.stringify({ id: 'test-module_123' }),
-    })
-  })
-})
-
-describe('disableModule', () => {
-  beforeEach(() => {
-    mockFetch.mockClear()
-  })
-
-  test('disables a module successfully', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('budget')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/budget', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles empty module id', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles module id with special characters', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('test-module_123')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/test-module_123', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles module id with slashes', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 204,
-    })
-
-    await disableModule('module/sub')
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/modules/module/sub', {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-  })
-
-  test('handles network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-    await expect(disableModule('budget')).rejects.toThrow('Network error')
   })
 })
 
@@ -407,6 +180,10 @@ describe('setupVaultKeys', () => {
       encrypted_mek: 'base64encodedmek',
       recovery_key_hash: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
+      public_key: 'base64spki',
+      encrypted_private_key: 'base64sealedprivate',
+      verifying_key: 'base64verifying',
+      encrypted_signing_key: 'base64sealedsigning',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -430,6 +207,10 @@ describe('setupVaultKeys', () => {
       encrypted_mek: '',
       recovery_key_hash: '',
       encrypted_mek_recovery: '',
+      public_key: 'base64spki',
+      encrypted_private_key: 'base64sealedprivate',
+      verifying_key: 'base64verifying',
+      encrypted_signing_key: 'base64sealedsigning',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -453,6 +234,10 @@ describe('setupVaultKeys', () => {
       encrypted_mek: 'base64encodedmek',
       recovery_key_hash: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
+      public_key: 'base64spki',
+      encrypted_private_key: 'base64sealedprivate',
+      verifying_key: 'base64verifying',
+      encrypted_signing_key: 'base64sealedsigning',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -527,6 +312,7 @@ describe('fetchVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -570,6 +356,7 @@ describe('fetchVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 0,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -588,6 +375,7 @@ describe('fetchVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 999,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -606,6 +394,7 @@ describe('fetchVault', () => {
       ciphertext: '',
       nonce: '',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -630,6 +419,7 @@ describe('putVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -653,6 +443,7 @@ describe('putVault', () => {
       ciphertext: '',
       nonce: '',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -676,6 +467,7 @@ describe('putVault', () => {
       ciphertext: 'encrypteddata',
       nonce: 'nonce123',
       version: 1,
+      updated_at: '2026-08-16T10:00:00Z',
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -820,6 +612,9 @@ describe('recoverVaultKeys', () => {
   })
 })
 
+// These exercise the shared `request` helper rather than any one endpoint.
+// Health is the vehicle because it is the plainest call in the file — it takes
+// no arguments and reads whatever comes back.
 describe('error handling edge cases', () => {
   beforeEach(() => {
     mockFetch.mockClear()
@@ -835,7 +630,7 @@ describe('error handling edge cases', () => {
       },
     })
 
-    await expect(fetchModules()).rejects.toThrow('API error: 500 Internal Server Error')
+    await expect(healthCheck()).rejects.toThrow('API error: 500 Internal Server Error')
   })
 
   test('handles null response body', async () => {
@@ -845,7 +640,7 @@ describe('error handling edge cases', () => {
       json: async () => null,
     })
 
-    const result = await fetchModules()
+    const result = await healthCheck()
 
     expect(result).toBeNull()
   })
@@ -857,7 +652,7 @@ describe('error handling edge cases', () => {
       json: async () => undefined,
     })
 
-    const result = await fetchModules()
+    const result = await healthCheck()
 
     expect(result).toBeUndefined()
   })
@@ -874,7 +669,7 @@ describe('error handling edge cases', () => {
     })
 
     // Should still throw even without callback
-    await expect(fetchModules()).rejects.toThrow('Unauthorized')
+    await expect(healthCheck()).rejects.toThrow('Unauthorized')
   })
 
   test('handles response with error object instead of error string', async () => {
@@ -886,18 +681,109 @@ describe('error handling edge cases', () => {
     })
 
     // body.error is truthy (an object), so it replaces the fallback message
-    await expect(fetchModules()).rejects.toThrow('[object Object]')
+    await expect(healthCheck()).rejects.toThrow('[object Object]')
   })
 
   test('handles fetch rejection', async () => {
     mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
 
-    await expect(fetchModules()).rejects.toThrow('Failed to fetch')
+    await expect(healthCheck()).rejects.toThrow('Failed to fetch')
   })
 
   test('handles timeout error', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Request timeout'))
 
-    await expect(fetchModules()).rejects.toThrow('Request timeout')
+    await expect(healthCheck()).rejects.toThrow('Request timeout')
+  })
+})
+
+describe('putVault — optimistic locking', () => {
+  beforeEach(() => {
+    mockFetch.mockClear()
+  })
+
+  test('sends the precondition and returns the new token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', updated_at: '2026-08-16T11:00:00Z' }),
+    })
+
+    const result = await putVault({
+      ciphertext: 'c',
+      nonce: 'n',
+      version: 3,
+      expected_updated_at: '2026-08-16T10:00:00Z',
+    })
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(body.expected_updated_at).toBe('2026-08-16T10:00:00Z')
+    // The response token becomes the precondition for the next write; without it
+    // a client could only ever save once before going stale against itself.
+    expect(result.updated_at).toBe('2026-08-16T11:00:00Z')
+  })
+
+  test('omits the precondition when there is no server copy yet', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', updated_at: '2026-08-16T11:00:00Z' }),
+    })
+
+    await putVault({ ciphertext: 'c', nonce: 'n', version: 3 })
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect('expected_updated_at' in body).toBe(false)
+  })
+
+  test('a 409 throws VaultConflictError, not a generic Error', async () => {
+    // The distinction is the point: the caller can only tell the user to reload
+    // if it can tell a conflict apart from a network or server failure.
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: 'vault was modified elsewhere — reload before saving again' }),
+    })
+
+    await expect(
+      putVault({ ciphertext: 'c', nonce: 'n', version: 3, expected_updated_at: 'x' }),
+    ).rejects.toBeInstanceOf(VaultConflictError)
+  })
+
+  test('a 409 with an unreadable body still yields a usable message', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => { throw new Error('not json') },
+    })
+
+    await expect(
+      putVault({ ciphertext: 'c', nonce: 'n', version: 3, expected_updated_at: 'x' }),
+    ).rejects.toThrow(/changed elsewhere/i)
+  })
+
+  test('other failures stay generic errors', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' })
+
+    await expect(
+      putVault({ ciphertext: 'c', nonce: 'n', version: 3 }),
+    ).rejects.not.toBeInstanceOf(VaultConflictError)
+  })
+})
+
+describe('withCode', () => {
+  // The messages stay English by decision; the code is what a user running the
+  // app in Rumantsch can read back to whoever runs the server.
+  test('appends the code the server sent', () => {
+    expect(withCode({ error: 'invalid or expired token', code: 'AUTH-020' }))
+      .toBe('invalid or expired token (AUTH-020)')
+  })
+
+  test('leaves a message alone when there is no code', () => {
+    expect(withCode({ error: 'something older' })).toBe('something older')
+  })
+
+  test('survives a body with neither', () => {
+    expect(withCode({})).toBe('')
   })
 })
