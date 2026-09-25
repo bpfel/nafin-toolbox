@@ -539,12 +539,9 @@ export const fr: Messages = {
 
   // --- Savoir : la bibliothèque et la visite guidée qui s'y trouve ---
   'knowledge.tourTitle': 'Faire la visite',
-  'knowledge.tourAgainTitle': 'Refaire la visite',
   'knowledge.tourBody': 'Un bref parcours des vues principales et de leurs commandes.',
   'knowledge.tourStart': 'Démarrer',
-  'knowledge.tourAgain': 'Recommencer',
   'knowledge.sharedTourTitle': 'Configurer les budgets partagés',
-  'knowledge.sharedTourAgainTitle': 'Budgets partagés, à nouveau',
   'knowledge.sharedTourBody': 'Comment deux personnes tiennent un plan de ménage à côté du leur, et qui peut le modifier.',
   'knowledge.about': 'À propos de l’app',
   'knowledge.swiss': 'Bases suisses',

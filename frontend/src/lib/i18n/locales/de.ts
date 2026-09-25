@@ -546,12 +546,9 @@ export const de: Messages = {
 
   // --- Wissen: die Bibliothek und der Rundgang darin ---
   'knowledge.tourTitle': 'Rundgang starten',
-  'knowledge.tourAgainTitle': 'Rundgang wiederholen',
   'knowledge.tourBody': 'Ein kurzer Gang durch die wichtigsten Ansichten und ihre Bedienelemente.',
   'knowledge.tourStart': 'Start',
-  'knowledge.tourAgain': 'Erneut',
   'knowledge.sharedTourTitle': 'Gemeinsame Budgets einrichten',
-  'knowledge.sharedTourAgainTitle': 'Gemeinsame Budgets, noch einmal',
   'knowledge.sharedTourBody': 'Wie zwei Personen einen Haushaltsplan neben dem eigenen führen — und wer ihn ändern darf.',
   'knowledge.about': 'Über diese App',
   'knowledge.swiss': 'Schweizer Grundlagen',

@@ -539,12 +539,9 @@ export const it: Messages = {
 
   // --- Sapere: la biblioteca e il tour guidato che vi si trova ---
   'knowledge.tourTitle': 'Fai il tour',
-  'knowledge.tourAgainTitle': 'Ripeti il tour',
   'knowledge.tourBody': 'Un breve percorso tra le viste principali e i loro comandi.',
   'knowledge.tourStart': 'Avvia',
-  'knowledge.tourAgain': 'Ripeti',
   'knowledge.sharedTourTitle': 'Configurare i budget condivisi',
-  'knowledge.sharedTourAgainTitle': 'Budget condivisi, di nuovo',
   'knowledge.sharedTourBody': 'Come due persone tengono un piano domestico accanto al proprio, e chi può modificarlo.',
   'knowledge.about': 'Su questa app',
   'knowledge.swiss': 'Basi svizzere',
