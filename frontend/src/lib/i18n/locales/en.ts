@@ -293,6 +293,7 @@ export const en = {
   // the same survey, because the annual sample is too small to break down
   // by household type and the BFS pools three years for those columns.
   'budget.setupHintHousehold': 'Start with default Swiss entries for a two-person household, based on BFS household survey data (HABE 2020–2021, couples under 65 without children). You can customize everything later.',
+  'budget.readOnlyEmpty': 'Nothing is planned here yet. You can view this household but not change it, so setting it up is for somebody who can.',
 
   // --- Entry dialog ---
   'entry.editTitle': 'Edit entry',

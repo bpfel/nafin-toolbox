@@ -172,6 +172,8 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
+    /* A whole name at the limit (`HOUSEHOLD_NAME_MAX`) beside its mark. The
+       ellipsis below stays for names made before the limit existed. */
     max-width: 14rem;
     min-width: 0;
     padding: 0.35rem 0.6rem;

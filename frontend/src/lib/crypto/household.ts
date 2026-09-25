@@ -201,3 +201,19 @@ export async function openGrantedKey(params: {
 
   return { key, epoch, pin: { userId: granter.user_id, verifyingKey: granter.verifying_key } }
 }
+
+/**
+ * How long a household's name may be, in characters.
+ *
+ * Eighteen fits every place a name is drawn without being cut, with room to
+ * spare where a longer language's controls sit beside it: the budget switcher's
+ * pill in the toolbar, the stack in the corner of a phone, the row on Profile.
+ * "Familie Müller" is 14, "WG Langstrasse" 14, "Ferienwohnung" 13 — the names
+ * people give where they live come in well under it. A name ellipsised on the
+ * control you check before entering rent is a name you cannot tell apart from
+ * its neighbour, which is the one job that control has.
+ *
+ * Enforced where a name is typed and again where it is sealed. The server
+ * cannot check it: a name is ciphertext by the time it arrives.
+ */
+export const HOUSEHOLD_NAME_MAX = 18

@@ -3,6 +3,9 @@
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
   import ActionButton from '../lib/nav/ActionButton.svelte'
   import BudgetModule from '../modules/budget/BudgetModule.svelte'
+  import { getVaultState } from '../lib/crypto/vaultStore.svelte'
+
+  const vaultState = getVaultState()
 
   /**
    * Monthly or yearly. It belongs to the screen because two things answer to
@@ -29,6 +32,8 @@
 
 <ScreenChrome title={t('nav.budget')} editKey="budget">
   {#snippet children()}
+    <!-- Not for a reader: an entry they add is one the server refuses. -->
+    {#if !vaultState.readOnly}
     <ActionButton label={t('entry.addOne')} onclick={() => budget?.openAddEntry()}>
       <svg
         viewBox="0 0 24 24"
@@ -43,6 +48,7 @@
         <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
     </ActionButton>
+    {/if}
 
     <!--
       The number of months it is showing: 1 or 12. A digit rather than a word,

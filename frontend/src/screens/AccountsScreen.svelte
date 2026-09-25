@@ -6,6 +6,9 @@
   import ActionButton from '../lib/nav/ActionButton.svelte'
   import AccountManagement from '../modules/accounts/management/AccountManagement.svelte'
   import AllocationScreen from '../modules/accounts/allocations/AllocationScreen.svelte'
+  import { getVaultState } from '../lib/crypto/vaultStore.svelte'
+
+  const vaultState = getVaultState()
 
   /**
    * Two views under one destination. The dependency runs one way — allocations
@@ -42,7 +45,7 @@
 
 <ScreenChrome title={t('nav.accounts')} editKey="accounts">
   {#snippet children()}
-    {#if !onAllocations}
+    {#if !onAllocations && !vaultState.readOnly}
       <ActionButton label={t('accounts.addOne')} onclick={() => accounts?.openCreateAccount()}>
         <svg
           viewBox="0 0 24 24"

@@ -87,6 +87,21 @@ export class VaultConflictError extends Error {
   }
 }
 
+/**
+ * A household save refused because this account may only read it.
+ *
+ * Its own type for the reason the conflict has one: the answer is not "try
+ * again" and not "something broke", it is "you cannot do this here", and only
+ * a distinct error lets the store say so instead of letting it escape as a
+ * crash.
+ */
+export class VaultReadOnlyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VaultReadOnlyError'
+  }
+}
+
 export async function fetchVaultKeys(): Promise<VaultKeysResponse | null> {
   try {
     return await request<VaultKeysResponse>('/vault/keys')
@@ -292,6 +307,10 @@ export async function putHouseholdVault(
   if (res.status === 409) {
     const body = await res.json().catch(() => ({}))
     throw new VaultConflictError(withCode(body))
+  }
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}))
+    throw new VaultReadOnlyError(withCode(body))
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))

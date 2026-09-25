@@ -189,7 +189,7 @@ export const it: Messages = {
   'household.none': 'Non ne hai ancora.',
   'household.create': 'Crea un’economia domestica',
   'household.nameLabel': 'Nome',
-  'household.namePlaceholder': 'Casa, Coinquilini con Anna…',
+  'household.namePlaceholder': 'Casa, Coinquilini…',
   'household.creating': 'Creazione…',
   'household.owner': 'Tua',
   'household.member': 'Condivisa con te',
@@ -278,6 +278,7 @@ export const it: Messages = {
   'budget.setupTitle': 'Configura il tuo budget',
   'budget.setupHint': 'Inizia con voci svizzere predefinite, basate sull’indagine sul budget delle economie domestiche dell’UST (HABE 2023, persona sola). Potrai adattare tutto in seguito.',
   'budget.setupHintHousehold': 'Inizia con voci svizzere predefinite per un’economia domestica di due persone, basate sull’indagine sul budget delle economie domestiche dell’UST (HABE 2020–2021, coppie sotto i 65 anni senza figli). Potrai adattare tutto in seguito.',
+  'budget.readOnlyEmpty': 'Qui non è ancora pianificato nulla. Puoi vedere questa economia domestica ma non modificarla: a configurarla sarà chi può farlo.',
 
   // --- Entry dialog ---
   'entry.editTitle': 'Modifica la voce',

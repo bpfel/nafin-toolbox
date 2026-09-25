@@ -185,3 +185,30 @@ describe('after creating one', () => {
     expect(rowFor('Flat with Anna').getAttribute('aria-expanded')).toBe('false')
   })
 })
+
+/**
+ * A name longer than its pill is a name cut off on the one control whose job is
+ * saying which household you are in. The limit lives in `household.ts`; this
+ * holds both places a name is typed to it.
+ */
+describe('a household name', () => {
+  test('stops at the limit when a household is started', async () => {
+    const { HOUSEHOLD_NAME_MAX } = await import('../crypto/household')
+    render(HouseholdSettings)
+    await userEvent.click(screen.getByText('Start a household'))
+
+    const input = screen.getByLabelText('Name') as HTMLInputElement
+    await userEvent.type(input, 'x'.repeat(HOUSEHOLD_NAME_MAX + 10))
+
+    expect(input.value).toHaveLength(HOUSEHOLD_NAME_MAX)
+  })
+
+  test('and when one is renamed', async () => {
+    const { HOUSEHOLD_NAME_MAX } = await import('../crypto/household')
+    render(HouseholdSettings)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Rename' })[0])
+
+    const input = screen.getByLabelText('Name') as HTMLInputElement
+    expect(input.maxLength).toBe(HOUSEHOLD_NAME_MAX)
+  })
+})

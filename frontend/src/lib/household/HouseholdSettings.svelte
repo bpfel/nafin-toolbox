@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
   import { getVaultState, createHousehold, renameHousehold, deleteHousehold } from '../crypto/vaultStore.svelte'
-  import { initialsOf } from '../crypto/household'
+  import { initialsOf, HOUSEHOLD_NAME_MAX } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import HouseholdPeople from './HouseholdPeople.svelte'
   import ExampleHousehold from './ExampleHousehold.svelte'
@@ -160,7 +160,7 @@
                 use:autofocus
                 bind:value={renameTo}
                 aria-label={t('household.nameLabel')}
-                maxlength="60"
+                maxlength={HOUSEHOLD_NAME_MAX}
                 disabled={busy}
               />
               <button class="btn-secondary" type="submit" disabled={busy || !renameTo.trim()}>
@@ -288,7 +288,7 @@
         bind:value={name}
         placeholder={t('household.namePlaceholder')}
         aria-label={t('household.nameLabel')}
-        maxlength="60"
+        maxlength={HOUSEHOLD_NAME_MAX}
         disabled={busy}
       />
       <button class="btn-primary" type="submit" disabled={busy || !name.trim()}>

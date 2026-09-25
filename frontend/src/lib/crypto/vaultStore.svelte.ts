@@ -1,7 +1,7 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
 import {
-  fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError,
+  fetchVaultKeys, setupVaultKeys, updateVaultKeys, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
   fetchHouseholdMembers, fetchHouseholdInvites, createHouseholdInvite, deleteHouseholdInvite,
@@ -11,6 +11,7 @@ import {
 import { generateIdentity, sealIdentity, openIdentity, isComplete, type OpenIdentity } from './identity'
 import {
   generateHouseholdKey, sealKeyForSelf, sealName, openName, openListedHousehold, openGrantedKey,
+  HOUSEHOLD_NAME_MAX,
   type OpenHousehold,
 } from './household'
 import {
@@ -234,6 +235,16 @@ export function getVaultState() {
     /** The household on screen, or null when the personal vault is. */
     get currentHousehold() {
       return currentId === 'personal' ? null : households.find(h => h.id === currentId) ?? null
+    },
+    /**
+     * Whether the vault on screen may be looked at and not changed.
+     *
+     * A reader in a household, and nobody else — your own vault is always
+     * yours. Read by the screens to leave out every control that edits, so a
+     * reader is never offered a change the server will refuse.
+     */
+    get readOnly() {
+      return isReadOnly()
     },
   }
 }
@@ -473,6 +484,7 @@ async function putCurrentAside(): Promise<void> {
 /** Make a household, with its own key, and switch to it. */
 export async function createHousehold(name: string): Promise<number> {
   if (!mek) throw new Error('Vault not unlocked')
+  assertNameFits(name)
 
   const key = await generateHouseholdKey()
   const empty = createEmptyVault()
@@ -506,6 +518,7 @@ export async function createHousehold(name: string): Promise<number> {
 export async function renameHousehold(id: number, name: string): Promise<void> {
   const household = households.find(h => h.id === id)
   if (!household) return
+  assertNameFits(name)
 
   await putHouseholdName(id, await sealName(name, household.key))
   households = households.map(h => (h.id === id ? { ...h, name } : h))
@@ -648,6 +661,22 @@ export async function setupKeys(password: string, email: string): Promise<string
   return recoveryKey
 }
 
+/** The vault on screen belongs to a household this account may only read. */
+function isReadOnly(): boolean {
+  if (currentId === 'personal') return false
+  return households.find(h => h.id === currentId)?.role === 'reader'
+}
+
+/**
+ * The input stops at the limit already; this is for anything that reaches the
+ * store without passing through it. See `HOUSEHOLD_NAME_MAX`.
+ */
+function assertNameFits(name: string): void {
+  if (name.length > HOUSEHOLD_NAME_MAX) {
+    throw new Error(`a household name is at most ${HOUSEHOLD_NAME_MAX} characters`)
+  }
+}
+
 /**
  * Save the current vault (encrypt + PUT to server).
  */
@@ -665,6 +694,9 @@ export async function saveVault(): Promise<void> {
   // Once the server has told us we are stale, retrying can only fail again — and
   // the auto-save runs every couple of seconds, so retrying would hammer it.
   if (slot.conflicted || slot.shapeInvalid) return
+  // The screens offer a reader nothing that edits. This is for anything that
+  // gets here anyway, so it stops at the door rather than at the server.
+  if (isReadOnly()) return
 
   // Checked before the write, not after the read: a vault that cannot describe
   // itself must not be allowed over one that can. `dirty` stays set, so the UI
@@ -699,6 +731,15 @@ export async function saveVault(): Promise<void> {
       slot.conflicted = true
       return
     }
+    if (e instanceof VaultReadOnlyError && typeof id === 'number') {
+      // The owner made this account a reader while it was editing. What this
+      // client believed about its role was out of date, so it takes the
+      // server's word, and the screens drop their editing controls. Not
+      // thrown: a permission changing under you is news, not a crash, and it
+      // used to arrive as "Something broke and the page stopped updating".
+      households = households.map(h => (h.id === id ? { ...h, role: 'reader' } : h))
+      return
+    }
     throw e
   } finally {
     slot.saving = false
@@ -712,6 +753,8 @@ export function markDirty(): void {
   // Nothing in a preview is worth saving, and setting the flag would put an
   // "unsaved" warning on the screen about edits that do not exist.
   if (current.parked) return
+  // Nor in a vault that cannot be saved: the warning would never clear.
+  if (isReadOnly()) return
   current.dirty = true
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
