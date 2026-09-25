@@ -1736,6 +1736,42 @@ describe('seedDefaults in another language', () => {
  * Two claims are worth holding here, because both are things a reader is told
  * in as many words and would have no way to check.
  */
+describe('a plan that balances exactly', () => {
+  /**
+   * The bug the household seed found on its first run.
+   *
+   * Its contributions are worked out from its own outgoings, so it balances to
+   * the rappen by construction — and the totals are accumulated as floats, so
+   * the subtraction lands a hair below zero and `toFixed(2)` keeps the sign.
+   * The screen said the plan was short by minus nothing.
+   */
+  test('reports zero rather than minus zero', () => {
+    const vault = createEmptyVault()
+    const income = createEntry(vault, { name: 'In', type: 'income', categoryName: 'A' })
+    const a = createEntry(vault, { name: 'A', type: 'expense', categoryName: 'B' })
+    const b = createEntry(vault, { name: 'B', type: 'expense', categoryName: 'B' })
+    setPlanned(vault, income.id, '2477.60')
+    setPlanned(vault, a.id, '2247.84')
+    setPlanned(vault, b.id, '229.76')
+
+    const summary = getPlanSummary(vault)
+
+    expect(summary.plannedBalance).toBe('0.00')
+    expect(summary.yearlyBalance).toBe('0.00')
+  })
+
+  // The sign is only taken off a value that has already rounded to zero.
+  test('one rappen short is still one rappen short', () => {
+    const vault = createEmptyVault()
+    const income = createEntry(vault, { name: 'In', type: 'income', categoryName: 'A' })
+    const out = createEntry(vault, { name: 'Out', type: 'expense', categoryName: 'B' })
+    setPlanned(vault, income.id, '100.00')
+    setPlanned(vault, out.id, '100.01')
+
+    expect(getPlanSummary(vault).plannedBalance).toBe('-0.01')
+  })
+})
+
 describe('seedSharedDefaults', () => {
   test('the two contributions come to exactly what goes out', () => {
     // The point of the example is a household that is funded, so a figure
@@ -1780,12 +1816,11 @@ describe('seedSharedDefaults', () => {
   /**
    * Nothing bought by a person rather than by the dwelling.
    *
-   * Health insurance is the deliberate exception and is in: the contract is
-   * per person, but a couple paying both premiums from a joint account is the
-   * ordinary case, and a shared plan that cannot hold the largest fixed bill
-   * either of them has is not much of a plan. A 3a payment is different — it
-   * is somebody's retirement, in their name, and cannot be shared even in
-   * principle.
+   * Health insurance is the one the survey would have let us seed — it reports
+   * 688.67 a month for this household — and it stays out: the premium is
+   * contracted, priced and subsidised per person, so seeding it would decide
+   * something that is the couple's to decide. The insurance heading is there
+   * for the cover on the home, which is shared by construction.
    */
   test('holds nothing bought by a person rather than by the home', () => {
     const vault = createEmptyVault()
@@ -1793,10 +1828,11 @@ describe('seedSharedDefaults', () => {
     seedSharedDefaults(vault)
     const names = listEntries(vault).map(e => e.name)
 
-    expect(names).toContain('Health Insurance')
+    expect(names).not.toContain('Health Insurance')
     expect(names).not.toContain('Pillar 3a')
     expect(names).not.toContain('GA travelcard')
     expect(names).not.toContain('Clothing & Footwear')
+    expect(names).toContain('Household insurance')
   })
 
   /**
@@ -1819,7 +1855,6 @@ describe('seedSharedDefaults', () => {
     expect(planned['Electricity']).toBe('70.58')
     expect(planned['Heating']).toBe('36.02')
     expect(planned['Food & Groceries']).toBe('715.63')
-    expect(planned['Health Insurance']).toBe('688.67')
     expect(planned['Household insurance']).toBe('41.95')
     expect(planned['Inventory reserve']).toBe('201.84')
   })

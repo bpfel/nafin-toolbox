@@ -96,8 +96,9 @@ export const UPKEEP: UpkeepEntry[] = [
     subject: 'Household budget figures, two people',
     current:
       'HABE 2020–2021, couples under 65 without children — rent 1238.54, service charges 145.12, ' +
-      'electricity 70.58, heating 36.02, food 715.63, health insurance 688.67, household insurance 41.95, ' +
-      'inventory 201.84. Francs a month per household, from table je-d-20.02.01.02.13.',
+      'electricity 70.58, heating 36.02, food 715.63, household insurance 41.95, inventory 201.84. ' +
+      'Francs a month per household, from table je-d-20.02.01.02.13. Health insurance is in the ' +
+      'survey at 688.67 and deliberately not seeded: the premium is per person.',
     // A separate entry from the one above, and a separate wave, because it has
     // to be. The annual HABE sample is around three thousand households, too
     // small to break down by household type, so the BFS pools three years for
