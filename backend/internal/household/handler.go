@@ -104,12 +104,16 @@ func requester(w http.ResponseWriter, r *http.Request) (userID, vaultID int, ok 
 // ErrNotMember covers both "no such household" and "not yours", and both answer
 // 404. Telling them apart would let anyone with an account discover which
 // household ids exist by watching 403 and 404 diverge.
+// writeAccessError answers for a refusal the store made on the user's behalf.
+//
+// It used to know only ErrNotMember, while the payload, rename and delete
+// handlers can all be refused for a *role* — a reader writing, a writer
+// deleting. Those fell through to the handlers' generic 500, so a correct
+// refusal arrived as "failed to save household", and the client treated a
+// permission it should have explained as a crash. Delegating keeps one list of
+// what each refusal means.
 func writeAccessError(w http.ResponseWriter, err error) bool {
-	if errors.Is(err, ErrNotMember) {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such household"})
-		return true
-	}
-	return false
+	return writeMembershipError(w, err)
 }
 
 func handleList(store Storer) http.HandlerFunc {

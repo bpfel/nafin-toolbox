@@ -435,3 +435,30 @@ func (m *mockStore) ChangeRole(ctx context.Context, vaultID, userID, targetID in
 	m.lastUserID, m.lastVaultID, m.lastTargetID, m.lastRole = userID, vaultID, targetID, role
 	return m.changeRoleErr
 }
+
+// A refusal for a role is a refusal, not a failure. These three were 500s: the
+// store refused correctly and the handler, not recognising why, reported that
+// it had broken — which the client showed as "Something broke".
+func TestHandlers_ARoleRefusalIs403(t *testing.T) {
+	cases := []struct {
+		name   string
+		store  *mockStore
+		method string
+		path   string
+		body   string
+	}{
+		{"a reader saving", &mockStore{putErr: ErrReadOnly}, http.MethodPut, "/households/5/vault",
+			`{"ciphertext":"Y3Q=","nonce":"bm9uY2U=","version":9}`},
+		{"a reader renaming", &mockStore{renameErr: ErrReadOnly}, http.MethodPut, "/households/5/name",
+			`{"encrypted_name":"bmFtZQ=="}`},
+		{"a writer deleting", &mockStore{deleteErr: ErrNotOwner}, http.MethodDelete, "/households/5", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			w := serve(c.store, c.method, c.path, c.body, userCtx(7))
+			if w.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want %d; body %s", w.Code, http.StatusForbidden, w.Body.String())
+			}
+		})
+	}
+}
