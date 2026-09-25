@@ -1357,3 +1357,21 @@ describe('assertVaultShape', () => {
     expect(() => assertVaultShape(answered)).not.toThrow()
   })
 })
+
+/**
+ * The one account every vault starts with is named in the language the vault
+ * was made in. It was always "Main" — English written into a French user's
+ * vault as data, where no catalogue could reach it.
+ */
+describe('the first account', () => {
+  test('takes the name it is given', () => {
+    expect(createEmptyVault('Compte principal').accounts[0].name).toBe('Compte principal')
+  })
+
+  test('has a name in every language the budget is seeded in', async () => {
+    const { seedNamesFor } = await import('../budget/seedNames')
+    const names = (['de', 'fr', 'it'] as const).map(l => seedNamesFor(l).mainAccount)
+
+    expect(names).toEqual(['Hauptkonto', 'Compte principal', 'Conto principale'])
+  })
+})

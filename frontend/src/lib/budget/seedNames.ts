@@ -37,6 +37,10 @@ export type SeedKey =
   | 'cat.contributions' | 'contributionAlex' | 'contributionSam'
   | 'cat.insurance' | 'electricity' | 'heating'
   | 'householdInsurance' | 'inventoryReserve'
+  // Not a budget line: the account every vault is created with. Here because
+  // it is the same kind of thing — a name written into the vault once, in the
+  // language it was made in, and the user's to change from then on.
+  | 'mainAccount'
   //
   // Alex and Sam stay Alex and Sam in every language. They are people in an
   // example, not interface text, and translating a name would only make the
@@ -76,6 +80,7 @@ const en: SeedNames = {
   heating: 'Heating',
   householdInsurance: 'Household insurance',
   inventoryReserve: 'Inventory reserve',
+  mainAccount: 'Main',
 }
 
 const de: SeedNames = {
@@ -110,6 +115,7 @@ const de: SeedNames = {
   heating: 'Heizung',
   householdInsurance: 'Hausratversicherung',
   inventoryReserve: 'Hausrat-Reserve',
+  mainAccount: 'Hauptkonto',
 }
 
 const fr: SeedNames = {
@@ -144,6 +150,7 @@ const fr: SeedNames = {
   heating: 'Chauffage',
   householdInsurance: 'Assurance ménage',
   inventoryReserve: 'Réserve mobilier',
+  mainAccount: 'Compte principal',
 }
 
 const it: SeedNames = {
@@ -178,6 +185,7 @@ const it: SeedNames = {
   heating: 'Riscaldamento',
   householdInsurance: 'Assicurazione economia domestica',
   inventoryReserve: 'Riserva arredamento',
+  mainAccount: 'Conto principale',
 }
 
 /**

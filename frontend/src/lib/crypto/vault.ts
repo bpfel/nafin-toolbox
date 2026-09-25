@@ -894,7 +894,14 @@ function migrateV8ToV9(vault: V8Shape): VaultData {
   return migrated
 }
 
-export function createEmptyVault(): VaultData {
+/**
+ * @param mainAccountName What to call the one account every vault starts with.
+ *   Data, like the seeded budget's names: written once, in the language the
+ *   vault was made in, and the user's from then on. Callers pass it from
+ *   `seedNamesFor(locale)`; English is only for the paths that have no locale
+ *   to hand, such as replacing a blob too damaged to read.
+ */
+export function createEmptyVault(mainAccountName = 'Main'): VaultData {
   return {
     version: VAULT_VERSION,
     budget: {
@@ -905,16 +912,16 @@ export function createEmptyVault(): VaultData {
     },
     // Invariant: a vault always holds at least one account, so every category
     // can be routed from the moment it is created.
-    accounts: [createMainAccount()],
+    accounts: [createMainAccount(mainAccountName)],
     trust: { pins: {}, epochs: {} },
     tour: { completedAt: null, dismissedAt: null },
   }
 }
 
-function createMainAccount(): VaultAccount {
+function createMainAccount(name: string): VaultAccount {
   return {
     id: crypto.randomUUID(),
-    name: 'Main',
+    name,
     kind: 'transactional',
     currency: 'CHF',
     currentAmount: '0.00',

@@ -19,6 +19,8 @@ import {
   hashInviteToken,
 } from './grant'
 import { fromBase64, toBase64, importPublicKey, openUnder, sealUnder } from './identity'
+import { seedNamesFor } from '../budget/seedNames'
+import { getLocale } from '../i18n/index.svelte'
 
 /**
  * Which vault the screens are looking at.
@@ -487,7 +489,7 @@ export async function createHousehold(name: string): Promise<number> {
   assertNameFits(name)
 
   const key = await generateHouseholdKey()
-  const empty = createEmptyVault()
+  const empty = createEmptyVault(mainAccountName())
   const payload = await encryptVault(empty, key)
 
   const created = await postHousehold({
@@ -552,7 +554,7 @@ export async function tryRestoreVault(): Promise<boolean> {
       current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, cachedMEK)
       current.lastUpdatedAt = vaultData.updated_at
     } else {
-      current.data = createEmptyVault()
+      current.data = createEmptyVault(mainAccountName())
       current.lastUpdatedAt = null
     }
     mek = cachedMEK
@@ -600,7 +602,7 @@ export async function initializeVault(password: string, email: string): Promise<
       current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, mek)
       current.lastUpdatedAt = vaultData.updated_at
     } else {
-      current.data = createEmptyVault()
+      current.data = createEmptyVault(mainAccountName())
       await saveVault()
     }
 
@@ -653,12 +655,21 @@ export async function setupKeys(password: string, email: string): Promise<string
   identity = await openIdentity(sealed, newMEK)
   mek = newMEK
   current.key = newMEK
-  current.data = createEmptyVault()
+  current.data = createEmptyVault(mainAccountName())
   await saveVault()
   await cacheMEK(newMEK)
   unlocked = true
 
   return recoveryKey
+}
+
+/**
+ * What a new vault's first account is called, in the language in use when the
+ * vault is made. It was always "Main" — English written into a French user's
+ * vault as data, where no catalogue could reach it.
+ */
+function mainAccountName(): string {
+  return seedNamesFor(getLocale()).mainAccount
 }
 
 /** The vault on screen belongs to a household this account may only read. */
@@ -843,7 +854,7 @@ export async function recoverVault(
     current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, recoveredMEK)
     current.lastUpdatedAt = vaultData.updated_at
   } else {
-    current.data = createEmptyVault()
+    current.data = createEmptyVault(mainAccountName())
     await saveVault()
   }
 
