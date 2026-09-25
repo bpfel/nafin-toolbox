@@ -339,6 +339,13 @@
           to do more than was meant. Owner is not among the choices: there is
           exactly one, and handing it over is its own act.
         -->
+        <!--
+          Grouped so that when the row runs out of room they move as one: below
+          the address, together, at the right. Wrapped one by one, the tick and
+          the bin fell to a line of their own at the left, where they read as
+          controls on the member above.
+        -->
+        <div class="form-actions">
         <select class="role" bind:value={inviteRole} aria-label={t('invite.roleLabel')} disabled={busy}>
           <option value="writer">{t('role.writer')}</option>
           <option value="reader">{t('role.reader')}</option>
@@ -354,6 +361,7 @@
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
           </svg>
         </ActionButton>
+        </div>
       </form>
     {:else}
       <ActionButton label={t('invite.inviteAction')} onclick={() => (inviting = true)}>
@@ -417,9 +425,9 @@
   .role {
     font: inherit;
     font-size: 0.875rem;
-    padding: 0.25rem 0.4rem;
+    padding: 0.45rem 0.5rem;
     border: 1px solid var(--rule);
-    border-radius: 0.3rem;
+    border-radius: 6px;
     background: var(--surface);
     color: inherit;
   }
@@ -487,13 +495,41 @@
 
   .naming {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
   }
 
+  /*
+   * The browser's own field was drawn until now — a black box and a square
+   * select, the only unstyled controls in the app. These match the other forms.
+   * 1rem on the input, not less: iOS zooms the page into any field smaller
+   * than 16px, and does not zoom back out.
+   */
   .naming input {
     flex: 1 1 12rem;
     min-width: 0;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    font-size: 1rem;
+  }
+
+  .naming input:focus,
+  .role:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
+  .form-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
   }
 
   .error {

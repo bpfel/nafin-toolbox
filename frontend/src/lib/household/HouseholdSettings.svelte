@@ -414,9 +414,23 @@
     flex-wrap: wrap;
   }
 
+  /* Matches the invitation form's field; see the note there. */
   .naming input {
     flex: 1 1 12rem;
     min-width: 0;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    font-size: 1rem;
+  }
+
+  .naming input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
   }
 
   .error {
