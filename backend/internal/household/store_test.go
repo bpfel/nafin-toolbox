@@ -1225,3 +1225,100 @@ func TestStore_OnlyTheOwnerCanRebuildALink(t *testing.T) {
 		t.Error("a writer was handed the means to re-deliver an invitation")
 	}
 }
+
+// Deleting an account is the third way a membership row disappears, and the
+// only one that runs no Go code: `shared_vault_members.user_id` cascades from
+// `users`, so the succession in LeaveHousehold never happens. Before migration
+// 013 this left the survivors with their access and no power at all — unable to
+// invite, remove, promote, or delete the household. Nothing was broken; it was
+// frozen, and only somebody with database access could thaw it.
+func TestStore_OwnershipSurvivesADeletedAccount(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-gone@example.ch")
+	ben := makeUser(t, db, "ben-stays@example.ch")
+	cara := makeUser(t, db, "cara-stays@example.ch")
+
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+	addMember(t, db, id, cara)
+
+	// The administrator's delete, exactly as the cascade sees it.
+	if _, err := db.Exec(`DELETE FROM users WHERE id = $1`, anna); err != nil {
+		t.Fatalf("deleting the owner's account: %v", err)
+	}
+
+	// To the longest-standing survivor, which is Ben.
+	role, err := store.Membership(ctx, id, ben)
+	if err != nil {
+		t.Fatalf("Ben is not a member any more: %v", err)
+	}
+	if role != RoleOwner {
+		t.Errorf("Ben is %q, want owner", role)
+	}
+	if role, err := store.Membership(ctx, id, cara); err != nil || role != RoleWriter {
+		t.Errorf("Cara is %q (%v), want writer — only one person succeeds", role, err)
+	}
+
+	// And the power that comes with it, which is the point.
+	if _, err := store.CreateInvite(ctx, id, ben, anInvite("new-owner@example.ch"), hour()); err != nil {
+		t.Errorf("the new owner cannot invite: %v", err)
+	}
+}
+
+// The other half of the same cascade, and the reason this is a separate rule
+// from 007 rather than a change to it: when the departing owner was the only
+// member there is nobody to succeed them, and the household should go.
+func TestStore_ASoleOwnersHouseholdGoesWithThem(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-alone@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if _, err := db.Exec(`DELETE FROM users WHERE id = $1`, anna); err != nil {
+		t.Fatalf("deleting the owner's account: %v", err)
+	}
+
+	var count int
+	if err := db.QueryRow(`SELECT count(*) FROM shared_vaults WHERE id = $1`, id).Scan(&count); err != nil {
+		t.Fatalf("counting households: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("the household outlived its only member")
+	}
+}
+
+// A writer leaving changes nothing about who is in charge. Worth stating,
+// because the trigger fires on every membership delete and the cheap exit is
+// the one an edit is most likely to break.
+func TestStore_ADepartingWriterDoesNotMoveOwnership(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-keeps@example.ch")
+	ben := makeUser(t, db, "ben-leaves@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	addMember(t, db, id, ben)
+
+	if _, err := db.Exec(`DELETE FROM users WHERE id = $1`, ben); err != nil {
+		t.Fatalf("deleting the writer's account: %v", err)
+	}
+
+	if role, err := store.Membership(ctx, id, anna); err != nil || role != RoleOwner {
+		t.Errorf("Anna is %q (%v), want owner", role, err)
+	}
+}
