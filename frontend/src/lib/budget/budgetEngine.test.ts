@@ -1181,6 +1181,60 @@ describe('seedDefaults', () => {
   })
 
   /**
+   * Reported from a screenshot: 12'550 typed into the yearly box showed as
+   * 12'549.96 in the table and -0.04 unallocated. The dialog stores a yearly
+   * figure as its monthly to four places — 1045.8333 — and the year of it was
+   * taken from that monthly rounded to the rappen first. Rounded once, at the
+   * end, it is the figure that was typed.
+   */
+  test('a year typed as a year comes back as that year', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const rent = vault.budget.entries.find(e => e.name === 'Rent')!
+    setPlanned(vault, rent.id, (12550 / 12).toFixed(4))
+    const summary = getPlanSummary(vault)
+
+    expect(summary.entries.find(e => e.entryId === rent.id)!.yearlyAmount).toBe('12550.00')
+  })
+
+  test('a year typed as a month is still twelve of that month', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const rent = vault.budget.entries.find(e => e.name === 'Rent')!
+    setPlanned(vault, rent.id, '1045.83')
+    const summary = getPlanSummary(vault)
+
+    expect(summary.entries.find(e => e.entryId === rent.id)!.yearlyAmount).toBe('12549.96')
+  })
+
+  /**
+   * The screenshot's -0.04: income typed as a year set against a bill, whose
+   * year was already exact. Both have to be rounded the same way, once, or
+   * Unallocated reads zero a month and four rappen short a year.
+   */
+  test('income typed as a year balances a bill of the same year', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    for (const entry of vault.budget.entries) {
+      setPlanned(vault, entry.id, '0.00')
+      if (entry.type !== 'bill') delete entry.reserve
+    }
+    const bills = vault.budget.entries.filter(e => e.type === 'bill')
+    for (const bill of bills.slice(1)) delete bill.reserve
+    const bill = bills[0]
+    bill.reserve = { ...bill.reserve!, targetAmount: '12550.00', periodMonths: 12 }
+    setPlanned(vault, bill.id, '1045.83')
+    const salary = vault.budget.entries.find(e => e.type === 'income')!
+    setPlanned(vault, salary.id, (12550 / 12).toFixed(4))
+    const summary = getPlanSummary(vault)
+
+    expect(summary.yearlyBalance).toBe('0.00')
+  })
+
+  /**
    * The totals are summed from the exact figures rather than multiplied at the
    * end, or the summary bar would disagree with the rows underneath it by a
    * rappen per reserve.

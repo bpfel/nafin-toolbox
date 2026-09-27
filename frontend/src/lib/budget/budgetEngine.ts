@@ -490,16 +490,20 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
  *
  * A bill or a purchase states its real total and the cycle it falls on, so a
  * year of it is `target x 12 / period` — exact, whatever the monthly rounds
- * to. Everything else has no figure truer than twelve of its monthly.
+ * to. Everything else has no figure truer than twelve of its monthly — but
+ * twelve of the monthly as stored, rounded once at the end. A year typed into
+ * the yearly box is kept as its monthly to four places, and rounding that to
+ * the rappen before multiplying turned 12'550 into 12'549.96.
  *
- * In centimes, because the whole point is the rappen.
+ * In centimes, because the whole point is the rappen. A stored monthly has at
+ * most four places, so twelve of it never lands on a half-rappen to break.
  */
 function yearlyFor(entry: VaultEntry, plannedAmount: string): string {
   const reserve = entry.reserve
   if (reserve && reserve.periodMonths > 0) {
     return fromCents(Math.round((toCents(reserve.targetAmount) * 12) / reserve.periodMonths))
   }
-  return fromCents(toCents(plannedAmount) * 12)
+  return fromCents(Math.round(Number(plannedAmount) * 1200))
 }
 
 // --- Snapshots ---
