@@ -73,7 +73,7 @@ export async function checkAuth() {
       // Admin users skip vault entirely — they don't use encrypted modules
       if (currentUser && currentUser.role !== 'admin') {
         // Try to restore vault from sessionStorage (survives page refresh)
-        const restored = await tryRestoreVault()
+        const restored = await tryRestoreVault(currentUser.id)
         if (!restored) {
           vaultLocked = true
         }
@@ -115,7 +115,7 @@ export async function login(email: string, password: string): Promise<string | {
     // Admin users skip vault entirely — they don't use encrypted modules
     if (data.role !== 'admin') {
       // Initialize vault
-      const vaultResult = await initializeVault(password, email)
+      const vaultResult = await initializeVault(password, email, data.id)
       if (vaultResult === 'no-keys') {
         // Keys don't exist yet — need setup
         heldPassword = password
@@ -155,7 +155,7 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
     if (currentUser && currentUser.role !== 'admin') {
       // Initialize vault using held credentials
       if (heldPassword && heldEmail) {
-        const vaultResult = await initializeVault(heldPassword, heldEmail)
+        const vaultResult = await initializeVault(heldPassword, heldEmail, currentUser.id)
         if (vaultResult === 'no-keys') {
           vaultNeedsSetup = true
         } else if (vaultResult === 'decrypt-failed') {
@@ -183,7 +183,7 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
 export async function unlockVault(password: string): Promise<string | null> {
   if (!currentUser) return 'Not logged in'
 
-  const vaultResult = await initializeVault(password, currentUser.email)
+  const vaultResult = await initializeVault(password, currentUser.email, currentUser.id)
   if (vaultResult === 'ok') {
     vaultLocked = false
     return null
@@ -209,9 +209,9 @@ export async function unlockVault(password: string): Promise<string | null> {
  * Returns the recovery key to show to the user.
  */
 export async function completeVaultSetup(): Promise<string | null> {
-  if (!heldPassword || !heldEmail) return null
+  if (!heldPassword || !heldEmail || !currentUser) return null
 
-  const recoveryKey = await setupKeys(heldPassword, heldEmail)
+  const recoveryKey = await setupKeys(heldPassword, heldEmail, currentUser.id)
   heldPassword = null
   heldEmail = null
   vaultNeedsSetup = false
@@ -303,7 +303,7 @@ export async function recoverAccount(recoveryKey: string): Promise<string | null
   if (!heldPassword || !heldEmail) return 'Password not available for re-encryption'
 
   try {
-    await recoverVault(recoveryKey, heldPassword, heldEmail)
+    await recoverVault(recoveryKey, heldPassword, heldEmail, currentUser.id)
     heldPassword = null
     heldEmail = null
     vaultDecryptFailed = false
@@ -357,7 +357,7 @@ export async function setup(email: string, password: string): Promise<string | n
     if (currentUser && currentUser.role !== 'admin') {
       // Set up vault keys for the new user
       try {
-        const recoveryKey = await setupKeys(password, email)
+        const recoveryKey = await setupKeys(password, email, currentUser.id)
         recoveryKeyToShow = recoveryKey
       } catch {
         // If key setup fails, user can still unlock later via the vault lock screen
@@ -385,7 +385,7 @@ export async function verifyEmail(token: string, password: string): Promise<stri
     // Set up vault keys for the invited user (admin users skip vault)
     if (currentUser && currentUser.role !== 'admin') {
       try {
-        const recoveryKey = await setupKeys(password, currentUser.email)
+        const recoveryKey = await setupKeys(password, currentUser.email, currentUser.id)
         recoveryKeyToShow = recoveryKey
       } catch {
         vaultLocked = true

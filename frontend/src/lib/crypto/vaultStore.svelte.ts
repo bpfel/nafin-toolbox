@@ -164,6 +164,25 @@ const MEK_STORAGE_KEY = 'vault_mek'
  */
 const CURRENT_VAULT_KEY = 'vault_current'
 
+/**
+ * Which vault this user last had on screen in this browser, by user id.
+ *
+ * What a new tab or a fresh sign-in opens on, where `CURRENT_VAULT_KEY` has
+ * nothing to say. Somebody who budgets in their household opens the app to
+ * their household, without a setting to find first.
+ *
+ * In localStorage, and so per device, rather than in the personal vault: every
+ * switch would otherwise be a write to the vault, and two devices switching
+ * would refuse each other's saves for the sake of remembering one number. It
+ * outlives sign-out on purpose — that is the moment it is for — and is keyed by
+ * user so the next person on the same browser does not inherit it. It holds a
+ * household's id and nothing that names it.
+ */
+const LAST_VAULT_KEY = 'vault_last'
+
+/** Whose vault is open, for `LAST_VAULT_KEY`. Null when none is. */
+let owner: number | null = null
+
 function rememberCurrent(id: VaultId): void {
   try {
     sessionStorage.setItem(CURRENT_VAULT_KEY, String(id))
@@ -171,15 +190,25 @@ function rememberCurrent(id: VaultId): void {
     // Private mode, blocked storage, a quota. Remembering is a convenience and
     // failing to remember is not worth a broken switch.
   }
+  if (owner === null) return
+  try {
+    localStorage.setItem(`${LAST_VAULT_KEY}:${owner}`, String(id))
+  } catch { /* as above */ }
 }
 
-/** What was on screen last, if it is still somewhere this user can go. */
+/**
+ * Where to land: what this tab had on screen before a reload, else what this
+ * user last opened in this browser, if it is still somewhere they can go.
+ */
 function recallCurrent(): VaultId {
   let stored: string | null = null
   try {
     stored = sessionStorage.getItem(CURRENT_VAULT_KEY)
-  } catch {
-    return 'personal'
+  } catch { /* see rememberCurrent */ }
+  if (stored === null && owner !== null) {
+    try {
+      stored = localStorage.getItem(`${LAST_VAULT_KEY}:${owner}`)
+    } catch { /* see rememberCurrent */ }
   }
   if (!stored || stored === 'personal') return 'personal'
 
@@ -187,6 +216,18 @@ function recallCurrent(): VaultId {
   // A household that has since been left, deleted, or whose grant no longer
   // opens is not somewhere to land. Personal is always there.
   return Number.isInteger(id) && households.some(h => h.id === id) ? id : 'personal'
+}
+
+/**
+ * Opens what `recallCurrent` names, and pins it to this tab.
+ *
+ * Pinned even when nothing moved. Landing on the personal budget is no switch,
+ * so this tab would otherwise have nothing of its own in sessionStorage, and its
+ * next reload would follow whatever another tab had opened in the meantime.
+ */
+async function landOnRecalled(): Promise<void> {
+  await switchTo(recallCurrent())
+  rememberCurrent(currentId)
 }
 
 /** Export MEK to sessionStorage so it survives page refreshes. */
@@ -544,9 +585,10 @@ export async function deleteHousehold(id: number): Promise<void> {
  * Try to restore vault from sessionStorage (page refresh).
  * Returns true if successful, false if no cached MEK.
  */
-export async function tryRestoreVault(): Promise<boolean> {
+export async function tryRestoreVault(userId: number): Promise<boolean> {
   const cachedMEK = await restoreMEK()
   if (!cachedMEK) return false
+  owner = userId
 
   try {
     const vaultData = await fetchVault()
@@ -568,7 +610,7 @@ export async function tryRestoreVault(): Promise<boolean> {
     unlocked = true
     // After the households are known, so a remembered one can be checked
     // against them rather than switched to on faith.
-    await switchTo(recallCurrent())
+    await landOnRecalled()
     return true
   } catch (e) {
     if (e instanceof VaultVersionAheadError) {
@@ -587,9 +629,14 @@ export async function tryRestoreVault(): Promise<boolean> {
  * Returns 'ok' on success, 'no-keys' if keys don't exist yet,
  * or 'decrypt-failed' if keys exist but unwrap/decrypt failed.
  */
-export async function initializeVault(password: string, email: string): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead'> {
+export async function initializeVault(
+  password: string,
+  email: string,
+  userId: number,
+): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead'> {
   const keys = await fetchVaultKeys()
   if (!keys) return 'no-keys'
+  owner = userId
 
   try {
     const kek = await deriveKEK(password, email, keys.iterations)
@@ -609,7 +656,7 @@ export async function initializeVault(password: string, email: string): Promise<
     await loadHouseholds(mek)
     await cacheMEK(mek)
     unlocked = true
-    await switchTo(recallCurrent())
+    await landOnRecalled()
     return 'ok'
   } catch (e) {
     mek = null
@@ -662,7 +709,8 @@ async function ensureIdentity(
  * Set up encryption keys for the first time.
  * Returns the recovery key that must be shown to the user.
  */
-export async function setupKeys(password: string, email: string): Promise<string> {
+export async function setupKeys(password: string, email: string, userId: number): Promise<string> {
+  owner = userId
   const newMEK = await generateMEK()
   const kek = await deriveKEK(password, email, 600000)
   const encryptedMEK = await wrapMEK(newMEK, kek)
@@ -828,6 +876,8 @@ export function clearVault(): void {
   try {
     sessionStorage.removeItem(CURRENT_VAULT_KEY)
   } catch { /* see rememberCurrent */ }
+  // LAST_VAULT_KEY stays: the next sign-in is what it is for.
+  owner = null
   // Every vault, not only the one on screen. A stashed slot holds a household's
   // decrypted budget and its key, and letting that outlive a sign-out would be
   // the same mistake as leaving the MEK behind.
@@ -863,7 +913,9 @@ export async function recoverVault(
   recoveryKey: string,
   newPassword: string,
   email: string,
+  userId: number,
 ): Promise<void> {
+  owner = userId
   // Get recovery-wrapped MEK from server (server verifies recovery key)
   const result = await recoverVaultKeys(recoveryKey)
   if (!result) throw new Error('Invalid recovery key')
