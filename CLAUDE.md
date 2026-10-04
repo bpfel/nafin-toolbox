@@ -64,8 +64,9 @@ it, which is one line in `lib/nav/destinations.ts`.
 ## Project Structure
 ```
 nafin-toolbox/
-├── docker-compose.yml              # 3 services: db, api, frontend
-├── docker-compose.prod.yml         # Production overrides
+├── docker-compose.yml              # 3 services: db, api, frontend — no ports published
+├── docker-compose.override.yml     # Dev ports; Compose loads it when no -f is given
+├── docker-compose.prod.yml         # Production overrides; publishes the frontend only
 ├── .github/workflows/test.yml      # CI: unit, frontend, integration tests
 ├── backend/
 │   ├── Dockerfile

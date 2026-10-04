@@ -2,12 +2,14 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # Requires .env file (see .env.example)
+#
+# Nothing here removes a port: docker-compose.yml publishes none, so this only
+# adds the one it needs. See docker-compose.yml for why.
 
 services:
   db:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports: !override []
     restart: unless-stopped
 
   api:
@@ -22,13 +24,14 @@ services:
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
-    ports: !override []
     restart: unless-stopped
 
   mailpit:
     profiles: ["dev-only"]
 
   frontend:
-    ports: !override
-      - "4000:3000"
+    ports:
+      # NAFIN_LISTEN=127.0.0.1:4000 in .env publishes on loopback only, for a
+      # reverse proxy on the same host.
+      - "${NAFIN_LISTEN:-4000}:3000"
     restart: unless-stopped

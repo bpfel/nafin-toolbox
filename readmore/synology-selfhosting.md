@@ -32,6 +32,8 @@ hostname and open ports; everything below avoids both.
 
 Docker on DSM needs root, so the commands below use `sudo`. Older Container
 Manager versions name the command `docker-compose` rather than `docker compose`.
+DSM's Compose is old (2.20 on DSM 7.2); after 0.4.0 the compose files behave the
+same on it as on a current one.
 
 ## 1. Tailscale on the NAS
 
@@ -47,7 +49,29 @@ Manager versions name the command `docker-compose` rather than `docker compose`.
    The address will be `https://<nas-name>.<tailnet>.ts.net`, shown in the admin
    console under Machines. The steps below call it `https://nas.example.ts.net`.
 
-## 2. The code
+## 2. Two DSM settings that get in the way
+
+**The firewall.** If DSM's firewall is on (Control Panel → Security → Firewall),
+it also filters traffic *between containers*, and its default rule drops it: the
+API then times out reaching the database, and nginx times out reaching the API.
+Add a rule above the deny rule:
+
+- Ports: **All**
+- Source IP: **Subnet** `172.16.0.0` / `255.240.0.0`, Docker's own networks
+- Action: **Allow**
+
+Apply it. Over SSH, `sudo iptables -S FORWARD_FIREWALL` should now show
+`-s 172.16.0.0/12 -j RETURN` before the `DROP`.
+
+**DNS.** The NAS has to resolve names to download base images and for Tailscale
+to fetch its certificate. If its DNS server (Control Panel → Network → General)
+is a Pi-hole or another DNS server running *on the NAS itself* in a macvlan
+container, the NAS can't reach it: a macvlan container can't be reached from its
+own host. Symptoms are `docker compose` timing out on `registry-1.docker.io` and
+`tailscale cert` timing out. Point the NAS at your router or a public resolver
+instead. The rest of the network can go on using the Pi-hole.
+
+## 3. The code
 
 Put the repository in a shared folder, e.g. `/volume1/docker/nafin-toolbox`.
 Either install the **Git Server** package, which brings the `git` command, and
@@ -57,13 +81,13 @@ clone over SSH:
 cd /volume1/docker
 git clone https://github.com/bpfel/nafin-toolbox.git
 cd nafin-toolbox
-git checkout v0.3.0            # or the release you want
+git checkout <release>         # a release newer than v0.4.0
 ```
 
 or clone on your computer and copy the folder across with File Station or
 `rsync`.
 
-## 3. Configuration
+## 4. Configuration
 
 ```sh
 cp .env.example .env
@@ -79,6 +103,10 @@ APP_URL=https://nas.example.ts.net
 CORS_ORIGINS=https://nas.example.ts.net
 ENCRYPTION_KEY=<generated>
 
+# The frontend on the NAS's loopback only, so the app is reachable through
+# Tailscale's HTTPS and never as plain HTTP on the LAN.
+NAFIN_LISTEN=127.0.0.1:4000
+
 # Leave SMTP_HOST empty to run without email: you then set each user's first
 # password yourself when inviting them. Or fill in the SMTP_* lines as described
 # in self-hosting.md.
@@ -88,25 +116,28 @@ SMTP_HOST=
 Keep a copy of `.env` somewhere other than the NAS. Without `ENCRYPTION_KEY`,
 every enrolled two-factor secret is unusable.
 
-Next to the compose files, create `docker-compose.synology.yml`. It binds the
-frontend to the NAS's loopback, so the app is only reachable through Tailscale's
-HTTPS and never as plain HTTP on the LAN:
-
-```yaml
-services:
-  frontend:
-    ports: !override
-      - "127.0.0.1:4000:3000"
-```
-
 Port 4000 is normally free on DSM, whose own pages use 5000 and 5001. If it is
-taken, pick another and use it in step 5 too.
+taken, pick another and use it in step 6 too.
 
-## 4. Build and start
+## 5. Build and start
+
+Every command from here names the same two compose files, under `sudo`. A shell
+function saves typing them; add it to `~/.profile` to keep it. It passes the
+release it is run from as `APP_VERSION` itself, because `sudo` drops variables
+set in front of it:
 
 ```sh
-sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  -f docker-compose.synology.yml up -d --build
+dc() {
+  sudo APP_VERSION="$(git describe --tags 2>/dev/null)" docker compose \
+    -f docker-compose.yml -f docker-compose.prod.yml "$@"
+}
+```
+
+Run it from the repository:
+
+```sh
+cd /volume1/docker/nafin-toolbox
+dc up -d --build
 ```
 
 The first build compiles the Go API and the frontend on the NAS; on a small CPU
@@ -115,13 +146,40 @@ show up in Container Manager, which is fine for watching logs and restarting the
 Start and update them from SSH, though, because Container Manager's project view
 takes a single compose file.
 
-Check that it answers locally:
+Check that it answers locally, and that nothing else is published:
 
 ```sh
 curl -sI http://127.0.0.1:4000 | head -1      # HTTP/1.1 200 OK
+dc ps --format '{{.Service}}  {{.Ports}}'
 ```
 
-## 5. HTTPS through Tailscale
+Only `frontend` should list a port, `127.0.0.1:4000->3000/tcp`. If `db` shows
+`0.0.0.0:5432`, the database is open to your network: you are on compose files
+from 0.4.0 or earlier.
+
+The first start of the database initialises its data directory, which on a NAS
+can take a minute; the API waits for it. If the API then logs timeouts dialling
+`db`, or nginx logs upstream timeouts, check the firewall rule in step 2.
+
+**Building on a NAS is slow.** To build on your computer instead, build there with
+image names and carry the images across:
+
+```sh
+# on the computer, in a checkout of the same release
+APP_VERSION="$(git describe --tags)" docker compose \
+  -f docker-compose.yml -f docker-compose.prod.yml build
+docker save nafin-toolbox-api nafin-toolbox-frontend | gzip > nafin-images.tar.gz
+scp nafin-images.tar.gz <user>@<nas>:/volume1/docker/nafin-toolbox/
+
+# on the NAS
+gunzip -c nafin-images.tar.gz | sudo docker load
+dc up -d          # no --build: it uses the loaded images
+```
+
+The image names come from the folder name: both checkouts must be in folders
+called `nafin-toolbox`, or set `COMPOSE_PROJECT_NAME` the same on both.
+
+## 6. HTTPS through Tailscale
 
 ```sh
 sudo tailscale serve --bg http://127.0.0.1:4000
@@ -133,7 +191,7 @@ time the address is opened, so the first request can take a few seconds. The
 address is only reachable from devices in your tailnet; `tailscale funnel` would
 make it public, which is not what this setup is for.
 
-## 6. First sign-in
+## 7. First sign-in
 
 1. On a device in your tailnet, open `https://nas.example.ts.net`.
 2. **Create first account.** That account is the administrator, and has no budget
@@ -151,10 +209,11 @@ The database lives in a Docker volume, which Hyper Backup does not see on its ow
 Dump it to a shared folder and back that folder up:
 
 ```sh
-sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  -f docker-compose.synology.yml exec -T db \
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db \
   pg_dump -U finance finance > /volume1/backups/nafin-$(date +%F).sql
 ```
+
+(Spelled out rather than `dc`, since Task Scheduler does not read `~/.profile`.)
 
 Run it from DSM's **Task Scheduler** (Control Panel → Task Scheduler → Create →
 Scheduled Task → User-defined script, as `root`), with `cd` to the repository
@@ -169,11 +228,26 @@ server's copy — but they do hold users' email addresses.
 ```sh
 cd /volume1/docker/nafin-toolbox
 git fetch --tags && git checkout <new release>
-sudo APP_VERSION="$(git describe --tags)" docker compose \
-  -f docker-compose.yml -f docker-compose.prod.yml \
-  -f docker-compose.synology.yml up -d --build
+dc up -d --build
 ```
 
 Rebuild both images: database migrations are compiled into the API image, so a
 restart alone runs none of them. Read the release's upgrade notes in
 [CHANGELOG.md](../CHANGELOG.md) first. `tailscale serve` survives the restart.
+
+## Coming from an earlier version of this chapter
+
+Up to 0.4.0, this chapter had you create a `docker-compose.synology.yml` that
+removed ports with `!override`. DSM's Compose ignores that, so such an instance
+publishes the database on 5432 and the API on 8081 to your network. To move over:
+
+```sh
+cd /volume1/docker/nafin-toolbox
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  -f docker-compose.synology.yml down          # the volume and its data stay
+rm docker-compose.synology.yml
+echo 'NAFIN_LISTEN=127.0.0.1:4000' >> .env
+git fetch --tags && git checkout <release>   # newer than v0.4.0
+dc up -d --build
+dc ps --format '{{.Service}}  {{.Ports}}'      # frontend only
+```
