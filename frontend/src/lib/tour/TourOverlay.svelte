@@ -444,6 +444,13 @@
     {#if text.note}
       <p class="body note">{text.note}</p>
     {/if}
+    {#if text.links?.length}
+      <ul class="links">
+        {#each text.links as link (link.url)}
+          <li><a href={link.url} target="_blank" rel="noopener noreferrer">{link.label}</a></li>
+        {/each}
+      </ul>
+    {/if}
 
     <div class="controls">
       <button class="quiet" onclick={abandonTour}>{t('tour.skip')}</button>
@@ -573,6 +580,16 @@
   .note {
     margin-top: 0.5rem;
     color: var(--ink-faint);
+  }
+
+  .links {
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    font-size: 0.92rem;
   }
 
   .controls {

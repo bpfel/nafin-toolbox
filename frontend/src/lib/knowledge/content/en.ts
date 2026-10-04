@@ -46,6 +46,15 @@ export const en: Content = {
       title: 'Allocations',
       body: 'Here you link every budget entry to where its money comes from and goes. Your salary arrives in the main account; the laptop fund and the Serafe bill move somewhere they will not be spent. What falls out is a balance for each one, and a projection of the reserves you need.',
     },
+    install: {
+      title: 'Put it on your home screen',
+      body: 'Installed, the app opens like any other, full-screen and without the browser around it. You do it from your browser’s menu, and it takes a minute.',
+      note: 'Using another browser? Search for its name with “install web app”.',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=en' },
+      ],
+    },
     knowledge: {
       title: 'You can come back',
       body: 'The tour starts again from here, beside articles on each view and on Swiss money. Nothing you have just seen has to be remembered.',

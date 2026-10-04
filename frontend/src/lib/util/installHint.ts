@@ -17,6 +17,18 @@ export function shouldOfferIosInstall(
   return /iPhone|iPad|iPod/.test(nav.userAgent) || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1)
 }
 
+/**
+ * Whether the app is running from the home screen rather than a browser tab.
+ *
+ * `navigator.standalone` is iOS's own flag, older than the media query and
+ * still the one Safari sets reliably.
+ */
+export function isInstalled(): boolean {
+  if (typeof window === 'undefined') return false
+  const nav = navigator as Navigator & { standalone?: boolean }
+  return nav.standalone === true || (window.matchMedia?.('(display-mode: standalone)').matches ?? false)
+}
+
 /** The live answer, for the component. */
 export function offerIosInstall(): boolean {
   return shouldOfferIosInstall(navigator, window.matchMedia?.('(display-mode: standalone)').matches ?? false)

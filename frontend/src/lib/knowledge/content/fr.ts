@@ -49,6 +49,15 @@ export const fr: PartialContent = {
       title: 'Affectations',
       body: 'Tu relies ici chaque entrée budgétaire à la provenance et à la destination de son argent. Ton salaire arrive sur le compte principal ; la provision pour l’ordinateur portable et la facture Serafe partent là où elles ne seront pas dépensées. Il en ressort un solde pour chacun et une projection des réserves nécessaires.',
     },
+    install: {
+      title: 'Sur l’écran d’accueil',
+      body: 'Installée, l’app s’ouvre comme les autres, en plein écran et sans le navigateur autour. Cela se fait depuis le menu du navigateur, en une minute.',
+      note: 'Un autre navigateur ? Cherche son nom avec « installer une web app ».',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/fr-ch/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=fr' },
+      ],
+    },
     knowledge: {
       title: 'Tu peux revenir',
       body: 'La visite repart d’ici, à côté des articles sur chaque vue et sur l’argent suisse. Rien de ce que tu viens de voir n’est à mémoriser.',

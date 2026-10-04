@@ -393,3 +393,34 @@ describe('the example budget is only on loan', () => {
     expect(vaultState.vault!.budget.entries[0].id).toBe('e1')
   })
 })
+
+describe('the step about installing the app', () => {
+  const ids = () => {
+    const seen: string[] = []
+    startTour('basics')
+    while (tour.running) {
+      seen.push(tour.step!.id)
+      moveTour(1)
+    }
+    return seen
+  }
+
+  test('is shown in a browser tab', () => {
+    expect(ids()).toContain('install')
+  })
+
+  test('is left out of a tour opened from the home screen, counter and all', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(display-mode: standalone)' }))
+    try {
+      startTour('basics')
+      const last = TOUR_STEPS.length - 2
+      for (let i = 0; i < last; i++) moveTour(1)
+      expect(tour.atLast).toBe(true)
+      expect(tour.step?.id).toBe('knowledge')
+      resetTour()
+      expect(ids()).not.toContain('install')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})

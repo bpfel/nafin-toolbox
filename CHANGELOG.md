@@ -36,6 +36,13 @@ release may change things without a deprecation period. Each release is a tag on
 - The images are unchanged. Recreating the containers is enough, but rebuilding
   does no harm.
 
+### New
+
+- **The tour shows how to install the app.** A step before the last points to
+  Apple's and Google's own instructions for iPhone and Android, in the reader's
+  language, and says what to search for on any other browser. It is left out
+  when the app is already opened from the home screen.
+
 ### Fixed
 
 - **On Docker Compose before 2.24, production published the database and the
