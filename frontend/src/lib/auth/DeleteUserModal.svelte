@@ -51,7 +51,7 @@
         restore it afterwards.
       </p>
 
-      <form onsubmit={proceed}>
+      <form novalidate onsubmit={proceed}>
         <label class="field">
           <span class="label">Type their email address to continue</span>
           <input

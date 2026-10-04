@@ -77,7 +77,7 @@
       <h1>{t('verify.setupTitle')}</h1>
       <p class="hint">{t('verify.setupHint')}</p>
 
-      <form onsubmit={handleSubmit}>
+      <form novalidate onsubmit={handleSubmit}>
         <label>
           {t('field.password')}
           <input

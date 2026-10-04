@@ -243,7 +243,7 @@
   {/if}
 
   <h3>Invite New User</h3>
-  <form onsubmit={handleInvite}>
+  <form novalidate onsubmit={handleInvite}>
     <div class="form-row">
       <label>
         Email

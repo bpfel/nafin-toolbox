@@ -347,7 +347,7 @@
       </div>
     </div>
   {:else if isOwner && inviting}
-      <form class="naming" onsubmit={e => { e.preventDefault(); invite() }}>
+      <form class="naming" novalidate onsubmit={e => { e.preventDefault(); invite() }}>
         <input
           use:autofocus
           type="email"

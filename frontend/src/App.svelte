@@ -257,7 +257,7 @@
         <h1>{t('vault.decryptFailedTitle')}</h1>
         <p class="hint">{t('vault.decryptFailedHint')}</p>
 
-        <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleRecovery() }}>
+        <form class="recovery-form" novalidate onsubmit={(e) => { e.preventDefault(); handleRecovery() }}>
           <label>
             {t('vault.recoveryKeyLabel')}
             <input
@@ -291,7 +291,7 @@
         <h1>{t('vault.unlockTitle')}</h1>
         <p class="hint">{t('vault.unlockHint')}</p>
 
-        <form class="recovery-form" onsubmit={(e) => { e.preventDefault(); handleUnlock() }}>
+        <form class="recovery-form" novalidate onsubmit={(e) => { e.preventDefault(); handleUnlock() }}>
           <label>
             {t('field.password')}
             <input
