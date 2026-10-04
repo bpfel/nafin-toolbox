@@ -1,0 +1,65 @@
+name: Links
+
+# Whether every page the app sends a reader to still exists. The links are
+# collected from where they live — Knowledge content and the upkeep register —
+# by frontend/src/lib/sources/registry.ts; a unit test in `npm test` makes sure
+# no link can live anywhere else.
+#
+# Its own workflow, not a job in test.yml, for the reason npm audit is its own
+# job: it fails because somebody else changed something, with no commit of
+# ours. So it runs where that is useful and nowhere else:
+#
+# - weekly, against main, which is what deployed instances are showing;
+# - on a pull request that touches a link, so a new one is checked on arrival;
+# - by hand.
+#
+# A scheduled failure opens an issue, or comments on the one already open: a red
+# cross on a cron run is seen by nobody.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - frontend/src/lib/knowledge/content/**
+      - frontend/src/lib/upkeep/**
+      - frontend/src/lib/sources/**
+      - .github/workflows/links.yml
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  links:
+    name: Linked pages exist
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run links
+
+      - name: Report a broken link
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Broken source links"
+          body="The weekly link check failed: $RUN_URL"$'\n\n'"Each failure names the link and where the app uses it."
+          open=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
