@@ -12,6 +12,13 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Upgrading
 
+- **Ask everyone who uses two-factor sign-in to set it up again.** Until now
+  the setup screen had a public web service draw the QR code, and handed it the
+  code's contents: the account's two-factor seed. That service could have
+  stored it. The seed alone is not enough to sign in, and the password never
+  left the app, but a seed that has been out cannot be called back. Under
+  Profile, **Disable 2FA** and then set it up again gives a new seed; the
+  authenticator app's old entry can be deleted after.
 - **Check what your instance publishes, now:**
 
   ```sh
@@ -45,6 +52,10 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Fixed
 
+- **The two-factor QR code is drawn in the browser.** It was an image from
+  `api.qrserver.com`, whose address carried the account's two-factor seed. The
+  code is now drawn locally, as the household invitation already was, and the
+  Content-Security-Policy no longer allows images from that service.
 - **On Docker Compose before 2.24, production published the database and the
   API.** The production file removed the development ports with `ports:
   !override`, which older versions ignore, merging the port lists instead. So

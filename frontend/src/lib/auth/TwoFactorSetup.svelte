@@ -2,6 +2,7 @@
   import { t } from '../i18n/index.svelte'
   import { setup2FA, confirm2FA } from './authStore.svelte'
   import TOTPInput from './TOTPInput.svelte'
+  import QrCode from '../util/QrCode.svelte'
   import { createCopier } from '../util/copier.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
@@ -80,7 +81,7 @@
     <p class="info">{t('twofa.scanHint')}</p>
 
     <div class="qr-container">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(otpauthURL)}" alt={t('twofa.qrAlt')} width="200" height="200" />
+      <QrCode value={otpauthURL} label={t('twofa.qrAlt')} />
     </div>
 
     <details class="manual-entry">
