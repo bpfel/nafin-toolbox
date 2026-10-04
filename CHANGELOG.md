@@ -8,6 +8,30 @@ Versions follow [semantic versioning](https://semver.org/) — pre-1.0, so a min
 release may change things without a deprecation period. Each release is a tag on
 `main`; see [RELEASING.md](RELEASING.md) for how one is cut.
 
+## [0.3.1] — 2026-10-04
+
+A maintenance release. Nothing a user sees or an operator runs has changed.
+
+### Upgrading from 0.3.0
+
+Nothing to do. No migrations, no vault changes, and nothing in the built app
+differs. Rebuilding is optional.
+
+### Fixed
+
+- **`undici` 7.29.0 → 7.30.0**, for ten advisories rated high together (WebSocket
+  and decompression denial of service, response splitting through the retry
+  interceptor, cookie disclosure through shared caches, TLS validation in
+  `BalancedPool`, among others). `undici` arrives only through `jsdom`, the
+  test environment: it is not in the built app, and the tests mock `fetch`, so
+  no instance was exposed. The fix keeps CI's `npm audit` check meaningful.
+
+The tag was cut without this entry or the version bump, which landed on
+`develop` afterwards: `frontend/package.json` at `v0.3.1` still reads 0.3.0. A
+release build takes its version from the tag and shows v0.3.1 either way.
+
+[0.3.1]: https://github.com/bpfel/nafin-toolbox/compare/v0.3.0...v0.3.1
+
 ## [0.3.0] — 2026-09-25
 
 The release that makes the app something more than one person can use: a budget
