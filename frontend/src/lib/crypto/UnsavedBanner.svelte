@@ -36,7 +36,8 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.85rem 1.25rem;
+    padding: 0.85rem calc(1.25rem + env(safe-area-inset-right, 0px)) 0.85rem
+      calc(1.25rem + env(safe-area-inset-left, 0px));
     background: #fdecea;
     border-top: 2px solid #c0392b;
     color: #7d2820;
