@@ -57,6 +57,11 @@ figures link to whoever publishes them rather than being quoted.
 - **Four screens:** Budget, Accounts, Knowledge, Profile — a bar along the bottom
   on a phone, a rail on a desktop. Administrators get Users, Audit, Upkeep and
   Profile instead.
+- **Installable** to the home screen as *nafin*, where it opens without browser
+  bars and the back gesture closes an open dialog before it leaves the screen.
+  Android offers to install it; on an iPhone, Profile explains how. Needs HTTPS
+  with a trusted certificate. It is a shortcut, not an offline app: it needs the
+  server like the browser tab does.
 - **Hide amounts** from whoever is looking over your shoulder.
 - **Languages:** German, French and Italian throughout, informal register.
   Rumantsch Grischun covers the plain interface words and is provisional until a

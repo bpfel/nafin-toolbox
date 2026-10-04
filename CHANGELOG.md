@@ -8,6 +8,79 @@ Versions follow [semantic versioning](https://semver.org/) — pre-1.0, so a min
 release may change things without a deprecation period. Each release is a tag on
 `main`; see [RELEASING.md](RELEASING.md) for how one is cut.
 
+## [0.4.0] — 2026-10-04
+
+The app can be installed on a phone now. This release also fixes sign-in on instances without email and behind a reverse proxy.
+
+### Upgrading from 0.3.1
+
+- **Rebuild both images.** The API and the frontend both changed. There are no
+  migrations and no vault changes, so nothing in the database or in anyone's
+  vault is touched.
+- **Check that your reverse proxy appends to `X-Forwarded-For`.** The API now
+  finds the client by reading that header from right to left and skipping the
+  addresses in `TRUSTED_PROXIES`. nginx does this with
+  `$proxy_add_x_forwarded_for`; Caddy and Traefik do it by default. If your
+  proxy doesn't send the header, every visitor still looks like the proxy and
+  shares one sign-in limit, as before. See
+  [Self-hosting](readmore/self-hosting.md#reverse-proxy).
+- **Installing to the home screen needs HTTPS with a certificate the phone
+  trusts.** Over plain HTTP, or with a self-signed certificate, the app works in
+  the browser as before but can't be installed.
+- **AUTH-050 is retired.** It stood for every validation rule at once. A
+  password that is too short is now `AUTH-051`, and an invalid email address is
+  `AUTH-052`. Notes or scripts that look for AUTH-050 need the new codes.
+
+### New
+
+- **Install it to the home screen**, as *nafin*. It opens without browser bars,
+  and the system back gesture closes an open dialog before it changes the
+  screen, rather than changing the screen under it. Android offers to install
+  it. On an iPhone, where Safari never offers, Profile explains how. The
+  installed app keeps its own storage, so it asks for a sign-in once more. It's
+  a shortcut to the server, not an offline app.
+- **The layout stays clear of the notch and the home indicator** on phones that
+  have them.
+- **The documentation is split into chapters.** The README is a short overview,
+  and the detail lives in `readmore/`: features, security, self-hosting,
+  self-hosting on a Synology NAS, administration, development and the roadmap.
+
+### Fixed
+
+- **One account's failed sign-ins locked out every account.** The API read the
+  client address from a header the frontend's nginx sets to the reverse proxy's
+  own address, so every visitor counted as the same client. Five wrong passwords
+  for one account then refused everyone else, on any device. Failures are now
+  counted per client and account together (five per 15 minutes) and per client
+  across all accounts (twenty). People sharing one router no longer share one
+  limit, and the right password clears that account's count. The audit log
+  records the real client address too: before, it took that address from a
+  header anyone could set.
+- **Without email set up, nobody could be invited.** The server needs a first
+  password when it can't send an invitation, and the invite form had no field
+  for one. The server now tells the form whether email is configured. Without
+  email, the form asks for a first password, which the new user replaces when
+  they first sign in.
+- **That first password could never be changed.** An account with no vault yet
+  was refused with "Vault not unlocked", so it never got past the
+  change-password screen.
+- **On some phones, forms did nothing.** Firefox on Android blocks a form that
+  fails the browser's own checks, such as a password that is too short, and
+  doesn't say why. Every form now leaves the checks to the app, which shows the
+  reason and its code. Changing a password checks the new one before
+  re-encrypting the vault's key, so a password the server would refuse can't
+  lock the vault.
+
+### Known issues
+
+- **The Synology chapter's compose setup doesn't work on DSM's Docker.** It
+  layers two compose files with `!override`, which Docker Compose ignores before
+  2.24, and DSM ships 2.20. As a result the database and API ports are published
+  after all. A corrected chapter follows. Until then, use one standalone compose
+  file rather than an override.
+
+[0.4.0]: https://github.com/bpfel/nafin-toolbox/compare/v0.3.1...v0.4.0
+
 ## [0.3.1] — 2026-10-04
 
 A maintenance release. Nothing a user sees or an operator runs has changed.
