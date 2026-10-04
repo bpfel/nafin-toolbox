@@ -33,6 +33,11 @@ export const en = {
   'language.en': 'English',
   'language.provisional': 'partly translated',
 
+  // --- Installing to the home screen (iOS, which has no prompt) ---
+  'install.title': 'Install the app',
+  'install.ios': 'Tap Share, then “Add to Home Screen”.',
+  'install.signIn': 'The installed app asks you to sign in once more.',
+
   // --- Common actions ---
   'action.cancel': 'Cancel',
   'action.save': 'Save',
