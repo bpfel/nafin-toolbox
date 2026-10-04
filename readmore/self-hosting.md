@@ -18,15 +18,26 @@ cp .env.example .env        # then fill it in — see below
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-The production override stops publishing the database and API ports, turns on
-secure cookies, takes its secrets from `.env`, leaves the development mail catcher
-out, and publishes the frontend on port **4000**. Put a reverse proxy with TLS in
-front of that port.
+The production override turns on secure cookies, takes its secrets from `.env`,
+leaves the development mail catcher out, and publishes the frontend on port
+**4000**. Nothing else is published: the database and API ports exist only in
+`docker-compose.override.yml`, for development, which `-f` leaves out. Put a
+reverse proxy with TLS in front of port 4000.
 
-Docker publishes `4000:3000` on every interface, and Docker's port rules bypass
-host firewalls such as `ufw`. If the proxy runs on the same host, bind it to
-loopback instead — `127.0.0.1:4000:3000` — so the app is only reachable through
-the proxy.
+Docker publishes port 4000 on every interface, and Docker's port rules bypass
+host firewalls such as `ufw`. If the proxy runs on the same host, set
+`NAFIN_LISTEN=127.0.0.1:4000` in `.env`, so the app is only reachable through the
+proxy.
+
+To check what is published:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --format '{{.Service}}  {{.Ports}}'
+```
+
+Only `frontend` should list a port. Up to 0.4.0, on Docker Compose older than
+2.24, the database (5432) and API (8081) were published too. See the upgrade notes
+after 0.4.0 in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Configuration
 
@@ -37,6 +48,7 @@ the proxy.
 | `POSTGRES_PASSWORD` | Database password. Generate a strong one. |
 | `APP_URL` | Public base URL, used in links in emails — e.g. `https://finance.example.ch` |
 | `CORS_ORIGINS` | Allowed origins for CORS and CSRF checks; usually the same as `APP_URL` |
+| `NAFIN_LISTEN` | Where the frontend is published: `4000` (default, every interface) or `127.0.0.1:4000` (loopback only) |
 | `ENCRYPTION_KEY` | 64 hex characters encrypting TOTP secrets. `openssl rand -hex 32`. Back it up: losing it makes every enrolled 2FA secret unusable. |
 | `SMTP_HOST` | Mail server. Leave empty to disable email — see [Mail](#mail). |
 | `SMTP_PORT` | `587` (STARTTLS) or `465` (implicit TLS) |

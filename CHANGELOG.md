@@ -8,6 +8,57 @@ Versions follow [semantic versioning](https://semver.org/) — pre-1.0, so a min
 release may change things without a deprecation period. Each release is a tag on
 `main`; see [RELEASING.md](RELEASING.md) for how one is cut.
 
+## [Unreleased]
+
+### Upgrading
+
+- **Check what your instance publishes, now:**
+
+  ```sh
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --format '{{.Service}}  {{.Ports}}'
+  ```
+
+  If `db` lists `0.0.0.0:5432` or `api` lists `0.0.0.0:8081`, your database and
+  API have been reachable from the network, the database protected only by its
+  password. That happens on Docker Compose older than 2.24 (`docker compose
+  version`); Synology DSM ships 2.20. Update and recreate the stack. If
+  the host faces the internet with no firewall in front, consider changing the
+  database password too. `POSTGRES_PASSWORD` only applies when the database is
+  first created, so change it in the database first, then in `.env`:
+  `docker compose ... exec db psql -U finance -c "ALTER USER finance PASSWORD '<new>'"`.
+- **If the reverse proxy runs on the same host and you had edited the frontend's
+  port to bind to loopback,** set `NAFIN_LISTEN=127.0.0.1:4000` in `.env`. The
+  port is set there now, not in the compose file.
+- **On a Synology set up from the earlier chapter:** delete
+  `docker-compose.synology.yml` and set `NAFIN_LISTEN=127.0.0.1:4000` in `.env`.
+  [Self-hosting on a Synology NAS](readmore/synology-selfhosting.md#coming-from-an-earlier-version-of-this-chapter)
+  has the commands.
+- The images are unchanged. Recreating the containers is enough, but rebuilding
+  does no harm.
+
+### Fixed
+
+- **On Docker Compose before 2.24, production published the database and the
+  API.** The production file removed the development ports with `ports:
+  !override`, which older versions ignore, merging the port lists instead. So
+  Postgres was published on 5432 and the API on 8081, next to the frontend.
+  `docker-compose.yml` now publishes no ports at all. Development ports are in
+  `docker-compose.override.yml`, which Compose loads only when no `-f` is given,
+  and production adds just the frontend. This works the same on every Compose
+  version. A CI check now fails if production publishes anything other than the
+  frontend.
+- **The frontend's address is set in `.env`** with `NAFIN_LISTEN`. It defaults to
+  `4000` as before; `127.0.0.1:4000` restricts it to loopback.
+- **The database's health check allows a slow first start.** Initialising the
+  data directory on a NAS outlasted the check's retries, so the API never
+  started.
+
+### Documentation
+
+- **The Synology chapter is rewritten** for the new compose layout. It adds DSM's
+  firewall rule for Docker's internal traffic, the DNS trap of a Pi-hole running
+  on the NAS itself, and building images on a computer instead of the NAS.
+
 ## [0.4.0] — 2026-10-04
 
 The app can be installed on a phone now. This release also fixes sign-in on instances without email and behind a reverse proxy.
@@ -73,11 +124,9 @@ The app can be installed on a phone now. This release also fixes sign-in on inst
 
 ### Known issues
 
-- **The Synology chapter's compose setup doesn't work on DSM's Docker.** It
-  layers two compose files with `!override`, which Docker Compose ignores before
-  2.24, and DSM ships 2.20. As a result the database and API ports are published
-  after all. A corrected chapter follows. Until then, use one standalone compose
-  file rather than an override.
+- **On Docker Compose before 2.24, the database and the API are published to the
+  network.** The production compose file removes their ports with `!override`,
+  which older versions ignore. Synology DSM ships 2.20. Fixed in the next release.
 
 [0.4.0]: https://github.com/bpfel/nafin-toolbox/compare/v0.3.1...v0.4.0
 

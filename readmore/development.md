@@ -28,6 +28,10 @@ docker compose up -d --build
 | Mailpit (catches all email) | http://localhost:8025 |
 | PostgreSQL | `localhost:5432`, user, password and database all `finance` |
 
+These ports come from `docker-compose.override.yml`, which Compose loads by itself
+when no `-f` is given. `docker-compose.yml` publishes no ports, so production,
+which names its files with `-f`, publishes only the frontend.
+
 The same command rebuilds after a change: about 15 s for the Go side, a few seconds
 for the frontend. There is no hot-reload overlay; the local stack runs production
 builds.
