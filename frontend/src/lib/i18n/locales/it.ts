@@ -32,6 +32,11 @@ export const it: Messages = {
   'language.en': 'English',
   'language.provisional': 'tradotto parzialmente',
 
+  // --- Installing to the home screen (iOS, which has no prompt) ---
+  'install.title': 'Installa l’app',
+  'install.ios': 'Tocca «Condividi», poi «Aggiungi alla schermata Home».',
+  'install.signIn': 'Nell’app installata accedi ancora una volta.',
+
   // --- Common actions ---
   'action.cancel': 'Annulla',
   'action.save': 'Salva',

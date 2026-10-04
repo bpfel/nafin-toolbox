@@ -5,6 +5,7 @@
   import HouseholdSettings from '../lib/household/HouseholdSettings.svelte'
   import LanguagePicker from '../lib/nav/LanguagePicker.svelte'
   import VersionTag from '../lib/util/VersionTag.svelte'
+  import InstallHint from '../lib/util/InstallHint.svelte'
 
   /**
    * Everything about the person rather than their money.
@@ -47,6 +48,10 @@
     -->
     <LanguagePicker />
   </div>
+
+  <!-- Only on an iPhone or iPad in a browser tab. Next to the language because
+       both are about the app rather than the account. -->
+  <InstallHint />
 
   <!-- Three more boxes, siblings of these two rather than a panel of their own. -->
   <SecuritySettings />
