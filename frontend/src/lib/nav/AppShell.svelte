@@ -182,6 +182,13 @@
        except in the one corner the dot occupies. */
     padding: 1.5rem var(--app-gutter)
       calc(var(--app-nav-height) + 5rem + env(safe-area-inset-bottom, 0));
+
+    /* Installed, with viewport-fit=cover, the page runs under the status bar
+       and — on a phone turned sideways — under the notch. Each edge clears
+       whatever the system has put over it; in a browser tab all four are 0. */
+    padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+    padding-left: calc(var(--app-gutter) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--app-gutter) + env(safe-area-inset-right, 0px));
   }
 
   .screen[hidden] {
@@ -192,12 +199,18 @@
     /* Room for the rail, which is fixed to the left edge rather than a column
        in a grid — see AppNav for why. */
     .shell {
-      padding-left: var(--app-rail-width);
+      /* The rail widens by the left inset — see AppNav — so this does too. */
+      padding-left: calc(var(--app-rail-width) + env(safe-area-inset-left, 0px));
     }
 
     main {
-      /* Nothing is over the bottom edge up here, so no room is kept for it. */
-      padding: var(--app-gutter);
+      /* Nothing is over the bottom edge up here, so no room is kept for it —
+         beyond the home indicator, which a phone in landscape is wide enough
+         to bring up to this layout. The left edge is the rail's. */
+      padding: calc(var(--app-gutter) + env(safe-area-inset-top, 0px))
+        calc(var(--app-gutter) + env(safe-area-inset-right, 0px))
+        calc(var(--app-gutter) + env(safe-area-inset-bottom, 0px))
+        var(--app-gutter);
     }
   }
 </style>

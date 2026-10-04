@@ -358,8 +358,8 @@
      bar to sit in. */
   .floating-language {
     position: fixed;
-    top: 1rem;
-    right: 1rem;
+    top: calc(1rem + env(safe-area-inset-top, 0px));
+    right: calc(1rem + env(safe-area-inset-right, 0px));
     z-index: 50;
   }
 

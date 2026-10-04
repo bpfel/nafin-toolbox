@@ -306,7 +306,7 @@
       gap: 0.5rem;
 
       position: fixed;
-      right: var(--app-gutter);
+      right: calc(var(--app-gutter) + env(safe-area-inset-right, 0px));
       /* Clear of the navigation and of whatever the home indicator takes. */
       bottom: calc(var(--app-nav-height) + env(safe-area-inset-bottom, 0px) + 0.75rem);
       /* Over the navigation bar, which is 40. */
