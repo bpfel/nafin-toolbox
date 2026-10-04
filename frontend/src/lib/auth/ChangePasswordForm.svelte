@@ -38,7 +38,7 @@
       <p class="hint">{message}</p>
     {/if}
 
-    <form onsubmit={handleSubmit}>
+    <form novalidate onsubmit={handleSubmit}>
       <label>
         {t('password.current')}
         <input

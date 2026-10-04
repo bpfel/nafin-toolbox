@@ -140,6 +140,21 @@ describe('InvitePanel inviting', () => {
     expect((password as HTMLInputElement).value).toBe('')
   })
 
+  test('a password too short still reaches the server, and its code is shown', async () => {
+    // Left to the browser, this never left the phone: Firefox on Android
+    // blocks the submit and shows no reason, so the button did nothing.
+    settings = { require_2fa: false, email_enabled: false }
+    inviteUser.mockResolvedValue({ error: 'password must be at least 8 characters (AUTH-051)' })
+    render(InvitePanel, { props: {} })
+
+    await fireEvent.input(await screen.findByLabelText('First password'), { target: { value: 'short' } })
+    await fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'new@example.ch' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Create User' }))
+
+    await waitFor(() => expect(inviteUser).toHaveBeenCalledWith('new@example.ch', 'user', 'short'))
+    expect(await screen.findByText('password must be at least 8 characters (AUTH-051)')).toBeTruthy()
+  })
+
   test('a server that does not report email keeps the form it always had', async () => {
     settings = { require_2fa: false }
     render(InvitePanel, { props: {} })

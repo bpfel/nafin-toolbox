@@ -164,7 +164,7 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidateEmail(req.Email); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 
@@ -182,7 +182,7 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 				return
 			}
 			if err := ValidatePassword(req.Password); err != nil {
-				apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+				apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 				return
 			}
 		}
@@ -319,7 +319,7 @@ func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidatePassword(req.NewPassword); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 
@@ -371,11 +371,11 @@ func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidateEmail(req.Email); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 		if err := ValidatePassword(req.Password); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 
@@ -444,7 +444,7 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidatePassword(req.Password); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 

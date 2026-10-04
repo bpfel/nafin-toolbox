@@ -84,8 +84,14 @@ var codes = map[string]string{
 	Auth + "|cannot reset your own password via admin endpoint": "AUTH-041",
 	Auth + "|cannot delete the last administrator":              "AUTH-042",
 
-	// --- Validation surfaced from the engine ---
-	Auth + "|validation": "AUTH-050",
+	// --- Validation of what was typed ---
+	// AUTH-050 is retired. It stood for every rule at once, so a user reading
+	// it out could not say which one their input broke; each rule has its own
+	// code now. The frontend checks the same rules before sending and reports
+	// them under these codes — see lib/auth/rules.ts.
+	Auth + "|validation":                             "AUTH-050",
+	Auth + "|password must be at least 8 characters": "AUTH-051",
+	Auth + "|invalid email address":                  "AUTH-052",
 
 	// --- The vault ---
 	Vault + "|invalid JSON":                "VAULT-010",
@@ -154,12 +160,4 @@ func Write(w http.ResponseWriter, area string, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body{Error: message, Code: CodeFor(area, message)})
-}
-
-// WriteCode sends a JSON error whose message is not fixed — a validation
-// message from deeper down — under an explicitly chosen code.
-func WriteCode(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body{Error: message, Code: code})
 }

@@ -1,4 +1,5 @@
 import { withCode } from '../api/client'
+import { passwordChangeProblem } from './rules'
 import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault } from '../crypto/vaultStore.svelte'
 
 export interface User {
@@ -252,6 +253,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
   // re-encrypt, and the vault is set up afterwards under the new password.
   // Without this, that change failed with "Vault not unlocked" and the account
   // could never get past it.
+  // Before anything else: the vault key is re-wrapped under the new password
+  // first, and a password the server then refused would leave it there.
+  const problem = passwordChangeProblem(currentPassword, newPassword)
+  if (problem) return problem
+
   if (currentUser && currentUser.role !== 'admin') {
     const mustChangeWithLockedVault = currentUser.must_change_password && vaultDecryptFailed
     if (!mustChangeWithLockedVault && !vaultNeedsSetup) {

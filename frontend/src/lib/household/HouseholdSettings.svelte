@@ -155,7 +155,7 @@
       {#each vaultState.households as household (household.id)}
         <li>
           {#if renamingId === household.id}
-            <form class="naming" onsubmit={e => { e.preventDefault(); rename(household.id) }}>
+            <form class="naming" novalidate onsubmit={e => { e.preventDefault(); rename(household.id) }}>
               <input
                 use:autofocus
                 bind:value={renameTo}
@@ -278,7 +278,7 @@
   {#if !canCreate}
     <p class="info">{t('household.needsKeys')}</p>
   {:else if naming}
-    <form class="naming" onsubmit={e => { e.preventDefault(); create() }}>
+    <form class="naming" novalidate onsubmit={e => { e.preventDefault(); create() }}>
       <!--
         Named at creation, with no default. There is no "Household" fallback,
         because a second one could not use it and "Household 2" is not a name

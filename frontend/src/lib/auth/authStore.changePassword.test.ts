@@ -87,4 +87,28 @@ describe('changing the password', () => {
     expect(result).toBe('Vault not unlocked')
     expect(fetchMock).not.toHaveBeenCalledWith('/api/auth/change-password', expect.anything())
   })
+
+  test('a new password the server would refuse stops before the vault is touched', async () => {
+    // The key is re-wrapped first. Re-wrapped under a password the server then
+    // refused, the vault would open with no password the account has.
+    initializeVault.mockResolvedValue('ok')
+    reEncryptMEK.mockResolvedValue(undefined)
+    await login(user.email, 'old-pass-123')
+
+    const result = await changePassword('old-pass-123', 'short')
+
+    expect(result).toBe('password must be at least 8 characters (AUTH-051)')
+    expect(reEncryptMEK).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/auth/change-password', expect.anything())
+  })
+
+  test('an empty field is named, with its code, before the vault is touched', async () => {
+    initializeVault.mockResolvedValue('ok')
+    await login(user.email, 'old-pass-123')
+
+    const result = await changePassword('', 'new-pass-456')
+
+    expect(result).toBe('current and new password required (AUTH-018)')
+    expect(reEncryptMEK).not.toHaveBeenCalled()
+  })
 })
