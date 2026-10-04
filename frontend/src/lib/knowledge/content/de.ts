@@ -113,7 +113,7 @@ export const de: PartialContent = {
       sources: [
         {
           label: 'ch.ch — die 3. Säule',
-          url: 'https://www.ch.ch/de/pensionierung/altersrente/die-3-saeule/',
+          url: 'https://www.ch.ch/de/pensionierung/altersvorsorge/3-saule--private-vorsorge-/',
         },
         {
           label: 'Eidgenössische Steuerverwaltung — Höchstabzüge Säule 3a',

@@ -59,12 +59,16 @@ release may change things without a deprecation period. Each release is a tag on
 - **The database's health check allows a slow first start.** Initialising the
   data directory on a NAS outlasted the check's retries, so the API never
   started.
+- **The pillar 3a article's German, French and Italian sources were dead
+  links.** ch.ch moved those pages; the English one was unaffected.
 
 ### Documentation
 
 - **The Synology chapter is rewritten** for the new compose layout. It adds DSM's
   firewall rule for Docker's internal traffic, the DNS trap of a Pi-hole running
   on the NAS itself, and building images on a computer instead of the NAS.
+- **Every page the app links to is checked weekly.** A failure opens an issue
+  naming the link and where it is used. See [Development](readmore/development.md#tests).
 
 ## [0.4.0] — 2026-10-04
 

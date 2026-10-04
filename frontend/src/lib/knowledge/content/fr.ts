@@ -114,7 +114,7 @@ export const fr: PartialContent = {
       sources: [
         {
           label: 'ch.ch — le 3e pilier',
-          url: 'https://www.ch.ch/fr/retraite/rente-de-vieillesse/le-3e-pilier/',
+          url: 'https://www.ch.ch/fr/retraite/prevoyance-vieillesse/prevoyance-privee-3e-pilier/',
         },
         {
           label: 'Administration fédérale des contributions — déductions maximales pilier 3a',

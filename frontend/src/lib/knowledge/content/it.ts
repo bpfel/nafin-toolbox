@@ -113,7 +113,7 @@ export const it: PartialContent = {
       sources: [
         {
           label: 'ch.ch — il 3° pilastro',
-          url: 'https://www.ch.ch/it/pensionamento/rendita-di-vecchiaia/il-3-pilastro/',
+          url: 'https://www.ch.ch/it/pensionamento/previdenza-per-la-vecchiaia/il-terzo-pilastro--previdenza-privata-/',
         },
         {
           label: 'Amministrazione federale delle contribuzioni — deduzioni massime pilastro 3a',
