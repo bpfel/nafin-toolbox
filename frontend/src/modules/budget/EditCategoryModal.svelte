@@ -4,6 +4,7 @@
   import type { VaultCategory, VaultData } from '../../lib/crypto/vault'
   import * as engine from '../../lib/budget/budgetEngine'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { closeOnBack } from '../../lib/nav/closeOnBack'
 
   interface Props {
     category: VaultCategory
@@ -77,7 +78,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('category.editTitle')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('category.editTitle')} use:focusTrap use:closeOnBack={onclose}>
     <h3>{t('category.editTitle')}</h3>
 
     <label class="field">

@@ -20,6 +20,8 @@
 // nginx has served `try_files $uri $uri/ /index.html` since the beginning, so
 // deep links have worked in production all along; nothing was reading them.
 
+import { leaveLayers } from './closeOnBack'
+
 /**
  * Every screen the address bar can name.
  *
@@ -106,8 +108,11 @@ export function getRoute(): Route {
 export function navigate(to: string): void {
   const path = pathOf(to)
   if (path === pathname && to === path) return
-  window.history.pushState({}, '', to)
-  pathname = path
+  // Over the screen being left, not over a dialog's step — see closeOnBack.
+  leaveLayers(() => {
+    window.history.pushState({}, '', to)
+    pathname = path
+  })
 }
 
 /**
@@ -115,8 +120,10 @@ export function navigate(to: string): void {
  * not be able to come back to — a spent verification link, most of all.
  */
 export function replace(to: string): void {
-  window.history.replaceState({}, '', to)
-  pathname = pathOf(to)
+  leaveLayers(() => {
+    window.history.replaceState({}, '', to)
+    pathname = pathOf(to)
+  })
 }
 
 /**
