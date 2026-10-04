@@ -5,11 +5,18 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/database"
+	"github.com/bpfel/nafin-toolbox/internal/email"
 )
 
 var testDB *sql.DB
@@ -1021,5 +1028,145 @@ func TestCreateFirstUser(t *testing.T) {
 	_, err = store.CreateFirstUser(ctx, "second@test.com", hash)
 	if err != ErrSetupAlreadyDone {
 		t.Errorf("expected ErrSetupAlreadyDone, got %v", err)
+	}
+}
+
+// --- Settings handler ---
+
+func TestHandleGetSettings_ReportsEmail(t *testing.T) {
+	truncateTables(t)
+
+	for _, tc := range []struct {
+		name   string
+		sender email.Sender
+		want   bool
+	}{
+		{"without SMTP", &email.LogSender{}, false},
+		{"with SMTP", &email.SMTPSender{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			deps := testDeps()
+			deps.Store = &Store{db: testDB}
+			deps.EmailSender = tc.sender
+
+			req := httptest.NewRequest(http.MethodGet, "/api/auth/settings", nil)
+			req = req.WithContext(adminCtx())
+			w := httptest.NewRecorder()
+			HandleGetSettings(deps).ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+			}
+			var body struct {
+				EmailEnabled *bool `json:"email_enabled"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decoding %q: %v", w.Body.String(), err)
+			}
+			if body.EmailEnabled == nil || *body.EmailEnabled != tc.want {
+				t.Errorf("email_enabled = %v, want %v (body: %s)", body.EmailEnabled, tc.want, w.Body.String())
+			}
+		})
+	}
+}
+
+// --- Sign-in limits ---
+
+// A sign-in as it arrives in production: through an outer proxy, then the
+// frontend's nginx, which sets X-Real-IP to the outer proxy's address.
+func loginFrom(t *testing.T, deps *HandlerDeps, client, email, password string) int {
+	t.Helper()
+	body := strings.NewReader(`{"email":"` + email + `","password":"` + password + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
+	req.RemoteAddr = "172.18.0.3:40000"
+	req.Header.Set("X-Real-IP", "172.18.0.1")
+	req.Header.Set("X-Forwarded-For", client+", 172.18.0.1")
+	w := httptest.NewRecorder()
+	HandleLogin(deps).ServeHTTP(w, req)
+	return w.Code
+}
+
+func loginDeps(t *testing.T) *HandlerDeps {
+	t.Helper()
+	truncateTables(t)
+	store := NewStore(testDB)
+	for _, email := range []string{"father@example.ch", "admin@example.ch"} {
+		if _, err := store.CreateUserFull(context.Background(), email, mustHash("right-pass-1"), RoleUser, false, true); err != nil {
+			t.Fatalf("CreateUserFull: %v", err)
+		}
+	}
+	deps := testDeps()
+	deps.Store = store
+	deps.LoginLimiter = NewLoginRateLimiter(20, time.Minute)
+	deps.LoginAccountLimiter = NewLoginRateLimiter(5, time.Minute)
+	for _, l := range []*LoginRateLimiter{deps.LoginLimiter, deps.LoginAccountLimiter} {
+		l.SetTrustedProxies([]string{"172.16.0.0/12"})
+	}
+	return deps
+}
+
+func TestLogin_OneAccountsFailuresDoNotLockOutAnother(t *testing.T) {
+	// The report: five wrong passwords for one account, then a single
+	// sign-in to another, from another device — refused as too many.
+	deps := loginDeps(t)
+
+	for i := 0; i < 5; i++ {
+		loginFrom(t, deps, "203.0.113.7", "father@example.ch", "wrong-pass")
+	}
+	if got := loginFrom(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"); got != http.StatusTooManyRequests {
+		t.Errorf("sixth try at the same account = %d, want 429", got)
+	}
+
+	// Another device elsewhere.
+	if got := loginFrom(t, deps, "198.51.100.9", "admin@example.ch", "right-pass-1"); got != http.StatusOK {
+		t.Errorf("another account from another address = %d, want 200", got)
+	}
+	// The same router, as a household shares one.
+	if got := loginFrom(t, deps, "203.0.113.7", "admin@example.ch", "right-pass-1"); got != http.StatusOK {
+		t.Errorf("another account from the same address = %d, want 200", got)
+	}
+}
+
+func TestLogin_GuessingAcrossAccountsIsStillLimited(t *testing.T) {
+	deps := loginDeps(t)
+
+	for i := 0; i < 20; i++ {
+		loginFrom(t, deps, "203.0.113.7", "nobody"+strconv.Itoa(i)+"@example.ch", "wrong-pass")
+	}
+	if got := loginFrom(t, deps, "203.0.113.7", "admin@example.ch", "right-pass-1"); got != http.StatusTooManyRequests {
+		t.Errorf("after twenty misses across accounts = %d, want 429", got)
+	}
+}
+
+func TestLogin_TheRightPasswordClearsTheMisses(t *testing.T) {
+	deps := loginDeps(t)
+
+	for i := 0; i < 4; i++ {
+		loginFrom(t, deps, "203.0.113.7", "father@example.ch", "wrong-pass")
+	}
+	if got := loginFrom(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"); got != http.StatusOK {
+		t.Fatalf("right password after four misses = %d, want 200", got)
+	}
+	// Four more misses would have been nine without the reset.
+	for i := 0; i < 4; i++ {
+		loginFrom(t, deps, "203.0.113.7", "father@example.ch", "wrong-pass")
+	}
+	if got := loginFrom(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"); got != http.StatusOK {
+		t.Errorf("right password after four fresh misses = %d, want 200", got)
+	}
+}
+
+func TestLogin_AuditRecordsTheClientNotTheProxy(t *testing.T) {
+	deps := loginDeps(t)
+	deps.Store.SetTrustedProxies([]string{"172.16.0.0/12"})
+
+	loginFrom(t, deps, "203.0.113.7", "father@example.ch", "wrong-pass")
+
+	var ip string
+	if err := testDB.QueryRow(`SELECT ip_address FROM audit_log ORDER BY id DESC LIMIT 1`).Scan(&ip); err != nil {
+		t.Fatalf("reading audit_log: %v", err)
+	}
+	if ip != "203.0.113.7" {
+		t.Errorf("audit ip = %q, want 203.0.113.7", ip)
 	}
 }

@@ -28,7 +28,7 @@ const (
 func (s *Store) LogAudit(ctx context.Context, userID *int, event AuditEvent, r *http.Request, metadata map[string]any) error {
 	var ip, ua string
 	if r != nil {
-		ip = clientIPFromRequest(r)
+		ip = clientIP(r, s.trustedProxies)
 		ua = r.UserAgent()
 	}
 
@@ -46,12 +46,4 @@ func (s *Store) LogAudit(ctx context.Context, userID *int, event AuditEvent, r *
 		userID, string(event), ip, ua, metaJSON,
 	)
 	return err
-}
-
-// clientIPFromRequest extracts the client IP, preferring X-Real-IP if present.
-func clientIPFromRequest(r *http.Request) string {
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
-	}
-	return remoteAddrIP(r.RemoteAddr)
 }

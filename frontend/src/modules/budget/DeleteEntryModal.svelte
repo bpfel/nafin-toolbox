@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t, tAround } from '../../lib/i18n/index.svelte'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { closeOnBack } from '../../lib/nav/closeOnBack'
 
   interface Props {
     entryId: string
@@ -32,7 +33,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('entry.deleteTitle')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('entry.deleteTitle')} use:focusTrap use:closeOnBack={onclose}>
     <h3>{t('entry.deleteTitle')}</h3>
     <!-- v4 replaced monthly periods with one plan plus named snapshots, so there
          is no longer a set of periods to be removed from. What actually happens:

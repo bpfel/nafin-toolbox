@@ -61,6 +61,8 @@
     z-index: 40;
     min-height: var(--app-nav-height);
     padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   .item {
@@ -118,10 +120,15 @@
        */
       position: fixed;
       inset: 0 auto 0 0;
-      width: var(--app-rail-width);
+      /* A phone on its side is wide enough for the rail, and puts the notch
+         on this edge. The rail grows by the inset rather than giving its
+         labels to it. */
+      width: calc(var(--app-rail-width) + env(safe-area-inset-left, 0px));
       flex-direction: column;
       gap: 0.15rem;
-      padding: 1rem 0.6rem;
+      padding: calc(1rem + env(safe-area-inset-top, 0px)) 0.6rem
+        calc(1rem + env(safe-area-inset-bottom, 0px))
+        calc(0.6rem + env(safe-area-inset-left, 0px));
       border-top: none;
       border-right: 1px solid #e0e0e0;
       overflow-y: auto;

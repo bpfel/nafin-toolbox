@@ -23,24 +23,24 @@ import (
 
 // HandlerDeps holds shared dependencies for auth handlers.
 type HandlerDeps struct {
-	Store              *Store
-	LoginLimiter       *LoginRateLimiter
-	SetupLimiter       *LoginRateLimiter
-	VerifyEmailLimiter *LoginRateLimiter
-	Verify2FALimiter   *LoginRateLimiter
-	EmailSender        email.Sender
-	EncryptionKey      []byte // 32-byte AES key, nil if 2FA not available
-	AppURL             string
+	Store *Store
+	// Sign-in failures are counted twice: per client, against anyone guessing
+	// across many accounts, and per client and account together, which is the
+	// one that runs out first. The second is what keeps one person's typos
+	// from locking out everyone else at the same address — a household
+	// behind one router, the usual case for an app like this.
+	LoginLimiter        *LoginRateLimiter
+	LoginAccountLimiter *LoginRateLimiter
+	SetupLimiter        *LoginRateLimiter
+	VerifyEmailLimiter  *LoginRateLimiter
+	Verify2FALimiter    *LoginRateLimiter
+	EmailSender         email.Sender
+	EncryptionKey       []byte // 32-byte AES key, nil if 2FA not available
+	AppURL              string
 }
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.LoginLimiter.Check(r) {
-			w.Header().Set("Retry-After", "900")
-			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
-			return
-		}
-
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
@@ -52,18 +52,29 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
+		client := deps.LoginLimiter.ClientIP(r)
+		account := client + "|" + strings.ToLower(strings.TrimSpace(req.Email))
+		if !deps.LoginLimiter.CheckKey(client) || !deps.LoginAccountLimiter.CheckKey(account) {
+			w.Header().Set("Retry-After", "900")
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
+			return
+		}
+
 		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
-			deps.LoginLimiter.RecordFailure(r)
+			deps.LoginLimiter.RecordFailureKey(client)
+			deps.LoginAccountLimiter.RecordFailureKey(account)
 			uid := userIDPtr(user)
 			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
+
+		deps.LoginAccountLimiter.Forget(account)
 
 		// Reject unverified email users
 		if !user.EmailVerified {
@@ -164,7 +175,7 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidateEmail(req.Email); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 
@@ -173,9 +184,7 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 			role = RoleAdmin
 		}
 
-		// Check if email sending is available
-		_, isLogSender := deps.EmailSender.(*email.LogSender)
-		smtpAvailable := !isLogSender
+		smtpAvailable := emailEnabled(deps)
 
 		// Validate password early in fallback mode (before DB lookup)
 		if !smtpAvailable {
@@ -184,7 +193,7 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 				return
 			}
 			if err := ValidatePassword(req.Password); err != nil {
-				apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+				apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 				return
 			}
 		}
@@ -264,6 +273,14 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 	}
 }
 
+// emailEnabled reports whether invitations go out by email. Without SMTP
+// configured the sender is a LogSender, and an invitation carries a first
+// password the admin passes on instead of a verification link.
+func emailEnabled(deps *HandlerDeps) bool {
+	_, isLogSender := deps.EmailSender.(*email.LogSender)
+	return !isLogSender
+}
+
 // HandleListUsers returns all users. Requires admin role.
 func HandleListUsers(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +330,7 @@ func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidatePassword(req.NewPassword); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 
@@ -365,11 +382,11 @@ func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidateEmail(req.Email); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 		if err := ValidatePassword(req.Password); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 
@@ -438,7 +455,7 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := ValidatePassword(req.Password); err != nil {
-			apierror.WriteCode(w, http.StatusBadRequest, "AUTH-050", err.Error())
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
 
@@ -1019,6 +1036,10 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"require_2fa": require2fa == "true",
+			// The invite form asks for a first password when this is false,
+			// because HandleInvite then requires one. Until it said so, the
+			// form could not invite anybody on an instance without SMTP.
+			"email_enabled": emailEnabled(deps),
 		})
 	}
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { User } from './authStore.svelte'
   import { focusTrap } from '../util/focusTrap'
+  import { closeOnBack } from '../nav/closeOnBack'
 
   interface Props {
     user: User
@@ -38,7 +39,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label="Delete user" use:focusTrap>
+  <div class="modal" role="dialog" aria-label="Delete user" use:focusTrap use:closeOnBack={() => { if (!deleting) onclose() }}>
     {#if step === 'verify'}
       <h3>Delete user</h3>
 
@@ -51,7 +52,7 @@
         restore it afterwards.
       </p>
 
-      <form onsubmit={proceed}>
+      <form novalidate onsubmit={proceed}>
         <label class="field">
           <span class="label">Type their email address to continue</span>
           <input

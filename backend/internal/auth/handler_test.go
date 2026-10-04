@@ -9,19 +9,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bpfel/nafin-toolbox/internal/apierror"
 	"github.com/bpfel/nafin-toolbox/internal/email"
 )
 
 func testDeps() *HandlerDeps {
 	limiter := NewLoginRateLimiter(100, time.Minute)
 	return &HandlerDeps{
-		Store:              &Store{db: nil},
-		LoginLimiter:       limiter,
-		SetupLimiter:       limiter,
-		VerifyEmailLimiter: limiter,
-		Verify2FALimiter:   limiter,
-		EmailSender:        &email.LogSender{},
-		AppURL:             "http://localhost:3000",
+		Store:               &Store{db: nil},
+		LoginLimiter:        limiter,
+		LoginAccountLimiter: limiter,
+		SetupLimiter:        limiter,
+		VerifyEmailLimiter:  limiter,
+		Verify2FALimiter:    limiter,
+		EmailSender:         &email.LogSender{},
+		AppURL:              "http://localhost:3000",
 	}
 }
 
@@ -221,6 +223,50 @@ func TestHandleInvite_FallbackShortPassword(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "password must be at least 8 characters") {
 		t.Errorf("body %q does not contain password length error", w.Body.String())
+	}
+}
+
+func TestEmailEnabled(t *testing.T) {
+	// The settings endpoint reports this to the invite form, and HandleInvite
+	// branches on it: both have to agree on what "no SMTP" looks like.
+	deps := testDeps()
+	if emailEnabled(deps) {
+		t.Error("emailEnabled with a LogSender = true, want false")
+	}
+
+	deps.EmailSender = &email.SMTPSender{}
+	if !emailEnabled(deps) {
+		t.Error("emailEnabled with an SMTPSender = false, want true")
+	}
+}
+
+// Each rule a user's input can break has a code of its own, so the code they
+// read out says which rule it was. The frontend reports the same codes when it
+// catches the rule first, so they must not drift.
+func TestValidationErrorsHaveTheirOwnCodes(t *testing.T) {
+	for err, want := range map[error]string{
+		errShortPassword: "AUTH-051",
+		errInvalidEmail:  "AUTH-052",
+	} {
+		if got := apierror.CodeFor(apierror.Auth, err.Error()); got != want {
+			t.Errorf("%q has code %s, want %s", err.Error(), got, want)
+		}
+	}
+}
+
+func TestHandleChangePassword_ShortPasswordCarriesItsCode(t *testing.T) {
+	deps := testDeps()
+	hash, _ := HashPassword("old-pass-123")
+	user := &User{ID: 1, Email: "a@example.ch", Role: RoleUser, PasswordHash: hash}
+	body := strings.NewReader(`{"current_password":"old-pass-123","new_password":"short"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", body)
+	req = req.WithContext(ContextWithUser(req.Context(), user))
+	w := httptest.NewRecorder()
+
+	HandleChangePassword(deps).ServeHTTP(w, req)
+
+	if !strings.Contains(w.Body.String(), `"code":"AUTH-051"`) {
+		t.Errorf("body %q does not carry AUTH-051", w.Body.String())
 	}
 }
 

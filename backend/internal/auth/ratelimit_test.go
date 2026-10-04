@@ -61,7 +61,7 @@ func TestLoginRateLimiter_ExpiresOldEntries(t *testing.T) {
 	}
 }
 
-func TestClientIP_TrustedProxy_XRealIP(t *testing.T) {
+func TestClientIP_TrustedProxy_XRealIPWithoutForwardedFor(t *testing.T) {
 	rl := NewLoginRateLimiter(10, time.Minute)
 	rl.SetTrustedProxies([]string{"172.16.0.0/12"})
 
@@ -71,6 +71,82 @@ func TestClientIP_TrustedProxy_XRealIP(t *testing.T) {
 
 	if got := rl.ClientIP(r); got != "10.0.0.1" {
 		t.Fatalf("expected 10.0.0.1, got %s", got)
+	}
+}
+
+// The production chain: an outer proxy, then the frontend's nginx, which sets
+// X-Real-IP to the outer proxy's address. Read first, that made every visitor
+// one client, and five wrong passwords on any account locked out all of them.
+func TestClientIP_BehindTwoProxies_IsTheClient(t *testing.T) {
+	rl := NewLoginRateLimiter(10, time.Minute)
+	rl.SetTrustedProxies([]string{"172.16.0.0/12"})
+
+	r, _ := http.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "172.18.0.3:12345"
+	r.Header.Set("X-Real-IP", "172.18.0.1")
+	r.Header.Set("X-Forwarded-For", "203.0.113.50, 172.18.0.1")
+
+	if got := rl.ClientIP(r); got != "203.0.113.50" {
+		t.Fatalf("expected 203.0.113.50, got %s", got)
+	}
+}
+
+// The leftmost entry is whatever the client sent. Trusting it would let a
+// client name a fresh address with every attempt and never be limited.
+func TestClientIP_SpoofedForwardedFor_IsIgnored(t *testing.T) {
+	rl := NewLoginRateLimiter(10, time.Minute)
+	rl.SetTrustedProxies([]string{"172.16.0.0/12"})
+
+	r, _ := http.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "172.18.0.3:12345"
+	r.Header.Set("X-Forwarded-For", "1.1.1.1, 203.0.113.50, 172.18.0.1")
+
+	if got := rl.ClientIP(r); got != "203.0.113.50" {
+		t.Fatalf("expected 203.0.113.50, got %s", got)
+	}
+}
+
+// Tailscale serve on a NAS: the tailnet address is not in the private ranges,
+// so it is the client.
+func TestClientIP_TailscaleServe_IsTheTailnetAddress(t *testing.T) {
+	rl := NewLoginRateLimiter(10, time.Minute)
+	rl.SetTrustedProxies([]string{"172.16.0.0/12", "192.168.0.0/16", "10.0.0.0/8"})
+
+	r, _ := http.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "172.19.0.3:12345"
+	r.Header.Set("X-Real-IP", "172.19.0.1")
+	r.Header.Set("X-Forwarded-For", "100.120.205.42, 172.19.0.1")
+
+	if got := rl.ClientIP(r); got != "100.120.205.42" {
+		t.Fatalf("expected 100.120.205.42, got %s", got)
+	}
+}
+
+func TestClientIP_TrustedAllTheWay_IsTheLeftmost(t *testing.T) {
+	rl := NewLoginRateLimiter(10, time.Minute)
+	rl.SetTrustedProxies([]string{"172.16.0.0/12", "192.168.0.0/16"})
+
+	r, _ := http.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "172.18.0.3:12345"
+	r.Header.Set("X-Forwarded-For", "192.168.1.20, 172.18.0.1")
+
+	if got := rl.ClientIP(r); got != "192.168.1.20" {
+		t.Fatalf("expected 192.168.1.20, got %s", got)
+	}
+}
+
+func TestForget_ClearsOneKeyOnly(t *testing.T) {
+	rl := NewLoginRateLimiter(1, time.Minute)
+	rl.RecordFailureKey("a")
+	rl.RecordFailureKey("b")
+
+	rl.Forget("a")
+
+	if !rl.CheckKey("a") {
+		t.Error("a should be clear after Forget")
+	}
+	if rl.CheckKey("b") {
+		t.Error("b should still be at its limit")
 	}
 }
 

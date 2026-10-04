@@ -12,6 +12,7 @@
   import { renderQRSvg } from '../../../lib/qrbill/svg'
   import { billMessage } from '../../../lib/qrbill/message'
   import { focusTrap } from '../../../lib/util/focusTrap'
+  import { closeOnBack } from '../../../lib/nav/closeOnBack'
   import InfoButton from '../../../lib/nav/InfoButton.svelte'
   import InfoModal from '../../../lib/nav/InfoModal.svelte'
 
@@ -206,7 +207,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('qrbill.dialogLabel')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('qrbill.dialogLabel')} use:focusTrap use:closeOnBack={onclose}>
     <div class="title-row">
       <h3>{t('qrbill.title', { account: account.name })}</h3>
       <InfoButton label={t('qrbill.detailsTitle')} onclick={() => (showDetails = true)} />

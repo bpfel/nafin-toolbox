@@ -8,6 +8,7 @@
     type VaultData,
   } from '../../lib/crypto/vault'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { closeOnBack } from '../../lib/nav/closeOnBack'
   import { autofocus } from '../../lib/util/autofocus'
   import { formatAmount, parseAmount } from '../../lib/util/money'
   import { monthNames } from '../../lib/util/months'
@@ -307,7 +308,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap use:closeOnBack={onclose}>
     <h3>
       {t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', {
         type: t(`entryType.${type}` as 'entryType.expense'),

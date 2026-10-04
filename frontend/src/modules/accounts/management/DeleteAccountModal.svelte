@@ -3,6 +3,7 @@
   import { untrack } from 'svelte'
   import type { VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
   import { focusTrap } from '../../../lib/util/focusTrap'
+  import { closeOnBack } from '../../../lib/nav/closeOnBack'
 
   interface Props {
     account: VaultAccount
@@ -61,7 +62,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('accountDelete.title')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('accountDelete.title')} use:focusTrap use:closeOnBack={onclose}>
     <h3>{t('accountDelete.title')}</h3>
 
     <p>

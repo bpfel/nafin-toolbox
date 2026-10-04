@@ -1,5 +1,6 @@
 <script lang="ts">
   import { focusTrap } from '../util/focusTrap'
+  import { closeOnBack } from './closeOnBack'
   import {
     AVAILABLE_LOCALES,
     getLocale,
@@ -73,7 +74,7 @@
   {#if open}
     <div class="backdrop" role="presentation" onclick={handleBackdrop}></div>
 
-    <ul class="panel" role="menu" aria-label={t('menu.language')} use:focusTrap>
+    <ul class="panel" role="menu" aria-label={t('menu.language')} use:focusTrap use:closeOnBack={close}>
       {#each AVAILABLE_LOCALES as locale}
         <li>
           <button

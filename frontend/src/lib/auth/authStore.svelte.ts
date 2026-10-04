@@ -1,4 +1,5 @@
 import { withCode } from '../api/client'
+import { passwordChangeProblem } from './rules'
 import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault } from '../crypto/vaultStore.svelte'
 
 export interface User {
@@ -13,6 +14,12 @@ export interface User {
 
 export interface AppSettings {
   require_2fa: boolean
+  /**
+   * Whether invitations go out by email. False on an instance without SMTP,
+   * where an invitation needs a first password instead. Optional because a
+   * server from before it was reported does not send it.
+   */
+  email_enabled?: boolean
 }
 
 const API_BASE = '/api'
@@ -99,6 +106,11 @@ export async function login(email: string, password: string): Promise<string | {
     }
     currentUser = data
     vaultLocked = false
+    // Whatever the vault said about the last account in this tab says nothing
+    // about this one. changePassword trusts vaultNeedsSetup to mean "no keys",
+    // and a stale true would skip re-wrapping a vault that has them.
+    vaultNeedsSetup = false
+    vaultDecryptFailed = false
 
     // Admin users skip vault entirely — they don't use encrypted modules
     if (data.role !== 'admin') {
@@ -135,6 +147,9 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
   if (res.ok) {
     currentUser = await res.json()
     vaultLocked = false
+    // As in login: start from what this account's vault says.
+    vaultNeedsSetup = false
+    vaultDecryptFailed = false
 
     // Admin users skip vault entirely
     if (currentUser && currentUser.role !== 'admin') {
@@ -231,9 +246,21 @@ export async function changePassword(currentPassword: string, newPassword: strin
   // Re-encrypt MEK before changing server password.
   // Skip for admin (no vault) and when must_change_password is set with locked vault
   // (e.g. after admin password reset — vault recovery happens separately).
+  //
+  // Skip too when there is no vault yet. An account an admin created with a
+  // first password, on an instance without email, is made to change it before
+  // anything else — before a vault exists to hold a key. There is nothing to
+  // re-encrypt, and the vault is set up afterwards under the new password.
+  // Without this, that change failed with "Vault not unlocked" and the account
+  // could never get past it.
+  // Before anything else: the vault key is re-wrapped under the new password
+  // first, and a password the server then refused would leave it there.
+  const problem = passwordChangeProblem(currentPassword, newPassword)
+  if (problem) return problem
+
   if (currentUser && currentUser.role !== 'admin') {
     const mustChangeWithLockedVault = currentUser.must_change_password && vaultDecryptFailed
-    if (!mustChangeWithLockedVault) {
+    if (!mustChangeWithLockedVault && !vaultNeedsSetup) {
       try {
         await reEncryptMEK(currentPassword, newPassword, currentUser.email)
       } catch (e) {
@@ -250,7 +277,14 @@ export async function changePassword(currentPassword: string, newPassword: strin
   })
 
   if (res.ok) {
+    // Signed out, as by logout, and with the same state cleared: the old
+    // password must not stay held for a vault setup, nor the flags outlive
+    // the session they described.
     currentUser = null
+    heldPassword = null
+    heldEmail = null
+    vaultNeedsSetup = false
+    vaultDecryptFailed = false
     clearVault()
     return null
   }

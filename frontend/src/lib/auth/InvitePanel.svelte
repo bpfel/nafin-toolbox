@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, type User, getAuthState } from './authStore.svelte'
+  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, getSettings, type User, getAuthState } from './authStore.svelte'
   import DeleteUserModal from './DeleteUserModal.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
@@ -24,6 +24,17 @@
   )
   let email = $state('')
   let role = $state<'admin' | 'user'>('user')
+  /**
+   * Without SMTP there is no invitation email, and the server creates the
+   * account from a password the admin sets and passes on — refusing an
+   * invitation without one. This form lost that field when email verification
+   * arrived, and could not invite anybody on such an instance after that.
+   *
+   * Assumed true until the server says otherwise, so an older server that does
+   * not report it gets the form it always had.
+   */
+  let emailEnabled = $state(true)
+  let firstPassword = $state('')
   let error = $state<string | null>(null)
   let success = $state<string | null>(null)
   let submitting = $state(false)
@@ -41,6 +52,9 @@
 
   $effect(() => {
     loadUsers()
+    getSettings().then((s) => {
+      emailEnabled = s.email_enabled ?? true
+    })
   })
 
   async function handleInvite(e: Event) {
@@ -49,14 +63,17 @@
     success = null
     submitting = true
 
-    const result = await inviteUser(email, role)
+    const result = await inviteUser(email, role, emailEnabled ? undefined : firstPassword)
     submitting = false
 
     if (result.error) {
       error = result.error
     } else {
-      success = `Invitation sent to ${result.user!.email}`
+      success = emailEnabled
+        ? `Invitation sent to ${result.user!.email}`
+        : `Account created for ${result.user!.email}. Pass the password on securely; they choose their own at first sign-in.`
       email = ''
+      firstPassword = ''
       role = 'user'
       await loadUsers()
     }
@@ -226,7 +243,7 @@
   {/if}
 
   <h3>Invite New User</h3>
-  <form onsubmit={handleInvite}>
+  <form novalidate onsubmit={handleInvite}>
     <div class="form-row">
       <label>
         Email
@@ -241,6 +258,27 @@
       </label>
     </div>
 
+    {#if !emailEnabled}
+      <!-- Plain text, not a password field: the admin has to read it out or
+           copy it to pass it on, and it is replaced at first sign-in. -->
+      <label class="first-password">
+        First password
+        <input
+          type="text"
+          bind:value={firstPassword}
+          required
+          minlength="8"
+          autocomplete="off"
+          spellcheck="false"
+          disabled={submitting}
+        />
+      </label>
+      <p class="hint">
+        Email is not set up on this server, so no invitation is sent. Set a first
+        password and pass it on; they choose their own at first sign-in.
+      </p>
+    {/if}
+
     {#if error}
       <p class="error">{error}</p>
     {/if}
@@ -249,7 +287,7 @@
     {/if}
 
     <button type="submit" disabled={submitting}>
-      {submitting ? 'Inviting...' : 'Invite User'}
+      {submitting ? 'Inviting...' : emailEnabled ? 'Invite User' : 'Create User'}
     </button>
   </form>
 </div>
@@ -441,6 +479,19 @@
     outline: none;
     border-color: #2d6a4f;
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.15);
+  }
+
+  /* Under the email and role row rather than in it: it only appears on an
+     instance without email, and a third box squeezed into that row would
+     shrink the other two. */
+  .first-password {
+    margin-top: 0.75rem;
+  }
+
+  .hint {
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+    margin: 0.35rem 0 0;
   }
 
   .error {

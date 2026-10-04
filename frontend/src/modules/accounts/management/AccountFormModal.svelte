@@ -5,6 +5,7 @@
   import { isQRIban, ibanStatus } from '../../../lib/qrbill/validate'
   import { formatIBANForDisplay } from '../../../lib/qrbill/format'
   import { focusTrap } from '../../../lib/util/focusTrap'
+  import { closeOnBack } from '../../../lib/nav/closeOnBack'
   import InfoButton from '../../../lib/nav/InfoButton.svelte'
   import InfoModal from '../../../lib/nav/InfoModal.svelte'
 
@@ -110,7 +111,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? t('accountForm.editTitle') : t('accountForm.addTitle')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={isEdit ? t('accountForm.editTitle') : t('accountForm.addTitle')} use:focusTrap use:closeOnBack={onclose}>
     <h3>{isEdit ? t('accountForm.editTitle') : t('accountForm.addTitle')}</h3>
 
     <label class="field">

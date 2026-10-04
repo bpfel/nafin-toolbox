@@ -82,7 +82,7 @@
 
       {#if useRecoveryCode}
         <p class="hint">{t('twofa.enterRecoveryCode')}</p>
-        <form onsubmit={(e) => { e.preventDefault(); handleVerify2FA() }}>
+        <form novalidate onsubmit={(e) => { e.preventDefault(); handleVerify2FA() }}>
           <label>
             {t('field.recoveryCode')}
             <input
@@ -129,7 +129,7 @@
         <p class="setup-hint">{t('auth.noUsersYet')}</p>
       {/if}
 
-      <form onsubmit={handleSubmit}>
+      <form novalidate onsubmit={handleSubmit}>
         <label>
           {t('field.email')}
           <input
