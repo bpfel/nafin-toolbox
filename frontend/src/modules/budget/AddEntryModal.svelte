@@ -121,6 +121,19 @@
     untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount) * 12) : '')),
   )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
+  /** Which box the amount was last typed into, and so which one is the truth. */
+  let amountTypedIn = $state<'planned_mo' | 'planned_yr'>('planned_mo')
+
+  /**
+   * The monthly to store for a figure typed into one of the boxes.
+   *
+   * A year is kept as its monthly to four places, so twelve of it comes back as
+   * the year that was typed. The monthly box shows that figure rounded to the
+   * rappen, and storing what it shows turned 12'550 into 12'549.96.
+   */
+  function storedMonthly(field: 'planned_mo' | 'planned_yr', val: number): string {
+    return field === 'planned_mo' ? val.toFixed(2) : (val / 12).toFixed(4)
+  }
 
   // --- the three-way relation --------------------------------------------
   //
@@ -189,16 +202,15 @@
     const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return false
 
+    amountTypedIn = field
     if (field === 'planned_mo') {
       plannedMoValue = formatAmount(val)
       plannedYrValue = formatAmount(val * 12)
-      if (editEntry && onsave) onsave(editEntry.id, val.toFixed(2))
     } else {
-      const monthly = val / 12
       plannedYrValue = formatAmount(val)
-      plannedMoValue = formatAmount(monthly)
-      if (editEntry && onsave) onsave(editEntry.id, monthly.toFixed(4))
+      plannedMoValue = formatAmount(val / 12)
     }
+    if (editEntry && onsave) onsave(editEntry.id, storedMonthly(field, val))
     return true
   }
 
@@ -224,6 +236,7 @@
     const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return
 
+    amountTypedIn = field
     if (field === 'planned_mo') {
       plannedYrValue = formatAmount(val * 12)
     } else {
@@ -238,9 +251,10 @@
       if (total <= 0 || periodMonths <= 0) return ''
       return (Math.round(total / periodMonths) / 100).toFixed(2)
     }
-    const value = parseAmount(plannedMoValue)
-    if (plannedMoValue.trim() === '' || isNaN(value) || !isFinite(value)) return ''
-    return value.toFixed(2)
+    const raw = amountTypedIn === 'planned_mo' ? plannedMoValue : plannedYrValue
+    const value = parseAmount(raw)
+    if (raw.trim() === '' || isNaN(value) || !isFinite(value)) return ''
+    return storedMonthly(amountTypedIn, value)
   }
 
   let anchorMonth = $derived(

@@ -133,6 +133,59 @@ describe('Enter in an amount field', () => {
   })
 })
 
+/**
+ * A year typed into a new entry used to be stored as the monthly box showed it,
+ * rounded to the rappen, so 12'550 a year came back as 12'549.96. Editing an
+ * existing entry already kept four places; creating one now does too.
+ */
+describe('a year typed into a new entry stays that year', () => {
+  function openNew() {
+    const vault = createEmptyVault()
+    engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+    const housing = engine.listCategories(vault)[0]
+
+    render(AddEntryModal, {
+      props: {
+        type: 'income' as const,
+        categories: [{ name: housing.name, id: housing.id }],
+        vault,
+        oncreated: vi.fn(),
+        onclose: vi.fn(),
+      },
+    })
+    return vault
+  }
+
+  async function add(vault: ReturnType<typeof openNew>, field: string, value: string) {
+    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Bonus' } })
+    await fireEvent.input(screen.getByLabelText(field), { target: { value } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    const bonus = vault.budget.entries.find(e => e.name === 'Bonus')!
+    return {
+      stored: vault.budget.plan.find(p => p.entryId === bonus.id)?.plannedAmount,
+      yearly: engine.getPlanSummary(vault).entries.find(e => e.entryId === bonus.id)?.yearlyAmount,
+    }
+  }
+
+  test('from the yearly box', async () => {
+    const vault = openNew()
+
+    const { stored, yearly } = await add(vault, 'Planned/yr', '12550')
+
+    expect(stored).toBe('1045.8333')
+    expect(yearly).toBe('12550.00')
+  })
+
+  test('from the monthly box, still to the rappen', async () => {
+    const vault = openNew()
+
+    const { stored, yearly } = await add(vault, 'Planned/mo', '1045.83')
+
+    expect(stored).toBe('1045.83')
+    expect(yearly).toBe('12549.96')
+  })
+})
+
 describe('a bill states the bill, not the monthly amount', () => {
   afterEach(cleanup)
 
