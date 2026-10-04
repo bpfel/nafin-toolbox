@@ -1,7 +1,8 @@
 # Gamification & Achievement System — Implementation Plan
 
-> **Superseded by `onboarding-and-progression-plan.md` (2026-08-16). Do not implement as
-> written.**
+> **Superseded 2026-08-16 by an onboarding-and-progression plan, itself dropped on
+> 2026-10-04: its first phase shipped as the Knowledge region and tour, the rest was not
+> pursued. Do not implement as written.**
 >
 > The architecture below does not work: it evaluates unlock conditions server-side, but user
 > data lives in an opaque encrypted vault the server cannot read. Only the five
@@ -11,7 +12,7 @@
 >
 > Kept for its **content**, which remains good and is not reproduced in the successor: the
 > chapter framing, the ~17 achievement definitions, and the Swiss-finance lesson text attached
-> to each. Mine this file for those; take the mechanism from the new plan.
+> to each. Mine this file for those; take the mechanism from the tour in `lib/tour/`.
 
 ## Context
 
