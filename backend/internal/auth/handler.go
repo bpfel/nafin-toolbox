@@ -23,24 +23,24 @@ import (
 
 // HandlerDeps holds shared dependencies for auth handlers.
 type HandlerDeps struct {
-	Store              *Store
-	LoginLimiter       *LoginRateLimiter
-	SetupLimiter       *LoginRateLimiter
-	VerifyEmailLimiter *LoginRateLimiter
-	Verify2FALimiter   *LoginRateLimiter
-	EmailSender        email.Sender
-	EncryptionKey      []byte // 32-byte AES key, nil if 2FA not available
-	AppURL             string
+	Store *Store
+	// Sign-in failures are counted twice: per client, against anyone guessing
+	// across many accounts, and per client and account together, which is the
+	// one that runs out first. The second is what keeps one person's typos
+	// from locking out everyone else at the same address — a household
+	// behind one router, the usual case for an app like this.
+	LoginLimiter        *LoginRateLimiter
+	LoginAccountLimiter *LoginRateLimiter
+	SetupLimiter        *LoginRateLimiter
+	VerifyEmailLimiter  *LoginRateLimiter
+	Verify2FALimiter    *LoginRateLimiter
+	EmailSender         email.Sender
+	EncryptionKey       []byte // 32-byte AES key, nil if 2FA not available
+	AppURL              string
 }
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.LoginLimiter.Check(r) {
-			w.Header().Set("Retry-After", "900")
-			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
-			return
-		}
-
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
@@ -52,18 +52,29 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
+		client := deps.LoginLimiter.ClientIP(r)
+		account := client + "|" + strings.ToLower(strings.TrimSpace(req.Email))
+		if !deps.LoginLimiter.CheckKey(client) || !deps.LoginAccountLimiter.CheckKey(account) {
+			w.Header().Set("Retry-After", "900")
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
+			return
+		}
+
 		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
-			deps.LoginLimiter.RecordFailure(r)
+			deps.LoginLimiter.RecordFailureKey(client)
+			deps.LoginAccountLimiter.RecordFailureKey(account)
 			uid := userIDPtr(user)
 			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
+
+		deps.LoginAccountLimiter.Forget(account)
 
 		// Reject unverified email users
 		if !user.EmailVerified {

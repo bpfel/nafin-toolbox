@@ -64,8 +64,13 @@ member holds the same key. The design is in `plans/shared-vault-plan.md`.
 
 - **CSRF:** the `Origin` header is checked on every state-changing request.
 - **Rate limits** per IP on sign-in, setup, email verification and two-factor.
-- **Trusted proxies:** only addresses in `TRUSTED_PROXIES` may set
-  `X-Forwarded-For` / `X-Real-IP`.
+  Sign-in allows five failures per account and twenty across all accounts, per
+  IP, in 15 minutes. So one person's typos don't lock out others behind the same
+  router, and the right password resets that account's count.
+- **Trusted proxies:** the client address is read from `X-Forwarded-For`,
+  right to left, skipping addresses in `TRUSTED_PROXIES`. The first address
+  outside them is the client. A client can't pick its own address by sending
+  the header. `X-Real-IP` is used only when there is no `X-Forwarded-For`.
 - **Headers:** `Content-Security-Policy` (nginx), and `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy` and `Permissions-Policy`
   from both nginx and the API.
