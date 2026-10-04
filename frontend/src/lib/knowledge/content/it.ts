@@ -48,6 +48,15 @@ export const it: PartialContent = {
       title: 'Assegnazioni',
       body: 'Qui colleghi ogni voce di budget alla provenienza e alla destinazione del suo denaro. Lo stipendio arriva sul conto principale; l’accantonamento per il computer portatile e la fattura Serafe vanno dove non verranno spesi. Ne risultano un saldo per ciascuno e una proiezione delle riserve necessarie.',
     },
+    install: {
+      title: 'Sulla schermata Home',
+      body: 'Installata, l’app si apre come le altre, a schermo intero e senza il browser attorno. Si fa dal menu del browser, in un minuto.',
+      note: 'Un altro browser? Cerca il suo nome con «installare web app».',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/it-ch/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=it' },
+      ],
+    },
     knowledge: {
       title: 'Puoi tornare qui',
       body: 'Il tour riparte da qui, accanto agli articoli su ogni vista e sul franco svizzero. Non devi ricordare nulla di ciò che hai appena visto.',

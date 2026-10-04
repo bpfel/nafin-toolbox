@@ -243,3 +243,25 @@ describe('translated articles keep the Swiss rules', () => {
     expect(article!.sources?.length ?? 0).toBe(english.length)
   })
 })
+
+/**
+ * A tour link leaves the app, in a new tab, from a card that is otherwise
+ * self-contained. Https only, and to the vendor whose browser it explains:
+ * a help page that moved is a dead link, but one that moved to somebody else
+ * is a link we sent a user to.
+ */
+describe('links in tour steps', () => {
+  const ALLOWED = ['support.apple.com', 'support.google.com']
+  const all = [['en', en] as [string, PartialContent], ...translations()]
+
+  test.each(all)('%s links only to the vendors’ own help', (_locale, content) => {
+    for (const [id, copy] of Object.entries(content.tour ?? {})) {
+      for (const link of copy?.links ?? []) {
+        const url = new URL(link.url)
+        expect(url.protocol, id).toBe('https:')
+        expect(ALLOWED, `${id}: ${link.url}`).toContain(url.hostname)
+        expect(link.label.trim(), id).toBeTruthy()
+      }
+    }
+  })
+})

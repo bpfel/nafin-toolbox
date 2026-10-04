@@ -3,6 +3,7 @@ import { getVaultState, markDirty, beginPreview, endPreview } from '../crypto/va
 import { recordCompleted, recordDismissed } from './tourState'
 import { resetBudget, seedDefaults, seedSharedDefaults } from '../budget/budgetEngine'
 import { getLocale } from '../i18n/index.svelte'
+import { isInstalled } from '../util/installHint'
 
 /**
  * Where the tour is, if it is running.
@@ -24,9 +25,20 @@ let running = $state(false)
  */
 let which = $state<TourId>('basics')
 
-/** The steps of the tour currently selected. */
+/**
+ * Whether the app was opened from the home screen. Read once at start: it
+ * cannot change while the page is open.
+ */
+let installed = false
+
+/**
+ * The steps of the tour currently selected, less any that do not apply here.
+ *
+ * Filtered rather than skipped at show time, so the counter and the Finish
+ * button agree with what will actually be shown.
+ */
 function steps(): TourStep[] {
-  return TOURS[which]
+  return TOURS[which].filter(s => !(s.browserOnly && installed))
 }
 
 /**
@@ -134,6 +146,7 @@ function prepare(step: TourStep): void {
  */
 export function startTour(tour: TourId): void {
   which = tour
+  installed = isInstalled()
   index = 0
   direction = 1
   running = true

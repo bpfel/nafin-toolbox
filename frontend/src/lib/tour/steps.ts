@@ -45,6 +45,7 @@ export type TourStepId =
   | 'typePurchase'
   | 'accounts'
   | 'allocations'
+  | 'install'
   | 'knowledge'
   // The shared-budgets walkthrough.
   | 'sharedWhat'
@@ -132,6 +133,15 @@ export interface TourStep {
    * be pointed at.
    */
   permeable?: true
+  /**
+   * Leave this step out when the app is already running installed.
+   *
+   * For the one step that explains how to put the app on a home screen: read
+   * inside the installed app it is advice about something already done. Left
+   * out rather than skipped, so the counter never promises a step it will not
+   * show. See `isInstalled`.
+   */
+  browserOnly?: true
 }
 
 export const TOUR_STEPS: TourStep[] = [
@@ -157,6 +167,10 @@ export const TOUR_STEPS: TourStep[] = [
   // so it shows it rather than pointing at the tab that would reach it. A
   // sub-tab is the one thing below a screen that is still a place.
   { id: 'allocations', path: '/accounts/allocations', anchor: 'accounts-tabs' },
+  // Nothing to ring: the control is the browser's menu, which the page cannot
+  // point at. On Profile because that is where the iPhone hint lives after
+  // the tour is over.
+  { id: 'install', path: '/profile', browserOnly: true },
   // Ends where it can be started again, which is the one thing a tour must not
   // leave the user unable to find.
   { id: 'knowledge', path: '/knowledge', anchor: 'nav-knowledge' },

@@ -48,6 +48,15 @@ export const de: PartialContent = {
       title: 'Zuordnungen',
       body: 'Hier verknüpfst du jeden Budgeteintrag damit, woher sein Geld kommt und wohin es geht. Dein Lohn landet auf dem Hauptkonto; der Laptop-Topf und die Serafe-Rechnung wandern dorthin, wo sie nicht ausgegeben werden. Daraus ergeben sich die Salden und eine Vorschau der nötigen Reserven.',
     },
+    install: {
+      title: 'Auf den Startbildschirm',
+      body: 'Installiert öffnet sich die App wie jede andere, im Vollbild und ohne Browser drumherum. Das geht über das Menü des Browsers und dauert eine Minute.',
+      note: 'Anderer Browser? Suche nach seinem Namen und «Web-App installieren».',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/de-ch/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=de' },
+      ],
+    },
     knowledge: {
       title: 'Du kannst zurückkommen',
       body: 'Von hier aus startet der Rundgang erneut, neben Texten zu jeder Ansicht und zu Schweizer Geldthemen. Nichts davon musst du dir jetzt merken.',
