@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t, tn } from '../../lib/i18n/index.svelte'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { closeOnBack } from '../../lib/nav/closeOnBack'
 
   interface Props {
     entryCount: number
@@ -28,7 +29,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('reset.title')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('reset.title')} use:focusTrap use:closeOnBack={onclose}>
     <h3>{t('reset.title')}</h3>
     <p>
       {tn('reset.explain', entryCount)}

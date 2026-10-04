@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
   import { focusTrap } from '../../../lib/util/focusTrap'
+  import { closeOnBack } from '../../../lib/nav/closeOnBack'
   import { monthLabel } from '../../../lib/util/months'
   import Money from '../../../lib/util/Money.svelte'
   import type { AllocationPart } from '../../../lib/accounts/accountMath'
@@ -45,7 +46,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('allocated.title', { account: accountName })} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('allocated.title', { account: accountName })} use:focusTrap use:closeOnBack={onclose}>
     <h3>{t('allocated.title', { account: accountName })}</h3>
 
     {#if parts.length === 0}

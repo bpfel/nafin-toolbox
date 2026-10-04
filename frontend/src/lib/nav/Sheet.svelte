@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { focusTrap } from '../util/focusTrap'
+  import { closeOnBack } from './closeOnBack'
   import { portal } from '../util/portal'
 
   /**
@@ -109,6 +110,7 @@
     aria-label={label}
     tabindex="-1"
     use:focusTrap
+    use:closeOnBack={onclose}
     onpointerdown={down}
     onpointermove={move}
     onpointerup={up}

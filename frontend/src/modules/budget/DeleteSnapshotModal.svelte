@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t, tAround } from '../../lib/i18n/index.svelte'
   import { focusTrap } from '../../lib/util/focusTrap'
+  import { closeOnBack } from '../../lib/nav/closeOnBack'
 
   interface Props {
     snapshotName: string
@@ -36,7 +37,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('snapshot.deleteTitle')} use:focusTrap>
+  <div class="modal" role="dialog" aria-label={t('snapshot.deleteTitle')} use:focusTrap use:closeOnBack={onclose}>
     <h3>{t('snapshot.deleteTitle')}</h3>
     <p>
       {explain[0]}<strong>{snapshotName}</strong>{explain[1]}

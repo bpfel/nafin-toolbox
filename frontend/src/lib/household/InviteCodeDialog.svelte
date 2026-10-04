@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
   import { focusTrap } from '../util/focusTrap'
+  import { closeOnBack } from '../nav/closeOnBack'
   import InviteQR from './InviteQR.svelte'
 
   /**
@@ -41,7 +42,7 @@
 
 <div class="backdrop" role="presentation" onclick={onclose}></div>
 
-<div class="modal" role="dialog" aria-label={t('invite.codeFor').replace('{name}', email)} use:focusTrap>
+<div class="modal" role="dialog" aria-label={t('invite.codeFor').replace('{name}', email)} use:focusTrap use:closeOnBack={onclose}>
   <h3>{t('invite.codeFor').replace('{name}', email)}</h3>
   <p class="why">{t('invite.linkWhy')}</p>
 
