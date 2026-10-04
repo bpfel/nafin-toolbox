@@ -224,6 +224,20 @@ func TestHandleInvite_FallbackShortPassword(t *testing.T) {
 	}
 }
 
+func TestEmailEnabled(t *testing.T) {
+	// The settings endpoint reports this to the invite form, and HandleInvite
+	// branches on it: both have to agree on what "no SMTP" looks like.
+	deps := testDeps()
+	if emailEnabled(deps) {
+		t.Error("emailEnabled with a LogSender = true, want false")
+	}
+
+	deps.EmailSender = &email.SMTPSender{}
+	if !emailEnabled(deps) {
+		t.Error("emailEnabled with an SMTPSender = false, want true")
+	}
+}
+
 // --- ListUsers handler tests ---
 
 func TestHandleListUsers_RequiresAdmin(t *testing.T) {

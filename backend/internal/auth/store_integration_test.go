@@ -5,11 +5,15 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
 	"github.com/bpfel/nafin-toolbox/internal/database"
+	"github.com/bpfel/nafin-toolbox/internal/email"
 )
 
 var testDB *sql.DB
@@ -1021,5 +1025,44 @@ func TestCreateFirstUser(t *testing.T) {
 	_, err = store.CreateFirstUser(ctx, "second@test.com", hash)
 	if err != ErrSetupAlreadyDone {
 		t.Errorf("expected ErrSetupAlreadyDone, got %v", err)
+	}
+}
+
+// --- Settings handler ---
+
+func TestHandleGetSettings_ReportsEmail(t *testing.T) {
+	truncateTables(t)
+
+	for _, tc := range []struct {
+		name   string
+		sender email.Sender
+		want   bool
+	}{
+		{"without SMTP", &email.LogSender{}, false},
+		{"with SMTP", &email.SMTPSender{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			deps := testDeps()
+			deps.Store = &Store{db: testDB}
+			deps.EmailSender = tc.sender
+
+			req := httptest.NewRequest(http.MethodGet, "/api/auth/settings", nil)
+			req = req.WithContext(adminCtx())
+			w := httptest.NewRecorder()
+			HandleGetSettings(deps).ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+			}
+			var body struct {
+				EmailEnabled *bool `json:"email_enabled"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decoding %q: %v", w.Body.String(), err)
+			}
+			if body.EmailEnabled == nil || *body.EmailEnabled != tc.want {
+				t.Errorf("email_enabled = %v, want %v (body: %s)", body.EmailEnabled, tc.want, w.Body.String())
+			}
+		})
 	}
 }
