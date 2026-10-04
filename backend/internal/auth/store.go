@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 )
 
@@ -18,10 +19,18 @@ const verificationTokenDuration = 48 * time.Hour
 
 type Store struct {
 	db *sql.DB
+	// For the audit log's IP column, read the way the rate limiters read it.
+	trustedProxies []*net.IPNet
 }
 
 func NewStore(db *sql.DB) *Store {
 	return &Store{db: db}
+}
+
+// SetTrustedProxies configures the proxies whose forwarding headers the audit
+// log believes. See clientIP.
+func (s *Store) SetTrustedProxies(cidrs []string) {
+	s.trustedProxies = parseCIDRs(cidrs)
 }
 
 // ---- User CRUD ----

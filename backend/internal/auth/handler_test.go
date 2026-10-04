@@ -16,13 +16,14 @@ import (
 func testDeps() *HandlerDeps {
 	limiter := NewLoginRateLimiter(100, time.Minute)
 	return &HandlerDeps{
-		Store:              &Store{db: nil},
-		LoginLimiter:       limiter,
-		SetupLimiter:       limiter,
-		VerifyEmailLimiter: limiter,
-		Verify2FALimiter:   limiter,
-		EmailSender:        &email.LogSender{},
-		AppURL:             "http://localhost:3000",
+		Store:               &Store{db: nil},
+		LoginLimiter:        limiter,
+		LoginAccountLimiter: limiter,
+		SetupLimiter:        limiter,
+		VerifyEmailLimiter:  limiter,
+		Verify2FALimiter:    limiter,
+		EmailSender:         &email.LogSender{},
+		AppURL:              "http://localhost:3000",
 	}
 }
 

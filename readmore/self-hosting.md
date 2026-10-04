@@ -59,9 +59,12 @@ With nginx, Caddy, Traefik or similar in front:
 
 1. **Terminate TLS** at the proxy.
 2. **Add HSTS:** `Strict-Transport-Security: max-age=63072000; includeSubDomains`.
-3. **Forward the client address** in `X-Real-IP` and `X-Forwarded-For`, and make
-   sure the proxy's address falls within `TRUSTED_PROXIES`. Rate limits and the
-   audit log depend on it.
+3. **Forward the client address** in `X-Forwarded-For`, appending to it rather
+   than replacing it (nginx: `$proxy_add_x_forwarded_for`; Caddy and Traefik do
+   this by default). Make sure the proxy's address falls within `TRUSTED_PROXIES`.
+   Rate limits and the audit log depend on it. If the proxy isn't trusted, every
+   visitor looks like the proxy, and one person's failed sign-ins count against
+   all of them.
 4. **Set `APP_URL` and `CORS_ORIGINS`** to the public HTTPS address.
 
 ## First sign-in

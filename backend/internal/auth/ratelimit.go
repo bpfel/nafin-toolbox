@@ -28,15 +28,7 @@ func NewLoginRateLimiter(max int, window time.Duration) *LoginRateLimiter {
 // SetTrustedProxies configures CIDR ranges whose X-Forwarded-For / X-Real-IP
 // headers will be trusted. If empty, only RemoteAddr is used.
 func (rl *LoginRateLimiter) SetTrustedProxies(cidrs []string) {
-	var nets []*net.IPNet
-	for _, cidr := range cidrs {
-		_, n, err := net.ParseCIDR(cidr)
-		if err != nil {
-			continue
-		}
-		nets = append(nets, n)
-	}
-	rl.trustedProxies = nets
+	rl.trustedProxies = parseCIDRs(cidrs)
 }
 
 // Allow records an attempt for the request's client IP and returns true if under the limit.
@@ -46,54 +38,56 @@ func (rl *LoginRateLimiter) Allow(r *http.Request) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	now := time.Now()
-	cutoff := now.Add(-rl.window)
-
-	// Prune expired entries
-	existing := rl.attempts[key]
-	pruned := existing[:0]
-	for _, t := range existing {
-		if t.After(cutoff) {
-			pruned = append(pruned, t)
-		}
-	}
-
+	pruned := rl.recent(key, time.Now())
 	if len(pruned) >= rl.max {
 		rl.attempts[key] = pruned
 		return false
 	}
 
-	rl.attempts[key] = append(pruned, now)
+	rl.attempts[key] = append(pruned, time.Now())
 	return true
 }
 
 // Check returns true if under the limit without recording an attempt.
 func (rl *LoginRateLimiter) Check(r *http.Request) bool {
-	key := rl.ClientIP(r)
-
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	cutoff := time.Now().Add(-rl.window)
-	count := 0
-	for _, t := range rl.attempts[key] {
-		if t.After(cutoff) {
-			count++
-		}
-	}
-	return count < rl.max
+	return rl.CheckKey(rl.ClientIP(r))
 }
 
 // RecordFailure records a failed attempt for the request's client IP.
 func (rl *LoginRateLimiter) RecordFailure(r *http.Request) {
-	key := rl.ClientIP(r)
+	rl.RecordFailureKey(rl.ClientIP(r))
+}
 
+// CheckKey is Check for a key the caller builds — a client and an account
+// together, for one.
+func (rl *LoginRateLimiter) CheckKey(key string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	return len(rl.recent(key, time.Now())) < rl.max
+}
+
+// RecordFailureKey is RecordFailure for a key the caller builds.
+func (rl *LoginRateLimiter) RecordFailureKey(key string) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	now := time.Now()
-	cutoff := now.Add(-rl.window)
+	rl.attempts[key] = append(rl.recent(key, now), now)
+}
 
+// Forget clears a key's attempts: the right password ends the run of wrong
+// ones before it, rather than leaving them to count against the next typo.
+func (rl *LoginRateLimiter) Forget(key string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	delete(rl.attempts, key)
+}
+
+// recent prunes a key's attempts to those inside the window. Callers hold mu.
+func (rl *LoginRateLimiter) recent(key string, now time.Time) []time.Time {
+	cutoff := now.Add(-rl.window)
 	existing := rl.attempts[key]
 	pruned := existing[:0]
 	for _, t := range existing {
@@ -101,40 +95,84 @@ func (rl *LoginRateLimiter) RecordFailure(r *http.Request) {
 			pruned = append(pruned, t)
 		}
 	}
-	rl.attempts[key] = append(pruned, now)
+	return pruned
 }
 
-// ClientIP extracts the client IP from the request.
-// Proxy headers (X-Real-IP, X-Forwarded-For) are only trusted when
-// RemoteAddr is in the configured trusted proxy CIDR ranges.
+// ClientIP is the address of whoever sent the request, as far as the
+// trusted proxies in front of the API can vouch for it.
 func (rl *LoginRateLimiter) ClientIP(r *http.Request) string {
-	remoteIP := remoteAddrIP(r.RemoteAddr)
+	return clientIP(r, rl.trustedProxies)
+}
 
-	if rl.isTrustedProxy(remoteIP) {
-		if ip := r.Header.Get("X-Real-IP"); ip != "" {
+// clientIP walks the forwarding chain from the API outwards and stops at the
+// first address no trusted proxy stands for.
+//
+// A request reaches the API through at least the frontend's nginx, and in
+// production through another proxy in front of that. Each appends the address
+// it was talked to by to X-Forwarded-For, so the chain reads, left to right:
+// client, outer proxy, nginx — and RemoteAddr is nginx itself. Walking from
+// the right and skipping every trusted hop lands on the client.
+//
+// It used to prefer X-Real-IP, which nginx sets to its own $remote_addr: the
+// outer proxy's address, the same for every visitor. Every failed sign-in on
+// an instance counted against one bucket, so five wrong passwords on one
+// account locked every account out, from every device.
+//
+// Nor is the leftmost entry the answer, although it usually holds the client:
+// it is whatever the client sent, and a client that sends a fresh one with
+// every attempt is never limited at all.
+//
+// X-Real-IP is still read when there is no X-Forwarded-For, from a proxy that
+// sets only that.
+func clientIP(r *http.Request, trusted []*net.IPNet) string {
+	addr := remoteAddrIP(r.RemoteAddr)
+	if !isTrusted(addr, trusted) {
+		return addr
+	}
+
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded == "" {
+		if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
 			return ip
 		}
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			// Take the first IP (original client)
-			if i := strings.IndexByte(forwarded, ','); i > 0 {
-				return strings.TrimSpace(forwarded[:i])
-			}
-			return strings.TrimSpace(forwarded)
+		return addr
+	}
+
+	hops := strings.Split(forwarded, ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(hops[i])
+		if hop == "" {
+			continue
+		}
+		addr = hop
+		if !isTrusted(hop, trusted) {
+			return hop
 		}
 	}
-
-	return remoteIP
+	// Trusted all the way: the leftmost is as far out as anyone can see.
+	return addr
 }
 
-func (rl *LoginRateLimiter) isTrustedProxy(ip string) bool {
-	if len(rl.trustedProxies) == 0 {
-		return false
+// parseCIDRs turns TRUSTED_PROXIES entries into networks, skipping any that
+// do not parse.
+func parseCIDRs(cidrs []string) []*net.IPNet {
+	var nets []*net.IPNet
+	for _, cidr := range cidrs {
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		nets = append(nets, n)
 	}
+	return nets
+}
+
+func isTrusted(ip string, trusted []*net.IPNet) bool {
 	parsed := net.ParseIP(ip)
 	if parsed == nil {
 		return false
 	}
-	for _, n := range rl.trustedProxies {
+	for _, n := range trusted {
 		if n.Contains(parsed) {
 			return true
 		}

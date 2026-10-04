@@ -49,7 +49,10 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	s.router.Use(originCheck(allowedOrigins))
 
 	authStore := auth.NewStore(s.db)
-	loginLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	// Five tries at one account, twenty across all of them, per client per
+	// quarter hour. See HandlerDeps.
+	loginLimiter := auth.NewLoginRateLimiter(20, 15*time.Minute)
+	loginAccountLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	setupLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verifyEmailLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verify2FALimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
@@ -64,6 +67,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 				cidrs = append(cidrs, c)
 			}
 		}
+		authStore.SetTrustedProxies(cidrs)
 		loginLimiter.SetTrustedProxies(cidrs)
 		setupLimiter.SetTrustedProxies(cidrs)
 		verifyEmailLimiter.SetTrustedProxies(cidrs)
@@ -72,14 +76,15 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	}
 
 	deps := &auth.HandlerDeps{
-		Store:              authStore,
-		LoginLimiter:       loginLimiter,
-		SetupLimiter:       setupLimiter,
-		VerifyEmailLimiter: verifyEmailLimiter,
-		Verify2FALimiter:   verify2FALimiter,
-		EmailSender:        emailSender,
-		EncryptionKey:      encryptionKey,
-		AppURL:             appURL,
+		Store:               authStore,
+		LoginLimiter:        loginLimiter,
+		LoginAccountLimiter: loginAccountLimiter,
+		SetupLimiter:        setupLimiter,
+		VerifyEmailLimiter:  verifyEmailLimiter,
+		Verify2FALimiter:    verify2FALimiter,
+		EmailSender:         emailSender,
+		EncryptionKey:       encryptionKey,
+		AppURL:              appURL,
 	}
 
 	s.router.Route("/api", func(r chi.Router) {
