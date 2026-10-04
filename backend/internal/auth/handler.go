@@ -173,9 +173,7 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 			role = RoleAdmin
 		}
 
-		// Check if email sending is available
-		_, isLogSender := deps.EmailSender.(*email.LogSender)
-		smtpAvailable := !isLogSender
+		smtpAvailable := emailEnabled(deps)
 
 		// Validate password early in fallback mode (before DB lookup)
 		if !smtpAvailable {
@@ -262,6 +260,14 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 			json.NewEncoder(w).Encode(user)
 		}
 	}
+}
+
+// emailEnabled reports whether invitations go out by email. Without SMTP
+// configured the sender is a LogSender, and an invitation carries a first
+// password the admin passes on instead of a verification link.
+func emailEnabled(deps *HandlerDeps) bool {
+	_, isLogSender := deps.EmailSender.(*email.LogSender)
+	return !isLogSender
 }
 
 // HandleListUsers returns all users. Requires admin role.
@@ -1019,6 +1025,10 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"require_2fa": require2fa == "true",
+			// The invite form asks for a first password when this is false,
+			// because HandleInvite then requires one. Until it said so, the
+			// form could not invite anybody on an instance without SMTP.
+			"email_enabled": emailEnabled(deps),
 		})
 	}
 }

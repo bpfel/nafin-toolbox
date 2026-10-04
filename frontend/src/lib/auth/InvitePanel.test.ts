@@ -21,9 +21,14 @@ function member(id: number, role: User['role']): User {
 let roster: User[] = [target]
 
 const deleteUser = vi.fn().mockResolvedValue(null)
+const inviteUser = vi.fn()
+
+// Read at call time, so a test can stand for an instance with or without SMTP.
+let settings: { require_2fa: boolean; email_enabled?: boolean } = { require_2fa: false, email_enabled: true }
 
 vi.mock('./authStore.svelte', () => ({
-  inviteUser: vi.fn(),
+  inviteUser: (...args: unknown[]) => inviteUser(...args),
+  getSettings: vi.fn(async () => settings),
   listUsers: vi.fn(async () => roster),
   deleteUser: (id: number) => deleteUser(id),
   resendVerification: vi.fn(),
@@ -94,5 +99,52 @@ describe('InvitePanel will not offer to delete the last admin', () => {
 
     const buttons = await screen.findAllByRole('button', { name: 'Delete' })
     expect(buttons.map(b => (b as HTMLButtonElement).disabled)).toEqual([false, false])
+  })
+})
+
+describe('InvitePanel inviting', () => {
+  afterEach(cleanup)
+
+  beforeEach(() => {
+    roster = [target]
+    inviteUser.mockReset()
+    inviteUser.mockResolvedValue({ user: { ...target, id: 9, email: 'new@example.ch' } })
+  })
+
+  test('with email, it sends an invitation and asks for no password', async () => {
+    settings = { require_2fa: false, email_enabled: true }
+    render(InvitePanel, { props: {} })
+
+    await fireEvent.input(await screen.findByLabelText('Email'), { target: { value: 'new@example.ch' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Invite User' }))
+
+    expect(screen.queryByLabelText('First password')).toBeNull()
+    await waitFor(() => expect(inviteUser).toHaveBeenCalledWith('new@example.ch', 'user', undefined))
+    expect(await screen.findByText('Invitation sent to new@example.ch')).toBeTruthy()
+  })
+
+  test('without email, it asks for a first password and sends it', async () => {
+    // The server refuses an invitation without one when no SMTP is set up.
+    // This form had no such field, so nobody could be invited at all.
+    settings = { require_2fa: false, email_enabled: false }
+    render(InvitePanel, { props: {} })
+
+    const password = await screen.findByLabelText('First password')
+    await fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'new@example.ch' } })
+    await fireEvent.input(password, { target: { value: 'first-pass-1' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Create User' }))
+
+    await waitFor(() => expect(inviteUser).toHaveBeenCalledWith('new@example.ch', 'user', 'first-pass-1'))
+    expect(await screen.findByText(/Account created for new@example.ch/)).toBeTruthy()
+    // Cleared, so the next account does not silently get the same password.
+    expect((password as HTMLInputElement).value).toBe('')
+  })
+
+  test('a server that does not report email keeps the form it always had', async () => {
+    settings = { require_2fa: false }
+    render(InvitePanel, { props: {} })
+
+    await screen.findByRole('button', { name: 'Invite User' })
+    expect(screen.queryByLabelText('First password')).toBeNull()
   })
 })

@@ -13,6 +13,12 @@ export interface User {
 
 export interface AppSettings {
   require_2fa: boolean
+  /**
+   * Whether invitations go out by email. False on an instance without SMTP,
+   * where an invitation needs a first password instead. Optional because a
+   * server from before it was reported does not send it.
+   */
+  email_enabled?: boolean
 }
 
 const API_BASE = '/api'
