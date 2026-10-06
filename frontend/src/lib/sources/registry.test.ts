@@ -28,10 +28,6 @@ const NOT_SOURCES: { prefix: string; why: string }[] = [
     prefix: 'https://example.invalid/',
     why: 'The pretend invitation link in the tour’s example household. `.invalid` can never resolve.',
   },
-  {
-    prefix: 'https://api.qrserver.com/',
-    why: 'Renders the two-factor QR code. Not a page a reader is sent to — and a third party seeing the TOTP secret, which wants replacing with a local renderer.',
-  },
 ]
 
 const URL_PATTERN = /https:\/\/[^\s'"`<>)\]{}]+/g
