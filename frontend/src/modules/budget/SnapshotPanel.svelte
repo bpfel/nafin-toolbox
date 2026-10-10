@@ -2,7 +2,7 @@
   import { t, tn } from '../../lib/i18n/index.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import type { VaultData } from '../../lib/crypto/vault'
-  import { markDirty } from '../../lib/crypto/vaultStore.svelte'
+  import { commit } from '../../lib/crypto/vaultStore.svelte'
   import SnapshotEditor from './SnapshotEditor.svelte'
   import DeleteSnapshotModal from './DeleteSnapshotModal.svelte'
 
@@ -25,11 +25,13 @@
 
   function takeSnapshotOfPlan() {
     try {
-      const created = engine.takeSnapshot(vault, newName)
+      // Built here and carried whole, so a replay stores the plan as it was
+      // on screen when the button was pressed. See `buildSnapshot`.
+      const created = engine.buildSnapshot(vault, newName)
+      commit('takeSnapshot', created)
       newName = ''
       snapshotError = null
       expandedId = created.id
-      markDirty()
       version++
     } catch (e) {
       // The engine refuses an unnamed snapshot. Say so where the name was typed
@@ -51,16 +53,14 @@
 
   function renameSnapshot(id: string, name: string) {
     // Deliberately not caught: SnapshotEditor shows the message next to its field.
-    engine.renameSnapshot(vault, id, name)
-    markDirty()
+    commit('renameSnapshot', id, name)
     version++
   }
 
   function confirmDelete() {
     if (!deleteTarget) return
-    engine.deleteSnapshot(vault, deleteTarget.id)
+    commit('deleteSnapshot', deleteTarget.id)
     if (expandedId === deleteTarget.id) expandedId = null
-    markDirty()
     version++
   }
 

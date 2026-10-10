@@ -1,11 +1,10 @@
 import { cleanup, render, screen, fireEvent } from '@testing-library/svelte'
+import { committingTo } from '../../lib/sync/testing'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import { createEmptyVault } from '../../lib/crypto/vault'
 import * as engine from '../../lib/budget/budgetEngine'
 
-vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
-  markDirty: vi.fn(),
-}))
+vi.mock('../../lib/crypto/vaultStore.svelte', async () => (await import('../../lib/sync/testing')).storeMock())
 
 import AddEntryModal from './AddEntryModal.svelte'
 
@@ -20,7 +19,7 @@ const chf = (n: number) =>
 // A real vault, because Enter runs the whole save path — which writes the name
 // and category through the engine, not just the amount.
 function openOn(plannedAmount: string, onsave = vi.fn(), onclose = vi.fn()) {
-  const vault = createEmptyVault()
+  const vault = committingTo(createEmptyVault())
   const rent = engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
   const housing = engine.listCategories(vault)[0]
 
@@ -187,7 +186,7 @@ describe('Enter in an amount field', () => {
  */
 describe('a year typed into a new entry stays that year', () => {
   function openNew() {
-    const vault = createEmptyVault()
+    const vault = committingTo(createEmptyVault())
     engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
     const housing = engine.listCategories(vault)[0]
 
@@ -237,7 +236,7 @@ describe('a bill states the bill, not the monthly amount', () => {
   afterEach(cleanup)
 
   function openBill() {
-    const vault = createEmptyVault()
+    const vault = committingTo(createEmptyVault())
     engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
     const housing = engine.listCategories(vault)[0]
     const oncreated = vi.fn()
@@ -299,7 +298,7 @@ describe('a purchase can be described from either end', () => {
   afterEach(cleanup)
 
   function openPurchase() {
-    const vault = createEmptyVault()
+    const vault = committingTo(createEmptyVault())
     engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
     const housing = engine.listCategories(vault)[0]
 

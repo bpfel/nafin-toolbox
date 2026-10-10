@@ -1,13 +1,12 @@
 import { cleanup, render, screen, fireEvent, within } from '@testing-library/svelte'
+import { committingTo } from '../../lib/sync/testing'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { VaultData } from '../../lib/crypto/vault'
 import { createEmptyVault } from '../../lib/crypto/vault'
 import * as engine from '../../lib/budget/budgetEngine'
 import { toggleEditing, clearEditing } from '../../lib/util/editMode.svelte'
 
-vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
-  markDirty: vi.fn(),
-}))
+vi.mock('../../lib/crypto/vaultStore.svelte', async () => (await import('../../lib/sync/testing')).storeMock())
 
 import BudgetTable from './BudgetTable.svelte'
 
@@ -18,7 +17,7 @@ afterEach(() => {
 })
 
 function makeVault(): VaultData {
-  const vault = createEmptyVault()
+  const vault = committingTo(createEmptyVault())
   engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
   engine.createEntry(vault, { name: 'Food', type: 'expense', categoryName: 'Housing' })
   return vault

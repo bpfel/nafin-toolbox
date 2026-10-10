@@ -8,13 +8,13 @@ import type { VaultAccount, VaultEntry, VaultData } from '../../../lib/crypto/va
 // stubbed with a live getter rather than a snapshot.
 const store = vi.hoisted(() => ({ vault: null as VaultData | null }))
 
-vi.mock('../../../lib/crypto/vaultStore.svelte', () => ({
+vi.mock('../../../lib/crypto/vaultStore.svelte', async () => ({
   getVaultState: () => ({
     get vault() {
       return store.vault
     },
   }),
-  markDirty: vi.fn(),
+  commit: (await import('../../../lib/sync/testing')).committerFor(() => store.vault),
 }))
 
 import { clearEditing, toggleEditing } from '../../../lib/util/editMode.svelte'

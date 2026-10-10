@@ -3,15 +3,22 @@ import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { VaultData } from '../../lib/crypto/vault'
 import { toggleEditing, clearEditing } from '../../lib/util/editMode.svelte'
 
-const markDirty = vi.fn()
+const committed = vi.fn()
 
-// The real store, with only the save stubbed out. A hand-rolled fake would be a
+// The real store, with the change spied on. A hand-rolled fake would be a
 // plain object, and the module leans on `$state` deep-proxying the vault so an
 // emptied entry list re-renders — reactivity a fake cannot model.
-vi.mock('../../lib/crypto/vaultStore.svelte', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../lib/crypto/vaultStore.svelte')>()),
-  markDirty: () => markDirty(),
-}))
+vi.mock('../../lib/crypto/vaultStore.svelte', async importOriginal => {
+  const real = await importOriginal<typeof import('../../lib/crypto/vaultStore.svelte')>()
+  // Spied on, and passed through: the change must still happen for the
+  // screen to show it.
+  const passOn = real.commit as (...args: unknown[]) => unknown
+  const commit = ((...args: unknown[]) => {
+    committed(...args)
+    return passOn(...args)
+  }) as typeof real.commit
+  return { ...real, commit }
+})
 
 import { getVaultState } from '../../lib/crypto/vaultStore.svelte'
 import BudgetModule from './BudgetModule.svelte'
@@ -27,7 +34,7 @@ function current(): VaultData {
 afterEach(() => {
   cleanup()
   clearEditing()
-  markDirty.mockClear()
+  committed.mockClear()
 })
 
 function load(snapshots: VaultData['budget']['snapshots'] = []) {
@@ -80,7 +87,7 @@ describe('resetting the budget', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Reset budget' })).toBeTruthy()
     expect(current().budget.entries).toHaveLength(2)
-    expect(markDirty).not.toHaveBeenCalled()
+    expect(committed).not.toHaveBeenCalled()
   })
 
   test('cancelling leaves the budget alone', async () => {
@@ -93,7 +100,7 @@ describe('resetting the budget', () => {
 
     expect(current().budget.entries).toHaveLength(2)
     expect(current().budget.plan).toHaveLength(2)
-    expect(markDirty).not.toHaveBeenCalled()
+    expect(committed).not.toHaveBeenCalled()
   })
 
   test('confirming empties the budget', async () => {
@@ -109,7 +116,7 @@ describe('resetting the budget', () => {
     expect(current().budget.entries).toEqual([])
     expect(current().budget.categories).toEqual([])
     expect(current().budget.plan).toEqual([])
-    expect(markDirty).toHaveBeenCalled()
+    expect(committed).toHaveBeenCalled()
   })
 
   test('the setup screen comes back after a reset', async () => {

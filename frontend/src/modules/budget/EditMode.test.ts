@@ -1,12 +1,11 @@
 import { cleanup, render, screen, fireEvent } from '@testing-library/svelte'
+import { committingTo } from '../../lib/sync/testing'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { PlanEntryView } from '../../lib/budget/budgetEngine'
 import type { VaultData } from '../../lib/crypto/vault'
 import { isEditing, toggleEditing, clearEditing } from '../../lib/util/editMode.svelte'
 
-vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
-  markDirty: vi.fn(),
-}))
+vi.mock('../../lib/crypto/vaultStore.svelte', async () => (await import('../../lib/sync/testing')).storeMock())
 
 import BudgetEntryRow from './BudgetEntryRow.svelte'
 import BudgetTable from './BudgetTable.svelte'
@@ -134,6 +133,10 @@ describe('single-category budgets hide the category name', () => {
   // Rendered for real: the rule lives in the table's markup, so asserting it
   // anywhere else would only be restating the implementation.
   function vaultWith(categories: { id: string; name: string; side: 'income' | 'expense' }[]): VaultData {
+    return committingTo(buildVaultWith(categories))
+  }
+
+  function buildVaultWith(categories: { id: string; name: string; side: 'income' | 'expense' }[]): VaultData {
     return {
       version: 9,
       tour: { completedAt: null, dismissedAt: null },

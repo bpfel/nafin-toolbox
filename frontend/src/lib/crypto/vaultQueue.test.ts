@@ -23,7 +23,7 @@ import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 import {
-  getVaultState, tryRestoreVault, clearVault, commit, markDirty, saveVault, beginPreview, endPreview,
+  getVaultState, tryRestoreVault, clearVault, commit, saveVault, beginPreview, endPreview,
 } from './vaultStore.svelte'
 
 const state = getVaultState()
@@ -115,15 +115,5 @@ describe('commit', () => {
     expect(state.dirty).toBe(false)
     endPreview()
     expect(state.vault!.accounts.map(a => a.name)).not.toContain('Example')
-  })
-})
-
-describe('markDirty, until every call site commits', () => {
-  test('is still saved, and settled by the save', async () => {
-    state.vault!.accounts[0].name = 'Edited directly'
-    markDirty()
-    expect(state.dirty).toBe(true)
-    await saveVault()
-    expect(state.dirty).toBe(false)
   })
 })

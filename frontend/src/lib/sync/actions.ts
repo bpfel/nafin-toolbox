@@ -181,6 +181,11 @@ export const ACTIONS = {
     },
     subject: accountName,
   }),
+  setAccountDetails: def({
+    apply: accounts.setAccountDetails,
+    check: (v, [id]) => (account(v, id) ? 'go' : 'accountGone'),
+    subject: accountName,
+  }),
   reorderAccounts: def({ apply: accounts.reorderAccounts }),
   correctBalance: def({
     apply: accounts.correctBalance,

@@ -67,7 +67,6 @@ vi.mock('./lib/crypto/vaultStore.svelte', () => ({
     currentVaultId: 'personal',
     currentHousehold: null,
   }),
-  markDirty: vi.fn(),
   switchTo: vi.fn(),
   createHousehold: vi.fn(),
   renameHousehold: vi.fn(),

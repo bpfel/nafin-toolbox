@@ -8,13 +8,13 @@ import type { VaultEntry, VaultData } from '../../../lib/crypto/vault'
 // crypto, network, or a login.
 let testVault: VaultData | null = null
 
-vi.mock('../../../lib/crypto/vaultStore.svelte', () => ({
+vi.mock('../../../lib/crypto/vaultStore.svelte', async () => ({
   getVaultState: () => ({
     get vault() {
       return testVault
     },
   }),
-  markDirty: vi.fn(),
+  commit: (await import('../../../lib/sync/testing')).committerFor(() => testVault),
 }))
 
 import { clearEditing, toggleEditing } from '../../../lib/util/editMode.svelte'

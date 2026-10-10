@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t, getLocale } from '../../lib/i18n/index.svelte'
-  import { getVaultState, markDirty } from '../../lib/crypto/vaultStore.svelte'
+  import { getVaultState, commit } from '../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
@@ -31,13 +31,12 @@
 
   function handleSave(entryId: string, amount: string) {
     if (!vaultState.vault) return
-    engine.setPlanned(vaultState.vault, entryId, amount)
-    markDirty()
+    commit('setPlanned', entryId, amount)
     version++
   }
 
+  // The change itself was committed where it was made; this only redraws.
   function handleEntryChange() {
-    markDirty()
     version++
   }
 
@@ -50,9 +49,7 @@
 
   function handleSeeded() {
     if (!vaultState.vault) return
-    const seed = household ? engine.seedSharedDefaults : engine.seedDefaults
-    seed(vaultState.vault, getLocale())
-    markDirty()
+    commit(household ? 'seedSharedDefaults' : 'seedDefaults', getLocale())
     version++
   }
 
@@ -84,11 +81,10 @@
 
   function handleReset() {
     if (!vaultState.vault) return
-    engine.resetBudget(vaultState.vault)
+    commit('resetBudget')
     // An empty budget is exactly the state the setup screen exists for, so the
     // offer of the defaults comes back rather than leaving a blank table.
     dismissedSetup = false
-    markDirty()
     version++
   }
 </script>
