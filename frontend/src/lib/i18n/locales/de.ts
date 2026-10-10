@@ -511,6 +511,7 @@ export const de: Messages = {
   'state.waitingBusy': 'Andere speichern gerade – neuer Versuch folgt.',
   'sync.merged': 'Mit Änderungen von anderswo aktualisiert.',
   'sync.overwritten': '{subject} wurde eben anderswo auf {theirs} geändert. Dein Wert, {mine}, ist gespeichert.',
+  'sync.goneElsewhere': 'Das wurde anderswo gelöscht, während du es bearbeitet hast.',
   'sync.undo': 'Rückgängig',
   'sync.dismiss': 'Schliessen',
   'sync.dropped.title': 'Nicht gespeichert:',

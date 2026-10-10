@@ -39,7 +39,7 @@ import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 const { VaultConflictError, VaultReadOnlyError, VaultGoneError } = client
 
-import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo } from './vaultStore.svelte'
+import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview } from './vaultStore.svelte'
 import { getNotices, type Notice } from '../sync/notices.svelte'
 import { undoOverwrite } from './vaultStore.svelte'
 
@@ -376,6 +376,45 @@ describe('lost answers and lifecycles', () => {
     expect(state.waiting).toBe('busy')
     expect(state.dirty).toBe(true)
     expect(entryNamed(state.vault!, 'Dentist')).toBeTruthy()
+  })
+})
+
+// --- coming back to the tab ------------------------------------------------
+
+describe('coming back to the tab', () => {
+  test('shows what was saved elsewhere meanwhile, and says so', async () => {
+    await elsewhere(v => budget.createEntry(v, { name: 'Gym', type: 'expense', categoryName: 'Health' }))
+
+    await refreshIfQuiet()
+
+    expect(entryNamed(state.vault!, 'Gym')).toBeTruthy()
+    expect(kinds()).toEqual(['merged'])
+  })
+
+  test('says nothing when nothing changed', async () => {
+    await refreshIfQuiet()
+    expect(kinds()).toEqual([])
+  })
+
+  test('leaves it to the save when there are changes of its own waiting', async () => {
+    commit('createEntry', { name: 'Dentist', type: 'expense', categoryName: 'Health' })
+    await elsewhere(v => budget.createEntry(v, { name: 'Gym', type: 'expense', categoryName: 'Health' }))
+
+    await refreshIfQuiet()
+
+    expect(entryNamed(state.vault!, 'Gym')).toBeUndefined()
+    expect(entryNamed(state.vault!, 'Dentist')).toBeTruthy()
+  })
+
+  test('35. a preview stays put; the real vault behind it is brought up to date', async () => {
+    beginPreview(copy => budget.resetBudget(copy))
+    await elsewhere(v => budget.createEntry(v, { name: 'Gym', type: 'expense', categoryName: 'Health' }))
+
+    await refreshIfQuiet()
+    expect(state.vault!.budget.entries).toEqual([])
+
+    endPreview()
+    expect(entryNamed(state.vault!, 'Gym')).toBeTruthy()
   })
 })
 
