@@ -1,6 +1,6 @@
 import { withCode } from '../api/client'
 import { passwordChangeProblem } from './rules'
-import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault } from '../crypto/vaultStore.svelte'
+import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault, saveVault, getVaultState } from '../crypto/vaultStore.svelte'
 
 export interface User {
   id: number
@@ -240,6 +240,24 @@ export async function logout() {
     recoveryKeyToShow = null
     loggingOut = false
   }
+}
+
+/**
+ * Sign out on every device this account is signed in on, this one included.
+ *
+ * For a lost phone, or a computer left signed in somewhere. Anything unsaved
+ * here is saved first, while this session can still save it; then every
+ * session goes at once, and this tab forgets it as an ordinary sign-out does.
+ */
+export async function logoutEverywhere(): Promise<boolean> {
+  if (getVaultState().dirty) await saveVault()
+  const res = await fetch(`${API_BASE}/auth/logout-everywhere`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) return false
+  await logout()
+  return true
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<string | null> {

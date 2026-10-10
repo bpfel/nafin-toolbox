@@ -97,13 +97,8 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		// No 2FA — create session directly
-		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
-
-		sess, err := deps.Store.CreateSession(r.Context(), user.ID)
+		// No 2FA — create session directly. See startSession.
+		sess, err := startSession(r.Context(), deps, user)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
@@ -113,6 +108,52 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
+	}
+}
+
+// startSession signs a user in on this device.
+//
+// A user's session is added alongside the ones they already have: signing in
+// on a phone used to sign the laptop out without a word, so a person with two
+// devices could not use both. Ending every session is what a password change,
+// an admin reset and "sign out everywhere" are for.
+//
+// An administrator keeps exactly one. Their sessions manage other people's
+// accounts and read the audit log, and a second one left open on some other
+// machine is a risk with nothing to show for it — so signing in as an admin
+// ends any other admin session first, as every sign-in used to.
+func startSession(ctx context.Context, deps *HandlerDeps, user *User) (*Session, error) {
+	if user.IsAdmin() {
+		if err := deps.Store.DeleteUserSessions(ctx, user.ID); err != nil {
+			return nil, err
+		}
+	}
+	return deps.Store.CreateSession(ctx, user.ID)
+}
+
+// HandleLogoutEverywhere ends every session of the signed-in account, this one
+// included — for a lost phone, or a computer left signed in somewhere.
+func HandleLogoutEverywhere(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		deps.Store.LogAudit(r.Context(), &user.ID, AuditLogoutEverywhere, r, nil)
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   isSecureCookie(),
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
 }
 
@@ -562,20 +603,15 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		// Create session
-		if err := deps.Store.DeleteUserSessions(r.Context(), userID); err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
-
-		sess, err := deps.Store.CreateSession(r.Context(), userID)
-		if err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
-
+		// Loaded before the session, which depends on the role. See startSession.
 		user, err := deps.Store.GetUserByID(r.Context(), userID)
 		if err != nil || user == nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		sess, err := startSession(r.Context(), deps, user)
+		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -923,6 +959,14 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if err := deps.Store.UpdatePassword(r.Context(), targetID, hash); err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		// A reset is the answer to "someone else may know this password", so
+		// every device signed in with the old one is signed out. With one
+		// session per account this hardly mattered; with several it does.
+		if err := deps.Store.DeleteUserSessions(r.Context(), targetID); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}

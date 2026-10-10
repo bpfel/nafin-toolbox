@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/bpfel/nafin-toolbox/internal/database"
 	"github.com/bpfel/nafin-toolbox/internal/email"
 )
@@ -1168,5 +1170,140 @@ func TestLogin_AuditRecordsTheClientNotTheProxy(t *testing.T) {
 	}
 	if ip != "203.0.113.7" {
 		t.Errorf("audit ip = %q, want 203.0.113.7", ip)
+	}
+}
+
+// --- Sessions per device ---
+
+// signIn signs in as a browser would and returns the session it was given.
+func signIn(t *testing.T, deps *HandlerDeps, email string) string {
+	t.Helper()
+	body := strings.NewReader(`{"email":"` + email + `","password":"right-pass-1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
+	w := httptest.NewRecorder()
+	HandleLogin(deps).ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("sign-in as %s = %d: %s", email, w.Code, w.Body.String())
+	}
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "session" {
+			return c.Value
+		}
+	}
+	t.Fatalf("sign-in as %s set no session cookie", email)
+	return ""
+}
+
+func stillSignedIn(t *testing.T, store *Store, token string) bool {
+	t.Helper()
+	sess, err := store.GetSession(context.Background(), token)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	return sess != nil
+}
+
+func asUser(t *testing.T, store *Store, email string) context.Context {
+	t.Helper()
+	user, err := store.GetUserByEmail(context.Background(), email)
+	if err != nil || user == nil {
+		t.Fatalf("GetUserByEmail(%s): %v", email, err)
+	}
+	return context.WithValue(context.Background(), userContextKey, user)
+}
+
+func TestLogin_AUserKeepsTheirOtherDevicesSignedIn(t *testing.T) {
+	// The report: signing in on a phone signed the laptop out without a word.
+	deps := loginDeps(t)
+	store := deps.Store
+
+	laptop := signIn(t, deps, "father@example.ch")
+	phone := signIn(t, deps, "father@example.ch")
+
+	if !stillSignedIn(t, store, laptop) {
+		t.Error("the laptop was signed out by signing in on the phone")
+	}
+	if !stillSignedIn(t, store, phone) {
+		t.Error("the phone is not signed in")
+	}
+}
+
+func TestLogin_AnAdminHasExactlyOneSession(t *testing.T) {
+	deps := loginDeps(t)
+	store := deps.Store
+	if _, err := store.CreateUserFull(context.Background(), "root@example.ch", mustHash("right-pass-1"), RoleAdmin, false, true); err != nil {
+		t.Fatalf("CreateUserFull: %v", err)
+	}
+
+	first := signIn(t, deps, "root@example.ch")
+	second := signIn(t, deps, "root@example.ch")
+
+	if stillSignedIn(t, store, first) {
+		t.Error("an earlier admin session survived a new admin sign-in")
+	}
+	if !stillSignedIn(t, store, second) {
+		t.Error("the new admin session is not signed in")
+	}
+}
+
+func TestLogoutEverywhere_EndsEverySessionOfTheAccount(t *testing.T) {
+	deps := loginDeps(t)
+	store := deps.Store
+	laptop := signIn(t, deps, "father@example.ch")
+	phone := signIn(t, deps, "father@example.ch")
+	someoneElse := signIn(t, deps, "admin@example.ch")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout-everywhere", nil)
+	req = req.WithContext(asUser(t, store, "father@example.ch"))
+	w := httptest.NewRecorder()
+	HandleLogoutEverywhere(deps).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	if stillSignedIn(t, store, laptop) || stillSignedIn(t, store, phone) {
+		t.Error("a session of the account survived signing out everywhere")
+	}
+	if !stillSignedIn(t, store, someoneElse) {
+		t.Error("another account was signed out too")
+	}
+	var cleared bool
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "session" && c.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Error("this device's cookie was not cleared")
+	}
+	var logged int
+	testDB.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE event = 'logout_everywhere'`).Scan(&logged)
+	if logged != 1 {
+		t.Errorf("audit entries for logout_everywhere = %d, want 1", logged)
+	}
+}
+
+func TestAdminResetPassword_SignsTheUserOutEverywhere(t *testing.T) {
+	// A reset answers "someone else may know this password". Every device
+	// signed in with the old one has to go.
+	deps := loginDeps(t)
+	store := deps.Store
+	laptop := signIn(t, deps, "father@example.ch")
+	phone := signIn(t, deps, "father@example.ch")
+	target, _ := store.GetUserByEmail(context.Background(), "father@example.ch")
+
+	admin := &User{ID: 999, Email: "root@example.ch", Role: RoleAdmin, EmailVerified: true}
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", strconv.Itoa(target.ID))
+	ctx := context.WithValue(context.WithValue(context.Background(), userContextKey, admin), chi.RouteCtxKey, rctx)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/users/"+strconv.Itoa(target.ID)+"/reset-password", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+	HandleAdminResetPassword(deps).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	if stillSignedIn(t, store, laptop) || stillSignedIn(t, store, phone) {
+		t.Error("a device stayed signed in after an admin reset the password")
 	}
 }
