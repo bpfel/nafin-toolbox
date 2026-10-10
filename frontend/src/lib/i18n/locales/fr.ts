@@ -504,6 +504,7 @@ export const fr: Messages = {
   'state.waitingBusy': 'D’autres enregistrent aussi – nouvel essai à venir.',
   'sync.merged': 'Mis à jour avec des modifications faites ailleurs.',
   'sync.overwritten': '{subject} venait d’être modifié ailleurs en {theirs}. Ta valeur, {mine}, est enregistrée.',
+  'sync.goneElsewhere': 'Cet élément a été supprimé ailleurs pendant que tu le modifiais.',
   'sync.undo': 'Annuler',
   'sync.dismiss': 'Fermer',
   'sync.dropped.title': 'Non enregistré :',

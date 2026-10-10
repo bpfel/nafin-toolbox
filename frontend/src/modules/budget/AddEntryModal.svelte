@@ -282,6 +282,13 @@
       (!targeted || centsOf(totalValue) > 0),
   )
 
+  // Deleted elsewhere while this form was open: the queue's replay took it out
+  // of the vault under the form. Saving would edit nothing, so the form says so
+  // and offers only Close.
+  let gone = $derived(
+    isEdit && !!editEntry && !vault.budget.entries.some(e => e.id === editEntry.id),
+  )
+
   function save() {
     const trimmed = name.trim()
     if (!canSave) return
@@ -510,6 +517,13 @@
       <p class="error">{error}</p>
     {/if}
 
+    {#if gone}
+      <p class="error" role="alert">{t('sync.goneElsewhere')}</p>
+      <div class="actions">
+        <span class="spacer"></span>
+        <button class="btn cancel" onclick={onclose}>{t('action.close')}</button>
+      </div>
+    {:else}
     <div class="actions">
       {#if isEdit && ondelete}
         <button class="btn delete" onclick={ondelete}>{t('action.delete')}</button>
@@ -520,6 +534,7 @@
         {isEdit ? t('action.save') : t('entry.add')}
       </button>
     </div>
+    {/if}
   </div>
 </div>
 

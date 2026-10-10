@@ -326,7 +326,12 @@
 {/if}
 
 {#if formOpen}
-  <AccountFormModal account={formAccount} onsave={saveAccount} onclose={closeForm} />
+  <AccountFormModal
+    account={formAccount}
+    gone={formAccount !== null && !vaultState.vault?.accounts.some(a => a.id === formAccount?.id)}
+    onsave={saveAccount}
+    onclose={closeForm}
+  />
 {/if}
 
 {#if deleteTarget && vaultState.vault}

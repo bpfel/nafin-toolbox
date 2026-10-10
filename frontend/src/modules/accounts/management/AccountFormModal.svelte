@@ -15,11 +15,13 @@
   interface Props {
     /** null creates a new account. */
     account: VaultAccount | null
+    /** The account was deleted elsewhere while the form was open. */
+    gone?: boolean
     onsave: (values: AccountDetails) => void
     onclose: () => void
   }
 
-  let { account, onsave, onclose }: Props = $props()
+  let { account, gone = false, onsave, onclose }: Props = $props()
 
   const KINDS: { value: AccountKind; label: () => string }[] = [
     { value: 'transactional', label: () => t('accountKind.transactional') },
@@ -223,11 +225,17 @@
       {/if}
     </div>
 
+    {#if gone}
+      <p class="error" role="alert">{t('sync.goneElsewhere')}</p>
+    {/if}
+
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
-      <button class="btn save" onclick={save} disabled={!name.trim()}>
-        {isEdit ? t('action.save') : t('accounts.add')}
-      </button>
+      <button class="btn cancel" onclick={onclose}>{gone ? t('action.close') : t('action.cancel')}</button>
+      {#if !gone}
+        <button class="btn save" onclick={save} disabled={!name.trim()}>
+          {isEdit ? t('action.save') : t('accounts.add')}
+        </button>
+      {/if}
     </div>
   </div>
 </div>
@@ -241,6 +249,15 @@
 {/if}
 
 <style>
+  .error {
+    color: #c0392b;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+    background: #fdecea;
+    border-radius: 6px;
+    margin: 0 0 1rem;
+  }
+
   .backdrop {
     position: fixed;
     inset: 0;

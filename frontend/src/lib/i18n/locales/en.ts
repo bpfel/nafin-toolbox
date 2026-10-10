@@ -550,6 +550,7 @@ export const en = {
   'state.waitingBusy': 'Others are saving too — will retry.',
   'sync.merged': 'Updated with changes made elsewhere.',
   'sync.overwritten': '{subject} had just been changed elsewhere to {theirs}. Yours, {mine}, is saved.',
+  'sync.goneElsewhere': 'This was deleted elsewhere while you were editing it.',
   'sync.undo': 'Undo',
   'sync.dismiss': 'Dismiss',
   'sync.dropped.title': 'Not saved:',

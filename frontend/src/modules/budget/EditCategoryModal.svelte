@@ -49,6 +49,9 @@
     ),
   )
 
+  // Deleted elsewhere while this form was open. See AddEntryModal.
+  let gone = $derived(!vault.budget.categories.some(c => c.id === category.id))
+
   function save() {
     error = null
     try {
@@ -123,9 +126,15 @@
       <p class="error" role="alert">{error}</p>
     {/if}
 
+    {#if gone}
+      <p class="error" role="alert">{t('sync.goneElsewhere')}</p>
+    {/if}
+
     <div class="actions">
-      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
-      {#if conflict}
+      <button class="btn cancel" onclick={onclose}>{gone ? t('action.close') : t('action.cancel')}</button>
+      {#if gone}
+        <!-- Nothing to save into. -->
+      {:else if conflict}
         <button class="btn merge" onclick={merge}>{t('category.mergeInto', { name: conflict.name })}</button>
       {:else}
         <button class="btn save" onclick={save} disabled={!changed || trimmed === ''}>{t('action.save')}</button>

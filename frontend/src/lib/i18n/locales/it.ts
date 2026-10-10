@@ -504,6 +504,7 @@ export const it: Messages = {
   'state.waitingBusy': 'Anche altri stanno salvando – nuovo tentativo in arrivo.',
   'sync.merged': 'Aggiornato con modifiche fatte altrove.',
   'sync.overwritten': '{subject} era appena stato modificato altrove in {theirs}. Il tuo valore, {mine}, è salvato.',
+  'sync.goneElsewhere': 'È stato eliminato altrove mentre lo stavi modificando.',
   'sync.undo': 'Annulla',
   'sync.dismiss': 'Chiudi',
   'sync.dropped.title': 'Non salvato:',

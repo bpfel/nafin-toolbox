@@ -1054,6 +1054,39 @@ async function lostHousehold(slot: VaultSlot, id: number): Promise<void> {
   stashed.delete(id)
 }
 
+/**
+ * Show what others saved while this tab was in the background.
+ *
+ * Only when this tab has nothing of its own waiting: with changes queued, the
+ * next save catches up anyway and says what it found. One request, on coming
+ * back to the tab — not a poll.
+ *
+ * A preview keeps showing; the real vault behind it is the one brought up to
+ * date, and is what the user returns to when the tour ends.
+ */
+export async function refreshIfQuiet(): Promise<void> {
+  const slot = current
+  const id = currentId
+  if (!slot.data || !slot.key || slot.saving || slot.dirty) return
+  if (slot.conflicted || slot.shapeInvalid || slot.versionAhead) return
+
+  const fresh = await fetchNewer(slot, id)
+  if (fresh === 'unreachable' || fresh === 'stopped') return
+  if (fresh.updatedAt === slot.lastUpdatedAt) return
+  // Something was changed here while the request was out; the save that
+  // follows will catch up and report, so this one stands back.
+  if (slot !== current || slot.dirty) return
+
+  confirmed(id, fresh.data)
+  slot.lastUpdatedAt = fresh.updatedAt
+  if (slot.parked) {
+    slot.parked = fresh.data
+    return
+  }
+  slot.data = fresh.data
+  notify({ kind: 'merged' })
+}
+
 /** Keep the changes, and try again after a pause that grows with each failure. */
 function retryLater(slot: VaultSlot, why: 'offline' | 'busy'): void {
   slot.waiting = why
@@ -1216,7 +1249,9 @@ if (typeof window !== 'undefined') {
   }
   window.addEventListener('online', tryNow)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') tryNow()
+    if (document.visibilityState !== 'visible') return
+    if (current.dirty) tryNow()
+    else void refreshIfQuiet()
   })
 }
 
