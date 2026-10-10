@@ -15,7 +15,9 @@
         ? tn('unsaved.versionAhead', vaultState.pending)
         : vaultState.conflicted
           ? t('unsaved.cannotOpen')
-          : null,
+          : vaultState.refused
+            ? tn('unsaved.refused', vaultState.pending, { status: vaultState.refused })
+            : null,
   )
 </script>
 

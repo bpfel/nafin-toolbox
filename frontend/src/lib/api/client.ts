@@ -19,6 +19,39 @@ export function setOnUnauthorized(callback: () => void) {
   onUnauthorized = callback
 }
 
+/**
+ * Send the app back to sign-in, as any request refused with 401 does.
+ *
+ * For the vault saves, which make their own requests rather than going
+ * through `request`: the store has to count what is about to be lost first,
+ * and only then hand over.
+ */
+export function signalUnauthorized(): void {
+  onUnauthorized?.()
+}
+
+/**
+ * A save refused with 401: this tab is no longer signed in.
+ *
+ * Signing in elsewhere ends every other session of the account, so this is
+ * what a second device sees the moment the first signs in again. Not worth
+ * retrying — nothing this tab sends will be accepted until it signs in.
+ */
+/** A save refused for any other reason, with the status the server gave. */
+export class VaultSaveError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+    this.name = 'VaultSaveError'
+  }
+}
+
+export class SessionEndedError extends Error {
+  constructor() {
+    super('signed out')
+    this.name = 'SessionEndedError'
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -188,6 +221,7 @@ export async function putVault(body: {
     body: JSON.stringify(body),
   })
 
+  if (res.status === 401) throw new SessionEndedError()
   if (res.status === 409) {
     let message = 'This vault was changed elsewhere. Reload before saving again.'
     try {
@@ -198,7 +232,7 @@ export async function putVault(body: {
   }
 
   if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`)
+    throw new VaultSaveError(res.status, `API error: ${res.status} ${res.statusText}`)
   }
 
   return res.json()
@@ -334,6 +368,7 @@ export async function putHouseholdVault(
   // It means another member wrote while this client was editing, and the answer
   // is to fetch their vault and apply this client's changes on top — which only
   // this error can say.
+  if (res.status === 401) throw new SessionEndedError()
   if (res.status === 409) {
     const body = await res.json().catch(() => ({}))
     throw new VaultConflictError(withCode(body))
@@ -348,7 +383,7 @@ export async function putHouseholdVault(
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ? withCode(body) : `API error: ${res.status} ${res.statusText}`)
+    throw new VaultSaveError(res.status, body.error ? withCode(body) : `API error: ${res.status} ${res.statusText}`)
   }
   return res.json()
 }

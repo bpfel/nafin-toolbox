@@ -35,6 +35,8 @@ export type Notice =
   | { id: number; kind: 'readOnly'; count: number }
   /** This account is no longer in the household it had changes waiting for. */
   | { id: number; kind: 'removed'; household: string; count: number }
+  /** Signed out under this tab, with changes waiting. */
+  | { id: number; kind: 'signedOut'; count: number }
 
 type NewNotice = Notice extends infer N ? (N extends Notice ? Omit<N, 'id'> : never) : never
 

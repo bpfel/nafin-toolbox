@@ -505,6 +505,9 @@ export const it: Messages = {
   'sync.merged': 'Aggiornato con modifiche fatte altrove.',
   'sync.overwritten': '{subject} era appena stato modificato altrove in {theirs}. Il tuo valore, {mine}, è salvato.',
   'sync.goneElsewhere': 'È stato eliminato altrove mentre lo stavi modificando.',
+  'sync.signedOut.none': 'Sei stato disconnesso – forse accedendo da un altro dispositivo.',
+  'sync.signedOut.one': 'Sei stato disconnesso – forse accedendo da un altro dispositivo. 1 modifica non è stata salvata.',
+  'sync.signedOut.other': 'Sei stato disconnesso – forse accedendo da un altro dispositivo. {count} modifiche non sono state salvate.',
   'sync.undo': 'Annulla',
   'sync.dismiss': 'Chiudi',
   'sync.dropped.title': 'Non salvato:',
@@ -525,6 +528,8 @@ export const it: Messages = {
   'sync.removed.other': 'Non sei più membro di {household}. {count} modifiche non sono state salvate.',
   'unsaved.shapeInvalid': 'Su questa pagina i tuoi dati sono in uno stato che non si può salvare in modo sicuro, perciò il salvataggio è fermo. Ricarica per ripartire dall’ultima versione salvata – ciò che è cambiato da allora andrà perso.',
   'unsaved.cannotOpen': 'I tuoi dati sono stati modificati altrove in un modo che questa pagina non riesce ad aprire, perciò il salvataggio è fermo. Ricarica per ottenere la versione più recente – ciò che è cambiato qui da allora andrà perso.',
+  'unsaved.refused.one': 'Il server non accetta le tue modifiche (errore {status}), perciò il salvataggio è fermo. Ricarica per continuare – 1 modifica fatta qui andrà persa.',
+  'unsaved.refused.other': 'Il server non accetta le tue modifiche (errore {status}), perciò il salvataggio è fermo. Ricarica per continuare – {count} modifiche fatte qui andranno perse.',
   'unsaved.versionAhead.one': 'Una versione più recente dell’app ha salvato i tuoi dati. Ricarica per continuare – 1 modifica fatta qui andrà persa.',
   'unsaved.versionAhead.other': 'Una versione più recente dell’app ha salvato i tuoi dati. Ricarica per continuare – {count} modifiche fatte qui andranno perse.',
 

@@ -551,6 +551,9 @@ export const en = {
   'sync.merged': 'Updated with changes made elsewhere.',
   'sync.overwritten': '{subject} had just been changed elsewhere to {theirs}. Yours, {mine}, is saved.',
   'sync.goneElsewhere': 'This was deleted elsewhere while you were editing it.',
+  'sync.signedOut.none': 'You were signed out — perhaps by signing in on another device.',
+  'sync.signedOut.one': 'You were signed out — perhaps by signing in on another device. 1 change was not saved.',
+  'sync.signedOut.other': 'You were signed out — perhaps by signing in on another device. {count} changes were not saved.',
   'sync.undo': 'Undo',
   'sync.dismiss': 'Dismiss',
   'sync.dropped.title': 'Not saved:',
@@ -571,6 +574,8 @@ export const en = {
   'sync.removed.other': 'You are no longer a member of {household}. {count} changes were not saved.',
   'unsaved.shapeInvalid': 'This page has your data in a state it cannot safely store, so it has stopped saving. Reload to start again from the last saved copy — anything changed since will be lost.',
   'unsaved.cannotOpen': 'Your data was changed elsewhere in a way this page cannot open, so it has stopped saving. Reload to pick up the newer copy; anything changed here since will be lost.',
+  'unsaved.refused.one': 'The server would not take your changes (error {status}), so saving has stopped. Reload to continue — 1 change made here will be lost.',
+  'unsaved.refused.other': 'The server would not take your changes (error {status}), so saving has stopped. Reload to continue — {count} changes made here will be lost.',
   'unsaved.versionAhead.one': 'A newer version of the app has saved your data. Reload to continue — 1 change made here will be lost.',
   'unsaved.versionAhead.other': 'A newer version of the app has saved your data. Reload to continue — {count} changes made here will be lost.',
 
