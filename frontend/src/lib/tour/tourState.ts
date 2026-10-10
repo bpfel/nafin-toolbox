@@ -1,4 +1,5 @@
 import type { VaultData } from '../crypto/vault'
+import { nowISO } from '../sync/source'
 
 /**
  * What the vault remembers about the tour, as pure functions over it.
@@ -38,7 +39,7 @@ export function shouldOfferTour(vault: VaultData | null): boolean {
 }
 
 export function recordCompleted(vault: VaultData): void {
-  vault.tour.completedAt = new Date().toISOString()
+  vault.tour.completedAt = nowISO()
 }
 
 /**
@@ -48,5 +49,5 @@ export function recordCompleted(vault: VaultData): void {
  * overwriting one with the other would lose which was given.
  */
 export function recordDismissed(vault: VaultData): void {
-  vault.tour.dismissedAt = new Date().toISOString()
+  vault.tour.dismissedAt = nowISO()
 }
