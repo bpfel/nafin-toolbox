@@ -12,6 +12,7 @@ const (
 	AuditLoginSuccess     AuditEvent = "login_success"
 	AuditLoginFailed      AuditEvent = "login_failed"
 	AuditLogout           AuditEvent = "logout"
+	AuditLogoutEverywhere AuditEvent = "logout_everywhere"
 	AuditPasswordChanged  AuditEvent = "password_changed"
 	Audit2FAEnabled       AuditEvent = "2fa_enabled"
 	Audit2FADisabled      AuditEvent = "2fa_disabled"

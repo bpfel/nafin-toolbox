@@ -103,6 +103,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Use(auth.RequireAuth(authStore))
 			r.Get("/auth/me", auth.HandleMe)
 			r.Post("/auth/logout", auth.HandleLogout(deps))
+			r.Post("/auth/logout-everywhere", auth.HandleLogoutEverywhere(deps))
 			r.Post("/auth/change-password", auth.HandleChangePassword(deps))
 			r.Get("/auth/settings", auth.HandleGetSettings(deps))
 

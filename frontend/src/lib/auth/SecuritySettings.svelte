@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount } from './authStore.svelte'
+  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount, logoutEverywhere } from './authStore.svelte'
   import TwoFactorSetup from './TwoFactorSetup.svelte'
   import Sheet from '../nav/Sheet.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
@@ -70,6 +70,20 @@
   function copyRecoveryCodes() {
     if (recoveryCodes) {
       copier.copy(recoveryCodes.join('\n'))
+    }
+  }
+
+  let signingOut = $state(false)
+  let signOutFailed = $state(false)
+
+  async function handleLogoutEverywhere() {
+    signingOut = true
+    signOutFailed = false
+    // On success this tab is signed out too, and the sign-in screen replaces
+    // this one; there is nothing to reset afterwards.
+    if (!(await logoutEverywhere())) {
+      signOutFailed = true
+      signingOut = false
     }
   }
 </script>
@@ -159,6 +173,23 @@
     <h3>{t('security.passwordTitle')}</h3>
     <button class="btn-secondary" onclick={() => showChangePassword = true}>{t('password.changeTitle')}</button>
   </div>
+
+  <!--
+    Devices. Not for an administrator: they are signed in on one device at a
+    time, so "everywhere" would only ever mean here.
+  -->
+  {#if authState.currentUser?.role !== 'admin'}
+    <div class="settings-card">
+      <h3>{t('security.devicesTitle')}</h3>
+      <p class="info">{t('security.devicesHint')}</p>
+      {#if signOutFailed}
+        <p class="error">{t('security.signOutEverywhereFailed')}</p>
+      {/if}
+      <button class="btn-secondary" onclick={handleLogoutEverywhere} disabled={signingOut}>
+        {t('security.signOutEverywhere')}
+      </button>
+    </div>
+  {/if}
 
   <!-- Delete Account Section -->
   <div class="settings-card">

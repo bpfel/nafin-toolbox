@@ -14,7 +14,7 @@
   let expandedId = $state<number | null>(null)
 
   const eventTypes = [
-    'login_success', 'login_failed', 'logout',
+    'login_success', 'login_failed', 'logout', 'logout_everywhere',
     'password_changed', '2fa_enabled', '2fa_disabled',
     '2fa_verified', '2fa_failed', 'recovery_code_used',
     'user_invited', 'email_verified', 'user_deleted',
@@ -24,6 +24,7 @@
     login_success: '#155724',
     login_failed: '#721c24',
     logout: '#666',
+    logout_everywhere: '#666',
     password_changed: '#856404',
     '2fa_enabled': '#155724',
     '2fa_disabled': '#856404',
@@ -39,6 +40,7 @@
     login_success: '#d4edda',
     login_failed: '#f8d7da',
     logout: '#e9ecef',
+    logout_everywhere: '#e9ecef',
     password_changed: '#fff3cd',
     '2fa_enabled': '#d4edda',
     '2fa_disabled': '#fff3cd',
