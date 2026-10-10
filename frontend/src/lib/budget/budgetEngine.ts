@@ -43,7 +43,16 @@ export function getOrCreateCategory(
   vault: VaultData,
   name: string,
   side: 'income' | 'expense',
+  /**
+   * The category meant, by id, if the caller knows it. Preferred over the name
+   * while it still exists on the right side: a change replayed after somebody
+   * renamed the category must still land in it, not in a new one under the old
+   * name.
+   */
+  preferId?: string,
 ): VaultCategory {
+  const preferred = preferId && vault.budget.categories.find(g => g.id === preferId && g.side === side)
+  if (preferred) return preferred
   const existing = vault.budget.categories.find(
     g => g.name === name && g.side === side,
   )
@@ -184,6 +193,8 @@ export function createEntry(
     name: string
     type: EntryType
     categoryName: string
+    /** The category meant, by id, where known. See `getOrCreateCategory`. */
+    categoryId?: string
     sortOrder?: number
     /**
      * What to plan for it, straight away.
@@ -205,7 +216,7 @@ export function createEntry(
     periodMonths?: number
   },
 ): VaultEntry {
-  const category = getOrCreateCategory(vault, opts.categoryName, sideOf(opts.type))
+  const category = getOrCreateCategory(vault, opts.categoryName, sideOf(opts.type), opts.categoryId)
   const cats = vault.budget.entries
   const order = opts.sortOrder ?? (cats.length > 0 ? Math.max(...cats.map(c => c.sortOrder)) + 10 : 10)
   // Entries are born routed: the default is legal for both types, so no
@@ -270,7 +281,11 @@ export function setReserve(
 export function updateEntry(
   vault: VaultData,
   entryId: string,
-  update: Partial<Pick<VaultEntry, 'name' | 'type' | 'sortOrder' | 'archived'>> & { categoryName?: string },
+  update: Partial<Pick<VaultEntry, 'name' | 'type' | 'sortOrder' | 'archived'>> & {
+    categoryName?: string
+    /** The category meant, by id, where known. See `getOrCreateCategory`. */
+    categoryId?: string
+  },
 ): VaultEntry | null {
   const cat = vault.budget.entries.find(c => c.id === entryId)
   if (!cat) return null
@@ -293,7 +308,7 @@ export function updateEntry(
   if (update.sortOrder !== undefined) cat.sortOrder = update.sortOrder
   if (update.archived !== undefined) cat.archived = update.archived
   if (update.categoryName !== undefined) {
-    const category = getOrCreateCategory(vault, update.categoryName, sideOf(cat.type))
+    const category = getOrCreateCategory(vault, update.categoryName, sideOf(cat.type), update.categoryId)
     cat.categoryId = category.id
     // Moving the last entry out empties the category it came from.
     pruneEmptyCategories(vault)

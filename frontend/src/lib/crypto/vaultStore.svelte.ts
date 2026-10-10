@@ -2,6 +2,7 @@ import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapME
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
 import {
   fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
+  VaultGoneError,
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
   fetchHouseholdMembers, fetchHouseholdInvites, createHouseholdInvite, deleteHouseholdInvite,
@@ -21,8 +22,9 @@ import {
 import { fromBase64, toBase64, importPublicKey, openUnder, sealUnder } from './identity'
 import { seedNamesFor } from '../budget/seedNames'
 import { getLocale } from '../i18n/index.svelte'
-import { perform, type Action, type ActionArgs, type ActionKind, type ActionResult } from '../sync/actions'
-import { enqueue } from '../sync/queue'
+import { perform, overwriteBy, type Action, type ActionArgs, type ActionKind, type ActionResult } from '../sync/actions'
+import { enqueue, replayAll } from '../sync/queue'
+import { notify, clearNotices } from '../sync/notices.svelte'
 
 /**
  * Which vault the screens are looking at.
@@ -54,9 +56,11 @@ interface VaultSlot {
   saving: boolean
   lastSaved: Date | null
   /**
-   * Set when the server refuses a save because the vault moved on. Sticky: the
-   * in-memory vault is now known to be stale, and every further save would fail
-   * the same way, so the UI must tell the user to reload rather than retry.
+   * Set when the server holds a newer vault that this client cannot open — a
+   * household whose key was changed and whose new key did not arrive. Sticky:
+   * saving over a vault it cannot read would destroy it, so the UI tells the
+   * user to reload. An ordinary refusal no longer gets here; the queue is
+   * replayed onto the newer vault instead.
    */
   conflicted: boolean
   /**
@@ -86,6 +90,18 @@ interface VaultSlot {
    * autosave, the flush on logout, and any direct call alike.
    */
   parked: VaultData | null
+  /**
+   * Why changes are waiting longer than a save takes: the server could not be
+   * reached, or kept refusing because others were saving at the same moment.
+   * Null while saving works. Either way the changes are kept and tried again.
+   */
+  waiting: 'offline' | 'busy' | null
+  /** How many changes have not reached the server. Shown when they are at risk. */
+  pending: number
+  /** A save was asked for while one was in flight; run it when that one ends. */
+  again: boolean
+  /** Consecutive failed attempts, for spacing out the retries. */
+  failures: number
 }
 
 function emptySlot(): VaultSlot {
@@ -100,6 +116,10 @@ function emptySlot(): VaultSlot {
     shapeInvalid: false,
     versionAhead: false,
     parked: null,
+    waiting: null,
+    pending: 0,
+    again: false,
+    failures: 0,
   }
 }
 
@@ -157,6 +177,28 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
  * again, and a reactive proxy cannot be cloned. Nothing renders from them.
  */
 const queues = new Map<VaultId, Action[]>()
+
+/**
+ * Each vault as the server last confirmed it, plain.
+ *
+ * What a replay compares against, to tell a value somebody else just changed
+ * (it moved between this and the newer vault) from one nobody touched. Outside
+ * the slot for the same reason as the queue.
+ */
+const bases = new Map<VaultId, VaultData>()
+
+function setQueue(slot: VaultSlot, id: VaultId, queue: Action[]): void {
+  queues.set(id, queue)
+  slot.pending = queue.length
+  slot.dirty = queue.length > 0
+}
+
+/** Note what the server holds, as of a load or a save. */
+function confirmed(id: VaultId, data: VaultData): void {
+  // A snapshot rather than structuredClone: `data` may already be reactive,
+  // and a proxy cannot be cloned.
+  bases.set(id, $state.snapshot(data) as VaultData)
+}
 
 const MEK_STORAGE_KEY = 'vault_mek'
 
@@ -272,6 +314,10 @@ export function getVaultState() {
     /** True when the vault in memory contradicts its own version, so saving is refused. */
     get shapeInvalid() { return current.shapeInvalid },
     get saving() { return current.saving },
+    /** Why changes are waiting to be saved, if they are: 'offline' or 'busy'. */
+    get waiting() { return current.waiting },
+    /** How many changes have not reached the server. */
+    get pending() { return current.pending },
     get lastSaved() { return current.lastSaved },
     get unlocked() { return unlocked },
     /** True while the screens are showing a throwaway copy. See `parked`. */
@@ -378,6 +424,7 @@ export async function switchTo(id: VaultId): Promise<void> {
       return
     }
     current.data = await decryptVault(payload.ciphertext, payload.nonce, household.key)
+    confirmed(id, current.data)
     current.lastUpdatedAt = payload.updated_at
   } catch (e) {
     if (e instanceof VaultVersionAheadError) {
@@ -559,6 +606,7 @@ export async function createHousehold(name: string): Promise<number> {
   await putCurrentAside()
   currentId = created.id
   rememberCurrent(created.id)
+  confirmed(created.id, empty)
   current = { ...emptySlot(), data: empty, key, lastUpdatedAt: created.updated_at }
 
   return created.id
@@ -580,6 +628,7 @@ export async function deleteHousehold(id: number): Promise<void> {
   households = households.filter(h => h.id !== id)
   stashed.delete(id)
   queues.delete(id)
+  bases.delete(id)
 
   if (currentId === id) {
     currentId = 'personal'
@@ -602,6 +651,7 @@ export async function tryRestoreVault(userId: number): Promise<boolean> {
     const vaultData = await fetchVault()
     if (vaultData) {
       current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, cachedMEK)
+      confirmed('personal', current.data)
       current.lastUpdatedAt = vaultData.updated_at
     } else {
       current.data = createEmptyVault(mainAccountName())
@@ -655,6 +705,7 @@ export async function initializeVault(
     const vaultData = await fetchVault()
     if (vaultData) {
       current.data = await decryptVault(vaultData.ciphertext, vaultData.nonce, mek)
+      confirmed('personal', current.data)
       current.lastUpdatedAt = vaultData.updated_at
     } else {
       current.data = createEmptyVault(mainAccountName())
@@ -782,6 +833,21 @@ function assertNameFits(name: string): void {
 /**
  * Save the current vault (encrypt + PUT to server).
  */
+/** Refusals in a row before giving the others a moment. */
+const MAX_REFUSALS = 3
+
+/** How long to wait before trying again, by consecutive failure. */
+const RETRY_MS = [2000, 5000, 15000, 30000, 60000]
+
+/**
+ * Save the vault on screen, catching up with anybody who saved first.
+ *
+ * Sends the vault with the `updated_at` it was built on. If the server has a
+ * newer one, that is fetched, every change still queued here is applied on top
+ * of it (`catchUp`), and the result is sent again. Two people changing
+ * different things both keep their change; one change that somebody else made
+ * impossible is dropped and reported, and the rest go on without it.
+ */
 export async function saveVault(): Promise<void> {
   // Captured before the first await: the user may switch vaults while the
   // request is in flight, and both the answer and the flags belong to the vault
@@ -793,12 +859,49 @@ export async function saveVault(): Promise<void> {
   // The vault on screen is a throwaway copy, not the user's. Refused here
   // rather than at each call site because this is where they all arrive.
   if (slot.parked) return
-  // Once the server has told us we are stale, retrying can only fail again — and
-  // the auto-save runs every couple of seconds, so retrying would hammer it.
-  if (slot.conflicted || slot.shapeInvalid) return
+  // Each of these is a vault this client must not write over.
+  if (slot.conflicted || slot.shapeInvalid || slot.versionAhead) return
   // The screens offer a reader nothing that edits. This is for anything that
   // gets here anyway, so it stops at the door rather than at the server.
   if (isReadOnly()) return
+  // Two saves built on the same version would refuse each other. The second
+  // waits for the first, and goes after it if anything is still unsaved.
+  if (slot.saving) {
+    slot.again = true
+    return
+  }
+
+  slot.saving = true
+  try {
+    for (let refusals = 0; ; ) {
+      const outcome = await attemptSave(slot, id)
+      if (outcome === 'saved') {
+        slot.waiting = null
+        slot.failures = 0
+        return
+      }
+      if (outcome === 'stopped') return
+      if (outcome === 'unreachable') return retryLater(slot, 'offline')
+
+      if (++refusals >= MAX_REFUSALS) return retryLater(slot, 'busy')
+      const caught = await catchUp(slot, id)
+      if (caught === 'unreachable') return retryLater(slot, 'offline')
+      if (caught === 'stopped' || !slot.dirty) return
+    }
+  } finally {
+    slot.saving = false
+    if (slot.again) {
+      slot.again = false
+      if (slot.dirty && slot === current) void saveVault()
+    }
+  }
+}
+
+type Attempt = 'saved' | 'refused' | 'unreachable' | 'stopped'
+
+/** One try at sending the vault. */
+async function attemptSave(slot: VaultSlot, id: VaultId): Promise<Attempt> {
+  if (!slot.data || !slot.key) return 'stopped'
 
   // Checked before the write, not after the read: a vault that cannot describe
   // itself must not be allowed over one that can. `dirty` stays set, so the UI
@@ -807,58 +910,168 @@ export async function saveVault(): Promise<void> {
     assertVaultShape(slot.data)
   } catch {
     slot.shapeInvalid = true
-    return
+    return 'stopped'
   }
 
-  slot.saving = true
-  // What this save carries, by identity rather than by count: an amount typed
-  // while it is in flight replaces the last queued action, and that one must
-  // stay queued for the next save rather than be cleared with this one.
+  // What this save carries, taken together and before the first await: the
+  // vault as it is now, and the actions that made it so — by identity, not by
+  // count, because an amount typed while the save is in flight replaces the
+  // last queued action, and that one must stay queued for the next save.
+  const sent = $state.snapshot(slot.data) as VaultData
   const carried = new Set(queues.get(id) ?? [])
+
+  let result: { updated_at: string }
   try {
-    const { ciphertext, nonce } = await encryptVault(slot.data, slot.key)
+    const { ciphertext, nonce } = await encryptVault(sent, slot.key)
     const body = {
       ciphertext,
       nonce,
-      version: slot.data.version,
+      version: sent.version,
       // Omitted when there is no server copy yet: the first save has nothing to
       // conflict with, and sending a token we never received would be a lie.
       ...(slot.lastUpdatedAt === null ? {} : { expected_updated_at: slot.lastUpdatedAt }),
     }
-
-    const result = id === 'personal' ? await putVault(body) : await putHouseholdVault(id, body)
-    slot.lastUpdatedAt = result.updated_at
-    const left = (queues.get(id) ?? []).filter(a => !carried.has(a))
-    queues.set(id, left)
-    slot.dirty = left.length > 0
-    slot.lastSaved = new Date()
+    result = id === 'personal' ? await putVault(body) : await putHouseholdVault(id, body)
   } catch (e) {
-    if (e instanceof VaultConflictError) {
-      // Leave `dirty` set: the edits are still unsaved, and the user needs to
-      // know they will be lost on reload rather than believing they persisted.
-      slot.conflicted = true
-      return
-    }
+    if (e instanceof VaultConflictError) return 'refused'
     if (e instanceof VaultReadOnlyError && typeof id === 'number') {
-      // The owner made this account a reader while it was editing. What this
-      // client believed about its role was out of date, so it takes the
-      // server's word, and the screens drop their editing controls. Not
-      // thrown: a permission changing under you is news, not a crash, and it
-      // used to arrive as "Something broke and the page stopped updating".
-      households = households.map(h => (h.id === id ? { ...h, role: 'reader' } : h))
-      return
+      await becameReader(slot, id)
+      return 'stopped'
     }
-    throw e
-  } finally {
-    slot.saving = false
+    if (e instanceof VaultGoneError && typeof id === 'number') {
+      await lostHousehold(slot, id)
+      return 'stopped'
+    }
+    // Anything else — no network, a server that is down — is worth trying
+    // again; the changes are still queued.
+    return 'unreachable'
+  }
+
+  slot.lastUpdatedAt = result.updated_at
+  confirmed(id, sent)
+  setQueue(slot, id, (queues.get(id) ?? []).filter(a => !carried.has(a)))
+  slot.lastSaved = new Date()
+  return 'saved'
+}
+
+/**
+ * Fetch the newer vault and apply this client's waiting changes on top of it.
+ *
+ * Tells the user what they need to know and nothing more: a change dropped, a
+ * value they wrote over somebody else's — and otherwise only that the screen
+ * now shows changes made elsewhere.
+ */
+async function catchUp(slot: VaultSlot, id: VaultId): Promise<'caught-up' | 'unreachable' | 'stopped'> {
+  const fresh = await fetchNewer(slot, id)
+  if (fresh === 'unreachable' || fresh === 'stopped') return fresh
+
+  const queue = queues.get(id) ?? []
+  const base = bases.get(id)
+  const { vault, dropped } = replayAll(fresh.data, queue)
+  const lost = new Set(dropped.map(d => d.action))
+  const overwrites = base
+    ? queue.filter(a => !lost.has(a)).map(a => overwriteBy(base, fresh.data, a)).filter(o => o !== null)
+    : []
+
+  confirmed(id, fresh.data)
+  slot.lastUpdatedAt = fresh.updatedAt
+  slot.data = vault
+  setQueue(slot, id, queue.filter(a => !lost.has(a)))
+
+  if (dropped.length > 0) {
+    notify({ kind: 'dropped', items: dropped.map(d => ({ subject: d.action.subject, reason: d.reason })) })
+  }
+  for (const o of overwrites) {
+    notify({ kind: 'overwritten', subject: o.action.subject ?? '', theirs: o.theirs, mine: o.mine, money: o.money, undo: o.undo })
+  }
+  if (dropped.length === 0 && overwrites.length === 0) notify({ kind: 'merged' })
+  return 'caught-up'
+}
+
+/** The vault as the server holds it now, opened. */
+async function fetchNewer(
+  slot: VaultSlot,
+  id: VaultId,
+): Promise<{ data: VaultData; updatedAt: string } | 'unreachable' | 'stopped'> {
+  const payload = id === 'personal' ? await fetchVault() : await fetchHouseholdVault(id)
+  if (!payload || !slot.key) return 'unreachable'
+  try {
+    return { data: await decryptVault(payload.ciphertext, payload.nonce, slot.key), updatedAt: payload.updated_at }
+  } catch (e) {
+    if (e instanceof VaultVersionAheadError) {
+      // A newer build saved it. Replaying onto data this one cannot read could
+      // only corrupt it; the banner says to reload, and how much would be lost.
+      slot.versionAhead = true
+      return 'stopped'
+    }
+  }
+  // It would not open with the key this client holds. For a household that
+  // means the key was changed — somebody left — and a new grant is waiting.
+  if (typeof id === 'number' && mek) {
+    await loadHouseholds(mek)
+    const renewed = households.find(h => h.id === id)?.key
+    if (renewed && renewed !== slot.key) {
+      slot.key = renewed
+      try {
+        return { data: await decryptVault(payload.ciphertext, payload.nonce, renewed), updatedAt: payload.updated_at }
+      } catch { /* below */ }
+    }
+  }
+  slot.conflicted = true
+  return 'stopped'
+}
+
+/** Made a reader with changes waiting: they can never be saved, so say how many. */
+async function becameReader(slot: VaultSlot, id: number): Promise<void> {
+  // What this client believed about its role was out of date, so it takes the
+  // server's word, and the screens drop their editing controls. Not thrown: a
+  // permission changing under you is news, not a crash.
+  households = households.map(h => (h.id === id ? { ...h, role: 'reader' } : h))
+  const count = queues.get(id)?.length ?? 0
+  setQueue(slot, id, [])
+  if (count > 0) notify({ kind: 'readOnly', count })
+  // Show the household as it really is, not with changes that will never land.
+  const fresh = await fetchNewer(slot, id)
+  if (fresh !== 'unreachable' && fresh !== 'stopped') {
+    confirmed(id, fresh.data)
+    slot.data = fresh.data
+    slot.lastUpdatedAt = fresh.updatedAt
   }
 }
 
-function scheduleSave(): void {
+/** Removed from a household, or it was deleted, with changes waiting. */
+async function lostHousehold(slot: VaultSlot, id: number): Promise<void> {
+  const name = households.find(h => h.id === id)?.name ?? ''
+  const count = queues.get(id)?.length ?? 0
+  // Before switching away: switching flushes an unsaved vault first, and this
+  // one's save can only be refused again.
+  setQueue(slot, id, [])
+  queues.delete(id)
+  bases.delete(id)
+  households = households.filter(h => h.id !== id)
+  notify({ kind: 'removed', household: name, count })
+  if (currentId === id) await switchTo('personal')
+  stashed.delete(id)
+}
+
+/** Keep the changes, and try again after a pause that grows with each failure. */
+function retryLater(slot: VaultSlot, why: 'offline' | 'busy'): void {
+  slot.waiting = why
+  const delay = RETRY_MS[Math.min(slot.failures, RETRY_MS.length - 1)]
+  slot.failures++
+  if (slot === current) scheduleSave(delay)
+}
+
+function scheduleSave(delay = 2000): void {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     saveVault()
-  }, 2000)
+  }, delay)
+}
+
+/** Put a value somebody else had chosen back, from the overwrite notice. */
+export function undoOverwrite(undo: Action): void {
+  commit(undo.kind, ...(undo.args as ActionArgs<typeof undo.kind>))
 }
 
 /**
@@ -884,9 +1097,9 @@ export function commit<K extends ActionKind>(kind: K, ...args: ActionArgs<K>): A
   // change shows, as it always has, and nothing is kept to save.
   if (current.parked || isReadOnly()) return result
 
-  queues.set(currentId, enqueue(queues.get(currentId) ?? [], action as Action))
-  current.dirty = true
-  scheduleSave()
+  setQueue(current, currentId, enqueue(queues.get(currentId) ?? [], action as Action))
+  // Waiting out a retry already: the change joins the queue and goes with it.
+  if (!current.waiting) scheduleSave()
   return result
 }
 
@@ -917,6 +1130,8 @@ export function clearVault(): void {
   // the same mistake as leaving the MEK behind.
   stashed.clear()
   queues.clear()
+  bases.clear()
+  clearNotices()
   households = []
   mek = null
   // With the MEK, and for the same reason: two unsealed private keys are worth
@@ -991,6 +1206,18 @@ export async function recoverVault(
  */
 async function hashRecoveryKey(recoveryKey: string): Promise<string> {
   return recoveryKey
+}
+
+// Back online, or back in front of the user: try what is waiting now rather
+// than at the end of a backoff that may have grown to a minute.
+if (typeof window !== 'undefined') {
+  const tryNow = () => {
+    if (current.dirty && !current.saving) void saveVault()
+  }
+  window.addEventListener('online', tryNow)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tryNow()
+  })
 }
 
 // Save on beforeunload if dirty
