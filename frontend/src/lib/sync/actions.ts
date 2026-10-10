@@ -1,4 +1,4 @@
-import { savesTowardsTarget, type VaultData, type VaultSnapshot } from '../crypto/vault'
+import { savesTowardsTarget, sideOf, type EntryType, type VaultData, type VaultSnapshot } from '../crypto/vault'
 import * as budget from '../budget/budgetEngine'
 import * as accounts from '../accounts/accountsEngine'
 import { isLegalRouting } from '../accounts/routing'
@@ -38,20 +38,45 @@ export type Verdict = 'go' | 'done' | RefusalCode
 
 interface ActionDef<A extends unknown[], R = unknown> {
   apply(vault: VaultData, ...args: A): R
+  /**
+   * Adds to the arguments what only the moment of making knows, before they are
+   * kept: which category a name meant, while it still means that one.
+   */
+  pin?(vault: VaultData, args: NoInfer<A>): NoInfer<A>
   check?(vault: VaultData, args: NoInfer<A>, tape: Tape): Verdict
   /** What it is about, in words, noted when made — for the message if it is ever refused. */
   subject?(vault: VaultData, args: NoInfer<A>): string | undefined
+  /**
+   * For an action that sets one value: that value as it stands in `vault`, and
+   * the value this action sets. Lets a replay notice that it is about to write
+   * over something somebody else changed a moment ago, and say so.
+   */
+  sets?: {
+    read(vault: VaultData, args: NoInfer<A>): string | undefined
+    written(args: NoInfer<A>): string | undefined
+    /** The same action, setting `value` instead: what Undo commits. */
+    with(args: NoInfer<A>, value: string): NoInfer<A>
+    /** Whether the value is an amount, so the message renders it as money. */
+    money?: true
+  }
 }
 
 function def<A extends unknown[], R>(d: ActionDef<A, R>): ActionDef<A, R> {
   return d
 }
 
+/** An argument list, typed as one rather than as an array. */
+const tuple = <T extends unknown[]>(...items: T): T => items
+
 const entry = (vault: VaultData, id: string) => vault.budget.entries.find(e => e.id === id)
 const category = (vault: VaultData, id: string) => vault.budget.categories.find(c => c.id === id)
 const account = (vault: VaultData, id: string | null) =>
   id === null ? null : vault.accounts.find(a => a.id === id)
 const snapshot = (vault: VaultData, id: string) => vault.budget.snapshots.find(s => s.id === id)
+
+/** The id of the category a name refers to now, on the side an entry type sits on. */
+const categoryIdFor = (vault: VaultData, name: string, type: EntryType) =>
+  vault.budget.categories.find(c => c.name === name && c.side === sideOf(type))?.id
 
 const needEntry = (vault: VaultData, id: string): Verdict => (entry(vault, id) ? 'go' : 'entryGone')
 const entryName = (vault: VaultData, [id]: [string, ...unknown[]]) => entry(vault, id)?.name
@@ -77,18 +102,38 @@ export const ACTIONS = {
     apply: budget.setPlanned,
     check: (v, [entryId]) => needEntry(v, entryId),
     subject: entryName,
+    sets: {
+      read: (v, [entryId]) => budget.plannedFor(v, entryId),
+      written: ([, amount]) => amount,
+      with: ([entryId], amount) => tuple(entryId, amount),
+      money: true,
+    },
   }),
 
   // --- entries ---
   createEntry: def({
     apply: budget.createEntry,
+    pin: (v, [opts]) => tuple({ ...opts, categoryId: opts.categoryId ?? categoryIdFor(v, opts.categoryName, opts.type) }),
     check: created(entry, 'entry'),
     subject: (_v, [opts]) => opts.name,
   }),
   updateEntry: def({
     apply: budget.updateEntry,
+    pin: (v, [entryId, update]) => {
+      const e = entry(v, entryId)
+      if (update.categoryName === undefined || !e || update.categoryId) return tuple(entryId, update)
+      const categoryId = categoryIdFor(v, update.categoryName, update.type ?? e.type)
+      return tuple(entryId, categoryId ? { ...update, categoryId } : update)
+    },
     check: (v, [entryId]) => needEntry(v, entryId),
     subject: entryName,
+    // Only the name: the other fields an edit carries are what the form
+    // already showed, and comparing them would report the form, not a person.
+    sets: {
+      read: (v, [entryId, update]) => (update.name === undefined ? undefined : entry(v, entryId)?.name),
+      written: ([, update]) => update.name,
+      with: ([entryId, update], name) => tuple(entryId, { ...update, name }),
+    },
   }),
   setReserve: def({
     apply: budget.setReserve,
@@ -117,6 +162,11 @@ export const ACTIONS = {
       return budget.findCategoryConflict(v, categoryId, name, update.side ?? c.side) ? 'nameTaken' : 'go'
     },
     subject: (v, [categoryId]) => category(v, categoryId)?.name,
+    sets: {
+      read: (v, [categoryId, update]) => (update.name === undefined ? undefined : category(v, categoryId)?.name),
+      written: ([, update]) => update.name?.trim(),
+      with: ([categoryId, update], name) => tuple(categoryId, { ...update, name }),
+    },
   }),
   mergeCategory: def({
     apply: budget.mergeCategory,
@@ -141,6 +191,11 @@ export const ACTIONS = {
     apply: budget.renameSnapshot,
     check: (v, [id]) => (snapshot(v, id) ? 'go' : 'snapshotGone'),
     subject: (v, [id]) => snapshot(v, id)?.name,
+    sets: {
+      read: (v, [id]) => snapshot(v, id)?.name,
+      written: ([, name]) => name.trim(),
+      with: ([id], name) => tuple(id, name),
+    },
   }),
   deleteSnapshot: def({
     apply: budget.deleteSnapshot,
@@ -171,6 +226,11 @@ export const ACTIONS = {
     apply: accounts.renameAccount,
     check: (v, [id]) => (account(v, id) ? 'go' : 'accountGone'),
     subject: accountName,
+    sets: {
+      read: (v, [id]) => account(v, id)?.name,
+      written: ([, name]) => name,
+      with: ([id], name) => tuple(id, name),
+    },
   }),
   deleteAccount: def({
     apply: accounts.deleteAccount,
@@ -191,6 +251,12 @@ export const ACTIONS = {
     apply: accounts.correctBalance,
     check: (v, [id]) => (account(v, id) ? 'go' : 'accountGone'),
     subject: accountName,
+    sets: {
+      read: (v, [id]) => account(v, id)?.currentAmount,
+      written: ([, amount]) => amount,
+      with: ([id, , atDate], amount) => tuple(id, amount, atDate),
+      money: true,
+    },
   }),
   setRouting: def({
     apply: accounts.setRouting,
@@ -260,11 +326,51 @@ export function perform<K extends ActionKind>(
   args: ActionArgs<K>,
 ): { action: Action<K>; result: ActionResult<K> } {
   const d = defOf(kind)
+  args = (d.pin?.(vault, args as unknown[]) ?? args) as ActionArgs<K>
   const subject = d.subject?.(vault, args as unknown[])
   const { result, tape } = recording(() => d.apply(vault, ...(args as unknown[])))
   return {
     action: { kind, args, tape, ...(subject === undefined ? {} : { subject }) },
     result: result as ActionResult<K>,
+  }
+}
+
+/** Somebody else changed what this action sets, and it is about to set it again. */
+export interface Overwrite {
+  action: Action
+  /** What they had set it to. */
+  theirs: string
+  /** What this action sets it to. */
+  mine: string
+  money: boolean
+  /** The same action, putting their value back. */
+  undo: Action
+}
+
+/**
+ * Whether replaying `action` onto `fresh` writes over a change somebody else
+ * made since `base` — the vault this client last saw from the server.
+ *
+ * Only for actions that set one value, and only when all three differ: the
+ * value moved between `base` and `fresh` (somebody else changed it), and this
+ * action sets something else again. Setting it to what they already chose is
+ * agreement, not an overwrite.
+ */
+export function overwriteBy(base: VaultData, fresh: VaultData, action: Action): Overwrite | null {
+  const sets = defOf(action.kind).sets
+  if (!sets) return null
+  const args = action.args as unknown[]
+  const before = sets.read(base, args)
+  const theirs = sets.read(fresh, args)
+  const mine = sets.written(args)
+  if (before === undefined || theirs === undefined || mine === undefined) return null
+  if (before === theirs || theirs === mine) return null
+  return {
+    action,
+    theirs,
+    mine,
+    money: sets.money === true,
+    undo: { ...action, args: sets.with(args, theirs) as never, tape: { ids: {}, times: [] } },
   }
 }
 

@@ -14,6 +14,7 @@
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
+  import SyncNotices from './lib/sync/SyncNotices.svelte'
   import TourOverlay from './lib/tour/TourOverlay.svelte'
   import { resetTour } from './lib/tour/tourStore.svelte'
   import AppShell from './lib/nav/AppShell.svelte'
@@ -349,6 +350,7 @@
 <!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
 <UpdateBanner />
 <UnsavedBanner />
+<SyncNotices />
 <!-- Here rather than inside a screen: the tour walks across screens, and a
      component owned by one of them would be destroyed halfway through. It
      renders nothing unless the tour is running. -->

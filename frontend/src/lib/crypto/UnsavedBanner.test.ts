@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/svelte'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 
-let state = { conflicted: false, shapeInvalid: false }
+let state = { conflicted: false, shapeInvalid: false, versionAhead: false, pending: 0 }
 
 vi.mock('./vaultStore.svelte', () => ({
   getVaultState: () => state,
@@ -11,7 +11,7 @@ import UnsavedBanner from './UnsavedBanner.svelte'
 
 afterEach(() => {
   cleanup()
-  state = { conflicted: false, shapeInvalid: false }
+  state = { conflicted: false, shapeInvalid: false, versionAhead: false, pending: 0 }
 })
 
 describe('the unsaved banner', () => {
@@ -21,37 +21,44 @@ describe('the unsaved banner', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  // Until this existed, a refused save showed as nothing louder than the word
-  // "Unsaved" in the top bar.
-  test('speaks up when the server refused the write', () => {
-    state = { conflicted: true, shapeInvalid: false }
+  // A refused save no longer gets here — the queue catches up instead. What
+  // does is a newer vault this tab cannot open, and saving over it is out.
+  test('speaks up when the newer copy cannot be opened', () => {
+    state = { ...state, conflicted: true }
     render(UnsavedBanner)
 
     expect(screen.getByRole('alert')).toBeTruthy()
-    expect(screen.getByText(/changed somewhere else/i)).toBeTruthy()
+    expect(screen.getByText(/cannot open/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Reload' })).toBeTruthy()
   })
 
   test('says something different when the vault itself is the problem', () => {
-    state = { conflicted: false, shapeInvalid: true }
+    state = { ...state, shapeInvalid: true }
     render(UnsavedBanner)
 
     expect(screen.getByText(/cannot safely store/i)).toBeTruthy()
   })
 
   test('the vault problem wins when both are set', () => {
-    state = { conflicted: true, shapeInvalid: true }
+    state = { ...state, conflicted: true, shapeInvalid: true }
     render(UnsavedBanner)
 
     // It is the more specific failure, and the one that says do not trust this tab.
     expect(screen.getByText(/cannot safely store/i)).toBeTruthy()
-    expect(screen.queryByText(/changed somewhere else/i)).toBeNull()
+    expect(screen.queryByText(/cannot open/i)).toBeNull()
   })
 
   test('warns that unsaved work is lost on reload', () => {
-    state = { conflicted: true, shapeInvalid: false }
+    state = { ...state, conflicted: true }
     render(UnsavedBanner)
 
     expect(screen.getByText(/will be lost/i)).toBeTruthy()
+  })
+
+  test('says how many changes a newer app version will cost', () => {
+    state = { ...state, versionAhead: true, pending: 3 }
+    render(UnsavedBanner)
+
+    expect(screen.getByText(/3 changes made here will be lost/i)).toBeTruthy()
   })
 })

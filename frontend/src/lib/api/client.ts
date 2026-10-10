@@ -102,6 +102,20 @@ export class VaultReadOnlyError extends Error {
   }
 }
 
+/**
+ * A household save refused because the household is not this account's any more.
+ *
+ * The server answers 404 both for a household that was deleted and for one
+ * this account was removed from, and so does this. Like the read-only case,
+ * the answer is neither "try again" nor "something broke".
+ */
+export class VaultGoneError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VaultGoneError'
+  }
+}
+
 export async function fetchVaultKeys(): Promise<VaultKeysResponse | null> {
   try {
     return await request<VaultKeysResponse>('/vault/keys')
@@ -318,7 +332,8 @@ export async function putHouseholdVault(
   // Handled here rather than through `request`, for the same reason the personal
   // vault does: a 409 is not a failure the caller should treat like any other.
   // It means another member wrote while this client was editing, and the answer
-  // is to reload rather than retry — which only this error can say.
+  // is to fetch their vault and apply this client's changes on top — which only
+  // this error can say.
   if (res.status === 409) {
     const body = await res.json().catch(() => ({}))
     throw new VaultConflictError(withCode(body))
@@ -326,6 +341,10 @@ export async function putHouseholdVault(
   if (res.status === 403) {
     const body = await res.json().catch(() => ({}))
     throw new VaultReadOnlyError(withCode(body))
+  }
+  if (res.status === 404) {
+    const body = await res.json().catch(() => ({}))
+    throw new VaultGoneError(withCode(body))
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))

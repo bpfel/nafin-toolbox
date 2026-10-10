@@ -1,18 +1,21 @@
 <script lang="ts">
-  import { t } from '../i18n/index.svelte'
+  import { t, tn } from '../i18n/index.svelte'
   import { getVaultState } from './vaultStore.svelte'
 
   const vaultState = getVaultState()
 
-  // Both mean the same thing to the user — edits are being kept in this tab and
-  // nowhere else — and differ only in what to do about it. Until this existed,
-  // a refused save showed as nothing louder than the word "Unsaved".
+  // Each means the same thing to the user — edits are being kept in this tab
+  // and nowhere else — and differs only in why. An ordinary clash with another
+  // device no longer gets here: the save queue applies this tab's changes on
+  // top of the newer copy instead (see `sync/`).
   let reason = $derived(
     vaultState.shapeInvalid
-      ? 'This page has your data in a state it cannot safely store, so it has stopped saving. Reload to start again from the last saved copy — anything changed since will be lost.'
-      : vaultState.conflicted
-        ? 'Your data was changed somewhere else — another tab or another device — so this page has stopped saving to avoid overwriting it. Reload to pick up the newer copy; anything changed here since will be lost.'
-        : null,
+      ? t('unsaved.shapeInvalid')
+      : vaultState.versionAhead && vaultState.pending > 0
+        ? tn('unsaved.versionAhead', vaultState.pending)
+        : vaultState.conflicted
+          ? t('unsaved.cannotOpen')
+          : null,
   )
 </script>
 
