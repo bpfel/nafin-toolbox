@@ -262,6 +262,50 @@ describe('edit against delete', () => {
   })
 })
 
+describe('categories and accounts gone another way', () => {
+  test('11. an entry added to a category merged away elsewhere brings that category back', async () => {
+    const [from, into] = state.vault!.budget.categories.filter(c => c.side === 'expense')
+    commit('createEntry', { name: 'Cleaning', type: 'expense', categoryName: from.name })
+    await elsewhere(v => budget.mergeCategory(v, from.id, into.id))
+
+    await saveVault()
+
+    const saved = await onServer()
+    const cleaning = entryNamed(saved, 'Cleaning')!
+    expect(saved.budget.categories.find(c => c.id === cleaning.categoryId)?.name).toBe(from.name)
+    // Everything that was merged stays merged.
+    expect(budget.entriesInCategory(saved, into.id).length).toBeGreaterThan(0)
+  })
+
+  /*
+   * 14 as the plan wrote it — "the delete that would leave no account fails" —
+   * cannot arise on replay: a delete goes ahead only if its reassignment target
+   * exists, and then there are at least two accounts. What matters is the rule
+   * behind it, so that is what is held: however deletes cross, one account is
+   * always left and nothing is routed to one that is gone.
+   */
+  test('14. however deletes cross, an account is always left', async () => {
+    const cash = commit('createAccount', { name: 'Cash', kind: 'cash' }).id
+    await saveVault()
+    const [main, savings] = state.vault!.accounts.map(a => a.id)
+    commit('deleteAccount', savings, cash)
+    await elsewhere(v => {
+      accounts.deleteAccount(v, main, savings)
+      accounts.deleteAccount(v, cash, savings)
+    })
+
+    await saveVault()
+
+    const saved = await onServer()
+    expect(saved.accounts.map(a => a.id)).toEqual([savings])
+    const ids = new Set(saved.accounts.map(a => a.id))
+    for (const e of saved.budget.entries) {
+      for (const end of [e.sourceAccountId, e.sinkAccountId]) if (end !== null) expect(ids.has(end)).toBe(true)
+    }
+    expect(only('dropped')?.items[0].reason).toBe('accountGone')
+  })
+})
+
 // --- order and bulk ----------------------------------------------------------
 
 describe('order and bulk', () => {
@@ -275,6 +319,32 @@ describe('order and bulk', () => {
     const saved = await onServer()
     expect(entryNamed(saved, 'Gym')).toBeTruthy()
     expect(saved.budget.entries).toHaveLength(ids.length + 1)
+  })
+
+  test('16. a reorder here holds for what is left after a delete elsewhere', async () => {
+    const ids = [...state.vault!.budget.entries].reverse().map(e => e.id)
+    const gone = ids[1]
+    commit('reorderEntries', ids)
+    await elsewhere(v => budget.deleteEntry(v, gone))
+
+    await saveVault()
+
+    const saved = await onServer()
+    const order = [...saved.budget.entries].sort((a, b) => a.sortOrder - b.sortOrder).map(e => e.id)
+    expect(order).toEqual(ids.filter(id => id !== gone))
+  })
+
+  test('17. two reorders: the second to save wins', async () => {
+    const ids = state.vault!.budget.entries.map(e => e.id)
+    const mine = [...ids].reverse()
+    const theirs = [...ids.slice(1), ids[0]]
+    commit('reorderEntries', mine)
+    await elsewhere(v => budget.reorderEntries(v, theirs))
+
+    await saveVault()
+
+    const saved = await onServer()
+    expect([...saved.budget.entries].sort((a, b) => a.sortOrder - b.sortOrder).map(e => e.id)).toEqual(mine)
   })
 
   test('18. a reset here wipes what was added elsewhere — that is what reset means', async () => {
@@ -467,22 +537,103 @@ describe('trust', () => {
 // --- households ------------------------------------------------------------
 
 describe('in a household', () => {
-  async function inHousehold(role = 'writer') {
-    const householdKey = await generateHouseholdKey()
-    const { ciphertext, nonce } = await encryptVault(base(), householdKey)
+  /** The household's own server state, and the key it is under right now. */
+  let flat: Stored
+  let flatKey: CryptoKey
+
+  async function listFlat(role = 'writer') {
     api.fetchHouseholds.mockResolvedValue([{
       id: 3,
-      encrypted_name: await sealName('Flat', householdKey),
-      wrapped_key: await sealKeyForSelf(householdKey, key),
+      encrypted_name: await sealName('Flat', flatKey),
+      wrapped_key: await sealKeyForSelf(flatKey, key),
       wrap_kind: 'self',
       role,
       updated_at: '2026-01-01T00:00:00Z',
     }])
-    api.fetchHouseholdVault.mockResolvedValue({ ciphertext, nonce, updated_at: '2026-01-01T00:00:00Z' })
+  }
+
+  async function inHousehold(role = 'writer') {
+    flatKey = await generateHouseholdKey()
+    const { ciphertext, nonce } = await encryptVault(base(), flatKey)
+    flat = { ciphertext, nonce, updated_at: stamp() }
+    await listFlat(role)
+    api.fetchHouseholdVault.mockImplementation(async () => ({ ...flat }))
+    api.putHouseholdVault.mockImplementation(async (_id: number, body: { ciphertext: string; nonce: string; expected_updated_at?: string }) => {
+      if (body.expected_updated_at !== undefined && body.expected_updated_at !== flat.updated_at) {
+        throw new VaultConflictError('stale')
+      }
+      flat = { ciphertext: body.ciphertext, nonce: body.nonce, updated_at: stamp() }
+      return { status: 'ok', updated_at: flat.updated_at }
+    })
     clearVault()
     await signInAgain()
     await switchTo(3)
   }
+
+  /** Another member changes the household and saves it — optionally under a new key. */
+  async function elsewhereInFlat(change: (v: VaultData) => void, newKey?: CryptoKey) {
+    const v = await decryptVault(flat.ciphertext, flat.nonce, flatKey)
+    change(v)
+    if (newKey) flatKey = newKey
+    const { ciphertext, nonce } = await encryptVault(v, flatKey)
+    flat = { ciphertext, nonce, updated_at: stamp() }
+  }
+
+  const flatOnServer = () => decryptVault(flat.ciphertext, flat.nonce, flatKey)
+
+  test('23. switching vaults while a save is in flight keeps each queue with its vault', async () => {
+    await inHousehold()
+    await switchTo('personal')
+    commit('createEntry', { name: 'Mine', type: 'expense', categoryName: 'Personal' })
+
+    let release!: () => void
+    api.putVault.mockImplementationOnce(
+      (body: never) => new Promise(resolve => { release = () => resolve(serve(body)) }),
+    )
+    const saving = saveVault()
+    await switchTo(3)
+    commit('createEntry', { name: 'Ours', type: 'expense', categoryName: 'Shared' })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    release()
+    await saving
+    await saveVault()
+
+    expect(entryNamed(await onServer(), 'Mine')).toBeTruthy()
+    expect(entryNamed(await onServer(), 'Ours')).toBeUndefined()
+    expect(entryNamed(await flatOnServer(), 'Ours')).toBeTruthy()
+    expect(entryNamed(await flatOnServer(), 'Mine')).toBeUndefined()
+    await switchTo('personal')
+    expect(state.dirty).toBe(false)
+  })
+
+  test('28. the key changed while changes waited: the new grant is fetched, and they land', async () => {
+    await inHousehold()
+    commit('createEntry', { name: 'Ours', type: 'expense', categoryName: 'Shared' })
+    const rotated = await generateHouseholdKey()
+    await elsewhereInFlat(v => budget.createEntry(v, { name: 'Theirs', type: 'expense', categoryName: 'Shared' }), rotated)
+    await listFlat()
+
+    await saveVault()
+
+    const saved = await flatOnServer()
+    expect(entryNamed(saved, 'Ours')).toBeTruthy()
+    expect(entryNamed(saved, 'Theirs')).toBeTruthy()
+    expect(state.conflicted).toBe(false)
+  })
+
+  test('28b. the key changed and no new grant came: it stops, rather than save under the old key', async () => {
+    await inHousehold()
+    commit('createEntry', { name: 'Ours', type: 'expense', categoryName: 'Shared' })
+    await elsewhereInFlat(() => {}, await generateHouseholdKey())
+    const before = flat.updated_at
+
+    await saveVault()
+
+    expect(state.conflicted).toBe(true)
+    expect(state.dirty).toBe(true)
+    expect(flat.updated_at).toBe(before)
+  })
+
 
   test('26. made a reader with changes waiting: told how many, and shown the real thing', async () => {
     await inHousehold()
