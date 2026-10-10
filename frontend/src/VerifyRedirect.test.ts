@@ -33,7 +33,6 @@ vi.mock('./lib/auth/authStore.svelte', () => ({
 
 vi.mock('./lib/crypto/vaultStore.svelte', () => ({
   getVaultState: () => ({ unlocked: true, vault: null, dirty: false, saving: false, conflicted: false, lastSaved: null, versionAhead: false }),
-  markDirty: vi.fn(),
 }))
 
 // UpdateBanner reads this; the watcher is stubbed so no timer or fetch runs.

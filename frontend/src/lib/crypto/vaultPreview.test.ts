@@ -13,7 +13,7 @@ vi.mock('../api/client', () => ({
   VaultConflictError: class extends Error {},
 }))
 
-import { getVaultState, beginPreview, endPreview, markDirty } from './vaultStore.svelte'
+import { getVaultState, beginPreview, endPreview, commit } from './vaultStore.svelte'
 
 const vaultState = getVaultState()
 
@@ -88,20 +88,18 @@ describe('previewing a vault', () => {
    * user would own a budget they never typed.
    */
   test('a change to the copy is not treated as unsaved work', () => {
-    beginPreview(copy => {
-      copy.budget.categories.push({ id: 'c', name: 'Demo', side: 'expense', sortOrder: 1 })
-    })
+    beginPreview(() => {})
 
-    markDirty()
+    commit('createEntry', { name: 'Demo', type: 'expense', categoryName: 'Demo' })
 
     expect(vaultState.dirty).toBe(false)
   })
 
-  test('and marking dirty works again once the preview is over', () => {
+  test('and a change is unsaved work again once the preview is over', () => {
     beginPreview(() => {})
     endPreview()
 
-    markDirty()
+    commit('createEntry', { name: 'Real', type: 'expense', categoryName: 'Real' })
 
     expect(vaultState.dirty).toBe(true)
   })

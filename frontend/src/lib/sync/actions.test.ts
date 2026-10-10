@@ -63,6 +63,10 @@ const CASES: Case[] = [
   { kind: 'createAccount', args: () => [{ name: 'Cash', kind: 'cash' }] },
   { kind: 'renameAccount', args: v => [v.accounts[1].id, 'Renamed account'] },
   { kind: 'deleteAccount', args: v => [v.accounts[1].id, v.accounts[0].id] },
+  {
+    kind: 'setAccountDetails',
+    args: v => [v.accounts[1].id, { kind: 'savings', bankName: 'ZKB', iban: 'CH93 0076 2011 6238 5295 7', ibanKind: 'iban' }],
+  },
   { kind: 'reorderAccounts', args: v => [[...v.accounts].reverse().map(a => a.id)] },
   { kind: 'correctBalance', args: v => [v.accounts[0].id, '5000.00', '2026-02-01'] },
   {
@@ -73,6 +77,8 @@ const CASES: Case[] = [
   { kind: 'recordTourDismissed', args: () => [] },
   { kind: 'rememberTrust', args: () => ['7', 'key-seven', '3', 2] },
 ]
+
+const caseOf = (kind: ActionKind) => CASES.find(c => c.kind === kind)!
 
 /** Seeding wants an empty budget, so it is held separately. */
 const SEED_CASES: Case[] = [
@@ -116,25 +122,25 @@ describe('refused where what it changes is gone', () => {
   const gone: { name: string; c: Case; remove: (v: VaultData) => void; reason: string }[] = [
     {
       name: 'setPlanned on a deleted entry',
-      c: CASES[0],
+      c: caseOf('setPlanned'),
       remove: v => budget.deleteEntry(v, firstEntry(v, 'expense').id),
       reason: 'entryGone',
     },
     {
       name: 'updateEntry on a deleted entry',
-      c: CASES[2],
+      c: caseOf('updateEntry'),
       remove: v => budget.deleteEntry(v, firstEntry(v, 'expense').id),
       reason: 'entryGone',
     },
     {
       name: 'setReserve on an entry that became an expense',
-      c: CASES[3],
+      c: caseOf('setReserve'),
       remove: v => budget.updateEntry(v, firstEntry(v, 'bill').id, { type: 'expense' }),
       reason: 'entryChanged',
     },
     {
       name: 'updateCategory on a deleted category',
-      c: CASES[6],
+      c: caseOf('updateCategory'),
       remove: v => {
         const id = v.budget.categories[0].id
         for (const e of budget.entriesInCategory(v, id)) budget.deleteEntry(v, e.id)
@@ -143,13 +149,13 @@ describe('refused where what it changes is gone', () => {
     },
     {
       name: 'renameSnapshot on a deleted snapshot',
-      c: CASES[10],
+      c: caseOf('renameSnapshot'),
       remove: v => budget.deleteSnapshot(v, v.budget.snapshots[0].id),
       reason: 'snapshotGone',
     },
     {
       name: 'renameAccount on a deleted account',
-      c: CASES[14],
+      c: caseOf('renameAccount'),
       remove: v => accounts.deleteAccount(v, v.accounts[1].id, v.accounts[0].id),
       reason: 'accountGone',
     },
@@ -167,7 +173,7 @@ describe('refused where what it changes is gone', () => {
     },
     {
       name: 'setRouting to a deleted account',
-      c: CASES[18],
+      c: caseOf('setRouting'),
       remove: v => accounts.deleteAccount(v, v.accounts[1].id, v.accounts[0].id),
       reason: 'accountGone',
     },
@@ -215,7 +221,7 @@ describe('what an action keeps', () => {
 
   test('an entry added to a category deleted elsewhere keeps its id, and the category comes back', () => {
     const before = filled()
-    const { after, action } = made(before, CASES[1])
+    const { after, action } = made(before, caseOf('createEntry'))
     const added = after.budget.entries.find(e => e.name === 'Dentist')!
 
     const elsewhere = clone(before)

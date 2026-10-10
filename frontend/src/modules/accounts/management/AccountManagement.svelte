@@ -1,8 +1,7 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
   import Sortable from 'sortablejs'
-  import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
-  import * as engine from '../../../lib/accounts/accountsEngine'
+  import { getVaultState, commit } from '../../../lib/crypto/vaultStore.svelte'
   import {
     allocationBreakdown,
     availableForAccount,
@@ -167,8 +166,7 @@
     if (!vault) return
     error = null
     try {
-      engine.reorderAccounts(vault, ids)
-      markDirty()
+      commit('reorderAccounts', ids)
       version++
     } catch (e) {
       error = e instanceof Error ? e.message : t('error.reorderAccounts')
@@ -190,39 +188,20 @@
     formAccount = null
   }
 
-  // The engine owns the name (and the invariants around accounts existing at
-  // all); the descriptive fields carry no invariants and have no engine setter,
-  // so they are written here. Clearing a field removes the key rather than
-  // storing an empty string, keeping the vault shape identical to a fresh one.
-  function applyDetails(account: VaultAccount, values: AccountDetails) {
-    account.kind = values.kind
-    if (values.bankName) account.bankName = values.bankName
-    else delete account.bankName
-    if (values.iban) {
-      account.iban = values.iban
-      account.ibanKind = values.ibanKind
-    } else {
-      delete account.iban
-      delete account.ibanKind
-    }
-    if (values.holder) account.holder = values.holder
-    else delete account.holder
-  }
-
   function saveAccount(values: AccountDetails) {
     const vault = vaultState.vault
     if (!vault) return
     error = null
     try {
-      let account: VaultAccount
+      let id: string
       if (formAccount) {
-        engine.renameAccount(vault, formAccount.id, values.name)
-        account = formAccount
+        commit('renameAccount', formAccount.id, values.name)
+        id = formAccount.id
       } else {
-        account = engine.createAccount(vault, { name: values.name })
+        id = commit('createAccount', { name: values.name }).id
       }
-      applyDetails(account, values)
-      markDirty()
+      const { name: _name, ...details } = values
+      commit('setAccountDetails', id, details)
       version++
       closeForm()
     } catch (e) {
@@ -237,8 +216,7 @@
     if (!vault) return
     error = null
     try {
-      engine.correctBalance(vault, accountId, amount, atDate)
-      markDirty()
+      commit('correctBalance', accountId, amount, atDate)
       version++
     } catch (e) {
       error = e instanceof Error ? e.message : t('error.correctBalance')
@@ -250,8 +228,7 @@
     if (!vault || !deleteTarget) return
     error = null
     try {
-      engine.deleteAccount(vault, deleteTarget.id, reassignToId)
-      markDirty()
+      commit('deleteAccount', deleteTarget.id, reassignToId)
       version++
       deleteTarget = null
     } catch (e) {

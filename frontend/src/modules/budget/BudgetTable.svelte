@@ -3,6 +3,7 @@
   import Sortable from 'sortablejs'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import * as engine from '../../lib/budget/budgetEngine'
+  import { commit } from '../../lib/crypto/vaultStore.svelte'
   import { sideOf, type EntryType, type VaultData } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
   import Money from '../../lib/util/Money.svelte'
@@ -199,7 +200,7 @@
   }
 
   function handleEntryDeleted(entryId: string) {
-    engine.deleteEntry(vault, entryId)
+    commit('deleteEntry', entryId)
     onentrydeleted()
   }
 
@@ -238,7 +239,7 @@
         const rows = node.querySelectorAll('.entry-row')
         const ids = Array.from(rows).map(r => (r as HTMLElement).dataset.entryId!).filter(Boolean)
         if (ids.length > 0) {
-          engine.reorderEntries(vault, ids)
+          commit('reorderEntries', ids)
           onentrycreated()
         }
       },
@@ -260,7 +261,7 @@
           .map(b => (b as HTMLElement).dataset.categoryId)
           .filter((id): id is string => Boolean(id))
         if (ids.length > 0) {
-          engine.reorderCategories(vault, ids)
+          commit('reorderCategories', ids)
           onentrycreated()
         }
       },

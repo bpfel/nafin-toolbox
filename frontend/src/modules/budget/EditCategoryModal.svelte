@@ -3,6 +3,7 @@
   import { untrack } from 'svelte'
   import type { VaultCategory, VaultData } from '../../lib/crypto/vault'
   import * as engine from '../../lib/budget/budgetEngine'
+  import { commit } from '../../lib/crypto/vaultStore.svelte'
   import { focusTrap } from '../../lib/util/focusTrap'
   import { closeOnBack } from '../../lib/nav/closeOnBack'
 
@@ -51,7 +52,7 @@
   function save() {
     error = null
     try {
-      engine.updateCategory(vault, category.id, { name: trimmed, side })
+      commit('updateCategory', category.id, { name: trimmed, side })
       onsaved()
       onclose()
     } catch (e) {
@@ -61,7 +62,7 @@
 
   function merge() {
     if (!conflict) return
-    engine.mergeCategory(vault, category.id, conflict.id)
+    commit('mergeCategory', category.id, conflict.id)
     onsaved()
     onclose()
   }

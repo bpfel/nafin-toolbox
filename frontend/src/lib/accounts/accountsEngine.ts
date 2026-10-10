@@ -94,6 +94,29 @@ export function correctBalance(vault: VaultData, id: string, amount: string, atD
   account.lastCorrectedAt = atDate
 }
 
+// The descriptive fields: what kind of account it is, and the bank details a
+// QR bill needs. They carry no invariant, so this only stores them — clearing
+// a field removes the key rather than storing an empty string, keeping the
+// vault shape identical to a fresh one.
+export type AccountDetailFields = Pick<VaultAccount, 'kind'> &
+  Partial<Pick<VaultAccount, 'bankName' | 'iban' | 'ibanKind' | 'holder'>>
+
+export function setAccountDetails(vault: VaultData, id: string, details: AccountDetailFields): void {
+  const account = findAccount(vault, id)
+  account.kind = details.kind
+  if (details.bankName) account.bankName = details.bankName
+  else delete account.bankName
+  if (details.iban) {
+    account.iban = details.iban
+    account.ibanKind = details.ibanKind
+  } else {
+    delete account.iban
+    delete account.ibanKind
+  }
+  if (details.holder) account.holder = { ...details.holder }
+  else delete account.holder
+}
+
 // Where an entry's money comes from and goes to. Refuses an illegal pair
 // rather than storing it: the allocation screen's controls cannot produce one,
 // and this is the assertion that keeps that true if they ever change. A reserve

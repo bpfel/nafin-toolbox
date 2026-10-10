@@ -1,14 +1,13 @@
 import { cleanup, render, screen, within } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
+import { committingTo } from '../../lib/sync/testing'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { VaultData } from '../../lib/crypto/vault'
 import * as engine from '../../lib/budget/budgetEngine'
 
 // The panel marks the vault dirty after every mutation, which schedules an
 // encrypted save over the network. The tests care about the vault, not the wire.
-vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
-  markDirty: vi.fn(),
-}))
+vi.mock('../../lib/crypto/vaultStore.svelte', async () => (await import('../../lib/sync/testing')).storeMock())
 
 import SnapshotPanel from './SnapshotPanel.svelte'
 
@@ -32,6 +31,10 @@ function snapshotAmount(entryName: string): string {
 }
 
 function makeVault(): VaultData {
+  return committingTo(buildVault())
+}
+
+function buildVault(): VaultData {
   return {
     version: 9,
     tour: { completedAt: null, dismissedAt: null },

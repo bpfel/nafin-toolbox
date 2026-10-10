@@ -37,7 +37,7 @@ import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 import {
-  getVaultState, tryRestoreVault, clearVault, switchTo, markDirty, saveVault,
+  getVaultState, tryRestoreVault, clearVault, switchTo, commit, saveVault,
   createHousehold, renameHousehold, deleteHousehold, removeMember,
 } from './vaultStore.svelte'
 
@@ -169,7 +169,7 @@ describe('switching', () => {
   // is current.
   test('flushes an unsaved edit before putting a vault aside', async () => {
     await withHousehold()
-    markDirty()
+    commit('createAccount', { name: 'Unsaved' })
 
     await switchTo(3)
 
@@ -180,7 +180,7 @@ describe('switching', () => {
   test('an unsaved warning belongs to its own vault', async () => {
     await withHousehold()
     await switchTo(3)
-    markDirty()
+    commit('createAccount', { name: 'Unsaved' })
     expect(state.dirty).toBe(true)
 
     await switchTo('personal')

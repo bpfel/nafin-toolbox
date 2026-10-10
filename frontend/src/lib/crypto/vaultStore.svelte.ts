@@ -86,15 +86,6 @@ interface VaultSlot {
    * autosave, the flush on logout, and any direct call alike.
    */
   parked: VaultData | null
-  /**
-   * Changed through `markDirty` rather than `commit` since the last save.
-   *
-   * Such a change was made straight on the vault and kept nowhere else, so it
-   * cannot be applied again onto a newer vault. While any call site still
-   * writes that way, a refused save that carries one has to fall back to the
-   * old answer — stop, and tell the user to reload.
-   */
-  untracked: boolean
 }
 
 function emptySlot(): VaultSlot {
@@ -109,7 +100,6 @@ function emptySlot(): VaultSlot {
     shapeInvalid: false,
     versionAhead: false,
     parked: null,
-    untracked: false,
   }
 }
 
@@ -517,16 +507,12 @@ function rememberTrust(userId: number, verifyingKey: string, householdId: number
   const trust = current.data?.trust
   if (!trust) return
 
-  let changed = false
-  if (trust.pins[String(userId)] !== verifyingKey) {
-    trust.pins[String(userId)] = verifyingKey
-    changed = true
-  }
-  if ((trust.epochs[String(householdId)] ?? 0) < epoch) {
-    trust.epochs[String(householdId)] = epoch
-    changed = true
-  }
-  if (changed) markDirty()
+  // Only when there is something new to write down: every unlock opens every
+  // granted household, and a change queued each time would be a save each time.
+  const known =
+    trust.pins[String(userId)] === verifyingKey && (trust.epochs[String(householdId)] ?? 0) >= epoch
+  if (known) return
+  commit('rememberTrust', String(userId), verifyingKey, String(householdId), epoch)
 }
 
 /**
@@ -829,8 +815,6 @@ export async function saveVault(): Promise<void> {
   // while it is in flight replaces the last queued action, and that one must
   // stay queued for the next save rather than be cleared with this one.
   const carried = new Set(queues.get(id) ?? [])
-  const hadUntracked = slot.untracked
-  slot.untracked = false
   try {
     const { ciphertext, nonce } = await encryptVault(slot.data, slot.key)
     const body = {
@@ -846,10 +830,9 @@ export async function saveVault(): Promise<void> {
     slot.lastUpdatedAt = result.updated_at
     const left = (queues.get(id) ?? []).filter(a => !carried.has(a))
     queues.set(id, left)
-    slot.dirty = left.length > 0 || slot.untracked
+    slot.dirty = left.length > 0
     slot.lastSaved = new Date()
   } catch (e) {
-    slot.untracked ||= hadUntracked
     if (e instanceof VaultConflictError) {
       // Leave `dirty` set: the edits are still unsaved, and the user needs to
       // know they will be lost on reload rather than believing they persisted.
@@ -869,20 +852,6 @@ export async function saveVault(): Promise<void> {
   } finally {
     slot.saving = false
   }
-}
-
-/**
- * Mark vault as dirty — triggers debounced auto-save (2s).
- */
-export function markDirty(): void {
-  // Nothing in a preview is worth saving, and setting the flag would put an
-  // "unsaved" warning on the screen about edits that do not exist.
-  if (current.parked) return
-  // Nor in a vault that cannot be saved: the warning would never clear.
-  if (isReadOnly()) return
-  current.untracked = true
-  current.dirty = true
-  scheduleSave()
 }
 
 function scheduleSave(): void {

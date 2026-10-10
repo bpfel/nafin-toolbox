@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
-  import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
+  import { getVaultState, commit } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/budget/budgetEngine'
   import {
     sideOf,
@@ -273,13 +273,8 @@
     }
 
     error = null
-    entry.sourceAccountId = routing.sourceAccountId
-    entry.sinkAccountId = routing.sinkAccountId
-    // A reserve has to accumulate somewhere. Routing back to spending removes
-    // the sink, so the reserve goes with it rather than lingering illegally.
-    if (entry.sinkAccountId === null) delete entry.reserve
-
-    markDirty()
+    // Routing back to spending drops the reserve with the sink; see `setRouting`.
+    commit('setRouting', entryId, routing.sourceAccountId, routing.sinkAccountId)
     version++
   }
 

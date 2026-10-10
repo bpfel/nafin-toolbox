@@ -2,6 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
+  import { commit } from '../../lib/crypto/vaultStore.svelte'
   import {
     savesTowardsTarget,
     type EntryType,
@@ -288,12 +289,12 @@
 
     try {
       if (isEdit && editing) {
-        engine.updateEntry(vault, editing.id, {
+        commit('updateEntry', editing.id, {
           name: trimmed,
           categoryName: resolvedCategoryName,
         })
         if (targeted) {
-          engine.setReserve(vault, editing.id, {
+          commit('setReserve', editing.id, {
             targetAmount: (centsOf(totalValue) / 100).toFixed(2),
             periodMonths,
             anchorMonth,
@@ -305,7 +306,7 @@
           if (amount !== '') onsave?.(editing.id, amount)
         }
       } else {
-        engine.createEntry(vault, {
+        commit('createEntry', {
           name: trimmed,
           type,
           categoryName: resolvedCategoryName,
