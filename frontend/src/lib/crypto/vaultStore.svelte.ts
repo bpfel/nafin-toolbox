@@ -21,6 +21,8 @@ import {
 import { fromBase64, toBase64, importPublicKey, openUnder, sealUnder } from './identity'
 import { seedNamesFor } from '../budget/seedNames'
 import { getLocale } from '../i18n/index.svelte'
+import { perform, type Action, type ActionArgs, type ActionKind, type ActionResult } from '../sync/actions'
+import { enqueue } from '../sync/queue'
 
 /**
  * Which vault the screens are looking at.
@@ -84,6 +86,15 @@ interface VaultSlot {
    * autosave, the flush on logout, and any direct call alike.
    */
   parked: VaultData | null
+  /**
+   * Changed through `markDirty` rather than `commit` since the last save.
+   *
+   * Such a change was made straight on the vault and kept nowhere else, so it
+   * cannot be applied again onto a newer vault. While any call site still
+   * writes that way, a refused save that carries one has to fall back to the
+   * old answer — stop, and tell the user to reload.
+   */
+  untracked: boolean
 }
 
 function emptySlot(): VaultSlot {
@@ -98,6 +109,7 @@ function emptySlot(): VaultSlot {
     shapeInvalid: false,
     versionAhead: false,
     parked: null,
+    untracked: false,
   }
 }
 
@@ -146,6 +158,15 @@ let unlocked = $state(false)
 let households = $state<OpenHousehold[]>([])
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Each vault's changes that the server has not confirmed yet, oldest first.
+ *
+ * By vault id rather than in the slot: the slot is deep `$state`, and actions
+ * must stay plain objects — they are cloned when a save is refused and applied
+ * again, and a reactive proxy cannot be cloned. Nothing renders from them.
+ */
+const queues = new Map<VaultId, Action[]>()
 
 const MEK_STORAGE_KEY = 'vault_mek'
 
@@ -572,6 +593,7 @@ export async function deleteHousehold(id: number): Promise<void> {
   await removeHousehold(id)
   households = households.filter(h => h.id !== id)
   stashed.delete(id)
+  queues.delete(id)
 
   if (currentId === id) {
     currentId = 'personal'
@@ -803,6 +825,12 @@ export async function saveVault(): Promise<void> {
   }
 
   slot.saving = true
+  // What this save carries, by identity rather than by count: an amount typed
+  // while it is in flight replaces the last queued action, and that one must
+  // stay queued for the next save rather than be cleared with this one.
+  const carried = new Set(queues.get(id) ?? [])
+  const hadUntracked = slot.untracked
+  slot.untracked = false
   try {
     const { ciphertext, nonce } = await encryptVault(slot.data, slot.key)
     const body = {
@@ -816,9 +844,12 @@ export async function saveVault(): Promise<void> {
 
     const result = id === 'personal' ? await putVault(body) : await putHouseholdVault(id, body)
     slot.lastUpdatedAt = result.updated_at
-    slot.dirty = false
+    const left = (queues.get(id) ?? []).filter(a => !carried.has(a))
+    queues.set(id, left)
+    slot.dirty = left.length > 0 || slot.untracked
     slot.lastSaved = new Date()
   } catch (e) {
+    slot.untracked ||= hadUntracked
     if (e instanceof VaultConflictError) {
       // Leave `dirty` set: the edits are still unsaved, and the user needs to
       // know they will be lost on reload rather than believing they persisted.
@@ -849,11 +880,45 @@ export function markDirty(): void {
   if (current.parked) return
   // Nor in a vault that cannot be saved: the warning would never clear.
   if (isReadOnly()) return
+  current.untracked = true
   current.dirty = true
+  scheduleSave()
+}
+
+function scheduleSave(): void {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     saveVault()
   }, 2000)
+}
+
+/**
+ * Change the vault on screen, and keep the change so it can be applied again.
+ *
+ * What every edit goes through: one call that applies the engine function,
+ * queues it as an action, and schedules the save. If somebody else saves
+ * first, the queue is what gets applied on top of their vault (see `sync/`).
+ *
+ * The arguments are copied out of any reactive state before they are kept: an
+ * action must record what was asked, not follow the form it was typed into.
+ *
+ * Whatever the engine throws is thrown on, and nothing is queued — a change
+ * refused on screen is not one to save.
+ */
+export function commit<K extends ActionKind>(kind: K, ...args: ActionArgs<K>): ActionResult<K> {
+  const vault = current.data
+  if (!vault) throw new Error('no vault is open')
+  const plain = $state.snapshot(args) as ActionArgs<K>
+  const { action, result } = perform(vault, kind, plain)
+
+  // A preview is a throwaway copy, and a reader's vault cannot be saved: the
+  // change shows, as it always has, and nothing is kept to save.
+  if (current.parked || isReadOnly()) return result
+
+  queues.set(currentId, enqueue(queues.get(currentId) ?? [], action as Action))
+  current.dirty = true
+  scheduleSave()
+  return result
 }
 
 /**
@@ -882,6 +947,7 @@ export function clearVault(): void {
   // decrypted budget and its key, and letting that outlive a sign-out would be
   // the same mistake as leaving the MEK behind.
   stashed.clear()
+  queues.clear()
   households = []
   mek = null
   // With the MEK, and for the same reason: two unsealed private keys are worth

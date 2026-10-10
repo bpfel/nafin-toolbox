@@ -13,6 +13,7 @@ import { defaultRouting, primaryAccountId } from '../accounts/routing'
 import { seedNamesFor, type SeedKey } from './seedNames'
 import type { Locale } from '../i18n/index.svelte'
 import { fromCents, toCents } from '../accounts/reserveMath'
+import { newId, nowISO } from '../sync/source'
 
 // --- Entry Categories ---
 
@@ -29,7 +30,7 @@ export function createCategory(
   const categories = vault.budget.categories
   const order = sortOrder ?? (categories.length > 0 ? Math.max(...categories.map(g => g.sortOrder)) + 10 : 10)
   const category: VaultCategory = {
-    id: crypto.randomUUID(),
+    id: newId('category'),
     name,
     side,
     sortOrder: order,
@@ -211,7 +212,7 @@ export function createEntry(
   // entry ever exists unrouted or contradictory.
   const routing = defaultRouting(opts.type, primaryAccountId(vault))
   const cat: VaultEntry = {
-    id: crypto.randomUUID(),
+    id: newId('entry'),
     name: opts.name,
     type: opts.type,
     sortOrder: order,
@@ -528,6 +529,21 @@ export function listSnapshots(vault: VaultData): VaultSnapshot[] {
  * taken from.
  */
 export function takeSnapshot(vault: VaultData, name: string): VaultSnapshot {
+  const snapshot = buildSnapshot(vault, name)
+  insertSnapshot(vault, snapshot)
+  return snapshot
+}
+
+/**
+ * The snapshot `takeSnapshot` would store, without storing it.
+ *
+ * Separate because a snapshot is a record of the plan *as the user saw it*.
+ * Kept as an action and replayed onto a vault somebody else has since changed,
+ * rebuilding it there would copy their plan, not the one on screen when the
+ * button was pressed — so the action carries this result, and replaying it
+ * only inserts it.
+ */
+export function buildSnapshot(vault: VaultData, name: string): VaultSnapshot {
   const trimmed = name.trim()
   if (trimmed === '') {
     // An unnamed snapshot cannot be told apart from any other, so it could never
@@ -545,13 +561,18 @@ export function takeSnapshot(vault: VaultData, name: string): VaultSnapshot {
   }))
 
   const snapshot: VaultSnapshot = {
-    id: crypto.randomUUID(),
+    id: newId('snapshot'),
     name: trimmed,
-    createdAt: new Date().toISOString(),
+    createdAt: nowISO(),
     lines,
   }
-  vault.budget.snapshots.unshift(snapshot)
   return snapshot
+}
+
+/** Stores a built snapshot, newest first. Storing one already there does nothing. */
+export function insertSnapshot(vault: VaultData, snapshot: VaultSnapshot): void {
+  if (vault.budget.snapshots.some(a => a.id === snapshot.id)) return
+  vault.budget.snapshots.unshift(snapshot)
 }
 
 /** Renames an snapshot. An empty name is rejected, as it is on creation. */
