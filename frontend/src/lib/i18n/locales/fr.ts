@@ -505,6 +505,9 @@ export const fr: Messages = {
   'sync.merged': 'Mis à jour avec des modifications faites ailleurs.',
   'sync.overwritten': '{subject} venait d’être modifié ailleurs en {theirs}. Ta valeur, {mine}, est enregistrée.',
   'sync.goneElsewhere': 'Cet élément a été supprimé ailleurs pendant que tu le modifiais.',
+  'sync.signedOut.none': 'Tu as été déconnecté – peut-être par une connexion sur un autre appareil.',
+  'sync.signedOut.one': 'Tu as été déconnecté – peut-être par une connexion sur un autre appareil. 1 modification n’a pas été enregistrée.',
+  'sync.signedOut.other': 'Tu as été déconnecté – peut-être par une connexion sur un autre appareil. {count} modifications n’ont pas été enregistrées.',
   'sync.undo': 'Annuler',
   'sync.dismiss': 'Fermer',
   'sync.dropped.title': 'Non enregistré :',
@@ -525,6 +528,8 @@ export const fr: Messages = {
   'sync.removed.other': 'Tu n’es plus membre de {household}. {count} modifications n’ont pas été enregistrées.',
   'unsaved.shapeInvalid': 'Tes données sont, sur cette page, dans un état qui ne peut pas être enregistré sans risque ; l’enregistrement est donc arrêté. Recharge pour repartir de la dernière version enregistrée – ce qui a changé depuis sera perdu.',
   'unsaved.cannotOpen': 'Tes données ont été modifiées ailleurs d’une manière que cette page ne peut pas ouvrir ; l’enregistrement est donc arrêté. Recharge pour obtenir la version plus récente – ce qui a changé ici depuis sera perdu.',
+  'unsaved.refused.one': 'Le serveur refuse tes modifications (erreur {status}) ; l’enregistrement est donc arrêté. Recharge pour continuer – 1 modification faite ici sera perdue.',
+  'unsaved.refused.other': 'Le serveur refuse tes modifications (erreur {status}) ; l’enregistrement est donc arrêté. Recharge pour continuer – {count} modifications faites ici seront perdues.',
   'unsaved.versionAhead.one': 'Une version plus récente de l’application a enregistré tes données. Recharge pour continuer – 1 modification faite ici sera perdue.',
   'unsaved.versionAhead.other': 'Une version plus récente de l’application a enregistré tes données. Recharge pour continuer – {count} modifications faites ici seront perdues.',
 

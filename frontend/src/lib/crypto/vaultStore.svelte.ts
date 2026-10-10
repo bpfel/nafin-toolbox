@@ -2,7 +2,7 @@ import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapME
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
 import {
   fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
-  VaultGoneError,
+  VaultGoneError, SessionEndedError, VaultSaveError, signalUnauthorized,
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
   fetchHouseholdMembers, fetchHouseholdInvites, createHouseholdInvite, deleteHouseholdInvite,
@@ -102,6 +102,11 @@ interface VaultSlot {
   again: boolean
   /** Consecutive failed attempts, for spacing out the retries. */
   failures: number
+  /**
+   * The status of a save the server refused for a reason retrying cannot fix.
+   * Sticky, like `conflicted`: the banner asks for a reload.
+   */
+  refused: number | null
 }
 
 function emptySlot(): VaultSlot {
@@ -120,6 +125,7 @@ function emptySlot(): VaultSlot {
     pending: 0,
     again: false,
     failures: 0,
+    refused: null,
   }
 }
 
@@ -313,6 +319,8 @@ export function getVaultState() {
     get versionAhead() { return current.versionAhead },
     /** True when the vault in memory contradicts its own version, so saving is refused. */
     get shapeInvalid() { return current.shapeInvalid },
+    /** The status of a save refused for a reason retrying cannot fix, if one was. */
+    get refused() { return current.refused },
     get saving() { return current.saving },
     /** Why changes are waiting to be saved, if they are: 'offline' or 'busy'. */
     get waiting() { return current.waiting },
@@ -860,7 +868,7 @@ export async function saveVault(): Promise<void> {
   // rather than at each call site because this is where they all arrive.
   if (slot.parked) return
   // Each of these is a vault this client must not write over.
-  if (slot.conflicted || slot.shapeInvalid || slot.versionAhead) return
+  if (slot.conflicted || slot.shapeInvalid || slot.versionAhead || slot.refused) return
   // The screens offer a reader nothing that edits. This is for anything that
   // gets here anyway, so it stops at the door rather than at the server.
   if (isReadOnly()) return
@@ -942,8 +950,19 @@ async function attemptSave(slot: VaultSlot, id: VaultId): Promise<Attempt> {
       await lostHousehold(slot, id)
       return 'stopped'
     }
-    // Anything else — no network, a server that is down — is worth trying
-    // again; the changes are still queued.
+    if (e instanceof SessionEndedError) {
+      sessionEnded(slot, id)
+      return 'stopped'
+    }
+    // A refusal that is not about the network or the server being down will be
+    // refused again however often it is sent. Retrying it would leave the user
+    // reading "will retry" for ever; stopping lets the banner say so.
+    if (e instanceof VaultSaveError && e.status < 500) {
+      slot.refused = e.status
+      return 'stopped'
+    }
+    // No network, a server that is down: worth trying again; the changes are
+    // still queued.
     return 'unreachable'
   }
 
@@ -1085,6 +1104,23 @@ export async function refreshIfQuiet(): Promise<void> {
   }
   slot.data = fresh.data
   notify({ kind: 'merged' })
+}
+
+/**
+ * Signed out under this tab — most often by signing in on another device.
+ *
+ * Retrying cannot help, so this counts what is waiting in every vault, drops
+ * it, and goes back to sign-in the way any refused request does. The count is
+ * posted after: going back clears the vault, and the notices with it.
+ */
+function sessionEnded(slot: VaultSlot, id: VaultId): void {
+  let count = 0
+  for (const queue of queues.values()) count += queue.length
+  // Before signing out, which flushes an unsaved vault — into the same 401.
+  setQueue(slot, id, [])
+  for (const other of stashed.values()) other.dirty = false
+  signalUnauthorized()
+  notify({ kind: 'signedOut', count })
 }
 
 /** Keep the changes, and try again after a pause that grows with each failure. */

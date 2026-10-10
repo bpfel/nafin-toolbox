@@ -21,8 +21,13 @@ vi.mock('../api/client', () => {
   class VaultConflictError extends Error {}
   class VaultReadOnlyError extends Error {}
   class VaultGoneError extends Error {}
+  class SessionEndedError extends Error {}
+  class VaultSaveError extends Error {
+    constructor(readonly status: number) { super(String(status)) }
+  }
   return {
-    VaultConflictError, VaultReadOnlyError, VaultGoneError,
+    VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError,
+    signalUnauthorized: vi.fn(),
     fetchVaultKeys: vi.fn(async () => ({ encrypted_mek: '', iterations: 600000 })),
     setupVaultKeys: vi.fn(), setupIdentity: vi.fn(), updateVaultKeys: vi.fn(), recoverVaultKeys: vi.fn(),
     fetchVault: vi.fn(), putVault: vi.fn(),
@@ -37,7 +42,7 @@ vi.mock('../api/client', () => {
 
 import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
-const { VaultConflictError, VaultReadOnlyError, VaultGoneError } = client
+const { VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError } = client
 
 import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview } from './vaultStore.svelte'
 import { getNotices, type Notice } from '../sync/notices.svelte'
@@ -485,6 +490,49 @@ describe('coming back to the tab', () => {
 
     endPreview()
     expect(entryNamed(state.vault!, 'Gym')).toBeTruthy()
+  })
+})
+
+// --- signed out --------------------------------------------------------------
+
+describe('signed out under the tab', () => {
+  test('signing in elsewhere: no retrying, back to sign-in, and told what was lost', async () => {
+    commit('createEntry', { name: 'A', type: 'expense', categoryName: 'X' })
+    commit('createEntry', { name: 'B', type: 'expense', categoryName: 'X' })
+    api.putVault.mockRejectedValue(new SessionEndedError())
+
+    await saveVault()
+
+    expect(api.signalUnauthorized).toHaveBeenCalledTimes(1)
+    expect(api.putVault).toHaveBeenCalledTimes(1)
+    expect(state.waiting).toBe(null)
+    expect(only('signedOut')?.count).toBe(2)
+  })
+})
+
+describe('refused for good', () => {
+  test('a refusal retrying cannot fix stops, rather than retrying for ever', async () => {
+    commit('createEntry', { name: 'A', type: 'expense', categoryName: 'X' })
+    api.putVault.mockRejectedValue(new VaultSaveError(413, 'too large'))
+
+    await saveVault()
+    await saveVault()
+
+    expect(api.putVault).toHaveBeenCalledTimes(1)
+    expect(state.refused).toBe(413)
+    expect(state.waiting).toBe(null)
+    expect(state.pending).toBe(1)
+  })
+
+  test('a server that is down is retried', async () => {
+    commit('createEntry', { name: 'A', type: 'expense', categoryName: 'X' })
+    api.putVault.mockRejectedValueOnce(new VaultSaveError(503, 'down'))
+
+    await saveVault()
+    expect(state.waiting).toBe('offline')
+    await saveVault()
+
+    expect(entryNamed(await onServer(), 'A')).toBeTruthy()
   })
 })
 

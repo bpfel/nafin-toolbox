@@ -512,6 +512,9 @@ export const de: Messages = {
   'sync.merged': 'Mit Änderungen von anderswo aktualisiert.',
   'sync.overwritten': '{subject} wurde eben anderswo auf {theirs} geändert. Dein Wert, {mine}, ist gespeichert.',
   'sync.goneElsewhere': 'Das wurde anderswo gelöscht, während du es bearbeitet hast.',
+  'sync.signedOut.none': 'Du wurdest abgemeldet – vielleicht durch eine Anmeldung auf einem anderen Gerät.',
+  'sync.signedOut.one': 'Du wurdest abgemeldet – vielleicht durch eine Anmeldung auf einem anderen Gerät. 1 Änderung wurde nicht gespeichert.',
+  'sync.signedOut.other': 'Du wurdest abgemeldet – vielleicht durch eine Anmeldung auf einem anderen Gerät. {count} Änderungen wurden nicht gespeichert.',
   'sync.undo': 'Rückgängig',
   'sync.dismiss': 'Schliessen',
   'sync.dropped.title': 'Nicht gespeichert:',
@@ -532,6 +535,8 @@ export const de: Messages = {
   'sync.removed.other': 'Du bist nicht mehr Mitglied von {household}. {count} Änderungen wurden nicht gespeichert.',
   'unsaved.shapeInvalid': 'Deine Daten sind auf dieser Seite in einem Zustand, der sich nicht sicher speichern lässt, deshalb wird nicht mehr gespeichert. Lade neu, um mit der zuletzt gespeicherten Fassung weiterzumachen – seither Geändertes geht verloren.',
   'unsaved.cannotOpen': 'Deine Daten wurden anderswo so geändert, dass diese Seite sie nicht öffnen kann, deshalb wird nicht mehr gespeichert. Lade neu, um die neuere Fassung zu holen – hier seither Geändertes geht verloren.',
+  'unsaved.refused.one': 'Der Server nimmt deine Änderungen nicht an (Fehler {status}), deshalb wird nicht mehr gespeichert. Lade neu, um weiterzumachen – 1 Änderung von hier geht verloren.',
+  'unsaved.refused.other': 'Der Server nimmt deine Änderungen nicht an (Fehler {status}), deshalb wird nicht mehr gespeichert. Lade neu, um weiterzumachen – {count} Änderungen von hier gehen verloren.',
   'unsaved.versionAhead.one': 'Eine neuere Version der App hat deine Daten gespeichert. Lade neu, um weiterzumachen – 1 Änderung von hier geht verloren.',
   'unsaved.versionAhead.other': 'Eine neuere Version der App hat deine Daten gespeichert. Lade neu, um weiterzumachen – {count} Änderungen von hier gehen verloren.',
 

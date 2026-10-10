@@ -68,6 +68,8 @@
           {tn('sync.readOnly', n.count)}
         {:else if n.kind === 'removed'}
           {removed(n)}
+        {:else if n.kind === 'signedOut'}
+          {n.count === 0 ? t('sync.signedOut.none') : tn('sync.signedOut', n.count)}
         {/if}
       </div>
       {#if n.kind === 'overwritten'}
