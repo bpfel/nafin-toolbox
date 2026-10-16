@@ -6,6 +6,7 @@
   import LanguagePicker from '../lib/nav/LanguagePicker.svelte'
   import VersionTag from '../lib/util/VersionTag.svelte'
   import InstallHint from '../lib/util/InstallHint.svelte'
+  import { logoutEverywhere } from '../lib/auth/authStore.svelte'
 
   /**
    * Everything about the person rather than their money.
@@ -29,6 +30,20 @@
   }
 
   let { email, role, userId = null, onlogout }: Props = $props()
+
+  let leaving = $state(false)
+  let leavingFailed = $state(false)
+
+  async function handleLogoutEverywhere() {
+    leaving = true
+    leavingFailed = false
+    // On success this tab is signed out too, and the sign-in screen replaces
+    // this one; there is nothing to reset afterwards.
+    if (!(await logoutEverywhere())) {
+      leavingFailed = true
+      leaving = false
+    }
+  }
 </script>
 
 <ScreenChrome title={t('nav.profile')} eye={false} />
@@ -76,9 +91,24 @@
     It follows the delete-account box, which is the more destructive of the two
     — but that one asks for a password before it does anything, and this one is
     undone by signing back in.
+
+    Logging out everywhere sits beside it rather than in a box of its own: it
+    is the same act for a lost phone, and it is where a person looks for it.
+    Not for an administrator, who is signed in on one device at a time, so
+    "everywhere" would only ever mean here.
   -->
   <div class="settings-card">
-    <button class="sign-out" onclick={onlogout}>{t('menu.logout')}</button>
+    <div class="sign-outs">
+      <button class="sign-out" onclick={onlogout}>{t('menu.logout')}</button>
+      {#if role !== 'admin'}
+        <button class="sign-out" onclick={handleLogoutEverywhere} disabled={leaving}>
+          {t('menu.logoutEverywhere')}
+        </button>
+      {/if}
+    </div>
+    {#if leavingFailed}
+      <p class="error" role="alert">{t('menu.logoutEverywhereFailed')}</p>
+    {/if}
   </div>
 
   <!--
@@ -135,8 +165,22 @@
     font-size: 0.85rem;
   }
 
-  .sign-out:hover {
+  .sign-out:hover:not(:disabled) {
     background: var(--alarm-soft);
+  }
+
+  /* Side by side while they fit; the second drops below on a narrow phone in
+     the longer languages rather than squeezing either label. */
+  .sign-outs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .error {
+    margin: 0.75rem 0 0;
+    color: var(--alarm);
+    font-size: 0.85rem;
   }
 
   .role-tag {
