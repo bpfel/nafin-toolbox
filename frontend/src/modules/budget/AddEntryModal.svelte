@@ -296,10 +296,14 @@
 
     try {
       if (isEdit && editing) {
-        commit('updateEntry', editing.id, {
-          name: trimmed,
-          categoryName: resolvedCategoryName,
-        })
+        // Only what changed. An unchanged name sent along with a new amount is
+        // a second change to be refused, and reported, if the entry is gone.
+        if (trimmed !== editing.name || resolvedCategoryName !== editing.categoryName) {
+          commit('updateEntry', editing.id, {
+            name: trimmed,
+            categoryName: resolvedCategoryName,
+          })
+        }
         if (targeted) {
           commit('setReserve', editing.id, {
             targetAmount: (centsOf(totalValue) / 100).toFixed(2),

@@ -214,6 +214,19 @@ describe('edit against delete', () => {
     expect(state.dirty).toBe(false)
   })
 
+  // Found testing by hand: the edit dialog's Save sent the name along with the
+  // amount, both fell to the deletion, and the notice said so twice.
+  test('8b. two changes to an entry deleted elsewhere are one line', async () => {
+    const rent = expense(state.vault!)
+    commit('updateEntry', rent.id, { name: rent.name, categoryName: 'Housing' })
+    commit('setPlanned', rent.id, '1.00')
+    await elsewhere(v => budget.deleteEntry(v, rent.id))
+
+    await saveVault()
+
+    expect(only('dropped')?.items).toEqual([{ subject: rent.name, reason: 'entryGone' }])
+  })
+
   test('9. a delete here wins over an edit saved elsewhere first', async () => {
     const rent = expense(state.vault!).id
     commit('deleteEntry', rent)

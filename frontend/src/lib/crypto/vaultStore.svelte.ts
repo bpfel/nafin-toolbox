@@ -998,7 +998,18 @@ async function catchUp(slot: VaultSlot, id: VaultId): Promise<'caught-up' | 'unr
   setQueue(slot, id, queue.filter(a => !lost.has(a)))
 
   if (dropped.length > 0) {
-    notify({ kind: 'dropped', items: dropped.map(d => ({ subject: d.action.subject, reason: d.reason })) })
+    // One line per thing lost, not per action: a dialog's Save is a rename and
+    // an amount, and both fall to the same deletion.
+    const seen = new Set<string>()
+    const items = dropped
+      .map(d => ({ subject: d.action.subject, reason: d.reason }))
+      .filter(item => {
+        const key = `${item.reason}\u0000${item.subject ?? ''}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    notify({ kind: 'dropped', items })
   }
   for (const o of overwrites) {
     notify({ kind: 'overwritten', subject: o.action.subject ?? '', theirs: o.theirs, mine: o.mine, money: o.money, undo: o.undo })
