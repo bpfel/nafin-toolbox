@@ -44,7 +44,7 @@ import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 const { VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError } = client
 
-import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview } from './vaultStore.svelte'
+import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview, sessionEndedElsewhere } from './vaultStore.svelte'
 import { getNotices, type Notice } from '../sync/notices.svelte'
 import { undoOverwrite } from './vaultStore.svelte'
 
@@ -507,6 +507,18 @@ describe('signed out under the tab', () => {
     expect(api.putVault).toHaveBeenCalledTimes(1)
     expect(state.waiting).toBe(null)
     expect(only('signedOut')?.count).toBe(2)
+  })
+
+  // "Log out everywhere" on another device, found by the session watch before
+  // the debounced save ran: the change is reported, not dropped in silence.
+  test('found by the session watch with a change still waiting', async () => {
+    commit('createEntry', { name: 'A', type: 'expense', categoryName: 'X' })
+
+    sessionEndedElsewhere()
+
+    expect(api.signalUnauthorized).toHaveBeenCalledTimes(1)
+    expect(only('signedOut')?.count).toBe(1)
+    expect(state.dirty).toBe(false)
   })
 })
 

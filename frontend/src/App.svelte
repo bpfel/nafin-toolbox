@@ -1,7 +1,7 @@
 <script lang="ts">
   import { setOnUnauthorized } from './lib/api/client'
   import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
-  import { getVaultState } from './lib/crypto/vaultStore.svelte'
+  import { getVaultState, sessionEndedElsewhere } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
   import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
@@ -72,7 +72,7 @@
   // Watch for this session being ended from another device, so a tab left open
   // does not go on showing the budget after "Log out everywhere".
   $effect(() => {
-    if (authState.currentUser) return startSessionWatch(() => handleLogout())
+    if (authState.currentUser) return startSessionWatch(sessionEndedElsewhere)
   })
 
   $effect(() => {

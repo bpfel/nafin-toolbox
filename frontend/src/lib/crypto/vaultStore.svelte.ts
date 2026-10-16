@@ -1107,7 +1107,8 @@ export async function refreshIfQuiet(): Promise<void> {
 }
 
 /**
- * Signed out under this tab — most often by signing in on another device.
+ * Signed out under this tab — by "Log out everywhere", a password change on
+ * another device, an administrator's reset, or the session running out.
  *
  * Retrying cannot help, so this counts what is waiting in every vault, drops
  * it, and goes back to sign-in the way any refused request does. The count is
@@ -1121,6 +1122,15 @@ function sessionEnded(slot: VaultSlot, id: VaultId): void {
   for (const other of stashed.values()) other.dirty = false
   signalUnauthorized()
   notify({ kind: 'signedOut', count })
+}
+
+/**
+ * The session watch found this tab signed out. Goes the way a save refused with
+ * a 401 does, so changes still waiting are counted and reported rather than
+ * dropped with the vault in silence.
+ */
+export function sessionEndedElsewhere(): void {
+  sessionEnded(current, currentId)
 }
 
 /** Keep the changes, and try again after a pause that grows with each failure. */
