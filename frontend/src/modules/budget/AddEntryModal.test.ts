@@ -4,9 +4,13 @@ import { describe, test, expect, vi, afterEach } from 'vitest'
 import { createEmptyVault } from '../../lib/crypto/vault'
 import * as engine from '../../lib/budget/budgetEngine'
 
-vi.mock('../../lib/crypto/vaultStore.svelte', async () => (await import('../../lib/sync/testing')).storeMock())
+// A spy around the stand-in, so a test can see which changes the dialog sent.
+vi.mock('../../lib/crypto/vaultStore.svelte', async () => ({
+  commit: vi.fn((await import('../../lib/sync/testing')).fakeCommit),
+}))
 
 import AddEntryModal from './AddEntryModal.svelte'
+import { commit } from '../../lib/crypto/vaultStore.svelte'
 
 afterEach(cleanup)
 
@@ -390,5 +394,31 @@ describe('AddEntryModal — closing from the amount field', () => {
     await fireEvent.blur(monthly)
 
     expect(onsave).not.toHaveBeenCalled()
+  })
+})
+
+// Save sends only what changed: an amount alone is one change, not a rename
+// that happens to keep the name. Otherwise an entry deleted elsewhere is
+// refused, and reported, twice.
+describe('AddEntryModal — saving only what changed', () => {
+  test('a new amount alone leaves the entry itself untouched', async () => {
+    const { onsave, monthly } = openOn('1350.00')
+    vi.mocked(commit).mockClear()
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onsave).toHaveBeenCalled()
+    expect(vi.mocked(commit).mock.calls.map(c => c[0])).not.toContain('updateEntry')
+  })
+
+  test('a new name is still sent', async () => {
+    openOn('1350.00')
+    vi.mocked(commit).mockClear()
+
+    await fireEvent.input(screen.getByDisplayValue('Rent'), { target: { value: 'Miete' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(vi.mocked(commit).mock.calls.map(c => c[0])).toContain('updateEntry')
   })
 })
