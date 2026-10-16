@@ -56,6 +56,7 @@ describe('AddEntryModal — the only way to change an amount', () => {
 
     await fireEvent.input(monthly, { target: { value: chf(1450) } })
     await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
   })
@@ -65,6 +66,7 @@ describe('AddEntryModal — the only way to change an amount', () => {
 
     await fireEvent.input(monthly, { target: { value: '1450' } })
     await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
   })
@@ -84,8 +86,53 @@ describe('AddEntryModal — the only way to change an amount', () => {
 
     await fireEvent.input(monthly, { target: { value: 'abc' } })
     await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onsave).not.toHaveBeenCalled()
+  })
+
+  // Leaving the field is not saving. Clicking Cancel blurs the field before the
+  // click lands, so an amount written on blur was saved by Cancel.
+  test('Cancel drops a typed amount', async () => {
+    const { onsave, onclose, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(onsave).not.toHaveBeenCalled()
+    expect(onclose).toHaveBeenCalled()
+  })
+
+  test('clicking outside the dialog drops it too', async () => {
+    const { onsave, onclose, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.blur(monthly)
+    await fireEvent.click(document.querySelector('.backdrop')!)
+
+    expect(onsave).not.toHaveBeenCalled()
+    expect(onclose).toHaveBeenCalled()
+  })
+
+  // Typed in yearly, a monthly figure is stored to four places; the box shows
+  // two. Saving the name alone must not round it to what the box shows.
+  test('an amount left untouched is not rewritten', async () => {
+    const { onsave } = openOn('83.3333')
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onsave).not.toHaveBeenCalled()
+  })
+
+  // Enter in the name field saves the whole dialog, the amount included.
+  test('Enter in the name saves a typed amount', async () => {
+    const { onsave, entryId, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.keyDown(screen.getByDisplayValue('Rent'), { key: 'Enter' })
+
+    expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
   })
 })
 

@@ -50,14 +50,6 @@
   // gone — and Chrome still blurs the amount field as it leaves the page.
   const editing = untrack(() => editEntry)
   const isEdit = editing != null
-  // Set as the dialog closes, so that blur does not write an amount Escape
-  // meant to discard, or write a second time what Enter has just saved.
-  let closing = false
-
-  function close() {
-    closing = true
-    onclose()
-  }
 
   /** Bill and purchase save towards a figure; the other three do not. */
   let targeted = $derived(savesTowardsTarget(type))
@@ -136,6 +128,9 @@
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
   /** Which box the amount was last typed into, and so which one is the truth. */
   let amountTypedIn = $state<'planned_mo' | 'planned_yr'>('planned_mo')
+  /** Whether the amount was typed in at all. Saving an untouched one would round
+   *  a stored figure to what the box shows. */
+  let amountChanged = false
 
   /**
    * The monthly to store for a figure typed into one of the boxes.
@@ -205,10 +200,10 @@
   }
 
   /**
-   * Normalises the pair of amount fields, and on an existing entry writes the
-   * value through. On a new one there is nothing to write to yet — the amount
-   * travels with `createEntry` instead, so this only keeps the monthly and
-   * yearly boxes agreeing with each other.
+   * Normalises the pair of amount fields so the monthly and yearly boxes agree.
+   * Writes nothing: the amount is saved with the rest of the dialog, by Save or
+   * Enter. It used to be written on blur, and since clicking Cancel blurs the
+   * field before the click lands, Cancel saved the amount it was meant to drop.
    */
   function commitValue(field: 'planned_mo' | 'planned_yr'): boolean {
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
@@ -223,13 +218,11 @@
       plannedYrValue = formatAmount(val)
       plannedMoValue = formatAmount(val / 12)
     }
-    if (editing && onsave) onsave(editing.id, storedMonthly(field, val))
     return true
   }
 
   function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
     valueFocusedField = null
-    if (closing) return
     commitValue(field)
   }
 
@@ -251,6 +244,7 @@
     if (isNaN(val) || !isFinite(val)) return
 
     amountTypedIn = field
+    amountChanged = true
     if (field === 'planned_mo') {
       plannedYrValue = formatAmount(val * 12)
     } else {
@@ -305,6 +299,10 @@
             anchorMonth,
           })
           onsave?.(editing.id, monthlyAmount())
+        } else if (amountChanged) {
+          // Cleared or unreadable leaves the stored amount alone, as it always has.
+          const amount = monthlyAmount()
+          if (amount !== '') onsave?.(editing.id, amount)
         }
       } else {
         engine.createEntry(vault, {
@@ -318,25 +316,25 @@
         })
       }
       oncreated()
-      close()
+      onclose()
     } catch (e) {
       error = e instanceof Error ? e.message : isEdit ? t('error.updateEntry') : t('error.createEntry')
     }
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') close()
+    if (e.key === 'Escape') onclose()
   }
 
   function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) close()
+    if (e.target === e.currentTarget) onclose()
   }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap use:closeOnBack={close}>
+  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap use:closeOnBack={onclose}>
     <h3>
       {t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', {
         type: t(`entryType.${type}` as 'entryType.expense'),
@@ -516,7 +514,7 @@
         <button class="btn delete" onclick={ondelete}>{t('action.delete')}</button>
       {/if}
       <span class="spacer"></span>
-      <button class="btn cancel" onclick={close}>{t('action.cancel')}</button>
+      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
       <button class="btn save" onclick={save} disabled={!canSave}>
         {isEdit ? t('action.save') : t('entry.add')}
       </button>
