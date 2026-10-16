@@ -32,6 +32,7 @@ vi.mock('./lib/auth/authStore.svelte', () => ({
 }))
 
 vi.mock('./lib/crypto/vaultStore.svelte', () => ({
+  sessionEndedElsewhere: vi.fn(),
   getVaultState: () => ({ unlocked: true, vault: null, dirty: false, saving: false, conflicted: false, lastSaved: null, versionAhead: false }),
 }))
 
