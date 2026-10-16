@@ -59,6 +59,11 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Fixed
 
+- **Enter in an entry's amount no longer breaks the page.** Saving the edit
+  dialog with Enter from the amount field closed it, and Chrome's blur on the
+  departing field then read the entry that had just closed: "Something broke
+  and the page stopped updating". Escape in that field now discards the typed
+  amount, as it always meant to.
 - **An admin's password reset now signs the user out on every device.** It
   used to leave their session running, which mattered little while an account
   could only have one.

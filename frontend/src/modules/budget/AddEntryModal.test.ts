@@ -294,3 +294,55 @@ describe('a purchase can be described from either end', () => {
     expect(laptop.reserve?.periodMonths).toBe(100)
   })
 })
+
+// The budget table opens this dialog as `{#if context}` and passes
+// `context.editEntry`, so once it closes, reading the prop reads through a
+// context that is gone. Chrome then fires blur on the amount field as it leaves
+// the page, and the blur handler read `editEntry` — "Cannot read properties of
+// null (reading 'editEntry')", and the page stopped updating. jsdom does not
+// blur a removed field, so the test fires it.
+describe('AddEntryModal — closing from the amount field', () => {
+  function openInTable(onsave = vi.fn()) {
+    const vault = createEmptyVault()
+    const rent = engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+    const housing = engine.listCategories(vault)[0]
+    let context: { editEntry: { id: string; name: string; categoryName: string; plannedAmount: string } } | null = {
+      editEntry: { id: rent.id, name: 'Rent', categoryName: 'Housing', plannedAmount: '1350.00' },
+    }
+    const props = {
+      type: 'expense' as const,
+      categories: [{ name: housing.name, id: housing.id }],
+      get editEntry() {
+        return context!.editEntry
+      },
+      vault,
+      oncreated: vi.fn(),
+      onclose: () => (context = null),
+      onsave,
+    }
+    render(AddEntryModal, { props })
+    return { onsave, entryId: rent.id, monthly: screen.getByLabelText('Planned/mo') as HTMLInputElement }
+  }
+
+  test('Enter saves, closes, and the blur that follows does nothing', async () => {
+    const { onsave, entryId, monthly } = openInTable()
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.keyDown(monthly, { key: 'Enter' })
+    await fireEvent.blur(monthly)
+
+    expect(onsave).toHaveBeenCalledTimes(1)
+    expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
+  })
+
+  // Escape is cancel. An amount typed and not yet committed stays unwritten.
+  test('Escape closes without writing what was typed', async () => {
+    const { onsave, monthly } = openInTable()
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.keyDown(window, { key: 'Escape' })
+    await fireEvent.blur(monthly)
+
+    expect(onsave).not.toHaveBeenCalled()
+  })
+})

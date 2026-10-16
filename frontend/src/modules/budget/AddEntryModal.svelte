@@ -45,16 +45,29 @@
 
   let { type, categories, editEntry = null, presetCategoryName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
 
-  let isEdit = $derived(editEntry != null)
+  // Read once, and kept. The parent passes it as `context.editEntry` under an
+  // `{#if context}`, so after closing, the prop reads through a context that is
+  // gone — and Chrome still blurs the amount field as it leaves the page.
+  const editing = untrack(() => editEntry)
+  const isEdit = editing != null
+  // Set as the dialog closes, so that blur does not write an amount Escape
+  // meant to discard, or write a second time what Enter has just saved.
+  let closing = false
+
+  function close() {
+    closing = true
+    onclose()
+  }
+
   /** Bill and purchase save towards a figure; the other three do not. */
   let targeted = $derived(savesTowardsTarget(type))
 
   // Seeded once: the modal is created fresh each time it opens, so every read of
-  // `editEntry` below is deliberately an initial value rather than a reactive
-  // one. `untrack` says so out loud, to Svelte and to the next reader.
-  let name = $state(untrack(() => editEntry?.name ?? ''))
+  // a prop below is deliberately an initial value rather than a reactive one.
+  // `untrack` says so out loud, to Svelte and to the next reader.
+  let name = $state(editing?.name ?? '')
   let selectedCategory = $state(
-    untrack(() => editEntry?.categoryName ?? presetCategoryName ?? categories[0]?.name ?? ''),
+    untrack(() => editing?.categoryName ?? presetCategoryName ?? categories[0]?.name ?? ''),
   )
   let newCategoryName = $state('')
   let useNewCategory = $state(false)
@@ -79,7 +92,7 @@
 
   /** The reserve as stored: the plan view does not carry one. */
   function storedReserve() {
-    return editEntry ? vault.budget.entries.find(e => e.id === editEntry.id)?.reserve : undefined
+    return editing ? vault.budget.entries.find(e => e.id === editing.id)?.reserve : undefined
   }
 
   let totalValue = $state(
@@ -115,10 +128,10 @@
   let periodRemainderMonths = $derived(periodMonths % 12)
 
   let plannedMoValue = $state(
-    untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount)) : '')),
+    editing?.plannedAmount ? formatAmount(Number(editing.plannedAmount)) : '',
   )
   let plannedYrValue = $state(
-    untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount) * 12) : '')),
+    editing?.plannedAmount ? formatAmount(Number(editing.plannedAmount) * 12) : '',
   )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
   /** Which box the amount was last typed into, and so which one is the truth. */
@@ -210,12 +223,13 @@
       plannedYrValue = formatAmount(val)
       plannedMoValue = formatAmount(val / 12)
     }
-    if (editEntry && onsave) onsave(editEntry.id, storedMonthly(field, val))
+    if (editing && onsave) onsave(editing.id, storedMonthly(field, val))
     return true
   }
 
   function handleValueBlur(field: 'planned_mo' | 'planned_yr') {
     valueFocusedField = null
+    if (closing) return
     commitValue(field)
   }
 
@@ -279,18 +293,18 @@
     error = null
 
     try {
-      if (isEdit && editEntry) {
-        engine.updateEntry(vault, editEntry.id, {
+      if (isEdit && editing) {
+        engine.updateEntry(vault, editing.id, {
           name: trimmed,
           categoryName: resolvedCategoryName,
         })
         if (targeted) {
-          engine.setReserve(vault, editEntry.id, {
+          engine.setReserve(vault, editing.id, {
             targetAmount: (centsOf(totalValue) / 100).toFixed(2),
             periodMonths,
             anchorMonth,
           })
-          onsave?.(editEntry.id, monthlyAmount())
+          onsave?.(editing.id, monthlyAmount())
         }
       } else {
         engine.createEntry(vault, {
@@ -304,25 +318,25 @@
         })
       }
       oncreated()
-      onclose()
+      close()
     } catch (e) {
       error = e instanceof Error ? e.message : isEdit ? t('error.updateEntry') : t('error.createEntry')
     }
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose()
+    if (e.key === 'Escape') close()
   }
 
   function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) onclose()
+    if (e.target === e.currentTarget) close()
   }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap use:closeOnBack={onclose}>
+  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap use:closeOnBack={close}>
     <h3>
       {t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', {
         type: t(`entryType.${type}` as 'entryType.expense'),
@@ -502,7 +516,7 @@
         <button class="btn delete" onclick={ondelete}>{t('action.delete')}</button>
       {/if}
       <span class="spacer"></span>
-      <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
+      <button class="btn cancel" onclick={close}>{t('action.cancel')}</button>
       <button class="btn save" onclick={save} disabled={!canSave}>
         {isEdit ? t('action.save') : t('entry.add')}
       </button>
