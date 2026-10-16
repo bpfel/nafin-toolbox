@@ -59,6 +59,10 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Fixed
 
+- **Two devices no longer overwrite each other's budget.** Loading the
+  personal vault left out when it was last saved, so a device's first save
+  after loading went through unconditionally and replaced whatever another
+  device had saved in the meantime. Households were not affected.
 - **Enter in an entry's amount no longer breaks the page.** Saving the edit
   dialog with Enter from the amount field closed it, and Chrome's blur on the
   departing field then read the entry that had just closed: "Something broke

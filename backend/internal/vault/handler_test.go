@@ -164,6 +164,7 @@ func TestHandleGetVault_NoVaultFound(t *testing.T) {
 }
 
 func TestHandleGetVault_Success(t *testing.T) {
+	updatedAt := time.Date(2026, 10, 16, 17, 31, 13, 123456000, time.UTC)
 	ciphertext := []byte("encrypted-data")
 	nonce := []byte("nonce12345")
 	store := &mockStore{
@@ -172,6 +173,7 @@ func TestHandleGetVault_Success(t *testing.T) {
 			Ciphertext: ciphertext,
 			Nonce:      nonce,
 			Version:    1,
+			UpdatedAt:  updatedAt,
 		},
 	}
 	handler := handleGetVault(store)
@@ -186,7 +188,7 @@ func TestHandleGetVault_Success(t *testing.T) {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result VaultPayload
+	var result GetVaultResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 		t.Fatalf("invalid JSON response: %v", err)
 	}
@@ -203,6 +205,12 @@ func TestHandleGetVault_Success(t *testing.T) {
 
 	if result.Version != 1 {
 		t.Errorf("version = %d, want 1", result.Version)
+	}
+
+	// The client sends this back as expected_updated_at on its first save.
+	// Missing, that save went unconditionally and overwrote another device's.
+	if !result.UpdatedAt.Equal(updatedAt) {
+		t.Errorf("updated_at = %v, want %v", result.UpdatedAt, updatedAt)
 	}
 }
 

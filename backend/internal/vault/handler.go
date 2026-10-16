@@ -57,10 +57,11 @@ func handleGetVault(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, VaultPayload{
+		writeJSON(w, http.StatusOK, GetVaultResponse{
 			Ciphertext: base64.StdEncoding.EncodeToString(v.Ciphertext),
 			Nonce:      base64.StdEncoding.EncodeToString(v.Nonce),
 			Version:    v.Version,
+			UpdatedAt:  v.UpdatedAt,
 		})
 	}
 }
