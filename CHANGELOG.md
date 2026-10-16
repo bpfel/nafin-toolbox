@@ -62,8 +62,11 @@ release may change things without a deprecation period. Each release is a tag on
 - **Enter in an entry's amount no longer breaks the page.** Saving the edit
   dialog with Enter from the amount field closed it, and Chrome's blur on the
   departing field then read the entry that had just closed: "Something broke
-  and the page stopped updating". Escape in that field now discards the typed
-  amount, as it always meant to.
+  and the page stopped updating".
+- **Cancel in the entry dialog no longer saves the amount.** The amount was
+  written as soon as its field lost focus, and clicking Cancel takes the focus
+  first. It is now saved with the rest of the dialog, by Save or Enter; Cancel,
+  Escape and a click outside drop it.
 - **An admin's password reset now signs the user out on every device.** It
   used to leave their session running, which mattered little while an account
   could only have one.
