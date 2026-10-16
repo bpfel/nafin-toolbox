@@ -30,6 +30,16 @@ type VaultPayload struct {
 	ExpectedUpdatedAt *time.Time `json:"expected_updated_at,omitempty"`
 }
 
+// GetVaultResponse is the stored vault as the client loads it. UpdatedAt is
+// the precondition for the client's first write: without it that write goes
+// unconditionally and overwrites whatever another device saved in between.
+type GetVaultResponse struct {
+	Ciphertext string    `json:"ciphertext"`
+	Nonce      string    `json:"nonce"`
+	Version    int       `json:"version"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 // PutVaultResponse hands back the new updated_at, which becomes the client's
 // precondition for its next write.
 type PutVaultResponse struct {
