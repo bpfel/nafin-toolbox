@@ -45,6 +45,15 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### New
 
+- **Changes made on two devices, or by two people in a household, both
+  survive.** A save refused because someone else saved first no longer stops
+  with a banner: the newer budget is fetched and this device's changes are
+  applied on top. When that cannot be done for a change — its entry was
+  deleted elsewhere, say — a notice names it. When a change replaced a value
+  someone had just set, a notice says so, with Undo. Changes made offline wait
+  and are sent when the connection is back, and a tab brought back into view
+  catches up with what changed while it was away. A save the server will
+  never accept now stops and says so instead of retrying for ever.
 - **Signed in on several devices at once.** Signing in on a phone no longer
   signs the laptop out. Profile has **Log out everywhere** beside **Log out**,
   for a lost phone or a computer left signed in. A tab whose session was
