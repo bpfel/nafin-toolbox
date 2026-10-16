@@ -10,6 +10,7 @@
   import { clearEditing } from './lib/util/editMode.svelte'
   import { autofocus } from './lib/util/autofocus'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
+  import { startSessionWatch } from './lib/auth/sessionWatch'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
@@ -66,6 +67,12 @@
 
   // Watch for deploys that leave this tab running chunks the server no longer has.
   $effect(() => startBuildVersionWatch())
+
+  // Watch for this session being ended from another device, so a tab left open
+  // does not go on showing the budget after "Log out everywhere".
+  $effect(() => {
+    if (authState.currentUser) return startSessionWatch(() => handleLogout())
+  })
 
   $effect(() => {
     if (authState.currentUser) {
