@@ -46,8 +46,8 @@ release may change things without a deprecation period. Each release is a tag on
 ### New
 
 - **Signed in on several devices at once.** Signing in on a phone no longer
-  signs the laptop out. Profile has a new **Sign out everywhere**, for a lost
-  phone or a computer left signed in. Administrators stay at one session:
+  signs the laptop out. Profile has **Log out everywhere** beside **Log out**,
+  for a lost phone or a computer left signed in. Administrators stay at one session:
   signing in as an admin still ends any other admin session.
 - **The tour shows how to install the app.** A step before the last points to
   Apple's and Google's own instructions for iPhone and Android, in the reader's
