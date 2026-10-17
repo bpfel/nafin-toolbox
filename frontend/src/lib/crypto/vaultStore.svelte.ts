@@ -1193,6 +1193,20 @@ export function closeEndedMonths(): void {
 }
 
 /**
+ * Whether a record's adding or last edit has not reached the server yet, for the
+ * marker beside it. Reads `pending` so a component asking is told again when a
+ * save lands.
+ */
+export function belegUnsaved(id: string): boolean {
+  void current.pending
+  return (queues.get(currentId) ?? []).some(
+    a =>
+      (a.kind === 'addBeleg' && a.tape.ids.beleg?.[0] === id) ||
+      (a.kind === 'editBeleg' && (a as Action<'editBeleg'>).args[0] === id),
+  )
+}
+
+/**
  * Save now rather than after the pause. For a record: entered at the till, it
  * should be on the server before the phone goes back in the pocket.
  */

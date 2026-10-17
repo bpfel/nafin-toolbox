@@ -711,9 +711,22 @@
     flex: 1 1 100%;
   }
 
+  /* The household's green, as the walkthrough draws it. `btn-primary` is not a
+     global class, so the button was the browser's own grey until this. */
   .confirm {
     padding: 0.35rem 0.9rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
     font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .confirm:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 
   .mismatch {
