@@ -18,11 +18,11 @@ export const en: Content = {
   tour: {
     welcome: {
       title: 'This is a planner',
-      body: 'This app has no connection to your bank and never sees your actual spending. The budget instead says how much must remain by the end of the month, so the commitments ahead of you are always covered.',
+      body: 'This app has no connection to your bank and never sees your account. The budget instead says how much must remain by the end of the month, so the commitments ahead of you are always covered.',
     },
     places: {
       title: 'The different screens',
-      body: 'Budget is where you plan a month. Accounts lists the real balances behind it. Knowledge holds this tour and short pieces on Swiss finance.',
+      body: 'Budget is where you plan a month. Spending records what a month actually cost. Accounts lists the real balances behind it. Knowledge holds this tour and short pieces on Swiss finance.',
     },
     types: {
       title: 'Different budget entries',
@@ -37,6 +37,10 @@ export const en: Content = {
       title: 'Controls',
       body: 'All the options for the current screen are here.',
       hoverNote: 'Hover over a symbol to see what it does.',
+    },
+    spending: {
+      title: 'What you actually spent',
+      body: 'Spending records receipts as you go: the amount, and the budget line it counts against. Review reads a month against the plan; lines paid by standing order count as paid by themselves. In a household it also shows who owes whom.',
     },
     accounts: {
       title: 'Accounts',
@@ -102,6 +106,16 @@ export const en: Content = {
   },
 
   articles: {
+    'about-belege': {
+      title: 'Recording what you spend',
+      body: [
+        'Spending is the other half of the budget: the plan says what a month should cost, and Spending records what it did. Each receipt is an amount, a day and the budget line it counts against — or none, as Unassigned.',
+        'Review reads a month against its plan, line by line. A line paid by standing order or direct debit, such as rent, can be marked paid automatically: it is not offered for receipts and counts as paid at its plan, so the month’s total is the whole month.',
+        'When a month is over it keeps the budget it ended with. Changing the plan afterwards does not rewrite a month already past.',
+        'In a household, each receipt says who paid — a member, or the joint account. Review shows who owes whom, carried on from month to month, and the fewest payments that settle it. The split, equal or by share, applies to receipts entered from then on.',
+      ],
+    },
+
     'about-budget': {
       title: 'What the budget is for',
       body: [

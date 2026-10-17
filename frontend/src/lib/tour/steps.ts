@@ -43,6 +43,7 @@ export type TourStepId =
   | 'typeSavings'
   | 'typeBill'
   | 'typePurchase'
+  | 'spending'
   | 'accounts'
   | 'allocations'
   | 'install'
@@ -166,6 +167,9 @@ export const TOUR_STEPS: TourStep[] = [
   { id: 'typeBill', path: '/budget', anchor: 'type-bill', sub: true, guideType: 'bill' },
   { id: 'typePurchase', path: '/budget', anchor: 'type-purchase', sub: true, guideType: 'purchase' },
 
+  // After the plan and before the accounts: what a month actually cost is read
+  // against the plan the steps before it described.
+  { id: 'spending', path: '/spending' },
   { id: 'accounts', path: '/accounts' },
   // The second segment is the point: the step describes the allocations view,
   // so it shows it rather than pointing at the tab that would reach it. A

@@ -44,8 +44,12 @@ it, which is one line in `lib/nav/destinations.ts`.
 
 ### Navigation
 - Destinations are data (`lib/nav/destinations.ts`), rendered as a bottom bar under 768px
-  and a left rail above. A user gets Budget · Accounts · Profile; an admin gets a different
-  list — Users · Audit · Profile — because an admin has no vault and cannot budget.
+  and a left rail above. A user gets Budget · Belege · Accounts · Knowledge · Profile — five,
+  checked at 320px in every locale; a sixth is a decision, not an arrival. An admin gets a
+  different list — Users · Audit · Upkeep · Profile — because an admin has no vault and
+  cannot budget.
+- A screen may pin its main action (`ActionButton pinned`): on a phone it stays out above
+  the dial's dot while the dial is closed, one tap where the thumb is. Belege pins its "+".
 - Two levels, hard stop: a screen and a sub-tab (`/accounts/allocations`). Anything deeper
   is a modal or a disclosure, not a place.
 - Tab switches push onto history, so the browser back gesture undoes the last move.
@@ -135,7 +139,7 @@ the server for something the vault cannot do.
 - `audit_log` — security event log (user_id nullable for anonymization)
 - `user_vaults` — encrypted vault blobs (opaque to server)
 
-### Encrypted Vault (frontend, inside `VaultData`, currently v7)
+### Encrypted Vault (frontend, inside `VaultData`, currently v11)
 
 **Naming, since it changed three times and older commits will read differently.**
 
@@ -168,7 +172,8 @@ is `category.side`.
   side and an entry's type could not both be called `type` once the second grew
   past two values: a Housing heading holds Rent and a roof fund alike
 - `VaultEntry` — name, `type`, sort order, archived flag, `categoryId`, routing
-  (`sourceAccountId` / `sinkAccountId`), optional `reserve`
+  (`sourceAccountId` / `sinkAccountId`), optional `reserve`, optional `automatic`
+  (paid by standing order: Belege offers it for no receipt and counts it as paid at its plan)
 - `ReserveDefinition` — `targetAmount`, `periodMonths`, `anchorMonth`. No `kind`:
   the entry type is the discriminator, so the schedule is recorded once and
   `reserveMath` branches on the type directly
@@ -177,6 +182,17 @@ is `category.side`.
   `entryName` / `categoryName` so they survive a later rename or delete
 - `VaultAccount` — name, kind, currency, `currentAmount` as at `lastCorrectedAt`
   (an anchor pair, never a running total), optional bank/IBAN/holder for QR bills
+- `people` (v10) — what a household calls its members, by user id. Set by the owner only;
+  kept after a member leaves. Empty in a personal vault
+- `Beleg` (v11) — one receipt: `date`, `amount`, `entryId` (expense entries only; `null` is
+  Unassigned), optional `note`; in a household `paidBy` (a user id or `'joint'`) and the
+  `shares` copied from `split` when it was entered. Called a *record* in code. A record is
+  never dropped: if its entry goes, it becomes Unassigned
+- `months` (v11) — a `ClosedMonth` per finished month that had records: the budget lines it
+  ended with, denormalised and frozen, taken by the first write after the month ends (no
+  server job — the server cannot read the plan, and the plan only changes through the app)
+- `settlements` and `split` (v11) — households only: payments that even balances out, and
+  how a new record is divided (equal, or a percentage per member adding to 100)
 
 ### Future modules (not yet implemented)
 - `Account` — name, type (bank/savings/cash), currency, balance
