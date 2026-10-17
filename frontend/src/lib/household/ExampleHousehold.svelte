@@ -3,7 +3,6 @@
   import { initialsOf } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import InviteQR from './InviteQR.svelte'
-  import WaitingDot from './WaitingDot.svelte'
 
   /**
    * A household with somebody invited to it, for the walkthrough to point at.
@@ -28,8 +27,8 @@
    */
   /**
    * Two moments of the same invitation, for two steps: just sent, with the code
-   * to hand over, and accepted, with the Confirm button and the dot that tell
-   * the owner somebody is waiting.
+   * to hand over, and accepted, with the Confirm button. The dot that tells an
+   * owner somebody is waiting is left out: it explains itself in the app.
    */
   let { stage = 'pending' }: { stage?: 'pending' | 'accepted' } = $props()
 
@@ -46,9 +45,6 @@
   <div class="row household">
     <HouseMark initials={initialsOf(NAME)} />
     <span class="name">{NAME}</span>
-    {#if stage === 'accepted'}
-      <WaitingDot />
-    {/if}
     <span class="tag">{t('role.owner')}</span>
   </div>
 

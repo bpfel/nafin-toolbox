@@ -75,7 +75,7 @@ export const it: PartialContent = {
     },
     sharedConfirm: {
       title: 'Farli entrare',
-      body: 'Appena la persona accetta, qui compare il pulsante «Conferma» – e un punto su Profilo te lo segnala, ovunque tu sia nell’app. È confermando che le consegni la chiave dell’economia domestica: prima non vede nulla. Poi, con la matita accanto a ogni persona, puoi darle un nome.',
+      body: 'Appena la persona accetta, qui compare il pulsante «Conferma». È confermando che le consegni la chiave dell’economia domestica: prima non vede nulla. Poi, con la matita accanto a ogni persona, puoi darle un nome.',
     },
     sharedSwitch: {
       title: 'Cambiare budget',

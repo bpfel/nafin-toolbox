@@ -79,7 +79,7 @@ export const en: Content = {
     },
     sharedConfirm: {
       title: 'Letting them in',
-      body: 'Once they accept, a Confirm button appears here, and a dot on Profile tells you so wherever you are in the app. Confirming is what hands them the household’s key: until you do, they can’t see anything. Afterwards, the pen beside each person lets you give them a name.',
+      body: 'Once they accept, a Confirm button appears here. Confirming is what hands them the household’s key: until you do, they can’t see anything. Afterwards, the pen beside each person lets you give them a name.',
     },
     sharedSwitch: {
       title: 'How to switch budgets',
