@@ -15,7 +15,7 @@ import { getInvitationState } from '../household/invitations.svelte'
  * password with other people's accounts and bury an audit log that wants a
  * screen of its own.
  */
-export type IconName = 'budget' | 'accounts' | 'knowledge' | 'profile' | 'users' | 'audit' | 'upkeep'
+export type IconName = 'budget' | 'spending' | 'accounts' | 'knowledge' | 'profile' | 'users' | 'audit' | 'upkeep'
 
 export interface Destination {
   screen: Screen
@@ -38,6 +38,8 @@ const invitations = getInvitationState()
  */
 const FOR_USER: Destination[] = [
   { screen: 'budget', path: '/budget', icon: 'budget', label: () => t('nav.budget') },
+  // Beside the budget it is read against: the plan, then what was spent.
+  { screen: 'spending', path: '/spending', icon: 'spending', label: () => t('nav.spending') },
   { screen: 'accounts', path: '/accounts', icon: 'accounts', label: () => t('nav.accounts') },
   { screen: 'knowledge', path: '/knowledge', icon: 'knowledge', label: () => t('nav.knowledge') },
   {
@@ -52,11 +54,11 @@ const FOR_USER: Destination[] = [
 ]
 
 /*
- * Four fits at 320px. Five does not — which is the constraint the shell was
- * drawn against, and it has not moved. Savings and a dashboard are both owed a
- * slot, so whoever adds the fifth destination has to decide what stops being
- * one; Knowledge is the likeliest candidate, since a library is a place you go
- * deliberately rather than one you switch to while working.
+ * Five fit at 320px. This said four did not, reckoning labels at 64px each —
+ * but other apps carry five, and so does this one, once every locale's labels
+ * fit: Belege and Konten, Spese and Conti, at the bar's font size, checked at
+ * 320px in all five languages. Shrink the label font before dropping a tab.
+ * A sixth (Savings, a dashboard) reopens the question.
  */
 
 /*

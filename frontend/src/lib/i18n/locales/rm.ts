@@ -60,6 +60,7 @@ export const rm: Partial<Messages> = {
 
   // --- Navigation ---
   'nav.budget': 'Budget',
+  'nav.spending': 'Quittanzas',
   'nav.accounts': 'Contos',
   'nav.knowledge': 'Savida',
   'nav.profile': 'Profil',

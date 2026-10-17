@@ -7,6 +7,7 @@
   import AppNav from './AppNav.svelte'
   import BudgetScreen from '../../screens/BudgetScreen.svelte'
   import AccountsScreen from '../../screens/AccountsScreen.svelte'
+  import SpendingScreen from '../../screens/SpendingScreen.svelte'
   import KnowledgeScreen from '../../screens/KnowledgeScreen.svelte'
   import TourOffer from '../tour/TourOffer.svelte'
   import { getVaultState } from '../crypto/vaultStore.svelte'
@@ -146,7 +147,7 @@
         back. `hidden` takes a screen out of the tab order and the accessibility
         tree exactly as removal would, and leaves it mounted.
 
-        Only the two money screens. Profile is cheap to build and holds nothing
+        Only the money screens. Profile is cheap to build and holds nothing
         worth keeping.
       -->
       {#if offerTour}
@@ -155,6 +156,9 @@
 
       <div class="screen" hidden={route.screen !== 'budget'}>
         <BudgetScreen />
+      </div>
+      <div class="screen" hidden={route.screen !== 'spending'}>
+        <SpendingScreen {userId} />
       </div>
       <div class="screen" hidden={route.screen !== 'accounts'}>
         <AccountsScreen />

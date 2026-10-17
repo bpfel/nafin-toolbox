@@ -15,6 +15,7 @@
 export const en = {
   // --- Navigation and profile ---
   'nav.budget': 'Budget',
+  'nav.spending': 'Spending',
   'nav.accounts': 'Accounts',
   'nav.knowledge': 'Knowledge',
   'nav.profile': 'Profile',
@@ -651,6 +652,36 @@ export const en = {
   'tour.offerAccept': 'Take the tour',
   'tour.offerDecline': 'Not now',
 
+  // --- Belege ---
+  'spending.tabRecord': 'Record',
+  'spending.tabReview': 'Review',
+  'spending.viewsLabel': 'Spending views',
+  'spending.empty': 'Record what you spend, and see it against your budget.',
+  'spending.amount': 'Amount',
+  'spending.entry': 'Counts against',
+  'spending.allEntries': 'All entries…',
+  'spending.unassigned': 'Unassigned',
+  'spending.date': 'Date',
+  'spending.note': 'Note',
+  'spending.paidBy': 'Paid by',
+  'spending.joint': 'Joint account',
+  'spending.today': 'Entered today',
+  'spending.unsaved': 'Not saved yet',
+  'spending.edit': 'Edit record',
+  'spending.delete': 'Delete record',
+  'spending.deleteConfirm': 'Delete this record?',
+  'spending.amountInvalid': 'Enter an amount.',
+  'spending.month': 'Month',
+  'spending.previousMonth': 'Previous month',
+  'spending.nextMonth': 'Next month',
+  'spending.spent': 'Spent',
+  'spending.planned': 'Planned',
+  'spending.total': 'Total',
+  'spending.asOf': 'Compared with the budget as of {date}.',
+  'spending.live': 'Compared with your budget as it is now.',
+  'spending.nothingThisMonth': 'Nothing recorded this month.',
+  'spending.notPlanned': 'not planned',
+  'spending.readOnly': 'You can only read this household; records are entered by its writers.',
 } as const
 
 /**
