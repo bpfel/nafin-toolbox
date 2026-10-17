@@ -264,18 +264,27 @@ export interface Balance {
  * A record paid from the joint account changes nobody's balance.
  */
 export function balances(vault: VaultData, upTo?: string): Record<string, Balance> {
+  return tally(vault, month => upTo === undefined || month <= upTo)
+}
+
+/** The same, for one month alone: what that month added to everybody's balance. */
+export function balancesIn(vault: VaultData, month: string): Record<string, Balance> {
+  return tally(vault, m => m === month)
+}
+
+function tally(vault: VaultData, counts: (month: string) => boolean): Record<string, Balance> {
   const result: Record<string, Balance> = {}
   const of = (m: string) => (result[m] ??= { paid: 0, share: 0, balance: 0 })
 
   for (const beleg of vault.belege) {
-    if (upTo !== undefined && monthOf(beleg.date) > upTo) continue
+    if (!counts(monthOf(beleg.date))) continue
     if (!beleg.paidBy || beleg.paidBy === JOINT || !beleg.shares) continue
     const total = rappen(beleg.amount)
     of(beleg.paidBy).paid += total
     for (const [m, part] of Object.entries(splitRappen(total, beleg.shares, beleg.paidBy))) of(m).share += part
   }
   for (const s of vault.settlements) {
-    if (upTo !== undefined && monthOf(s.date) > upTo) continue
+    if (!counts(monthOf(s.date))) continue
     const total = rappen(s.amount)
     of(s.from).paid += total
     of(s.to).share += total

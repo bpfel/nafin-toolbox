@@ -5,6 +5,7 @@
   import { monthLabel } from '../../lib/util/months'
   import Money from '../../lib/util/Money.svelte'
   import RecordRow from './RecordRow.svelte'
+  import Balances from './Balances.svelte'
 
   /**
    * A month against the budget it belongs to.
@@ -18,9 +19,16 @@
     vault: VaultData
     names?: Record<string, string>
     onopen?: (beleg: Beleg) => void
+    /** The household's members, for who owes whom; empty in a personal budget. */
+    members?: { id: string; name: string }[]
+    me?: string
+    readOnly?: boolean
   }
 
-  let { vault, names, onopen }: Props = $props()
+  let { vault, names, onopen, members = [], me = '', readOnly = false }: Props = $props()
+
+  /** Only where there is somebody to owe: two members, or records that say who paid. */
+  let shared = $derived(members.length > 1 || vault.belege.some(b => b.paidBy !== undefined))
 
   let current = $derived(thisMonth())
   let months = $derived(reviewableMonths(vault, current))
@@ -111,6 +119,10 @@
       <span class="planned">/ <Money value={review.planned} cents /></span>
     </span>
   </div>
+
+  {#if shared}
+    <Balances {vault} {month} {members} {me} {readOnly} />
+  {/if}
 </div>
 
 <style>
