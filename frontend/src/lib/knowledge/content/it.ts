@@ -20,11 +20,11 @@ export const it: PartialContent = {
   tour: {
     welcome: {
       title: 'Un pianificatore',
-      body: 'Questa app non ha alcun collegamento con la tua banca e non vede mai le tue spese reali. Il budget dice invece quanto deve restare alla fine del mese, perché gli impegni futuri siano sempre coperti.',
+      body: 'Questa app non ha alcun collegamento con la tua banca e non vede mai il tuo conto. Il budget dice invece quanto deve restare alla fine del mese, perché gli impegni futuri siano sempre coperti.',
     },
     places: {
       title: 'Le diverse schermate',
-      body: 'Budget è dove pianifichi un mese. Conti mostra i saldi reali corrispondenti. Sapere ospita questo tour e brevi testi sulle finanze svizzere.',
+      body: 'Budget è dove pianifichi un mese. Spese registra quanto è costato davvero un mese. Conti mostra i saldi reali corrispondenti. Sapere ospita questo tour e brevi testi sulle finanze svizzere.',
     },
     types: {
       title: 'Diverse voci di budget',
@@ -39,6 +39,10 @@ export const it: PartialContent = {
       title: 'I comandi',
       body: 'Tutte le opzioni per la schermata corrente sono qui.',
       hoverNote: 'Passa il puntatore su un simbolo per vedere che cosa fa.',
+    },
+    spending: {
+      title: 'Quello che spendi davvero',
+      body: 'In Spese registri le uscite man mano: l’importo e la voce di budget a cui contano. Il riepilogo confronta un mese con il piano; le voci pagate con ordine permanente contano da sole come pagate. In un’economia domestica mostra anche chi deve cosa a chi.',
     },
     accounts: {
       title: 'Conti',
@@ -97,6 +101,16 @@ export const it: PartialContent = {
     },
   },
   articles: {
+    'about-belege': {
+      title: 'Registrare quello che spendi',
+      body: [
+        'Spese è l’altra metà del budget: il piano dice quanto dovrebbe costare un mese, Spese registra quanto è costato. Ogni spesa è un importo, un giorno e la voce di budget a cui conta – o nessuna, come «non assegnata».',
+        'Il riepilogo confronta un mese con il suo piano, voce per voce. Una voce pagata con ordine permanente o addebito diretto, come l’affitto, può essere segnata come pagata automaticamente: non viene più proposta per le spese e conta come pagata al suo importo previsto, così il totale mostra tutto il mese.',
+        'Finito un mese, conserva il budget con cui si è chiuso. Cambiare il piano dopo non riscrive un mese passato.',
+        'In un’economia domestica, ogni spesa dice chi ha pagato – un membro o il conto comune. Il riepilogo mostra chi deve cosa a chi, riportato di mese in mese, e i pagamenti minimi per pareggiare. La ripartizione, in parti uguali o per quota, vale per le spese registrate da quel momento.',
+      ],
+    },
+
     'about-budget': {
       title: 'A cosa serve il budget',
       body: [

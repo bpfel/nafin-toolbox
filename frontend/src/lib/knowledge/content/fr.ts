@@ -21,11 +21,11 @@ export const fr: PartialContent = {
   tour: {
     welcome: {
       title: 'Un planificateur',
-      body: 'Cette application n’a aucun lien avec ta banque et ne voit jamais tes dépenses réelles. Le budget dit plutôt combien doit rester à la fin du mois, pour que les engagements à venir soient toujours couverts.',
+      body: 'Cette application n’a aucun lien avec ta banque et ne voit jamais ton compte. Le budget dit plutôt combien doit rester à la fin du mois, pour que les engagements à venir soient toujours couverts.',
     },
     places: {
       title: 'Les différents écrans',
-      body: 'Budget, c’est là que tu planifies un mois. Comptes montre les soldes réels correspondants. Savoir abrite cette visite et de courts textes sur les finances suisses.',
+      body: 'Budget, c’est là que tu planifies un mois. Tickets note ce qu’un mois a vraiment coûté. Comptes montre les soldes réels correspondants. Savoir abrite cette visite et de courts textes sur les finances suisses.',
     },
     types: {
       title: 'Différentes entrées budgétaires',
@@ -40,6 +40,10 @@ export const fr: PartialContent = {
       title: 'Les commandes',
       body: 'Toutes les options pour l’écran en cours sont ici.',
       hoverNote: 'Survole un symbole pour voir ce qu’il fait.',
+    },
+    spending: {
+      title: 'Ce que tu dépenses vraiment',
+      body: 'Dans Tickets, tu saisis tes dépenses au fil de l’eau : le montant et la ligne de budget concernée. Le bilan compare un mois au plan ; les lignes payées par ordre permanent comptent d’elles-mêmes comme payées. Dans un ménage, il montre aussi qui doit quoi.',
     },
     accounts: {
       title: 'Comptes',
@@ -98,6 +102,16 @@ export const fr: PartialContent = {
     },
   },
   articles: {
+    'about-belege': {
+      title: 'Saisir ce que tu dépenses',
+      body: [
+        'Tickets est l’autre moitié du budget : le plan dit ce qu’un mois devrait coûter, Tickets note ce qu’il a coûté. Chaque ticket est un montant, un jour et la ligne de budget concernée – ou aucune, comme « non attribué ».',
+        'Le bilan compare un mois à son plan, ligne par ligne. Une ligne payée par ordre permanent ou prélèvement, comme le loyer, peut être marquée payée automatiquement : elle n’est plus proposée pour les tickets et compte comme payée à son montant prévu, pour que le total montre tout le mois.',
+        'Une fois terminé, un mois garde le budget avec lequel il s’est achevé. Modifier le plan ensuite ne réécrit pas un mois passé.',
+        'Dans un ménage, chaque ticket dit qui a payé – un membre ou le compte commun. Le bilan montre qui doit quoi, reporté d’un mois à l’autre, et le moins de paiements pour équilibrer. La répartition, à parts égales ou par part, vaut pour les tickets saisis à partir de là.',
+      ],
+    },
+
     'about-budget': {
       title: 'À quoi sert le budget',
       body: [

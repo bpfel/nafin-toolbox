@@ -20,11 +20,11 @@ export const de: PartialContent = {
   tour: {
     welcome: {
       title: 'Ein Planer',
-      body: 'Diese App hat keine Verbindung zu deiner Bank und sieht deine tatsächlichen Ausgaben nie. Das Budget sagt stattdessen, wie viel bis Ende Monat übrig bleiben muss, damit die anstehenden Verpflichtungen immer gedeckt sind.',
+      body: 'Diese App hat keine Verbindung zu deiner Bank und sieht dein Konto nie. Das Budget sagt stattdessen, wie viel bis Ende Monat übrig bleiben muss, damit die anstehenden Verpflichtungen immer gedeckt sind.',
     },
     places: {
       title: 'Die Bildschirme',
-      body: 'Budget ist, wo du einen Monat planst. Konten zeigt die tatsächlichen Salden dahinter. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen.',
+      body: 'Budget ist, wo du einen Monat planst. Belege hält fest, was ein Monat wirklich gekostet hat. Konten zeigt die tatsächlichen Salden dahinter. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen.',
     },
     types: {
       title: 'Verschiedene Budgeteinträge',
@@ -39,6 +39,10 @@ export const de: PartialContent = {
       title: 'Bedienelemente',
       body: 'Alle Optionen für den aktuellen Bildschirm sind hier.',
       hoverNote: 'Fahr mit der Maus über ein Symbol, um zu sehen, was es tut.',
+    },
+    spending: {
+      title: 'Was du wirklich ausgibst',
+      body: 'In den Belegen erfasst du Quittungen laufend: den Betrag und die Budgetzeile, auf die er zählt. Die Übersicht vergleicht einen Monat mit dem Plan; Zeilen per Dauerauftrag gelten von selbst als bezahlt. Im Haushalt zeigt sie auch, wer wem was schuldet.',
     },
     accounts: {
       title: 'Konten',
@@ -97,6 +101,16 @@ export const de: PartialContent = {
     },
   },
   articles: {
+    'about-belege': {
+      title: 'Erfassen, was du ausgibst',
+      body: [
+        'Die Belege sind die andere Hälfte des Budgets: Der Plan sagt, was ein Monat kosten soll, die Belege halten fest, was er gekostet hat. Jeder Beleg ist ein Betrag, ein Tag und die Budgetzeile, auf die er zählt – oder keine, als «nicht zugeordnet».',
+        'Die Übersicht vergleicht einen Monat Zeile für Zeile mit seinem Plan. Eine Zeile, die per Dauerauftrag oder Lastschrift bezahlt wird, etwa die Miete, kannst du als automatisch bezahlt markieren: Sie wird nicht für Belege angeboten und zählt mit ihrem Planbetrag als bezahlt, damit das Total den ganzen Monat zeigt.',
+        'Ist ein Monat vorbei, behält er das Budget, mit dem er geendet hat. Spätere Änderungen am Plan schreiben einen vergangenen Monat nicht um.',
+        'Im Haushalt sagt jeder Beleg, wer bezahlt hat – ein Mitglied oder das gemeinsame Konto. Die Übersicht zeigt, wer wem was schuldet, über die Monate weitergeführt, und die wenigsten Zahlungen zum Ausgleich. Die Aufteilung, gleichmässig oder nach Anteil, gilt für Belege, die ab dann erfasst werden.',
+      ],
+    },
+
     'about-budget': {
       title: 'Wozu das Budget da ist',
       body: [
