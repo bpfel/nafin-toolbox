@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeEach, vi } from 'vitest'
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createEmptyVault, encryptVault, decryptVault, type VaultData } from './vault'
 import { generateHouseholdKey, sealKeyForSelf, sealName } from './household'
 import * as budget from '../budget/budgetEngine'
 import * as accounts from '../accounts/accountsEngine'
+import * as belege from '../belege/belegeEngine'
 
 /**
  * Two devices, one vault: the conflict scenarios of `plans/save-queue-plan.md`.
@@ -44,7 +45,7 @@ import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 const { VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError } = client
 
-import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview, sessionEndedElsewhere, nameMember, peopleOf } from './vaultStore.svelte'
+import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview, sessionEndedElsewhere, nameMember, peopleOf, closeEndedMonths } from './vaultStore.svelte'
 import { getNotices, type Notice } from '../sync/notices.svelte'
 import { undoOverwrite } from './vaultStore.svelte'
 
@@ -803,3 +804,140 @@ async function signInAgain(): Promise<void> {
   sessionStorage.setItem('vault_mek', btoa(String.fromCharCode(...new Uint8Array(raw))))
   await tryRestoreVault(42)
 }
+
+// --- Belege ------------------------------------------------------------------
+//
+// The plan's own list, on top of the queue's. A record is money somebody spent
+// and typed in, so where the general rule drops and reports, a record degrades
+// instead: kept, as Unassigned.
+
+describe('Belege', () => {
+  /** Pretend it is this local date and time. Only `Date` is faked. */
+  function itIs(year: number, month: number, day: number) {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(year, month - 1, day, 9, 0))
+  }
+
+  afterEach(() => vi.useRealTimers())
+
+  const record = (date: string, amount: string, entryId: string | null = null) =>
+    ({ date, amount, entryId, createdBy: '1' })
+
+  test('B1. a record added here and one added elsewhere both survive', async () => {
+    commit('addBeleg', record('2026-10-05', '12.00'))
+    await elsewhere(v => belege.addBeleg(v, record('2026-10-05', '30.00')))
+
+    await saveVault()
+
+    expect((await onServer()).belege.map(b => b.amount).sort()).toEqual(['12.00', '30.00'])
+  })
+
+  test('B2. edited here, deleted elsewhere: the delete stands, and the edit is reported', async () => {
+    commit('addBeleg', record('2026-10-05', '12.00'))
+    await saveVault()
+    const id = state.vault!.belege[0].id
+
+    commit('editBeleg', id, { amount: '15.00' })
+    await elsewhere(v => belege.deleteBeleg(v, id))
+    await saveVault()
+
+    expect((await onServer()).belege).toEqual([])
+    expect(only('dropped')?.items[0].reason).toBe('belegGone')
+  })
+
+  test('B2b. deleted here, edited elsewhere: the delete stands', async () => {
+    commit('addBeleg', record('2026-10-05', '12.00'))
+    await saveVault()
+    const id = state.vault!.belege[0].id
+
+    commit('deleteBeleg', id)
+    await elsewhere(v => belege.editBeleg(v, id, { amount: '15.00' }))
+    await saveVault()
+
+    expect((await onServer()).belege).toEqual([])
+  })
+
+  test('B3. counted against an entry deleted elsewhere: kept as Unassigned, and said so', async () => {
+    const groceries = expense(state.vault!)
+    commit('addBeleg', record('2026-10-05', '42.50', groceries.id))
+    await elsewhere(v => budget.deleteEntry(v, groceries.id))
+
+    await saveVault()
+
+    const saved = await onServer()
+    expect(saved.belege).toHaveLength(1)
+    expect(saved.belege[0].entryId).toBeNull()
+    expect(only('unassigned')?.count).toBe(1)
+  })
+
+  test('B4. both devices write first in November: October is closed once, by the first to save', async () => {
+    commit('addBeleg', record('2026-10-05', '12.00'))
+    await saveVault()
+    itIs(2026, 11, 1)
+    await elsewhere(v => belege.closeMonth(v, '2026-10', { closedAt: 'theirs', lines: [] }))
+
+    commit('addBeleg', record('2026-11-01', '5.00'))
+    await saveVault()
+
+    expect((await onServer()).months['2026-10'].closedAt).toBe('theirs')
+  })
+
+  test('B5. Rent changed on the 1st, before anything else: October keeps the old Rent', async () => {
+    const rent = expense(state.vault!)
+    commit('setPlanned', rent.id, '1500.00')
+    commit('addBeleg', record('2026-10-05', '1500.00', rent.id))
+    await saveVault()
+    itIs(2026, 11, 1)
+
+    commit('setPlanned', rent.id, '1800.00')
+    await saveVault()
+
+    const october = (await onServer()).months['2026-10']
+    expect(october.lines.find(l => l.entryId === rent.id)?.plannedAmount).toBe('1500.00')
+  })
+
+  test('B6. a record backdated into a month nobody wrote in closes it, with the plan as it is now', async () => {
+    itIs(2026, 11, 10)
+
+    commit('addBeleg', record('2026-09-20', '80.00'))
+    await saveVault()
+
+    const saved = await onServer()
+    expect(saved.months['2026-09']).toBeTruthy()
+    expect(saved.months['2026-11']).toBeUndefined()
+  })
+
+  test('B7. the split changed elsewhere while a record was entered here: the record keeps its own', async () => {
+    commit('addBeleg', { ...record('2026-10-05', '100.00'), paidBy: '1', shares: { '1': 1, '2': 1 } })
+    await elsewhere(v => belege.setSplit(v, { mode: 'shares', shares: { '1': 60, '2': 40 } }))
+
+    await saveVault()
+
+    const saved = await onServer()
+    expect(saved.belege[0].shares).toEqual({ '1': 1, '2': 1 })
+    expect(saved.split).toEqual({ mode: 'shares', shares: { '1': 60, '2': 40 } })
+  })
+
+  test('B8. the same settlement recorded on both devices is two: a real double payment until one goes', async () => {
+    const paid = { date: '2026-10-06', from: '2', to: '1', amount: '30.00', createdBy: '2' }
+    commit('addSettlement', paid)
+    await elsewhere(v => belege.addSettlement(v, paid))
+
+    await saveVault()
+
+    expect((await onServer()).settlements).toHaveLength(2)
+  })
+
+  // On load, for a writer: Belege calls this when it opens, so a month is
+  // closed even if nobody writes anything in November.
+  test('opening the app in November closes October, without anything else written', async () => {
+    commit('addBeleg', record('2026-10-05', '12.00'))
+    await saveVault()
+    itIs(2026, 11, 2)
+
+    closeEndedMonths()
+    await saveVault()
+
+    expect((await onServer()).months['2026-10']).toBeTruthy()
+  })
+})

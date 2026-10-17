@@ -44,9 +44,13 @@ const tour = getTourState()
  */
 function emptyVault(): VaultData {
   return {
-    version: 10,
+    version: 11,
     trust: { pins: {}, epochs: {} },
     people: {},
+    belege: [],
+    months: {},
+    settlements: [],
+    split: { mode: 'equal' as const },
     budget: { categories: [], entries: [], plan: [], snapshots: [] },
     accounts: [
       {

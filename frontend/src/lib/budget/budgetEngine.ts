@@ -324,6 +324,9 @@ export function deleteEntry(vault: VaultData, entryId: string): void {
   // left alone: they hold names, not references, and a record of a past plan
   // must not lose lines because an entry was deleted afterwards.
   vault.budget.plan = vault.budget.plan.filter(e => e.entryId !== entryId)
+  // A record is money somebody spent; it outlives the line it was counted
+  // against, as Unassigned. A finished month keeps the line in its own copy.
+  for (const beleg of vault.belege) if (beleg.entryId === entryId) beleg.entryId = null
   pruneEmptyCategories(vault)
 }
 
@@ -617,6 +620,9 @@ export function resetBudget(vault: VaultData): void {
   vault.budget.entries = []
   vault.budget.categories = []
   vault.budget.plan = []
+  // Records stay, as Unassigned — a fresh plan is not a reason to forget
+  // what was spent.
+  for (const beleg of vault.belege) beleg.entryId = null
 }
 
 // --- Seed Defaults ---

@@ -64,6 +64,8 @@
               <li>{line(item)}</li>
             {/each}
           </ul>
+        {:else if n.kind === 'unassigned'}
+          {tn('sync.unassigned', n.count)}
         {:else if n.kind === 'readOnly'}
           {tn('sync.readOnly', n.count)}
         {:else if n.kind === 'removed'}

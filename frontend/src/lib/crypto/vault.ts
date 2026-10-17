@@ -1,6 +1,6 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 10
+export const VAULT_VERSION = 11
 
 /**
  * A stored vault written by a build newer than this one.
@@ -19,7 +19,7 @@ export class VaultVersionAheadError extends Error {
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 10
+  version: 11
   budget: BudgetVaultData
   accounts: VaultAccount[]
   /** Whether the guided tour has been taken, or turned down. */
@@ -35,11 +35,74 @@ export interface VaultData {
    * record that mentions them — who paid, in Belege — can still say who.
    */
   people: Record<string, VaultPerson>
+  /** What was actually spent: one record per receipt, the Belege module. */
+  belege: Beleg[]
+  /**
+   * Each finished month that had records, with the budget it is read against,
+   * frozen when the month ended — by `'YYYY-MM'`. A past month read against
+   * today's plan would change its verdict every time the plan did.
+   */
+  months: Record<string, ClosedMonth>
+  /** Households only: money one member paid another to even out. */
+  settlements: Settlement[]
+  /** Households only: how a record is divided between members when entered. */
+  split: Split
 }
 
 export interface VaultPerson {
   name: string
 }
+
+/** One thing spent. A *record* in code; a *Beleg* to a German reader. */
+export interface Beleg {
+  id: string
+  /** The day it was spent, `YYYY-MM-DD`, in local time. */
+  date: string
+  /** In CHF, as typed and normalised: `'12.50'`. */
+  amount: string
+  /** The budget line it counts against; `null` is Unassigned. Expense entries only. */
+  entryId: string | null
+  note?: string
+  /** Households: a user id, or `'joint'` for the joint account. */
+  paidBy?: string
+  /**
+   * Households: each member's weight in this record, copied from `split` when
+   * it was entered, so changing the split later does not rewrite old records.
+   */
+  shares?: Record<string, number>
+  /** User id of whoever entered it. */
+  createdBy: string
+  /** When it was entered, not when it was spent. */
+  createdAt: string
+}
+
+/** The budget a finished month is read against, as it stood when it ended. */
+export interface ClosedMonth {
+  closedAt: string
+  lines: ClosedMonthLine[]
+}
+
+/** Denormalised, like a snapshot's lines, so a later rename or delete cannot reach it. */
+export interface ClosedMonthLine {
+  entryId: string
+  entryName: string
+  categoryName: string
+  /** Monthly, as it stood. */
+  plannedAmount: string
+}
+
+export interface Settlement {
+  id: string
+  date: string
+  from: string
+  to: string
+  amount: string
+  createdBy: string
+  createdAt: string
+}
+
+/** Equal between members, or a weight per member (percentages that add to 100). */
+export type Split = { mode: 'equal' } | { mode: 'shares'; shares: Record<string, number> }
 
 /**
  * The things a client must remember in order not to be lied to twice.
@@ -351,6 +414,13 @@ export function assertVaultShape(vault: VaultData): void {
   if (!people || typeof people !== 'object') {
     throw new VaultShapeError('people is missing')
   }
+
+  // v11's. A vault written without these would lose every record anybody typed.
+  const v11 = vault as unknown as { belege?: unknown; months?: unknown; settlements?: unknown; split?: unknown }
+  if (!Array.isArray(v11.belege)) throw new VaultShapeError('belege is missing')
+  if (!v11.months || typeof v11.months !== 'object') throw new VaultShapeError('months is missing')
+  if (!Array.isArray(v11.settlements)) throw new VaultShapeError('settlements is missing')
+  if (!v11.split || typeof v11.split !== 'object') throw new VaultShapeError('split is missing')
 }
 
 // --- Encrypt / decrypt ---
@@ -483,12 +553,17 @@ export function migrateVault(parsed: unknown): VaultData {
   // narrowing. Only a vault claiming to be current while missing what a current
   // vault always writes; anything older is handled by its own branch.
   const wearingV8Keys =
-    (vault.version === 9 || vault.version === VAULT_VERSION) &&
+    (vault.version === 9 || vault.version === 10 || vault.version === VAULT_VERSION) &&
     (vault as { trust?: unknown }).trust === undefined
 
   // v10 added `people`; the same narrowing again.
   const wearingV9Keys =
-    vault.version === VAULT_VERSION && (vault as { people?: unknown }).people === undefined
+    (vault.version === 10 || vault.version === VAULT_VERSION) &&
+    (vault as { people?: unknown }).people === undefined
+
+  // v11 added the Belege keys; `belege` stands for all four.
+  const wearingV10Keys =
+    vault.version === VAULT_VERSION && (vault as { belege?: unknown }).belege === undefined
 
   if (
     vault.version === VAULT_VERSION &&
@@ -497,14 +572,15 @@ export function migrateVault(parsed: unknown): VaultData {
     !wearingV6Keys &&
     !wearingV7Keys &&
     !wearingV8Keys &&
-    !wearingV9Keys
+    !wearingV9Keys &&
+    !wearingV10Keys
   ) {
     return vault as unknown as VaultData
   }
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
   // for being four steps behind. Everything from v8 on is purely additive, so
   // those last steps are one helper rather than one more wrapper on each line.
-  const fromV8 = (v8: V8Shape) => migrateV9ToV10(migrateV8ToV9(v8))
+  const fromV8 = (v8: V8Shape) => migrateV10ToV11(migrateV9ToV10(migrateV8ToV9(v8)))
   if (vault.version === 2) {
     return fromV8(
       migrateV7ToV8(
@@ -532,7 +608,8 @@ export function migrateVault(parsed: unknown): VaultData {
   }
   if (vault.version === 7 || wearingV7Keys) return fromV8(migrateV7ToV8(vault as unknown as V7Shape))
   if (vault.version === 8 || wearingV8Keys) return fromV8(vault as unknown as V8Shape)
-  if (vault.version === 9 || wearingV9Keys) return migrateV9ToV10(vault as unknown as V9Shape)
+  if (vault.version === 9 || wearingV9Keys) return migrateV10ToV11(migrateV9ToV10(vault as unknown as V9Shape))
+  if (vault.version === 10 || wearingV10Keys) return migrateV10ToV11(vault as unknown as V10Shape)
 
   // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
   // the data. Refuse it so the app can say so, instead of handing back an empty
@@ -937,10 +1014,29 @@ interface V9Shape {
  * Empty for everybody. Nobody has been named yet, and every place that shows a
  * member falls back to their email address, which is all the app knew before.
  */
-function migrateV9ToV10(vault: V9Shape): VaultData {
+function migrateV9ToV10(vault: V9Shape): V10Shape {
+  const migrated = vault as unknown as V10Shape
+  // 10 rather than VAULT_VERSION, for the reason given in `migrateV7ToV8`.
+  migrated.version = 10
+  migrated.people = migrated.people ?? {}
+  return migrated
+}
+
+interface V10Shape extends V9Shape {
+  people: Record<string, VaultPerson>
+}
+
+/**
+ * v10 -> v11: Belege. Nothing spent yet, no month closed, nobody owing
+ * anybody, and the split even — the default a household would pick anyway.
+ */
+function migrateV10ToV11(vault: V10Shape): VaultData {
   const migrated = vault as unknown as VaultData
   migrated.version = VAULT_VERSION
-  migrated.people = migrated.people ?? {}
+  migrated.belege = migrated.belege ?? []
+  migrated.months = migrated.months ?? {}
+  migrated.settlements = migrated.settlements ?? []
+  migrated.split = migrated.split ?? { mode: 'equal' }
   return migrated
 }
 
@@ -966,6 +1062,10 @@ export function createEmptyVault(mainAccountName = 'Main'): VaultData {
     trust: { pins: {}, epochs: {} },
     tour: { completedAt: null, dismissedAt: null },
     people: {},
+    belege: [],
+    months: {},
+    settlements: [],
+    split: { mode: 'equal' },
   }
 }
 

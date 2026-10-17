@@ -1,6 +1,7 @@
 import { savesTowardsTarget, sideOf, type EntryType, type VaultData, type VaultSnapshot } from '../crypto/vault'
 import * as budget from '../budget/budgetEngine'
 import * as accounts from '../accounts/accountsEngine'
+import * as belege from '../belege/belegeEngine'
 import { isLegalRouting } from '../accounts/routing'
 import { recordCompleted, recordDismissed } from '../tour/tourState'
 import { recording, replaying, type Tape } from './source'
@@ -32,6 +33,7 @@ export type RefusalCode =
   | 'accountGone'
   | 'lastAccount'
   | 'pinMismatch'
+  | 'belegGone'
   | 'failed'
 
 export type Verdict = 'go' | 'done' | RefusalCode
@@ -301,6 +303,36 @@ export const ACTIONS = {
       return pinned === undefined || pinned === verifyingKey ? 'go' : 'pinMismatch'
     },
   }),
+
+  // --- Belege ---
+  // A record whose entry was deleted elsewhere is not refused: `addBeleg` and
+  // `editBeleg` make it Unassigned instead, because it is money somebody spent.
+  addBeleg: def({
+    apply: belege.addBeleg,
+    check: created((v, id) => v.belege.find(b => b.id === id), 'beleg'),
+  }),
+  editBeleg: def({
+    apply: belege.editBeleg,
+    check: (v, [id]) => (v.belege.some(b => b.id === id) ? 'go' : 'belegGone'),
+  }),
+  deleteBeleg: def({
+    apply: belege.deleteBeleg,
+    check: (v, [id]) => (v.belege.some(b => b.id === id) ? 'go' : 'done'),
+  }),
+  // Carries its lines, taken when it was made: the plan as the month ended.
+  closeMonth: def({
+    apply: belege.closeMonth,
+    check: (v, [month]) => (v.months[month] ? 'done' : 'go'),
+  }),
+  addSettlement: def({
+    apply: belege.addSettlement,
+    check: created((v, id) => v.settlements.find(s => s.id === id), 'settlement'),
+  }),
+  deleteSettlement: def({
+    apply: belege.deleteSettlement,
+    check: (v, [id]) => (v.settlements.some(s => s.id === id) ? 'go' : 'done'),
+  }),
+  setSplit: def({ apply: belege.setSplit }),
 
   // --- people ---
   nameMember: def({

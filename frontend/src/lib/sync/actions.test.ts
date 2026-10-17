@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest'
 import { createEmptyVault, type VaultData } from '../crypto/vault'
 import * as budget from '../budget/budgetEngine'
 import * as accounts from '../accounts/accountsEngine'
+import * as belege from '../belege/belegeEngine'
 import { perform, reapply, ACTIONS, type ActionKind, type ActionArgs, type Action } from './actions'
 import { enqueue, replayAll } from './queue'
 
@@ -22,6 +23,9 @@ function filled(): VaultData {
   budget.seedDefaults(v, 'en', '2026-01')
   accounts.createAccount(v, { name: 'Savings', kind: 'savings' })
   budget.takeSnapshot(v, 'January')
+  const groceries = v.budget.entries.find(e => e.type === 'expense')!
+  belege.addBeleg(v, { date: '2026-10-03', amount: '42.50', entryId: groceries.id, createdBy: '1' })
+  belege.addSettlement(v, { date: '2026-10-04', from: '2', to: '1', amount: '10.00', createdBy: '2' })
   return v
 }
 
@@ -77,6 +81,19 @@ const CASES: Case[] = [
   { kind: 'recordTourDismissed', args: () => [] },
   { kind: 'rememberTrust', args: () => ['7', 'key-seven', '3', 2] },
   { kind: 'nameMember', args: () => ['7', 'Ben'] },
+  {
+    kind: 'addBeleg',
+    args: v => [{ date: '2026-10-05', amount: '12.50', entryId: firstEntry(v, 'expense').id, createdBy: '1' }],
+  },
+  { kind: 'editBeleg', args: v => [v.belege[0].id, { amount: '20.00', note: 'Market' }] },
+  { kind: 'deleteBeleg', args: v => [v.belege[0].id] },
+  { kind: 'closeMonth', args: () => ['2026-09', { closedAt: '2026-10-01T00:00:00.000Z', lines: [] }] },
+  {
+    kind: 'addSettlement',
+    args: () => [{ date: '2026-10-06', from: '1', to: '2', amount: '5', createdBy: '1' }],
+  },
+  { kind: 'deleteSettlement', args: v => [v.settlements[0].id] },
+  { kind: 'setSplit', args: () => [{ mode: 'shares', shares: { '1': 60, '2': 40 } }] },
 ]
 
 const caseOf = (kind: ActionKind) => CASES.find(c => c.kind === kind)!

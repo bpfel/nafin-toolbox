@@ -29,7 +29,7 @@
  * synchronous: nothing else can run between setting the tape and clearing it.
  */
 
-export type IdKind = 'category' | 'entry' | 'snapshot' | 'account'
+export type IdKind = 'category' | 'entry' | 'snapshot' | 'account' | 'beleg' | 'settlement'
 
 /** What an action was handed the first time it ran. */
 export interface Tape {

@@ -212,10 +212,14 @@ describe('encryptVault and decryptVault', () => {
   test('round-trip encryption and decryption preserves data', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -362,10 +366,14 @@ describe('encryptVault and decryptVault', () => {
   test('preserves complex vault with multiple snapshots', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -413,10 +421,14 @@ describe('encryptVault and decryptVault', () => {
   test('preserves archived flag in entries', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -441,10 +453,14 @@ describe('encryptVault and decryptVault', () => {
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '1234.05', lastCorrectedAt: '2026-08-15' },
       ],
@@ -476,10 +492,14 @@ describe('encryptVault and decryptVault', () => {
   test('preserves special characters in text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Zürich «Haupt»', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -512,10 +532,14 @@ describe('encryptVault and decryptVault', () => {
   test('preserves sortOrder values', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -549,10 +573,14 @@ describe('encryptVault and decryptVault', () => {
 
     // Create a large vault with many entries
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: Array.from({ length: 5 }, (_, i) => ({
         id: `a${i}`,
         name: `Account ${i}`,
@@ -610,10 +638,14 @@ describe('encryptVault and decryptVault', () => {
   test('handles empty strings in all text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: '', name: '', kind: 'cash', currency: 'CHF', currentAmount: '', lastCorrectedAt: '' },
       ],
@@ -643,10 +675,14 @@ describe('encryptVault and decryptVault', () => {
   test('preserves exact JSON structure including whitespace in strings', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -678,10 +714,14 @@ describe('encryptVault and decryptVault', () => {
     const encryptedSmall = await encryptVault(smallVault, mek)
 
     const largeVault: VaultData = {
-      version: 10,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
       people: {},
+      belege: [],
+      months: {},
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [],
       budget: {
         categories: Array.from({ length: 50 }, (_, i) => ({
@@ -1219,7 +1259,7 @@ describe('migrateVault — legacy versions forward', () => {
   // And the shape check refuses to write one, which is what stops a bad
   // migration outliving the tab that made it.
   test('a vault without a trust record cannot be saved', () => {
-    const missing = { ...v8Vault(), version: 10, people: {} } as unknown as VaultData
+    const missing = { ...v8Vault(), version: 11, people: {}, belege: [], months: {}, settlements: [], split: { mode: 'equal' } } as unknown as VaultData
 
     expect(() => assertVaultShape(missing)).toThrow(/trust is missing/)
   })
@@ -1252,13 +1292,38 @@ describe('migrateVault — legacy versions forward', () => {
   })
 
   test('a vault without names cannot be saved', () => {
-    const missing = { ...v9Vault(), version: 10 } as unknown as VaultData
+    const missing = { ...v9Vault(), version: 11, belege: [], months: {}, settlements: [], split: { mode: 'equal' } } as unknown as VaultData
 
     expect(() => assertVaultShape(missing)).toThrow(/people is missing/)
   })
 
+  /**
+   * v10 -> v11: Belege. Nothing spent, nothing closed, nobody owing anybody,
+   * and an even split — the default a household would pick anyway.
+   */
+  test('a v10 vault gains empty Belege, and keeps its names', () => {
+    const migrated = migrateVault({ ...v9Vault(), version: 10, people: { '7': { name: 'Ben' } } })
+
+    expect(migrated.version).toBe(VAULT_VERSION)
+    expect(migrated.belege).toEqual([])
+    expect(migrated.months).toEqual({})
+    expect(migrated.settlements).toEqual([])
+    expect(migrated.split).toEqual({ mode: 'equal' })
+    expect(migrated.people).toEqual({ '7': { name: 'Ben' } })
+  })
+
+  test('a vault stamped v11 without records is migrated, not taken at its word', () => {
+    expect(migrateVault({ ...v9Vault(), version: 11, people: {} }).belege).toEqual([])
+  })
+
+  test('a vault without its records cannot be saved', () => {
+    const missing = { ...v9Vault(), version: 11, people: {} } as unknown as VaultData
+
+    expect(() => assertVaultShape(missing)).toThrow(/belege is missing/)
+  })
+
   test('a vault from a newer build is refused, not emptied', () => {
-    expect(() => migrateVault({ version: 11, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
+    expect(() => migrateVault({ version: 12, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
     expect(() => migrateVault({ version: 99, budget: { entries: [] } })).toThrow(/newer version/)
   })
 
@@ -1269,20 +1334,20 @@ describe('migrateVault — legacy versions forward', () => {
    * how a save silently drops whatever that build added.
    */
   test('a newer vault is refused even though it is missing this version’s keys', () => {
-    expect(() => migrateVault({ version: 11, budget: { entries: [] }, accounts: [] })).toThrow(
+    expect(() => migrateVault({ version: 12, budget: { entries: [] }, accounts: [] })).toThrow(
       VaultVersionAheadError,
     )
   })
 
   test('the refusal names both versions, so the log says what to do', () => {
     try {
-      migrateVault({ version: 11, budget: { entries: [] } })
+      migrateVault({ version: 12, budget: { entries: [] } })
       throw new Error('should have refused')
     } catch (e) {
       expect(e).toBeInstanceOf(VaultVersionAheadError)
-      expect((e as VaultVersionAheadError).found).toBe(11)
+      expect((e as VaultVersionAheadError).found).toBe(12)
       // Both numbers: the one found, and the one this build can read.
-      expect((e as Error).message).toContain('v11')
+      expect((e as Error).message).toContain('v12')
       expect((e as Error).message).toContain(`v${VAULT_VERSION}`)
     }
   })
