@@ -156,9 +156,13 @@
         </div>
       {:else}
         <h3 class="heading">{t('spending.thisMonth')}</h3>
-        {#each thisMonthsRecords as beleg (beleg.id)}
-          <RecordRow {beleg} {vault} {names} onopen={vaultState.readOnly ? undefined : () => (editing = beleg)} />
-        {/each}
+        <!-- On a card, as Budget's table and Accounts' cards are: the list is
+             the foreground, and the page behind it the ground. -->
+        <div class="card">
+          {#each thisMonthsRecords as beleg (beleg.id)}
+            <RecordRow {beleg} {vault} {names} onopen={vaultState.readOnly ? undefined : () => (editing = beleg)} />
+          {/each}
+        </div>
       {/if}
     </div>
 
@@ -220,9 +224,16 @@
   }
 
   .heading {
-    margin: 0 0 0.25rem;
+    margin: 0 0 0.5rem;
     font-size: 0.9rem;
     color: var(--ink-faint);
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
   }
 
   .start {
