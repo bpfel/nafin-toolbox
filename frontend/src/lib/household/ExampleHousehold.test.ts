@@ -7,7 +7,7 @@ afterEach(cleanup)
 
 /**
  * Admission is a button now, so the household walkthrough says so: a step
- * after inviting that shows the invitation accepted, with Confirm and the dot.
+ * after inviting that shows the invitation accepted, with Confirm.
  */
 describe('the walkthrough’s example household', () => {
   test('Confirm is explained right after inviting, on the same card', () => {
@@ -28,12 +28,11 @@ describe('the walkthrough’s example household', () => {
     expect(screen.queryByText('Confirm')).toBeNull()
   })
 
-  test('accepted: Confirm and the dot, and no code', () => {
+  test('accepted: Confirm, and no code', () => {
     render(ExampleHousehold, { stage: 'accepted' })
 
     expect(screen.getByText('Accepted')).toBeTruthy()
     expect(screen.getByText('Confirm')).toBeTruthy()
-    expect(screen.getByRole('img', { name: /waiting for your confirmation/i })).toBeTruthy()
     expect(screen.queryByText('Copy link')).toBeNull()
   })
 })

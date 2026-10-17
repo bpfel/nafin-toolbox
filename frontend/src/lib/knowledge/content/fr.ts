@@ -76,7 +76,7 @@ export const fr: PartialContent = {
     },
     sharedConfirm: {
       title: 'Faire entrer',
-      body: 'Dès que la personne accepte, un bouton « Confirmer » apparaît ici – et un point sur Profil te le signale, où que tu sois dans l’app. C’est en confirmant que tu lui remets la clé du ménage : avant, elle ne voit rien. Ensuite, le crayon à côté de chaque personne te permet de lui donner un nom.',
+      body: 'Dès que la personne accepte, un bouton « Confirmer » apparaît ici. C’est en confirmant que tu lui remets la clé du ménage : avant, elle ne voit rien. Ensuite, le crayon à côté de chaque personne te permet de lui donner un nom.',
     },
     sharedSwitch: {
       title: 'Changer de budget',

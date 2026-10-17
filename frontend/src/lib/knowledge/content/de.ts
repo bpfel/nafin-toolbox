@@ -75,7 +75,7 @@ export const de: PartialContent = {
     },
     sharedConfirm: {
       title: 'Hereinlassen',
-      body: 'Sobald die Person annimmt, erscheint hier «Bestätigen» – und ein Punkt bei Profil zeigt es dir, wo immer du in der App bist. Erst mit dem Bestätigen erhält sie den Schlüssel des Haushalts: Bis dahin sieht sie nichts. Danach gibst du mit dem Stift neben jeder Person einen Namen.',
+      body: 'Sobald die Person annimmt, erscheint hier «Bestätigen». Erst mit dem Bestätigen erhält sie den Schlüssel des Haushalts: Bis dahin sieht sie nichts. Danach gibst du mit dem Stift neben jeder Person einen Namen.',
     },
     sharedSwitch: {
       title: 'Budget wechseln',
