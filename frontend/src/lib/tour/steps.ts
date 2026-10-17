@@ -51,6 +51,7 @@ export type TourStepId =
   | 'sharedWhat'
   | 'sharedStart'
   | 'sharedInvite'
+  | 'sharedConfirm'
   | 'sharedSwitch'
   | 'sharedEntries'
   | 'sharedContributions'
@@ -117,8 +118,11 @@ export interface TourStep {
    * place of the real list. It matters because the step it belongs to explains
    * inviting somebody, and the reader most likely to need that explanation is
    * looking at "You have none yet."
+   *
+   * Which moment of an invitation it shows: sent and `pending`, or `accepted`
+   * and waiting for the owner's Confirm.
    */
-  exampleHousehold?: true
+  exampleHousehold?: 'pending' | 'accepted'
   /**
    * Let the pointer reach the thing being ringed.
    *
@@ -201,7 +205,10 @@ export const TOUR_STEPS: TourStep[] = [
 export const SHARED_STEPS: TourStep[] = [
   { id: 'sharedWhat', path: '/budget' },
   { id: 'sharedStart', path: '/profile', anchor: 'household' },
-  { id: 'sharedInvite', path: '/profile', anchor: 'household', exampleHousehold: true },
+  { id: 'sharedInvite', path: '/profile', anchor: 'household', exampleHousehold: 'pending' },
+  // Admission is a button the owner presses, so the reader has to know it is
+  // coming — otherwise the person they invited waits, and nothing told them why.
+  { id: 'sharedConfirm', path: '/profile', anchor: 'household', exampleHousehold: 'accepted' },
   // Seeds here rather than one step later, at `sharedPlan`: this step is about
   // moving between two budgets, and an empty one behind it is a poor
   // advertisement for having a second.

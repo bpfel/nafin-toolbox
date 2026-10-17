@@ -75,7 +75,11 @@ export const en: Content = {
     },
     sharedInvite: {
       title: 'Inviting others',
-      body: 'Unfold a household entry to invite other people. To extend an invitation, use their account e-mail and give them the sharing link — either by copying it or via QR code. You can decide whether they are only able to read the shared budget, or whether they can write to it as well.',
+      body: 'Unfold a household entry to invite other people. To extend an invitation, use their account e-mail and give them the sharing link — either by copying it or via QR code. You can decide whether they are only able to read the shared budget, or whether they can write to it as well. Once they accept, you let them in.',
+    },
+    sharedConfirm: {
+      title: 'Letting them in',
+      body: 'Once they accept, a Confirm button appears here, and a dot on Profile tells you so wherever you are in the app. Confirming is what hands them the household’s key: until you do, they can’t see anything. Afterwards, the pen beside each person lets you give them a name.',
     },
     sharedSwitch: {
       title: 'How to switch budgets',

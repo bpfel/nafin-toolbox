@@ -45,6 +45,17 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### New
 
+- **Letting somebody into a household is a Confirm button, and it is live.**
+  Once the invited person accepts, Confirm appears on the household's People
+  panel without reloading, and a dot on Profile, in the household switcher and
+  on the household's row tells the owner somebody is waiting. The invited
+  person's screen waits too, and opens the household the moment they are
+  confirmed. It used to happen by itself, but only when the owner's app next
+  loaded. The household walkthrough has a step for it.
+- **Names for household members.** The owner gives each member — themselves
+  included — a name with the pen beside them; until then the address shows.
+  Names are kept in the household's encrypted budget, not on the server. A
+  member's role is now changed by tapping their role.
 - **Changes made on two devices, or by two people in a household, both
   survive.** A save refused because someone else saved first no longer stops
   with a banner: the newer budget is fetched and this device's changes are

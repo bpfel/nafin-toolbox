@@ -72,7 +72,11 @@ export const fr: PartialContent = {
     },
     sharedInvite: {
       title: 'Inviter d’autres personnes',
-      body: 'Déplie un ménage pour y inviter quelqu’un. Pour l’invitation, utilise son e-mail de compte et donne-lui le lien de partage — copié, ou sous forme de QR code. Tu décides si la personne peut seulement lire le budget partagé ou aussi le modifier.',
+      body: 'Déplie un ménage pour y inviter quelqu’un. Pour l’invitation, utilise son e-mail de compte et donne-lui le lien de partage — copié, ou sous forme de QR code. Tu décides si la personne peut seulement lire le budget partagé ou aussi le modifier. Quand elle accepte, tu la fais entrer.',
+    },
+    sharedConfirm: {
+      title: 'Faire entrer',
+      body: 'Dès que la personne accepte, un bouton « Confirmer » apparaît ici – et un point sur Profil te le signale, où que tu sois dans l’app. C’est en confirmant que tu lui remets la clé du ménage : avant, elle ne voit rien. Ensuite, le crayon à côté de chaque personne te permet de lui donner un nom.',
     },
     sharedSwitch: {
       title: 'Changer de budget',

@@ -150,7 +150,7 @@
       step that says "unfold a household to invite somebody" has to be able
       to point at a household, and most readers of that sentence have none.
     -->
-    <ExampleHousehold />
+    <ExampleHousehold stage={tour.exampleHouseholdStage} />
   {:else if vaultState.households.length === 0}
     <p class="none">{t('household.none')}</p>
   {:else}

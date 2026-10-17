@@ -71,7 +71,11 @@ export const it: PartialContent = {
     },
     sharedInvite: {
       title: 'Invitare altre persone',
-      body: 'Apri un’economia domestica per invitare qualcuno. Per l’invito usa l’e-mail del suo account e passa il link di condivisione — copiato, oppure come codice QR. Decidi tu se può solo leggere il budget condiviso o anche modificarlo.',
+      body: 'Apri un’economia domestica per invitare qualcuno. Per l’invito usa l’e-mail del suo account e passa il link di condivisione — copiato, oppure come codice QR. Decidi tu se può solo leggere il budget condiviso o anche modificarlo. Quando accetta, la fai entrare.',
+    },
+    sharedConfirm: {
+      title: 'Farli entrare',
+      body: 'Appena la persona accetta, qui compare il pulsante «Conferma» – e un punto su Profilo te lo segnala, ovunque tu sia nell’app. È confermando che le consegni la chiave dell’economia domestica: prima non vede nulla. Poi, con la matita accanto a ogni persona, puoi darle un nome.',
     },
     sharedSwitch: {
       title: 'Cambiare budget',
