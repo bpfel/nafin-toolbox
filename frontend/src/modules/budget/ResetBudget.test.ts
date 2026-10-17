@@ -43,9 +43,10 @@ function load(snapshots: VaultData['budget']['snapshots'] = []) {
 
 function makeVault(snapshots: VaultData['budget']['snapshots'] = []): VaultData {
   return {
-    version: 9,
+    version: 10,
     tour: { completedAt: null, dismissedAt: null },
     trust: { pins: {}, epochs: {} },
+    people: {},
     accounts: [],
     budget: {
       categories: [

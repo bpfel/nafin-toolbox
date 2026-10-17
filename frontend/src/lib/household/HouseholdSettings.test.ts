@@ -21,6 +21,8 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
   listMembers: vi.fn(async () => []),
   removeMember: vi.fn(),
   changeRole: vi.fn(),
+  peopleOf: vi.fn(async () => ({})),
+  nameMember: vi.fn(),
 }))
 
 import HouseholdSettings from './HouseholdSettings.svelte'
@@ -276,7 +278,9 @@ describe('leaving', () => {
 })
 
 describe('the people in a household', () => {
-  test('are the others — you are not listed', async () => {
+  // The owner is listed, as "You", for one reason: to name themselves. See
+  // Names.test.ts.
+  test('are the others — you are not listed, unless you own it', async () => {
     const { listMembers } = await import('../crypto/vaultStore.svelte')
     vi.mocked(listMembers).mockResolvedValue([
       { user_id: 7, email: 'me@example.ch', role: 'owner', joined_at: '2026-01-01' },
@@ -284,7 +288,7 @@ describe('the people in a household', () => {
     ] as never)
     render(HouseholdSettings, { myUserId: 7 })
 
-    await userEvent.click(rowFor('Flat with Anna'))
+    await userEvent.click(rowFor('Ski cabin'))
 
     await waitFor(() => expect(screen.getByText('anna@example.ch')).toBeTruthy())
     expect(screen.queryByText('me@example.ch')).toBeNull()

@@ -1,5 +1,5 @@
 import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
-import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData } from './vault'
+import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData, type VaultPerson } from './vault'
 import {
   fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
   VaultGoneError, SessionEndedError, VaultSaveError, signalUnauthorized,
@@ -1455,6 +1455,68 @@ export async function acceptInvite(token: string, secret: Uint8Array): Promise<n
   const mac = await macPublicKey(secret, fromBase64(keys.public_key))
   const { household_id } = await acceptHouseholdInvite(token, mac)
   return household_id
+}
+
+/**
+ * What a household calls its members, by user id.
+ *
+ * From the vault when it is open — live, so a name set here shows at once —
+ * and otherwise read from the server and opened. The People panel is on
+ * Profile, where the household on screen is usually somebody else's budget.
+ */
+export async function peopleOf(householdId: number): Promise<Record<string, VaultPerson>> {
+  if (currentId === householdId && current.data) return current.data.people
+  const waiting = stashed.get(householdId)
+  if (waiting?.data) return waiting.data.people
+  const household = households.find(h => h.id === householdId)
+  if (!household) return {}
+  const payload = await fetchHouseholdVault(householdId)
+  if (!payload) return {}
+  return (await decryptVault(payload.ciphertext, payload.nonce, household.key)).people
+}
+
+/**
+ * Name a member of a household; an empty name goes back to their email.
+ *
+ * The household on screen takes it through the queue like any change. Any
+ * other is written directly: fetched, named, saved against the version it was
+ * read at, and done again if somebody saved in between. Naming is idempotent,
+ * so doing it again on the newer vault is all a conflict needs. A copy of the
+ * household put aside in this tab is named too; when it next saves, the server
+ * refuses its old version and the queue catches it up, as it would for anybody
+ * else's change.
+ */
+export async function nameMember(householdId: number, userId: number, name: string): Promise<void> {
+  const args: ActionArgs<'nameMember'> = [String(userId), name]
+  if (currentId === householdId) {
+    commit('nameMember', ...args)
+    return
+  }
+  const household = households.find(h => h.id === householdId)
+  if (!household) throw new Error('no such household')
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const payload = await fetchHouseholdVault(householdId)
+    if (!payload) throw new Error('household gone')
+    const data = await decryptVault(payload.ciphertext, payload.nonce, household.key)
+    perform(data, 'nameMember', args)
+    const { ciphertext, nonce } = await encryptVault(data, household.key)
+    try {
+      await putHouseholdVault(householdId, {
+        ciphertext,
+        nonce,
+        version: data.version,
+        expected_updated_at: payload.updated_at,
+      })
+    } catch (e) {
+      if (e instanceof VaultConflictError) continue
+      throw e
+    }
+    const waiting = stashed.get(householdId)
+    if (waiting?.data) perform(waiting.data, 'nameMember', args)
+    return
+  }
+  throw new Error('the household kept changing while it was being named')
 }
 
 /** Move somebody between writer and reader. Owner only, which the server holds. */

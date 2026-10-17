@@ -76,6 +76,7 @@ const CASES: Case[] = [
   { kind: 'recordTourCompleted', args: () => [] },
   { kind: 'recordTourDismissed', args: () => [] },
   { kind: 'rememberTrust', args: () => ['7', 'key-seven', '3', 2] },
+  { kind: 'nameMember', args: () => ['7', 'Ben'] },
 ]
 
 const caseOf = (kind: ActionKind) => CASES.find(c => c.kind === kind)!
@@ -196,6 +197,18 @@ describe('refused where what it changes is gone', () => {
     const { action } = perform(clone(v), 'rememberTrust', ['7', 'key-a', '3', 1])
     v.trust.pins['7'] = 'key-b'
     expect(reapply(v, action).verdict).toBe('pinMismatch')
+  })
+
+  // Last writer wins: only the owner names people, so two names racing means
+  // one owner on two devices.
+  test('nameMember: a later name replaces an earlier one, and an empty one clears it', () => {
+    const v = filled()
+    perform(v, 'nameMember', ['7', 'Ben'])
+    const { action } = perform(clone(v), 'nameMember', ['7', 'Benji'])
+    expect(reapply(v, action).vault.people['7']).toEqual({ name: 'Benji' })
+
+    perform(v, 'nameMember', ['7', '  '])
+    expect(v.people['7']).toBeUndefined()
   })
 })
 

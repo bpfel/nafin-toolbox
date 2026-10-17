@@ -1,6 +1,6 @@
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 9
+export const VAULT_VERSION = 10
 
 /**
  * A stored vault written by a build newer than this one.
@@ -19,13 +19,26 @@ export class VaultVersionAheadError extends Error {
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 9
+  version: 10
   budget: BudgetVaultData
   accounts: VaultAccount[]
   /** Whether the guided tour has been taken, or turned down. */
   tour: TourState
   /** What this client has decided to believe about other people. */
   trust: VaultTrust
+  /**
+   * What the household calls its members, by user id. Household vaults only:
+   * a personal vault carries an empty map and nothing reads it.
+   *
+   * In the vault rather than on the server, because a name is personal data and
+   * the server's whole job is not to read any. Kept when a member leaves, so a
+   * record that mentions them — who paid, in Belege — can still say who.
+   */
+  people: Record<string, VaultPerson>
+}
+
+export interface VaultPerson {
+  name: string
 }
 
 /**
@@ -332,6 +345,12 @@ export function assertVaultShape(vault: VaultData): void {
   if (!trust.epochs || typeof trust.epochs !== 'object') {
     throw new VaultShapeError('trust.epochs is missing')
   }
+
+  // v10's. Without it a household would forget what everybody is called.
+  const people = (vault as unknown as { people?: unknown }).people
+  if (!people || typeof people !== 'object') {
+    throw new VaultShapeError('people is missing')
+  }
 }
 
 // --- Encrypt / decrypt ---
@@ -464,7 +483,12 @@ export function migrateVault(parsed: unknown): VaultData {
   // narrowing. Only a vault claiming to be current while missing what a current
   // vault always writes; anything older is handled by its own branch.
   const wearingV8Keys =
-    vault.version === VAULT_VERSION && (vault as { trust?: unknown }).trust === undefined
+    (vault.version === 9 || vault.version === VAULT_VERSION) &&
+    (vault as { trust?: unknown }).trust === undefined
+
+  // v10 added `people`; the same narrowing again.
+  const wearingV9Keys =
+    vault.version === VAULT_VERSION && (vault as { people?: unknown }).people === undefined
 
   if (
     vault.version === VAULT_VERSION &&
@@ -472,39 +496,43 @@ export function migrateVault(parsed: unknown): VaultData {
     !wearingV5Keys &&
     !wearingV6Keys &&
     !wearingV7Keys &&
-    !wearingV8Keys
+    !wearingV8Keys &&
+    !wearingV9Keys
   ) {
     return vault as unknown as VaultData
   }
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
-  // for being four steps behind.
+  // for being four steps behind. Everything from v8 on is purely additive, so
+  // those last steps are one helper rather than one more wrapper on each line.
+  const fromV8 = (v8: V8Shape) => migrateV9ToV10(migrateV8ToV9(v8))
   if (vault.version === 2) {
-    return migrateV8ToV9(
+    return fromV8(
       migrateV7ToV8(
         migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault))))),
       ),
     )
   }
   if (vault.version === 3) {
-    return migrateV8ToV9(
+    return fromV8(
       migrateV7ToV8(
         migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape)))),
       ),
     )
   }
   if (vault.version === 4 || wearingV4Keys) {
-    return migrateV8ToV9(
+    return fromV8(
       migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape)))),
     )
   }
   if (vault.version === 5 || wearingV5Keys) {
-    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape))))
+    return fromV8(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape))))
   }
   if (vault.version === 6 || wearingV6Keys) {
-    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(vault as unknown as V6Shape)))
+    return fromV8(migrateV7ToV8(migrateV6ToV7(vault as unknown as V6Shape)))
   }
-  if (vault.version === 7 || wearingV7Keys) return migrateV8ToV9(migrateV7ToV8(vault as unknown as V7Shape))
-  if (vault.version === 8 || wearingV8Keys) return migrateV8ToV9(vault as unknown as V8Shape)
+  if (vault.version === 7 || wearingV7Keys) return fromV8(migrateV7ToV8(vault as unknown as V7Shape))
+  if (vault.version === 8 || wearingV8Keys) return fromV8(vault as unknown as V8Shape)
+  if (vault.version === 9 || wearingV9Keys) return migrateV9ToV10(vault as unknown as V9Shape)
 
   // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
   // the data. Refuse it so the app can say so, instead of handing back an empty
@@ -887,10 +915,32 @@ interface V8Shape {
  * nobody made, and a pin nobody checked is worse than no pin at all — it would
  * silently accept whatever key happened to be there first.
  */
-function migrateV8ToV9(vault: V8Shape): VaultData {
+function migrateV8ToV9(vault: V8Shape): V9Shape {
+  const migrated = vault as unknown as V9Shape
+  // 9 rather than VAULT_VERSION, for the reason given in `migrateV7ToV8`.
+  migrated.version = 9
+  migrated.trust = { pins: {}, epochs: {} }
+  return migrated
+}
+
+interface V9Shape {
+  version: number
+  budget: BudgetVaultData
+  accounts: VaultAccount[]
+  tour: TourState
+  trust: VaultTrust
+}
+
+/**
+ * v9 -> v10: what a household calls its members.
+ *
+ * Empty for everybody. Nobody has been named yet, and every place that shows a
+ * member falls back to their email address, which is all the app knew before.
+ */
+function migrateV9ToV10(vault: V9Shape): VaultData {
   const migrated = vault as unknown as VaultData
   migrated.version = VAULT_VERSION
-  migrated.trust = { pins: {}, epochs: {} }
+  migrated.people = migrated.people ?? {}
   return migrated
 }
 
@@ -915,6 +965,7 @@ export function createEmptyVault(mainAccountName = 'Main'): VaultData {
     accounts: [createMainAccount(mainAccountName)],
     trust: { pins: {}, epochs: {} },
     tour: { completedAt: null, dismissedAt: null },
+    people: {},
   }
 }
 
