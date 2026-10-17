@@ -133,6 +133,7 @@ describe('closing a month', () => {
 describe('a month against the budget', () => {
   test('per entry, Unassigned apart, and totals over both', () => {
     const v = vault()
+    for (const e of v.budget.entries) delete e.automatic
     const [a, b] = [anyExpense(v, 0), anyExpense(v, 1)]
     budget.setPlanned(v, a.id, '100.00')
     addBeleg(v, { date: '2026-10-01', amount: '30', entryId: a.id, createdBy: '1' })
@@ -245,3 +246,48 @@ describe('the calendar', () => {
   })
 })
 
+
+/**
+ * Lines paid without a receipt — rent, health insurance — are not offered for
+ * a record, and a month counts them as paid at their plan, so its total is the
+ * whole month and not only the receipted part.
+ */
+describe('lines paid automatically', () => {
+  test('the starter budget marks the usual standing orders', () => {
+    const v = vault()
+    const marked = v.budget.entries.filter(e => e.automatic).map(e => e.name)
+    expect(marked).toContain('Rent')
+    expect(v.budget.entries.find(e => e.name === 'Groceries')?.automatic).toBeUndefined()
+  })
+
+  test('are not offered for a record', () => {
+    const v = vault()
+    const rent = v.budget.entries.find(e => e.name === 'Rent')!
+    expect(spendableEntries(v).some(e => e.id === rent.id)).toBe(false)
+  })
+
+  test('count as spent at their plan, in the line and in the total', () => {
+    const v = vault()
+    for (const e of v.budget.entries) delete e.automatic
+    const rent = v.budget.entries.find(e => e.name === 'Rent')!
+    const before = reviewMonth(v, '2026-10').spent
+    budget.setAutomatic(v, rent.id, true)
+
+    const review = reviewMonth(v, '2026-10')
+    const row = review.rows.find(r => r.entryId === rent.id)!
+    expect(row.automatic).toBe(true)
+    expect(row.spent).toBe(row.planned)
+    expect(review.spent).toBe(before + row.planned!)
+  })
+
+  test('a closed month keeps the mark it ended with', () => {
+    const v = vault()
+    const rent = v.budget.entries.find(e => e.name === 'Rent')!
+    addBeleg(v, { date: '2026-09-01', amount: '1', entryId: null, createdBy: '1' })
+    closeMonth(v, '2026-09', buildClosedMonth(v, '2026-09'))
+
+    budget.setAutomatic(v, rent.id, false)
+
+    expect(reviewMonth(v, '2026-09').rows.find(r => r.entryId === rent.id)?.automatic).toBe(true)
+  })
+})

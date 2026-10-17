@@ -422,3 +422,25 @@ describe('AddEntryModal — saving only what changed', () => {
     expect(vi.mocked(commit).mock.calls.map(c => c[0])).toContain('updateEntry')
   })
 })
+
+// Where the mark is put on, and taken off again, outside Belege.
+describe('AddEntryModal — paid automatically', () => {
+  test('an expense can be marked, and Save sends the mark', async () => {
+    openOn('1350.00')
+    vi.mocked(commit).mockClear()
+
+    await fireEvent.click(screen.getByLabelText(/Paid automatically/))
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(vi.mocked(commit).mock.calls.find(c => c[0] === 'setEntryAutomatic')?.slice(2)).toEqual([true])
+  })
+
+  test('nothing is sent when it was left as it was', async () => {
+    openOn('1350.00')
+    vi.mocked(commit).mockClear()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(vi.mocked(commit).mock.calls.map(c => c[0])).not.toContain('setEntryAutomatic')
+  })
+})

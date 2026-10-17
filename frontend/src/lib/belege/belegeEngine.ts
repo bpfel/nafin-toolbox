@@ -107,10 +107,13 @@ export function today(now: Date = new Date()): string {
 
 // --- choosing an entry -------------------------------------------------------
 
-/** What a record can be counted against: expense entries still in use. */
+/**
+ * What a record can be counted against: expense entries still in use, and not
+ * paid automatically — nobody holds a receipt for the rent.
+ */
 export function spendableEntries(vault: VaultData): VaultEntry[] {
   return vault.budget.entries
-    .filter(e => e.type === 'expense' && !e.archived)
+    .filter(e => e.type === 'expense' && !e.archived && !e.automatic)
     .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
@@ -151,6 +154,7 @@ export function closingLines(vault: VaultData, month: string): ClosedMonthLine[]
       entryName: e.name,
       categoryName: categoryName.get(e.categoryId) ?? '',
       plannedAmount: plannedFor(vault, e.id),
+      ...(e.automatic ? { automatic: true } : {}),
     }))
 }
 
@@ -333,9 +337,11 @@ export interface ReviewRow {
   categoryName: string
   /** Rappen. `null` where the month had no plan for it — a record against an entry made later. */
   planned: number | null
-  /** Rappen. */
+  /** Rappen. For a line paid automatically, its plan, as though receipted. */
   spent: number
   belege: Beleg[]
+  /** Paid without receipts, and counted as paid at its plan. */
+  automatic: boolean
 }
 
 export interface MonthReview {
@@ -358,16 +364,19 @@ export function reviewMonth(vault: VaultData, month: string): MonthReview {
   const closed = vault.months[month]
   const lines = closed ? closed.lines : closingLines(vault, month).filter(l => liveLineShows(vault, l.entryId, records))
 
+  // A line paid automatically starts out spent at its plan: the month's total
+  // is then the whole month, not only the part that came with receipts.
   const rows: ReviewRow[] = lines.map(l => ({
     entryId: l.entryId,
     entryName: l.entryName,
     categoryName: l.categoryName,
     planned: rappen(l.plannedAmount),
-    spent: 0,
+    spent: l.automatic ? rappen(l.plannedAmount) : 0,
     belege: [],
+    automatic: l.automatic === true,
   }))
   const byEntry = new Map(rows.map(r => [r.entryId, r]))
-  const unassigned: ReviewRow = { entryId: null, entryName: '', categoryName: '', planned: null, spent: 0, belege: [] }
+  const unassigned: ReviewRow = { entryId: null, entryName: '', categoryName: '', planned: null, spent: 0, belege: [], automatic: false }
 
   for (const beleg of records) {
     let row = beleg.entryId === null ? unassigned : byEntry.get(beleg.entryId)
@@ -375,7 +384,7 @@ export function reviewMonth(vault: VaultData, month: string): MonthReview {
       // Backdated into a closed month, against an entry made after it closed.
       const entry = vault.budget.entries.find(e => e.id === beleg.entryId)
       const category = vault.budget.categories.find(c => c.id === entry?.categoryId)
-      row = { entryId: beleg.entryId, entryName: entry?.name ?? '', categoryName: category?.name ?? '', planned: null, spent: 0, belege: [] }
+      row = { entryId: beleg.entryId, entryName: entry?.name ?? '', categoryName: category?.name ?? '', planned: null, spent: 0, belege: [], automatic: false }
       rows.push(row)
       byEntry.set(beleg.entryId, row)
     }

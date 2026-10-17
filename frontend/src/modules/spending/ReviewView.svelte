@@ -5,6 +5,7 @@
   import { monthLabel } from '../../lib/util/months'
   import Money from '../../lib/util/Money.svelte'
   import RecordRow from './RecordRow.svelte'
+  import { commit, saveNow } from '../../lib/crypto/vaultStore.svelte'
   import Balances from './Balances.svelte'
 
   /**
@@ -50,6 +51,21 @@
     }
   }
 
+  /**
+   * Asked where the question arises: a planned line with nothing recorded, this
+   * month. Rent at "0 / 1'800" is how somebody finds out the mark exists. Not
+   * on a finished month — its copy is fixed — and not to a reader.
+   */
+  function mayAsk(row: ReviewRow): boolean {
+    return !readOnly && !review.closedAt && month === current && row.entryId !== null
+      && !row.automatic && (row.planned ?? 0) > 0 && row.spent === 0
+  }
+
+  function markAutomatic(entryId: string) {
+    commit('setEntryAutomatic', entryId, true)
+    saveNow()
+  }
+
   function closedOn(iso: string): string {
     const d = new Date(iso)
     return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`
@@ -75,7 +91,7 @@
   <ul class="lines">
     {#each rows as row (key(row))}
       {@const over = row.planned !== null && row.spent > row.planned}
-      <li>
+      <li class:automatic={row.automatic}>
         <button
           class="line"
           aria-expanded={open === key(row)}
@@ -84,6 +100,7 @@
         >
           <span class="name">
             {row.entryId === null ? t('spending.unassigned') : row.entryName}
+            {#if row.automatic}<span class="auto">{t('spending.automatic')}</span>{/if}
           </span>
           <span class="figures">
             <span class="spent" class:over><Money value={row.spent} cents /></span>
@@ -101,6 +118,9 @@
             </span>
           {/if}
         </button>
+        {#if mayAsk(row)}
+          <button class="ask" onclick={() => markAutomatic(row.entryId!)}>{t('spending.markAutomatic')}</button>
+        {/if}
         {#if open === key(row)}
           <div class="records">
             {#each row.belege as beleg (beleg.id)}
@@ -227,6 +247,38 @@
 
   .records {
     padding: 0 0 0.5rem 0.75rem;
+  }
+
+  /* Counted, not receipted: greyed, so the eye goes to what was spent by hand. */
+  .automatic .line {
+    color: var(--ink-faint);
+  }
+
+  .automatic .fill {
+    background: var(--ink-faint);
+  }
+
+  .auto {
+    margin-left: 0.4rem;
+    font-size: 0.75rem;
+    font-style: italic;
+  }
+
+  .ask {
+    margin: 0.3rem 0 0.4rem 0.25rem;
+    padding: 0.2rem 0.6rem;
+    border: 1px dashed var(--rule);
+    border-radius: 999px;
+    background: none;
+    color: var(--ink-faint);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .ask:hover {
+    color: var(--ink);
+    border-color: var(--ink-faint);
   }
 
   .totals {

@@ -89,6 +89,8 @@ export interface ClosedMonthLine {
   categoryName: string
   /** Monthly, as it stood. */
   plannedAmount: string
+  /** Paid automatically, as it stood: counted as spent at its plan. */
+  automatic?: boolean
 }
 
 export interface Settlement {
@@ -322,6 +324,12 @@ export interface VaultEntry {
   sourceAccountId: string | null
   sinkAccountId: string | null
   reserve?: ReserveDefinition
+  /**
+   * Paid without a receipt — a standing order, a direct debit: rent, health
+   * insurance. Belege does not offer it for a record and counts it as paid at
+   * its planned amount, so a month's total is the whole month. Absent is false.
+   */
+  automatic?: boolean
 }
 
 /** A vault whose contents do not match the version it declares. */
