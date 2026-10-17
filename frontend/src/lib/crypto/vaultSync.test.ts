@@ -44,7 +44,7 @@ import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 const { VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError } = client
 
-import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview, sessionEndedElsewhere } from './vaultStore.svelte'
+import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview, sessionEndedElsewhere, nameMember, peopleOf } from './vaultStore.svelte'
 import { getNotices, type Notice } from '../sync/notices.svelte'
 import { undoOverwrite } from './vaultStore.svelte'
 
@@ -653,6 +653,59 @@ describe('in a household', () => {
   }
 
   const flatOnServer = () => decryptVault(flat.ciphertext, flat.nonce, flatKey)
+
+  // --- names ---------------------------------------------------------------
+  //
+  // The People panel is on Profile, so a household is usually named while some
+  // other budget is on screen.
+
+  test('39. naming in the household on screen goes through the queue', async () => {
+    await inHousehold('owner')
+
+    await nameMember(3, 8, 'Ben')
+    await saveVault()
+
+    expect((await flatOnServer()).people['8']).toEqual({ name: 'Ben' })
+  })
+
+  test('40. naming a household that is not on screen writes it directly, and only it', async () => {
+    await inHousehold('owner')
+    await switchTo('personal')
+    api.fetchHouseholdVault.mockClear()
+
+    await nameMember(3, 8, 'Ben')
+
+    expect((await flatOnServer()).people['8']).toEqual({ name: 'Ben' })
+    expect((await onServer()).people).toEqual({})
+    expect(await peopleOf(3)).toEqual({ '8': { name: 'Ben' } })
+  })
+
+  test('41. somebody saved the household in between: named again on theirs, nothing of theirs lost', async () => {
+    await inHousehold('owner')
+    await switchTo('personal')
+    const put = api.putHouseholdVault.getMockImplementation()!
+    api.putHouseholdVault.mockImplementationOnce(async () => {
+      await elsewhereInFlat(v => budget.createEntry(v, { name: 'Theirs', type: 'expense', categoryName: 'Shared' }))
+      throw new VaultConflictError('stale')
+    })
+
+    await nameMember(3, 8, 'Ben')
+
+    const saved = await flatOnServer()
+    expect(saved.people['8']).toEqual({ name: 'Ben' })
+    expect(entryNamed(saved, 'Theirs')).toBeTruthy()
+    api.putHouseholdVault.mockImplementation(put)
+  })
+
+  test('42. a copy of the household put aside in this tab shows the name when switched back to', async () => {
+    await inHousehold('owner')
+    await switchTo('personal')
+
+    await nameMember(3, 8, 'Ben')
+    await switchTo(3)
+
+    expect(state.vault!.people['8']).toEqual({ name: 'Ben' })
+  })
 
   test('23. switching vaults while a save is in flight keeps each queue with its vault', async () => {
     await inHousehold()

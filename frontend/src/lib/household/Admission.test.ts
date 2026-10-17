@@ -15,6 +15,8 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
   listMembers: vi.fn(async () => []),
   removeMember: vi.fn(),
   changeRole: vi.fn(),
+  peopleOf: vi.fn(async () => ({})),
+  nameMember: vi.fn(),
 }))
 
 import { confirmMember, loadInvites } from '../crypto/vaultStore.svelte'

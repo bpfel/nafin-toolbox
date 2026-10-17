@@ -106,9 +106,10 @@ describe('the controls are in the DOM the moment edit mode is on', () => {
 
   function buildVault(): VaultData {
     return {
-      version: 9,
+      version: 10,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',

@@ -138,9 +138,10 @@ describe('single-category budgets hide the category name', () => {
 
   function buildVaultWith(categories: { id: string; name: string; side: 'income' | 'expense' }[]): VaultData {
     return {
-      version: 9,
+      version: 10,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',

@@ -2,8 +2,10 @@
   import { t } from '../i18n/index.svelte'
   import {
     inviteToHousehold, loadInvites, withdrawInvite, listMembers, removeMember,
-    confirmMember, changeRole, type PendingInvite,
+    confirmMember, changeRole, peopleOf, nameMember, type PendingInvite,
   } from '../crypto/vaultStore.svelte'
+  import type { VaultPerson } from '../crypto/vault'
+  import { PERSON_NAME_MAX } from '../crypto/household'
   import { recordInvites, noteInvited } from './invitations.svelte'
   import type { HouseholdMember } from '../api/client'
   import InviteCodeDialog from './InviteCodeDialog.svelte'
@@ -42,6 +44,44 @@
   let { householdId, isOwner, myUserId, householdName }: Props = $props()
 
   let members = $state<HouseholdMember[]>([])
+  /** What the household calls each member, by user id. Empty until named. */
+  let people = $state<Record<string, VaultPerson>>({})
+
+  /** A member's name if the owner has given one, else the address as before. */
+  function called(member: { user_id: number; email: string }): string {
+    return people[String(member.user_id)]?.name ?? member.email
+  }
+
+  /** Whose name is being edited, and the draft. */
+  let naming = $state<number | null>(null)
+  let nameDraft = $state('')
+
+  async function loadPeople() {
+    try {
+      people = await peopleOf(householdId)
+    } catch {
+      // Names are a nicety: without them the panel shows addresses, as it did.
+    }
+  }
+
+  function startNaming(member: HouseholdMember) {
+    naming = member.user_id
+    nameDraft = people[String(member.user_id)]?.name ?? ''
+  }
+
+  async function saveName(userId: number) {
+    busy = true
+    error = null
+    try {
+      await nameMember(householdId, userId, nameDraft.slice(0, PERSON_NAME_MAX))
+      naming = null
+      await loadPeople()
+    } catch {
+      error = t('household.failed')
+    } finally {
+      busy = false
+    }
+  }
   let invites = $state<PendingInvite[]>([])
   let busy = $state(false)
   let error = $state<string | null>(null)
@@ -59,6 +99,13 @@
    * row now, beside the rename.
    */
   const others = $derived(members.filter(m => m.user_id !== myUserId))
+
+  /**
+   * The owner's own row, which is back for one reason: only the owner names
+   * people, themselves included, and there was nowhere else to put their pen.
+   * Nobody else sees a row for themselves — they have nothing to do on it.
+   */
+  const me = $derived(isOwner ? members.find(m => m.user_id === myUserId) : undefined)
 
   /**
    * Who takes over if the owner leaves: the longest-standing of the others,
@@ -134,6 +181,7 @@
   $effect(() => {
     void householdId
     void refresh()
+    void loadPeople()
   })
 
   /**
@@ -243,26 +291,81 @@
   </div>
 
   <ul class="list">
-    {#each others as member (member.user_id)}
-      <li class="row">
-        <span class="who">{member.email}</span>
-        <span class="tag">{t(`role.${member.role}` as 'role.owner')}</span>
-
-        <!--
-          Changing what somebody may do is the owner's, and not something to do
-          to yourself: an owner demoting themselves would strand the household,
-          which is the thing succession exists to prevent.
-        -->
-        {#if isOwner && member.role !== 'owner' && changingRole !== member.user_id}
-          <ActionButton
-            label={t('invite.changeRole').replace('{name}', member.email)}
-            onclick={() => (changingRole = member.user_id)}
-          >
+    {#snippet who(member: HouseholdMember)}
+      {#if naming === member.user_id}
+        <form class="naming who-form" novalidate onsubmit={e => { e.preventDefault(); saveName(member.user_id) }}>
+          <input
+            use:autofocus
+            bind:value={nameDraft}
+            maxlength={PERSON_NAME_MAX}
+            aria-label={t('people.nameLabel')}
+            placeholder={member.email}
+            disabled={busy}
+          />
+          <div class="form-actions">
+            <ActionButton label={t('action.save')} disabled={busy} onclick={() => saveName(member.user_id)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </ActionButton>
+            <ActionButton danger label={t('action.cancel')} onclick={() => (naming = null)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </ActionButton>
+          </div>
+        </form>
+      {:else}
+        <!-- The name, with the address under it so a name is never the only
+             way to tell two people apart. Unnamed, the address alone. -->
+        <span class="who">
+          {#if people[String(member.user_id)]}
+            <span class="name">{called(member)}</span>
+            <span class="email">{member.email}</span>
+          {:else}
+            {member.email}
+          {/if}
+        </span>
+        {#if isOwner}
+          <ActionButton label={t('people.name').replace('{name}', member.email)} onclick={() => startNaming(member)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12 20h9" />
               <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
             </svg>
           </ActionButton>
+        {/if}
+      {/if}
+    {/snippet}
+
+    {#if me}
+      <li class="row">
+        {@render who(me)}
+        <span class="tag">{t('people.you')}</span>
+      </li>
+    {/if}
+
+    {#each others as member (member.user_id)}
+      <li class="row">
+        {@render who(member)}
+
+        <!--
+          Changing what somebody may do is the owner's, and not something to do
+          to yourself: an owner demoting themselves would strand the household,
+          which is the thing succession exists to prevent. The role is the
+          control: the pen beside the name is for naming.
+        -->
+        {#if isOwner && member.role !== 'owner' && changingRole !== member.user_id}
+          <button
+            class="tag tag-button"
+            aria-label={t('invite.changeRole').replace('{name}', called(member))}
+            title={t('invite.changeRole').replace('{name}', called(member))}
+            onclick={() => (changingRole = member.user_id)}
+          >
+            {t(`role.${member.role}` as 'role.owner')}
+          </button>
+        {:else if changingRole !== member.user_id}
+          <span class="tag">{t(`role.${member.role}` as 'role.owner')}</span>
         {/if}
 
         {#if changingRole === member.user_id}
@@ -283,7 +386,7 @@
             <p>{t('invite.removeWarning')}</p>
             <div class="btn-row">
               <button class="btn-danger" onclick={() => remove(member.user_id)} disabled={busy}>
-                {t('invite.removeConfirm').replace('{name}', member.email)}
+                {t('invite.removeConfirm').replace('{name}', called(member))}
               </button>
               <button class="btn-secondary" onclick={() => (confirmingRemoval = null)}>
                 {t('action.cancel')}
@@ -371,7 +474,7 @@
     <div class="confirm-box">
       <p>
         {#if isOwner && successor}
-          {t('invite.leaveOwner').replace('{name}', householdName).replace('{successor}', successor.email)}
+          {t('invite.leaveOwner').replace('{name}', householdName).replace('{successor}', called(successor))}
         {:else}
           {t('invite.leaveWarning').replace('{name}', householdName)}
         {/if}
@@ -552,6 +655,39 @@
 
   .invite .who {
     color: var(--ink-faint);
+  }
+
+  .who .name {
+    display: block;
+    font-weight: 600;
+  }
+
+  .who .email {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+  }
+
+  .who-form {
+    flex: 1 1 100%;
+  }
+
+  /* The role, as the control that changes it: looks like the tag it is, and
+     underlined so it reads as something to press. */
+  .tag-button {
+    background: none;
+    border: none;
+    padding: 0.25rem 0.1rem;
+    font: inherit;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .tag-button:hover {
+    color: var(--ink);
   }
 
   .tag {

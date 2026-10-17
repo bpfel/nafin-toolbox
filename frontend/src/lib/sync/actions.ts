@@ -96,6 +96,17 @@ function rememberTrust(vault: VaultData, userId: string, verifyingKey: string, h
   if ((vault.trust.epochs[householdId] ?? 0) < epoch) vault.trust.epochs[householdId] = epoch
 }
 
+/**
+ * Name a member, or clear the name back to their email with an empty one.
+ * Last writer wins: only the owner names people, so two names racing means one
+ * owner on two devices, and the later is the one they meant.
+ */
+function nameMember(vault: VaultData, userId: string, name: string): void {
+  const trimmed = name.trim()
+  if (trimmed === '') delete vault.people[userId]
+  else vault.people[userId] = { name: trimmed }
+}
+
 export const ACTIONS = {
   // --- the plan ---
   setPlanned: def({
@@ -289,6 +300,12 @@ export const ACTIONS = {
       const pinned = v.trust.pins[userId]
       return pinned === undefined || pinned === verifyingKey ? 'go' : 'pinMismatch'
     },
+  }),
+
+  // --- people ---
+  nameMember: def({
+    apply: nameMember,
+    check: (v, [userId, name]) => ((v.people[userId]?.name ?? '') === name.trim() ? 'done' : 'go'),
   }),
 }
 
