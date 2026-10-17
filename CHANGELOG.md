@@ -57,6 +57,11 @@ release may change things without a deprecation period. Each release is a tag on
   account — and Review shows who owes whom, running on from month to month,
   with the fewest payments that settle it and a split that is equal or by
   share.
+  A budget line paid by standing order or direct debit — rent, health
+  insurance — can be marked *paid automatically*: it is not offered for a
+  receipt, and Review counts it as paid at its plan, so a month's total is the
+  whole month. Review asks about a planned line with nothing recorded, and the
+  starter budgets come with the usual ones marked.
 - **Letting somebody into a household is a Confirm button, and it is live.**
   Once the invited person accepts, Confirm appears on the household's People
   panel without reloading, and a dot on Profile, in the household switcher and

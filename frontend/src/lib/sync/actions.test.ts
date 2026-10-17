@@ -94,6 +94,7 @@ const CASES: Case[] = [
   },
   { kind: 'deleteSettlement', args: v => [v.settlements[0].id] },
   { kind: 'setSplit', args: () => [{ mode: 'shares', shares: { '1': 60, '2': 40 } }] },
+  { kind: 'setEntryAutomatic', args: v => [firstEntry(v, 'expense').id, false] },
 ]
 
 const caseOf = (kind: ActionKind) => CASES.find(c => c.kind === kind)!

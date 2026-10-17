@@ -304,6 +304,12 @@ export const ACTIONS = {
     },
   }),
 
+  setEntryAutomatic: def({
+    apply: budget.setAutomatic,
+    check: (v, [entryId]) => needEntry(v, entryId),
+    subject: entryName,
+  }),
+
   // --- Belege ---
   // A record whose entry was deleted elsewhere is not refused: `addBeleg` and
   // `editBeleg` make it Unassigned instead, because it is money somebody spent.

@@ -616,6 +616,14 @@ export function deleteSnapshot(vault: VaultData, id: string): void {
  * the same bargain deleteEntry already makes. A reset is for starting the
  * plan over, not for erasing what the plan used to say.
  */
+/** Mark a line as paid without a receipt, or take the mark off. */
+export function setAutomatic(vault: VaultData, entryId: string, automatic: boolean): void {
+  const entry = vault.budget.entries.find(e => e.id === entryId)
+  if (!entry) return
+  if (automatic) entry.automatic = true
+  else delete entry.automatic
+}
+
 export function resetBudget(vault: VaultData): void {
   vault.budget.entries = []
   vault.budget.categories = []
@@ -642,6 +650,11 @@ interface DefaultEntry {
   /** What a `bill` or `purchase` is saving towards, and over how long. */
   targetAmount?: string
   periodMonths?: number
+  /**
+   * Almost always a standing order or a direct debit in Switzerland, so it
+   * arrives marked as paid automatically and Belege never asks for a receipt.
+   */
+  automatic?: true
 }
 
 function bfsDefaultCategories(): DefaultCategory[] {
@@ -658,11 +671,11 @@ function bfsDefaultCategories(): DefaultCategory[] {
 function bfsDefaults(): DefaultEntry[] {
   return [
     { key: 'salaryNet', type: 'income', sortOrder: 10, categoryKey: 'cat.employment', amount: '6000.00' },
-    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1350.00' },
-    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '150.00' },
-    { key: 'healthInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insuranceTaxes', amount: '391.67' },
-    { key: 'otherInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insuranceTaxes', amount: '166.67' },
-    { key: 'taxes', type: 'expense', sortOrder: 30, categoryKey: 'cat.insuranceTaxes', amount: '833.33' },
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1350.00', automatic: true },
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '150.00', automatic: true },
+    { key: 'healthInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insuranceTaxes', amount: '391.67', automatic: true },
+    { key: 'otherInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insuranceTaxes', amount: '166.67', automatic: true },
+    { key: 'taxes', type: 'expense', sortOrder: 30, categoryKey: 'cat.insuranceTaxes', amount: '833.33', automatic: true },
     { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '500.00' },
     // 67.08, not 400: the GA below takes 332.92 of HABE's transport figure and
     // this is the rest — the occasional taxi, a bike, a car shared for a
@@ -670,7 +683,7 @@ function bfsDefaults(): DefaultEntry[] {
     // exactly the 400.00 the survey reports and the setup screen's claim
     // about where these numbers come from stays true.
     { key: 'transport', type: 'expense', sortOrder: 20, categoryKey: 'cat.living', amount: '67.08' },
-    { key: 'telecoms', type: 'expense', sortOrder: 30, categoryKey: 'cat.living', amount: '80.00' },
+    { key: 'telecoms', type: 'expense', sortOrder: 30, categoryKey: 'cat.living', amount: '80.00', automatic: true },
     { key: 'clothing', type: 'expense', sortOrder: 10, categoryKey: 'cat.lifestyle', amount: '100.00' },
     { key: 'entertainment', type: 'expense', sortOrder: 20, categoryKey: 'cat.lifestyle', amount: '250.00' },
     { key: 'diningOut', type: 'expense', sortOrder: 30, categoryKey: 'cat.lifestyle', amount: '250.00' },
@@ -743,6 +756,7 @@ export function seedDefaults(vault: VaultData, locale: Locale = 'en', anchorMont
       targetAmount: d.targetAmount,
       periodMonths: d.periodMonths,
     })
+    if (d.automatic) entry.automatic = true
     setPlanned(vault, entry.id, d.amount)
   }
 }
@@ -815,6 +829,7 @@ export function seedSharedDefaults(
       targetAmount: d.targetAmount,
       periodMonths: d.periodMonths,
     })
+    if (d.automatic) entry.automatic = true
     setPlanned(vault, entry.id, d.amount)
   }
 }
@@ -840,17 +855,17 @@ function sharedDefaults(): DefaultEntry[] {
     { key: 'contributionSam', type: 'income', sortOrder: 20, categoryKey: 'cat.contributions', amount: '991.04' },
 
     // 5711: net rent or mortgage interest on the main residence.
-    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1238.54' },
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1238.54', automatic: true },
     // 5712: Nebenkosten — the service charges a Swiss tenant pays beside the
     // rent. Rubbish, water, drainage, and the flat-rate share of the rest.
-    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '145.12' },
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '145.12', automatic: true },
     // 5713.01. Split out from heating because the survey splits them, and
     // because they arrive on different bills from different suppliers.
-    { key: 'electricity', type: 'expense', sortOrder: 30, categoryKey: 'cat.housing', amount: '70.58' },
+    { key: 'electricity', type: 'expense', sortOrder: 30, categoryKey: 'cat.housing', amount: '70.58', automatic: true },
     // 5713.02 + 5713.03: gas and other fuels, plus central or district
     // heating. The two together with electricity are exactly the survey's
     // 106.59 for energy at the main residence, so the split reconciles.
-    { key: 'heating', type: 'expense', sortOrder: 40, categoryKey: 'cat.housing', amount: '36.02' },
+    { key: 'heating', type: 'expense', sortOrder: 40, categoryKey: 'cat.housing', amount: '36.02', automatic: true },
     // Serafe collects the federal radio and television levy. It is charged per
     // *dwelling*, which is why it belongs in a shared budget at all, and it is
     // the one bill that is the same for every household in the country — an
@@ -867,7 +882,7 @@ function sharedDefaults(): DefaultEntry[] {
     // 4201: contents, liability, fire and building cover. Insurance on the
     // home rather than on a person, and the only premium here for that reason
     // — the survey's 688.67 of health insurance is not seeded. See above.
-    { key: 'householdInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insurance', amount: '41.95' },
+    { key: 'householdInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insurance', amount: '41.95', automatic: true },
 
     // 581 + 582 + 583: furniture and furnishings, household textiles, and
     // kitchen and household appliances. What a home is furnished and equipped
