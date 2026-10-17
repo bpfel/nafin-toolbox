@@ -71,7 +71,11 @@ export const de: PartialContent = {
     },
     sharedInvite: {
       title: 'Andere einladen',
-      body: 'Klapp einen Haushalt auf, um andere einzuladen. Verwende für die Einladung ihre Konto-E-Mail und gib ihnen den Link zum Teilen — entweder kopiert oder als QR-Code. Du entscheidest, ob sie das geteilte Budget nur lesen oder auch ändern dürfen.',
+      body: 'Klapp einen Haushalt auf, um andere einzuladen. Verwende für die Einladung ihre Konto-E-Mail und gib ihnen den Link zum Teilen — entweder kopiert oder als QR-Code. Du entscheidest, ob sie das geteilte Budget nur lesen oder auch ändern dürfen. Nehmen sie an, lässt du sie herein.',
+    },
+    sharedConfirm: {
+      title: 'Hereinlassen',
+      body: 'Sobald die Person annimmt, erscheint hier «Bestätigen» – und ein Punkt bei Profil zeigt es dir, wo immer du in der App bist. Erst mit dem Bestätigen erhält sie den Schlüssel des Haushalts: Bis dahin sieht sie nichts. Danach gibst du mit dem Stift neben jeder Person einen Namen.',
     },
     sharedSwitch: {
       title: 'Budget wechseln',

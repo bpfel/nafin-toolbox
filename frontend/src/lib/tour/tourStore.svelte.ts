@@ -81,7 +81,11 @@ export function getTourState() {
      * `exampleHousehold` on `TourStep`.
      */
     get showingExampleHousehold() {
-      return running && steps()[index]?.exampleHousehold === true
+      return running && steps()[index]?.exampleHousehold !== undefined
+    },
+    /** Which moment of an invitation the example shows. */
+    get exampleHouseholdStage(): 'pending' | 'accepted' {
+      return steps()[index]?.exampleHousehold ?? 'pending'
     },
     get atFirst() {
       return index === 0
