@@ -637,8 +637,6 @@ export const it: Messages = {
   'spending.readOnly': 'Puoi solo leggere questa economia domestica; le spese le registra chi può modificarla.',
   'spending.automatic': 'automatico',
   'spending.markAutomatic': 'Pagato automaticamente?',
-  'entry.automatic': 'Pagato automaticamente',
-  'entry.automaticHint': 'Con ordine permanente o addebito diretto: in Spese conta come pagato, senza spese da registrare.',
   'spending.owes': 'Chi deve a chi',
   'spending.paid': 'Pagato',
   'spending.share': 'Quota',
@@ -655,6 +653,5 @@ export const it: Messages = {
   'spending.splitShares': 'Per quota',
   'spending.splitChange': 'Modifica ripartizione',
   'spending.splitHint': 'Vale per le spese registrate da ora in poi.',
-  'spending.splitSum': 'Le quote devono fare 100%.',
   'spending.formerMember': 'Ex membro',
 }

@@ -644,8 +644,6 @@ export const de: Messages = {
   'spending.readOnly': 'Du kannst diesen Haushalt nur lesen; Belege erfassen die Mitglieder mit Schreibrecht.',
   'spending.automatic': 'automatisch',
   'spending.markAutomatic': 'Automatisch bezahlt?',
-  'entry.automatic': 'Automatisch bezahlt',
-  'entry.automaticHint': 'Per Dauerauftrag oder Lastschrift: zählt in den Belegen als bezahlt, ohne Quittung.',
   'spending.owes': 'Wer schuldet wem',
   'spending.paid': 'Bezahlt',
   'spending.share': 'Anteil',
@@ -662,6 +660,5 @@ export const de: Messages = {
   'spending.splitShares': 'Nach Anteil',
   'spending.splitChange': 'Aufteilung ändern',
   'spending.splitHint': 'Gilt für Belege, die ab jetzt erfasst werden.',
-  'spending.splitSum': 'Die Anteile müssen 100 % ergeben.',
   'spending.formerMember': 'Ehemaliges Mitglied',
 }

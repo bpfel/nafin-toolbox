@@ -2,7 +2,6 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { VaultData } from '../../lib/crypto/vault'
   import { commit, saveNow } from '../../lib/crypto/vaultStore.svelte'
-  import { integerInput } from '../../lib/util/money'
 
   /**
    * How a new record is divided: equally, or a percentage per member.
@@ -23,7 +22,8 @@
 
   let editing = $state(false)
   let mode = $state<'equal' | 'shares'>('equal')
-  let draft = $state<Record<string, string>>({})
+  /** Whole percentages, always adding up to 100: a slider moved takes from the others. */
+  let draft = $state<Record<string, number>>({})
 
   let summary = $derived(
     vault.split.mode === 'equal'
@@ -31,33 +31,42 @@
       : members.map(m => `${m.name} ${(vault.split as { shares: Record<string, number> }).shares[m.id] ?? 0}%`).join(' · '),
   )
 
-  let total = $derived(members.reduce((sum, m) => sum + (Number(draft[m.id]) || 0), 0))
-  let valid = $derived(mode === 'equal' || total === 100)
+  /** Even, with the odd percent to the first: 34 · 33 · 33. */
+  function even(): Record<string, number> {
+    const each = Math.floor(100 / Math.max(1, members.length))
+    return Object.fromEntries(members.map((m, i) => [m.id, i === 0 ? 100 - each * (members.length - 1) : each]))
+  }
 
   function open() {
     mode = vault.split.mode
-    const even = Math.floor(100 / Math.max(1, members.length))
-    draft = Object.fromEntries(
-      members.map((m, i) => [
-        m.id,
-        String(
-          vault.split.mode === 'shares'
-            ? (vault.split.shares[m.id] ?? 0)
-            : i === 0 ? 100 - even * (members.length - 1) : even,
-        ),
-      ]),
-    )
+    const stored = vault.split.mode === 'shares' ? vault.split.shares : null
+    const sum = stored ? members.reduce((t, m) => t + (stored[m.id] ?? 0), 0) : 0
+    draft = stored && sum === 100 ? Object.fromEntries(members.map(m => [m.id, stored[m.id] ?? 0])) : even()
     editing = true
   }
 
+  /**
+   * One share moved: the rest is shared out among the others in the
+   * proportion they already had — evenly, if they had none — rounded to
+   * whole percents, with the odd ones to the largest. So it always adds to 100.
+   */
+  function move(id: string, value: number) {
+    const others = members.filter(m => m.id !== id)
+    const rest = 100 - value
+    const had = others.reduce((t, m) => t + (draft[m.id] ?? 0), 0)
+    const next: Record<string, number> = { [id]: value }
+    let given = 0
+    for (const m of others) {
+      next[m.id] = Math.floor(had > 0 ? (rest * (draft[m.id] ?? 0)) / had : rest / others.length)
+      given += next[m.id]
+    }
+    const largest = [...others].sort((a, b) => next[b.id] - next[a.id])[0]
+    if (largest) next[largest.id] += rest - given
+    draft = next
+  }
+
   function save() {
-    if (!valid) return
-    commit(
-      'setSplit',
-      mode === 'equal'
-        ? { mode: 'equal' }
-        : { mode: 'shares', shares: Object.fromEntries(members.map(m => [m.id, Number(draft[m.id]) || 0])) },
-    )
+    commit('setSplit', mode === 'equal' ? { mode: 'equal' } : { mode: 'shares', shares: { ...draft } })
     saveNow()
     editing = false
   }
@@ -79,23 +88,48 @@
       <label><input type="radio" bind:group={mode} value="shares" /> {t('spending.splitShares')}</label>
     </fieldset>
     {#if mode === 'shares'}
-      <div class="shares">
-        {#each members as member (member.id)}
-          <label class="share">
-            <span>{member.name}</span>
-            <input use:integerInput inputmode="numeric" bind:value={draft[member.id]} aria-label={member.name} />
-            <span>%</span>
-          </label>
-        {/each}
-      </div>
-      {#if !valid}
-        <p class="error">{t('spending.splitSum')}</p>
+      {#if members.length === 2}
+        <!-- Two people: one slider, since one share is the other's complement. -->
+        {@const [a, b] = members}
+        <div class="pair">
+          <span>{a.name} {draft[a.id]}%</span>
+          <span>{b.name} {draft[b.id]}%</span>
+        </div>
+        <input
+          class="slider"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={draft[a.id]}
+          aria-label={a.name}
+          aria-valuetext={`${a.name} ${draft[a.id]}% · ${b.name} ${draft[b.id]}%`}
+          oninput={e => move(a.id, Number(e.currentTarget.value))}
+        />
+      {:else}
+        <div class="shares">
+          {#each members as member (member.id)}
+            <label class="share">
+              <span class="who">{member.name}</span>
+              <input
+                class="slider"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={draft[member.id]}
+                oninput={e => move(member.id, Number(e.currentTarget.value))}
+              />
+              <span class="pct">{draft[member.id]}%</span>
+            </label>
+          {/each}
+        </div>
       {/if}
     {/if}
     <p class="hint">{t('spending.splitHint')}</p>
     <div class="buttons">
       <button class="cancel" onclick={() => (editing = false)}>{t('action.cancel')}</button>
-      <button class="save" disabled={!valid} onclick={save}>{t('action.save')}</button>
+      <button class="save" onclick={save}>{t('action.save')}</button>
     </div>
   {/if}
 </div>
@@ -144,20 +178,31 @@
     gap: 0.5rem;
   }
 
-  .share span:first-child {
-    flex: 1 1 auto;
+  .share .who {
+    flex: 0 0 6rem;
     min-width: 0;
     overflow-wrap: anywhere;
   }
 
-  .share input {
-    width: 4.5rem;
-    font: inherit;
-    font-size: 1rem;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--rule);
-    border-radius: 6px;
+  .share .pct {
+    flex: 0 0 3rem;
     text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pair {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A thumb target: tall enough to grab with the phone in one hand. */
+  .slider {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 36px;
+    accent-color: var(--accent);
   }
 
   .hint {
@@ -166,11 +211,6 @@
     color: var(--ink-faint);
   }
 
-  .error {
-    margin: 0.4rem 0 0;
-    font-size: 0.85rem;
-    color: var(--alarm);
-  }
 
   .buttons {
     display: flex;

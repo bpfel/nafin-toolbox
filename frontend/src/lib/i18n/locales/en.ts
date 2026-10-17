@@ -685,8 +685,6 @@ export const en = {
   'spending.readOnly': 'You can only read this household; records are entered by its writers.',
   'spending.automatic': 'automatic',
   'spending.markAutomatic': 'Paid automatically?',
-  'entry.automatic': 'Paid automatically',
-  'entry.automaticHint': 'By standing order or direct debit: Spending counts it as paid and asks for no receipts.',
   'spending.owes': 'Who owes whom',
   'spending.paid': 'Paid',
   'spending.share': 'Share',
@@ -703,7 +701,6 @@ export const en = {
   'spending.splitShares': 'By share',
   'spending.splitChange': 'Change split',
   'spending.splitHint': 'Applies to records entered from now on.',
-  'spending.splitSum': 'The shares must add up to 100%.',
   'spending.formerMember': 'Former member',
 } as const
 

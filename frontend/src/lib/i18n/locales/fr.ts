@@ -637,8 +637,6 @@ export const fr: Messages = {
   'spending.readOnly': 'Tu peux seulement lire ce ménage ; les tickets sont saisis par ceux qui peuvent le modifier.',
   'spending.automatic': 'automatique',
   'spending.markAutomatic': 'Payé automatiquement ?',
-  'entry.automatic': 'Payé automatiquement',
-  'entry.automaticHint': 'Par ordre permanent ou prélèvement : compté comme payé dans Tickets, sans ticket à saisir.',
   'spending.owes': 'Qui doit quoi',
   'spending.paid': 'Payé',
   'spending.share': 'Part',
@@ -655,6 +653,5 @@ export const fr: Messages = {
   'spending.splitShares': 'Par part',
   'spending.splitChange': 'Modifier la répartition',
   'spending.splitHint': 'S’applique aux tickets saisis à partir de maintenant.',
-  'spending.splitSum': 'Les parts doivent faire 100 %.',
   'spending.formerMember': 'Ancien membre',
 }
