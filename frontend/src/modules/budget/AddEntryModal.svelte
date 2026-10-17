@@ -64,14 +64,6 @@
   )
   let newCategoryName = $state('')
   let useNewCategory = $state(false)
-  /**
-   * Paid by standing order or direct debit. Only an expense can be: the other
-   * types are not spent at a till in the first place.
-   */
-  const wasAutomatic = untrack(() =>
-    editing ? vault.budget.entries.find(e => e.id === editing.id)?.automatic === true : false,
-  )
-  let automatic = $state(wasAutomatic)
   let error = $state<string | null>(null)
 
   const now = new Date()
@@ -312,9 +304,6 @@
             categoryName: resolvedCategoryName,
           })
         }
-        if (type === 'expense' && automatic !== wasAutomatic) {
-          commit('setEntryAutomatic', editing.id, automatic)
-        }
         if (targeted) {
           commit('setReserve', editing.id, {
             targetAmount: (centsOf(totalValue) / 100).toFixed(2),
@@ -328,7 +317,7 @@
           if (amount !== '') onsave?.(editing.id, amount)
         }
       } else {
-        const created = commit('createEntry', {
+        commit('createEntry', {
           name: trimmed,
           type,
           categoryName: resolvedCategoryName,
@@ -337,7 +326,6 @@
           targetAmount: targeted ? (centsOf(totalValue) / 100).toFixed(2) : undefined,
           periodMonths: targeted ? periodMonths : undefined,
         })
-        if (type === 'expense' && automatic) commit('setEntryAutomatic', created.id, true)
       }
       oncreated()
       onclose()
@@ -529,16 +517,6 @@
       </div>
     {/if}
 
-    {#if type === 'expense'}
-      <label class="automatic">
-        <input type="checkbox" bind:checked={automatic} />
-        <span>
-          <span class="label">{t('entry.automatic')}</span>
-          <span class="automatic-hint">{t('entry.automaticHint')}</span>
-        </span>
-      </label>
-    {/if}
-
     {#if error}
       <p class="error">{error}</p>
     {/if}
@@ -658,28 +636,6 @@
     flex-direction: column;
     gap: 0.25rem;
     margin-bottom: 1rem;
-  }
-  .automatic {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.6rem;
-    margin: 0 0 1rem;
-    cursor: pointer;
-  }
-  .automatic input {
-    margin-top: 0.2rem;
-    width: 1.1rem;
-    height: 1.1rem;
-    flex: none;
-  }
-  .automatic > span {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-  .automatic-hint {
-    font-size: 0.8rem;
-    color: var(--ink-faint);
   }
   .label {
     font-size: 0.85rem;
