@@ -46,10 +46,11 @@ release may change things without a deprecation period. Each release is a tag on
 ### New
 
 - **Belege: what you actually spent, against the budget.** A new tab between
-  Budget and Accounts. *Record* takes a receipt in a few taps: the amount,
-  the budget line — preselected to the one you used last, with your recent
-  ones as chips — the date and a note; it is saved at once. *Review* shows a
-  month line by line against its plan. A finished month keeps the budget it
+  Budget and Accounts. A receipt is entered from the **+**, in a dialog: the
+  amount, the budget line — preselected to the one you used last, with your
+  recent ones as chips — the date and a note; it is saved at once. *Records*
+  lists the month's receipts, and *Review* shows a month line by line against
+  its plan. A finished month keeps the budget it
   ended with, so changing Rent today does not rewrite October. A record whose
   budget line is deleted is kept as Unassigned, never lost.
 - **Letting somebody into a household is a Confirm button, and it is live.**
