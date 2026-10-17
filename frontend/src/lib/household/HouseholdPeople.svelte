@@ -2,8 +2,9 @@
   import { t } from '../i18n/index.svelte'
   import {
     inviteToHousehold, loadInvites, withdrawInvite, listMembers, removeMember,
-    letInWhoeverIsReady, changeRole, type PendingInvite,
+    confirmMember, changeRole, type PendingInvite,
   } from '../crypto/vaultStore.svelte'
+  import { recordInvites, noteInvited } from './invitations.svelte'
   import type { HouseholdMember } from '../api/client'
   import InviteCodeDialog from './InviteCodeDialog.svelte'
   import ActionButton from '../nav/ActionButton.svelte'
@@ -19,10 +20,15 @@
    *
    * What this panel is really for is the moment in the middle. When an
    * invitation comes back accepted, the app has already checked the key the
-   * server is offering against a MAC the server could not have computed — and
-   * if that check fails, the person on screen has to be stopped rather than
-   * nudged. That is the one place in the app where a warning outranks getting
-   * on with it.
+   * server is offering against a MAC the server could not have computed. If it
+   * checks out, a Confirm button lets them in; if it fails, the person on screen
+   * has to be stopped rather than nudged. That is the one place in the app where
+   * a warning outranks getting on with it.
+   *
+   * Letting in used to happen by itself, whenever the owner's app next loaded.
+   * The check never needed a person — but the moment did: the invitee waited,
+   * with nothing on the owner's screen saying why, until somebody reloaded. So
+   * the panel watches while an invitation is open, and admission is a button.
    */
   interface Props {
     householdId: number
@@ -110,12 +116,9 @@
 
   async function refresh() {
     try {
-      // Anybody whose acceptance checks out is let in here rather than by a
-      // button. See `letInWhoeverIsReady` for why the button bought nothing.
-      if (isOwner) await letInWhoeverIsReady(householdId)
-
       members = await listMembers(householdId)
       invites = await loadInvites(householdId)
+      if (isOwner) recordInvites(householdId, invites)
 
       // An invitation that has been taken up, or withdrawn, has no code left to
       // show — and a code still on screen would be an offer nobody can accept.
@@ -133,6 +136,38 @@
     void refresh()
   })
 
+  /**
+   * Live while somebody could be about to accept, or is waiting to be let in:
+   * every few seconds, so the Confirm button appears while both people are
+   * still at the table. Nothing open, nothing asked.
+   */
+  const WATCH_MS = 4000
+  const watching = $derived(isOwner && invites.length > 0)
+  $effect(() => {
+    if (!watching) return
+    let inFlight = false
+    const timer = setInterval(async () => {
+      if (inFlight || busy || document.visibilityState !== 'visible') return
+      inFlight = true
+      await refresh()
+      inFlight = false
+    }, WATCH_MS)
+    return () => clearInterval(timer)
+  })
+
+  async function confirm(invite: PendingInvite) {
+    busy = true
+    error = null
+    try {
+      await confirmMember(householdId, invite)
+      await refresh()
+    } catch {
+      error = t('household.failed')
+    } finally {
+      busy = false
+    }
+  }
+
   async function invite() {
     const address = email.trim()
     if (!address || busy) return
@@ -144,6 +179,7 @@
     error = null
     try {
       await inviteToHousehold(householdId, address, inviteRole)
+      noteInvited(householdId)
       inviting = false
       email = ''
       triedInvalid = false
@@ -204,17 +240,6 @@
 <div class="people">
   <div class="head">
     <h4>{t('invite.title')}</h4>
-    <!--
-      An invitation is answered somewhere else, by somebody else, at a time
-      nobody here chooses. Without this the only way to find out was to fold the
-      household away and open it again.
-    -->
-    <ActionButton label={t('invite.refresh')} onclick={refresh}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <polyline points="23 4 23 10 17 10" />
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-      </svg>
-    </ActionButton>
   </div>
 
   <ul class="list">
@@ -292,6 +317,16 @@
         {/if}
 
         <span class="tag">{t(`role.${invite.role}` as 'role.writer')}</span>
+
+        <!--
+          The one way in. Only on an acceptance whose key checks out; the MAC
+          is checked again at the moment of granting, in `confirmMember`.
+        -->
+        {#if isOwner && invite.accepted_at && invite.verified}
+          <button class="btn-primary confirm" onclick={() => confirm(invite)} disabled={busy}>
+            {t('invite.confirm')}
+          </button>
+        {/if}
 
         {#if isOwner}
           <!--
@@ -532,6 +567,11 @@
 
   .confirm-box {
     flex: 1 1 100%;
+  }
+
+  .confirm {
+    padding: 0.35rem 0.9rem;
+    font-size: 0.875rem;
   }
 
   .mismatch {
