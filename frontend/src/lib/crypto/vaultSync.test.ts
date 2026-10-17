@@ -707,6 +707,15 @@ describe('in a household', () => {
     expect(state.vault!.people['8']).toEqual({ name: 'Ben' })
   })
 
+  // Found by hand: a member with the household open saw the old names until
+  // they reloaded, because the panel read this tab's copy.
+  test('43. names are read from the household as it is now, not as this tab last saw it', async () => {
+    await inHousehold('writer')
+    await elsewhereInFlat(v => { v.people['1'] = { name: 'Anna' } })
+
+    expect(await peopleOf(3)).toEqual({ '1': { name: 'Anna' } })
+  })
+
   test('23. switching vaults while a save is in flight keeps each queue with its vault', async () => {
     await inHousehold()
     await switchTo('personal')

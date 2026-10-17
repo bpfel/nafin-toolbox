@@ -278,9 +278,9 @@ describe('leaving', () => {
 })
 
 describe('the people in a household', () => {
-  // The owner is listed, as "You", for one reason: to name themselves. See
-  // Names.test.ts.
-  test('are the others — you are not listed, unless you own it', async () => {
+  // You are listed once, as "You" — the row shows what the household calls you.
+  // Your role is not repeated there: the household's own row already says it.
+  test('are the others, and you once, as You', async () => {
     const { listMembers } = await import('../crypto/vaultStore.svelte')
     vi.mocked(listMembers).mockResolvedValue([
       { user_id: 7, email: 'me@example.ch', role: 'owner', joined_at: '2026-01-01' },
@@ -291,7 +291,8 @@ describe('the people in a household', () => {
     await userEvent.click(rowFor('Ski cabin'))
 
     await waitFor(() => expect(screen.getByText('anna@example.ch')).toBeTruthy())
-    expect(screen.queryByText('me@example.ch')).toBeNull()
+    expect(screen.getAllByText('me@example.ch')).toHaveLength(1)
+    expect(screen.getByText('You')).toBeTruthy()
   })
 })
 

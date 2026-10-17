@@ -53,12 +53,14 @@ describe('names in a household', () => {
     expect(screen.getByRole('button', { name: 'Name anna@example.ch' })).toBeTruthy()
   })
 
-  test('nobody else has one, nor a row of their own', async () => {
+  // Everybody sees what the household calls them; only the owner can change it.
+  test('everybody else sees their own row, and no pen anywhere', async () => {
+    store.people = { '1': { name: 'Me' } }
     panel(false)
 
-    await waitFor(() => expect(screen.getByText('anna@example.ch')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('You')).toBeTruthy())
+    expect(screen.getByText('Me')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Name / })).toBeNull()
-    expect(screen.queryByText('You')).toBeNull()
   })
 
   test('naming somebody writes the name to the household', async () => {
