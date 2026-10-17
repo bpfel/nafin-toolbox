@@ -1460,14 +1460,20 @@ export async function acceptInvite(token: string, secret: Uint8Array): Promise<n
 /**
  * What a household calls its members, by user id.
  *
- * From the vault when it is open — live, so a name set here shows at once —
- * and otherwise read from the server and opened. The People panel is on
- * Profile, where the household on screen is usually somebody else's budget.
+ * The household on screen is brought up to date first, then read — live, so a
+ * name set here shows at once. Without the refresh, a member who had it open
+ * before the owner named somebody went on seeing the old names until they
+ * reloaded. With changes of this tab's own waiting it is not refreshed: the
+ * copy here is the newer one, and the next save brings in anybody else's.
+ *
+ * Any other household is read from the server. A copy put aside in this tab
+ * may be just as old, so it is not trusted for this.
  */
 export async function peopleOf(householdId: number): Promise<Record<string, VaultPerson>> {
-  if (currentId === householdId && current.data) return current.data.people
-  const waiting = stashed.get(householdId)
-  if (waiting?.data) return waiting.data.people
+  if (currentId === householdId && current.data) {
+    await refreshIfQuiet()
+    if (currentId === householdId && current.data) return current.data.people
+  }
   const household = households.find(h => h.id === householdId)
   if (!household) return {}
   const payload = await fetchHouseholdVault(householdId)

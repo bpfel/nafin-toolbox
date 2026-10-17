@@ -102,11 +102,11 @@
   const others = $derived(members.filter(m => m.user_id !== myUserId))
 
   /**
-   * The owner's own row, which is back for one reason: only the owner names
-   * people, themselves included, and there was nowhere else to put their pen.
-   * Nobody else sees a row for themselves — they have nothing to do on it.
+   * Your own row, which is back so everybody can see what the household calls
+   * them. Only the owner names people, so only the owner's has a pen — they
+   * name themselves here like anybody else.
    */
-  const me = $derived(isOwner ? members.find(m => m.user_id === myUserId) : undefined)
+  const me = $derived(members.find(m => m.user_id === myUserId))
 
   /**
    * Who takes over if the owner leaves: the longest-standing of the others,

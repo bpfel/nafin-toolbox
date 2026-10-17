@@ -54,6 +54,7 @@ release may change things without a deprecation period. Each release is a tag on
   loaded. The household walkthrough has a step for it.
 - **Names for household members.** The owner gives each member — themselves
   included — a name with the pen beside them; until then the address shows.
+  Every member sees what the household calls them, on a row of their own.
   Names are kept in the household's encrypted budget, not on the server. A
   member's role is now changed by tapping their role.
 - **Changes made on two devices, or by two people in a household, both
