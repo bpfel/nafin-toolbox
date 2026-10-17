@@ -55,8 +55,8 @@ release may change things without a deprecation period. Each release is a tag on
   budget line is deleted is kept as Unassigned, never lost.
   In a household, each record says who paid — a member or the joint
   account — and Review shows who owes whom, running on from month to month,
-  with the fewest payments that settle it, and a split that is equal or set
-  with a slider.
+  with the fewest payments that settle it, and a split that is equal or by
+  share, always adding up to 100.
   A budget line paid by standing order or direct debit — rent, health
   insurance — can be marked *paid automatically*: it is not offered for a
   receipt, and Review counts it as paid at its plan, so a month's total is the

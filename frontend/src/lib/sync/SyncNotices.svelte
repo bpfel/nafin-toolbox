@@ -33,7 +33,7 @@
       : tn('sync.removed', n.count, { household: n.household })
   }
 
-  function undo(n: Extract<Notice, { kind: 'overwritten' }>) {
+  function undo(n: Extract<Notice, { kind: 'overwritten' | 'automatic' }>) {
     undoOverwrite(n.undo)
     dismiss(n.id)
   }
@@ -64,6 +64,8 @@
               <li>{line(item)}</li>
             {/each}
           </ul>
+        {:else if n.kind === 'automatic'}
+          {t('sync.automatic', { subject: n.subject })}
         {:else if n.kind === 'unassigned'}
           {tn('sync.unassigned', n.count)}
         {:else if n.kind === 'readOnly'}
@@ -74,7 +76,7 @@
           {n.count === 0 ? t('sync.signedOut.none') : tn('sync.signedOut', n.count)}
         {/if}
       </div>
-      {#if n.kind === 'overwritten'}
+      {#if n.kind === 'overwritten' || n.kind === 'automatic'}
         <button class="action" onclick={() => undo(n)}>{t('sync.undo')}</button>
       {/if}
       <button class="close" aria-label={t('sync.dismiss')} onclick={() => dismiss(n.id)}>×</button>

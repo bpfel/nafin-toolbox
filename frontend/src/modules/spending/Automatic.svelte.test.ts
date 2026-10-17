@@ -12,6 +12,7 @@ vi.mock('../../lib/crypto/vaultStore.svelte', async () => {
 })
 
 import ReviewView from './ReviewView.svelte'
+import { getNotices, clearNotices } from '../../lib/sync/notices.svelte'
 
 beforeEach(() => {
   const raw = createEmptyVault('Main')
@@ -21,7 +22,10 @@ beforeEach(() => {
   store.vault = v
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  clearNotices()
+})
 
 const rent = () => store.vault!.budget.entries.find(e => e.name === 'Rent')!
 
@@ -39,6 +43,26 @@ describe('asking whether a line is paid automatically', () => {
     expect(rent().automatic).toBe(true)
     expect(within(screen.getByText('Rent').closest('li')!).getByText('automatic')).toBeTruthy()
     expect(within(screen.getByText('Rent').closest('li')!).queryByRole('button', { name: 'Paid automatically?' })).toBeNull()
+  })
+
+  // One tap is easy to make by mistake, so it is said, with Undo.
+  test('marking says so, with Undo', async () => {
+    render(ReviewView, { vault: store.vault! })
+    await userEvent.click(within(screen.getByText('Rent').closest('li')!).getByRole('button', { name: 'Paid automatically?' }))
+
+    const notice = getNotices().find(n => n.kind === 'automatic')
+    expect(notice).toMatchObject({ subject: 'Rent', undo: { kind: 'setEntryAutomatic', args: [rent().id, false] } })
+  })
+
+  // And the way back, found where the mark is: the line opens, as any line does.
+  test('an automatic line opens to go back to receipts', async () => {
+    rent().automatic = true
+    render(ReviewView, { vault: store.vault! })
+
+    await userEvent.click(screen.getByText('Rent'))
+    await userEvent.click(screen.getByRole('button', { name: 'Record receipts instead' }))
+
+    expect(rent().automatic).toBeUndefined()
   })
 
   test('a reader is not asked', () => {
