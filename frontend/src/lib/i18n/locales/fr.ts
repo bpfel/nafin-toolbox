@@ -605,7 +605,9 @@ export const fr: Messages = {
   'tour.offerDecline': 'Plus tard',
 
   // --- Belege ---
-  'spending.tabRecord': 'Saisir',
+  'spending.tabRecord': 'Liste',
+  'spending.add': 'Ajouter un ticket',
+  'spending.thisMonth': 'Ce mois-ci',
   'spending.tabReview': 'Bilan',
   'spending.viewsLabel': 'Vues des tickets',
   'spending.empty': 'Saisis ce que tu dépenses et compare-le à ton budget.',
@@ -617,7 +619,6 @@ export const fr: Messages = {
   'spending.note': 'Note',
   'spending.paidBy': 'Payé par',
   'spending.joint': 'Compte commun',
-  'spending.today': 'Saisis aujourd’hui',
   'spending.unsaved': 'Pas encore enregistré',
   'spending.edit': 'Modifier le ticket',
   'spending.delete': 'Supprimer le ticket',

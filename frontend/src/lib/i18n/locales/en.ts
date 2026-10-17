@@ -653,7 +653,9 @@ export const en = {
   'tour.offerDecline': 'Not now',
 
   // --- Belege ---
-  'spending.tabRecord': 'Record',
+  'spending.tabRecord': 'Records',
+  'spending.add': 'Add record',
+  'spending.thisMonth': 'This month',
   'spending.tabReview': 'Review',
   'spending.viewsLabel': 'Spending views',
   'spending.empty': 'Record what you spend, and see it against your budget.',
@@ -665,7 +667,6 @@ export const en = {
   'spending.note': 'Note',
   'spending.paidBy': 'Paid by',
   'spending.joint': 'Joint account',
-  'spending.today': 'Entered today',
   'spending.unsaved': 'Not saved yet',
   'spending.edit': 'Edit record',
   'spending.delete': 'Delete record',

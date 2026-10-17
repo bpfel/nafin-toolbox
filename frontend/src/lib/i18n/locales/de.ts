@@ -612,7 +612,9 @@ export const de: Messages = {
   'tour.offerDecline': 'Später',
 
   // --- Belege ---
-  'spending.tabRecord': 'Erfassen',
+  'spending.tabRecord': 'Einträge',
+  'spending.add': 'Beleg erfassen',
+  'spending.thisMonth': 'Diesen Monat',
   'spending.tabReview': 'Übersicht',
   'spending.viewsLabel': 'Ansichten der Belege',
   'spending.empty': 'Erfasse, was du ausgibst, und sieh es neben deinem Budget.',
@@ -624,7 +626,6 @@ export const de: Messages = {
   'spending.note': 'Notiz',
   'spending.paidBy': 'Bezahlt von',
   'spending.joint': 'Gemeinsames Konto',
-  'spending.today': 'Heute erfasst',
   'spending.unsaved': 'Noch nicht gespeichert',
   'spending.edit': 'Beleg bearbeiten',
   'spending.delete': 'Beleg löschen',

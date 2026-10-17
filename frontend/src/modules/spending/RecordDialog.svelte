@@ -7,22 +7,31 @@
   import RecordForm, { type RecordValues } from './RecordForm.svelte'
 
   /**
-   * Changing or deleting a record. The same fields as entering one, so a
-   * correction is made in the shape the record was made in.
+   * Adding a record, or changing or deleting one. The same fields both ways, so
+   * a correction is made in the shape the record was made in.
    */
   interface Props {
-    beleg: Beleg
+    /** The record to change; absent when adding one. */
+    beleg?: Beleg
     vault: VaultData
     userId: string
     members: { id: string; name: string }[]
+    /** Adding: what to do with the values. The screen knows the split and the payer. */
+    onadd?: (values: RecordValues) => void
     onclose: () => void
   }
 
-  let { beleg, vault, userId, members, onclose }: Props = $props()
+  let { beleg, vault, userId, members, onadd, onclose }: Props = $props()
+  let title = $derived(beleg ? t('spending.edit') : t('spending.add'))
 
   let confirming = $state(false)
 
   function save(values: RecordValues) {
+    if (!beleg) {
+      onadd?.(values)
+      onclose()
+      return
+    }
     commit('editBeleg', beleg.id, {
       amount: values.amount,
       entryId: values.entryId,
@@ -35,6 +44,7 @@
   }
 
   function remove() {
+    if (!beleg) return
     commit('deleteBeleg', beleg.id)
     saveNow()
     onclose()
@@ -52,13 +62,15 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('spending.edit')} use:focusTrap use:closeOnBack={onclose}>
-    <h3>{t('spending.edit')}</h3>
+  <div class="modal" role="dialog" aria-label={title} use:focusTrap use:closeOnBack={onclose}>
+    <h3>{title}</h3>
 
     <RecordForm {vault} {userId} {members} initial={beleg} submitLabel={t('action.save')} onsubmit={save} />
 
     <div class="secondary">
-      {#if confirming}
+      {#if !beleg}
+        <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
+      {:else if confirming}
         <span class="ask">{t('spending.deleteConfirm')}</span>
         <button class="btn delete" onclick={remove}>{t('action.delete')}</button>
         <button class="btn cancel" onclick={() => (confirming = false)}>{t('action.cancel')}</button>

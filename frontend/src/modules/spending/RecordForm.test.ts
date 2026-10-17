@@ -74,18 +74,6 @@ describe('entering a record', () => {
     expect(onsubmit.mock.calls[0][0].entryId).toBe(groceries.id)
   })
 
-  test('is ready for the next one afterwards: the amount empties, the entry stays', async () => {
-    const v = vault()
-    const { amount } = form(v)
-    const other = spendableEntries(v)[1]
-    await userEvent.selectOptions(screen.getByLabelText('Counts against'), other.id)
-
-    await typeAmount(amount, '5{Enter}')
-
-    expect(amount.value).toBe('')
-    expect((screen.getByLabelText('Counts against') as HTMLSelectElement).value).toBe(other.id)
-  })
-
   test('asks who paid only in a household of two or more, defaulting to this person', async () => {
     form(vault(), [{ id: '1', name: 'Anna' }])
     expect(screen.queryByLabelText('Paid by')).toBeNull()
