@@ -53,6 +53,10 @@ release may change things without a deprecation period. Each release is a tag on
   its plan. A finished month keeps the budget it
   ended with, so changing Rent today does not rewrite October. A record whose
   budget line is deleted is kept as Unassigned, never lost.
+  In a household, each record says who paid — a member or the joint
+  account — and Review shows who owes whom, running on from month to month,
+  with the fewest payments that settle it and a split that is equal or by
+  share.
 - **Letting somebody into a household is a Confirm button, and it is live.**
   Once the invited person accepts, Confirm appears on the household's People
   panel without reloading, and a dot on Profile, in the household switcher and

@@ -55,7 +55,18 @@
     })
   })
 
-  let names = $derived(members.length > 0 ? Object.fromEntries(members.map(m => [m.id, m.name])) : undefined)
+  /**
+   * A name for whoever a record says paid, including somebody who has left:
+   * the owner's name for them stays in the household after they go.
+   */
+  let names = $derived(
+    members.length > 0
+      ? {
+          ...Object.fromEntries(Object.entries(vaultState.vault?.people ?? {}).map(([id, p]) => [id, p.name])),
+          ...Object.fromEntries(members.map(m => [m.id, m.name])),
+        }
+      : undefined,
+  )
 
   function record(values: RecordValues) {
     const vault = vaultState.vault
@@ -152,7 +163,14 @@
     </div>
 
     <div hidden={!onReview}>
-      <ReviewView {vault} {names} onopen={vaultState.readOnly ? undefined : b => (editing = b)} />
+      <ReviewView
+        {vault}
+        {names}
+        {members}
+        {me}
+        readOnly={vaultState.readOnly}
+        onopen={vaultState.readOnly ? undefined : b => (editing = b)}
+      />
     </div>
   </div>
 
