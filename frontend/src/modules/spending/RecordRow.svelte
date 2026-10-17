@@ -62,7 +62,7 @@
     align-items: baseline;
     gap: 0.6rem;
     width: 100%;
-    padding: 0.55rem 0.25rem;
+    padding: 0.65rem 0.9rem;
     border: none;
     border-bottom: 1px solid var(--rule);
     background: none;
@@ -73,6 +73,11 @@
 
   button.row {
     cursor: pointer;
+  }
+
+  /* The card's own edge ends the list; a rule under the last row doubles it. */
+  .row:last-child {
+    border-bottom: none;
   }
 
   button.row:hover {
