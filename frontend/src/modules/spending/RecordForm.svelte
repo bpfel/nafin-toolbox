@@ -58,14 +58,6 @@
       return
     }
     onsubmit({ amount, entryId, date: date || today(), note, ...(members.length > 1 ? { paidBy } : {}) })
-    if (!initial) {
-      // Ready for the next receipt: same line, same day, same payer — only the
-      // amount and the note are new each time.
-      amount = ''
-      note = ''
-      tried = false
-      amountField?.focus()
-    }
   }
 </script>
 

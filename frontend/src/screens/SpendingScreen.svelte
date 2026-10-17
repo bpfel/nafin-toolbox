@@ -4,10 +4,11 @@
   import { getRoute, navigate } from '../lib/nav/router.svelte'
   import { swipeHorizontal } from '../lib/util/swipe'
   import ScreenChrome from '../lib/nav/ScreenChrome.svelte'
+  import ActionButton from '../lib/nav/ActionButton.svelte'
   import { getVaultState, commit, saveNow, closeEndedMonths, listMembers } from '../lib/crypto/vaultStore.svelte'
   import type { Beleg } from '../lib/crypto/vault'
-  import { sharesFor, today } from '../lib/belege/belegeEngine'
-  import RecordForm, { type RecordValues } from '../modules/spending/RecordForm.svelte'
+  import { belegeIn, sharesFor, thisMonth } from '../lib/belege/belegeEngine'
+  import type { RecordValues } from '../modules/spending/RecordForm.svelte'
   import RecordRow from '../modules/spending/RecordRow.svelte'
   import RecordDialog from '../modules/spending/RecordDialog.svelte'
   import ReviewView from '../modules/spending/ReviewView.svelte'
@@ -15,9 +16,10 @@
   /**
    * Belege: what was actually spent, against the budget.
    *
-   * Two views, as Accounts has: Record, to enter a receipt in the time it takes
-   * to put the phone away, and Review, to read a month against its plan. The
-   * tab is in the address, so the one you were on survives a reload.
+   * Two views, as Accounts has: this month's records, and Review, to read a
+   * month against its plan. A receipt is entered from the "+", on either, in a
+   * dialog — the screen's ordinary action, where Budget and Accounts keep
+   * theirs. The tab is in the address, so the one you were on survives a reload.
    */
   let { userId = null }: { userId?: number | null } = $props()
 
@@ -72,17 +74,31 @@
     saveNow()
   }
 
-  /** Entered today, newest first, so the one just typed is on top. */
-  let enteredToday = $derived(
-    (vaultState.vault?.belege ?? [])
-      .filter(b => today(new Date(b.createdAt)) === today())
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  /** This month's, newest first, so the one just entered is on top. */
+  let thisMonthsRecords = $derived(
+    vaultState.vault
+      ? belegeIn(vaultState.vault, thisMonth()).sort(
+          (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+        )
+      : [],
   )
 
   let editing = $state<Beleg | null>(null)
+  let adding = $state(false)
 </script>
 
-<ScreenChrome title={t('nav.spending')} />
+<ScreenChrome title={t('nav.spending')}>
+  {#snippet children()}
+    {#if !vaultState.readOnly && vaultState.vault}
+      <ActionButton label={t('spending.add')} onclick={() => (adding = true)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </ActionButton>
+    {/if}
+  {/snippet}
+</ScreenChrome>
 
 <nav class="view-tabs" aria-label={t('spending.viewsLabel')}>
   <a
@@ -115,22 +131,21 @@
     }}
   >
     <div hidden={onReview}>
-      {#if vault.belege.length === 0}
-        <p class="empty">{t('spending.empty')}</p>
-      {/if}
-
       {#if vaultState.readOnly}
         <p class="empty">{t('spending.readOnly')}</p>
-      {:else}
-        <!-- Started afresh on a switch: the defaults are this budget's. -->
-        {#key vaultState.currentVaultId}
-          <RecordForm {vault} userId={me} {members} submitLabel={t('action.save')} onsubmit={record} />
-        {/key}
       {/if}
 
-      {#if enteredToday.length > 0}
-        <h3 class="today">{t('spending.today')}</h3>
-        {#each enteredToday as beleg (beleg.id)}
+      {#if thisMonthsRecords.length === 0}
+        <!-- What it is for, and the one action that starts it. -->
+        <div class="start">
+          <p class="empty">{t('spending.empty')}</p>
+          {#if !vaultState.readOnly}
+            <button class="add" onclick={() => (adding = true)}>{t('spending.add')}</button>
+          {/if}
+        </div>
+      {:else}
+        <h3 class="heading">{t('spending.thisMonth')}</h3>
+        {#each thisMonthsRecords as beleg (beleg.id)}
           <RecordRow {beleg} {vault} {names} onopen={vaultState.readOnly ? undefined : () => (editing = beleg)} />
         {/each}
       {/if}
@@ -143,6 +158,9 @@
 
   {#if editing}
     <RecordDialog beleg={editing} {vault} userId={me} {members} onclose={() => (editing = null)} />
+  {/if}
+  {#if adding}
+    <RecordDialog {vault} userId={me} {members} onadd={record} onclose={() => (adding = false)} />
   {/if}
 {/if}
 
@@ -183,9 +201,28 @@
     color: var(--ink-faint);
   }
 
-  .today {
-    margin: 1.5rem 0 0.25rem;
+  .heading {
+    margin: 0 0 0.25rem;
     font-size: 0.9rem;
     color: var(--ink-faint);
+  }
+
+  .start {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .add {
+    min-height: 44px;
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
   }
 </style>
