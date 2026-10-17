@@ -36,10 +36,14 @@ function makeVault(): VaultData {
 
 function buildVault(): VaultData {
   return {
-    version: 10,
+    version: 11,
     tour: { completedAt: null, dismissedAt: null },
     trust: { pins: {}, epochs: {} },
     people: {},
+    belege: [],
+    months: {},
+    settlements: [],
+    split: { mode: 'equal' as const },
     accounts: [
       {
         id: 'main',

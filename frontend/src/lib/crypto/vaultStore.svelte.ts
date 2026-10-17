@@ -24,6 +24,7 @@ import { seedNamesFor } from '../budget/seedNames'
 import { getLocale } from '../i18n/index.svelte'
 import { perform, overwriteBy, type Action, type ActionArgs, type ActionKind, type ActionResult } from '../sync/actions'
 import { enqueue, replayAll } from '../sync/queue'
+import { buildClosedMonth, monthsToClose, thisMonth } from '../belege/belegeEngine'
 import { notify, clearNotices } from '../sync/notices.svelte'
 
 /**
@@ -954,11 +955,16 @@ async function catchUp(slot: VaultSlot, id: VaultId): Promise<'caught-up' | 'unr
     ? queue.filter(a => !lost.has(a)).map(a => overwriteBy(base, fresh.data, a)).filter(o => o !== null)
     : []
 
+  // Records counted against an entry deleted elsewhere were kept, as
+  // Unassigned; that is worth saying, though nothing was lost.
+  const unassigned = queue.filter(a => !lost.has(a) && countsAgainstGone(a, fresh.data)).length
+
   confirmed(id, fresh.data)
   slot.lastUpdatedAt = fresh.updatedAt
   slot.data = vault
   setQueue(slot, id, queue.filter(a => !lost.has(a)))
 
+  if (unassigned > 0) notify({ kind: 'unassigned', count: unassigned })
   if (dropped.length > 0) {
     // One line per thing lost, not per action: a dialog's Save is a rename and
     // an amount, and both fall to the same deletion.
@@ -976,8 +982,17 @@ async function catchUp(slot: VaultSlot, id: VaultId): Promise<'caught-up' | 'unr
   for (const o of overwrites) {
     notify({ kind: 'overwritten', subject: o.action.subject ?? '', theirs: o.theirs, mine: o.mine, money: o.money, undo: o.undo })
   }
-  if (dropped.length === 0 && overwrites.length === 0) notify({ kind: 'merged' })
+  if (dropped.length === 0 && overwrites.length === 0 && unassigned === 0) notify({ kind: 'merged' })
   return 'caught-up'
+}
+
+/** A record added or moved onto an entry that `vault` no longer has. */
+function countsAgainstGone(action: Action, vault: VaultData): boolean {
+  const entryId =
+    action.kind === 'addBeleg' ? (action as Action<'addBeleg'>).args[0].entryId
+    : action.kind === 'editBeleg' ? (action as Action<'editBeleg'>).args[1].entryId
+    : undefined
+  return typeof entryId === 'string' && !vault.budget.entries.some(e => e.id === entryId)
 }
 
 /** The vault as the server holds it now, opened. */
@@ -1142,6 +1157,9 @@ export function undoOverwrite(undo: Action): void {
 export function commit<K extends ActionKind>(kind: K, ...args: ActionArgs<K>): ActionResult<K> {
   const vault = current.data
   if (!vault) throw new Error('no vault is open')
+  // Before anything else changes the plan, so a finished month is copied as it
+  // ended — Rent raised on the 1st must not reach October's copy.
+  if (kind !== 'closeMonth') closeEndedMonths()
   const plain = $state.snapshot(args) as ActionArgs<K>
   const { action, result } = perform(vault, kind, plain)
 
@@ -1152,7 +1170,38 @@ export function commit<K extends ActionKind>(kind: K, ...args: ActionArgs<K>): A
   setQueue(current, currentId, enqueue(queues.get(currentId) ?? [], action as Action))
   // Waiting out a retry already: the change joins the queue and goes with it.
   if (!current.waiting) scheduleSave()
+  // And after: a record backdated into a finished month nobody wrote in has
+  // made that month one to close, with the plan as it is now.
+  if (kind !== 'closeMonth') closeEndedMonths()
   return result
+}
+
+/**
+ * Copy the budget into every finished month that has records and no copy yet.
+ *
+ * Writers only — a reader cannot save, and sees the live plan with a note until
+ * a writer's app closes the month. Not on a preview, whose plan is an example.
+ * Each close is an action of its own carrying its lines, so on a newer vault it
+ * is a no-op if somebody else's copy got there first.
+ */
+export function closeEndedMonths(): void {
+  const vault = current.data
+  if (!vault || current.parked || isReadOnly()) return
+  for (const month of monthsToClose(vault, thisMonth())) {
+    commit('closeMonth', month, buildClosedMonth(vault, month))
+  }
+}
+
+/**
+ * Save now rather than after the pause. For a record: entered at the till, it
+ * should be on the server before the phone goes back in the pocket.
+ */
+export function saveNow(): void {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (current.dirty && !current.waiting) void saveVault()
 }
 
 /**
