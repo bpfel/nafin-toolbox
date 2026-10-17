@@ -501,9 +501,25 @@
      * off, which is the urgent one, would cost the same two taps as turning it
      * on. `.pressed` is what a toggle already wears when it is on.
      */
-    .dial:not(.expanded) .strip :global(.action:not(.pressed)),
+    .dial:not(.expanded) .strip :global(.action:not(.pressed):not(.pinned)),
     .dial:not(.expanded) .strip :global(.vault-switch) {
       display: none;
+    }
+
+    /*
+     * A screen's main action stays out too, by the same rule: the dial shows
+     * what is on, and what the screen is for. Belege is entered a receipt at a
+     * time, at the till, and two taps — open, then "+" — for the one thing the
+     * screen exists to do was one too many. Filled, so it reads as the action
+     * rather than as a toggle that happens to be on.
+     */
+    .strip :global(.action.pinned) {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .strip :global(.action.pinned:hover:not(:disabled)) {
+      background: var(--accent-dark);
     }
 
     /* Open: each control says what it is. Right-aligned, so the glyphs stay in

@@ -42,6 +42,12 @@
      * reason for something they can no longer identify.
      */
     hint?: string
+    /**
+     * The screen's main action, kept out beside the dot when the dial is closed,
+     * so it is one tap where the thumb already is. One per screen at most; on a
+     * desktop toolbar it is an ordinary control.
+     */
+    pinned?: boolean
     onclick: (event: MouseEvent) => void
     /** For the hold-to-peek eye; nothing else needs them. */
     onpointerdown?: () => void
@@ -57,6 +63,7 @@
     danger = false,
     disabled = false,
     hint,
+    pinned = false,
     onclick,
     onpointerdown,
     onpointerup,
@@ -83,6 +90,7 @@
   class="action"
   class:pressed
   class:danger
+  class:pinned
   aria-label={label}
   aria-pressed={pressed}
   title={hint ? `${label} — ${hint}` : label}
