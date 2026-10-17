@@ -4,6 +4,8 @@
   import { initialsOf, HOUSEHOLD_NAME_MAX } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import HouseholdPeople from './HouseholdPeople.svelte'
+  import WaitingDot from './WaitingDot.svelte'
+  import { getInvitationState } from './invitations.svelte'
   import ExampleHousehold from './ExampleHousehold.svelte'
   import { getTourState } from '../tour/tourStore.svelte'
   import ActionButton from '../nav/ActionButton.svelte'
@@ -31,6 +33,7 @@
   let { myUserId = null }: Props = $props()
 
   const vaultState = getVaultState()
+  const invitations = getInvitationState()
   const tour = getTourState()
 
   /**
@@ -197,6 +200,9 @@
               >
                 <HouseMark initials={initialsOf(household.name)} />
                 <span class="name">{household.name}</span>
+                {#if invitations.waitingIn(household.id) > 0}
+                  <WaitingDot />
+                {/if}
                 <svg
                   class="chevron"
                   class:down={unfolded === household.id}

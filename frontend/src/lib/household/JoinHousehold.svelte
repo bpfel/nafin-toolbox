@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { acceptInvite, getVaultState } from '../crypto/vaultStore.svelte'
+  import { acceptInvite, getVaultState, householdArrived, switchTo } from '../crypto/vaultStore.svelte'
   import { fromBase64 } from '../crypto/identity'
   import { navigate } from '../nav/router.svelte'
 
@@ -20,7 +20,9 @@
    */
   const vaultState = getVaultState()
 
-  let state = $state<'reading' | 'joining' | 'done' | 'failed'>('reading')
+  let phase = $state<'reading' | 'joining' | 'done' | 'failed'>('reading')
+  /** The household accepted into, once the server has said which. */
+  let joined = $state<number | null>(null)
 
   /**
    * Both halves come out of the fragment rather than the query string.
@@ -40,31 +42,58 @@
   async function join() {
     const parts = fromFragment()
     if (!parts || !vaultState.unlocked) {
-      state = 'failed'
+      phase = 'failed'
       return
     }
-    state = 'joining'
+    phase = 'joining'
     try {
-      await acceptInvite(parts.token, fromBase64(parts.secret))
+      joined = await acceptInvite(parts.token, fromBase64(parts.secret))
       // Cleared as soon as it has been used: leaving a one-time secret in the
       // address bar means it survives in history, in a screenshot, and in
       // whatever syncs tabs between devices.
       history.replaceState(null, '', '/join')
-      state = 'done'
+      phase = 'done'
     } catch {
-      state = 'failed'
+      phase = 'failed'
     }
   }
 
   $effect(() => {
-    if (vaultState.unlocked && state === 'reading') void join()
+    if (vaultState.unlocked && phase === 'reading') void join()
+  })
+
+  /**
+   * Waiting for the owner to confirm, which they now do with a button — often
+   * sitting beside you. Checked every few seconds while this screen is open,
+   * and the household opened the moment it is there. Leave, and it arrives on
+   * the next unlock instead, as it always did.
+   */
+  const WAIT_MS = 4000
+  $effect(() => {
+    if (phase !== 'done' || joined === null) return
+    const id = joined
+    let inFlight = false
+    const timer = setInterval(async () => {
+      if (inFlight || document.visibilityState !== 'visible') return
+      inFlight = true
+      try {
+        if (await householdArrived(id)) {
+          clearInterval(timer)
+          await switchTo(id)
+          navigate('/budget')
+        }
+      } finally {
+        inFlight = false
+      }
+    }, WAIT_MS)
+    return () => clearInterval(timer)
   })
 </script>
 
 <div class="join">
-  {#if state === 'joining' || state === 'reading'}
+  {#if phase === 'joining' || phase === 'reading'}
     <p>{t('join.working')}</p>
-  {:else if state === 'done'}
+  {:else if phase === 'done'}
     <h2>{t('join.doneTitle')}</h2>
     <p>{t('join.doneHint')}</p>
     <button class="btn-primary" onclick={() => navigate('/budget')}>{t('join.continue')}</button>

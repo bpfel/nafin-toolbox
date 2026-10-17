@@ -471,44 +471,6 @@ async function loadHouseholds(withMEK: CryptoKey): Promise<void> {
     households = []
   }
 
-  // Deliberately not awaited: nobody should wait on other people's paperwork
-  // to see their own budget.
-  void admitWhoeverAccepted()
-}
-
-/**
- * Hand the key to anybody who accepted an invitation while nobody was looking.
- *
- * **Why this has to happen on somebody's device at all.** The server cannot do
- * it: wrapping the household key for a new member needs the household key, and
- * the server has never had it. So the last step of joining is taken by an
- * owner's browser, and until it runs the invitee has accepted and can read
- * nothing.
- *
- * It used to run only while the People fold was open — the one screen almost
- * nobody is on when the invitation is accepted, because accepting happens on
- * somebody else's device at a time of their choosing. The result looked exactly
- * like a broken link: the invitee was told the invitation was accepted, and the
- * household never arrived. It had not failed; it was waiting for a screen.
- *
- * Now every unlock sweeps every household this account owns. One request each,
- * only for owners, and only where an invitation is outstanding — and the fold
- * still does the same on the way in, for the case where both people are looking
- * at once.
- *
- * Silent either way. An acceptance whose key does not check out is left alone
- * and shows as a mismatch on the People panel, which is the one place it can be
- * acted on; a request that simply failed is retried by the next unlock.
- */
-async function admitWhoeverAccepted(): Promise<void> {
-  for (const household of households) {
-    if (household.role !== 'owner') continue
-    try {
-      await letInWhoeverIsReady(household.id)
-    } catch {
-      // Next unlock.
-    }
-  }
 }
 
 /**
@@ -1416,38 +1378,25 @@ export async function loadInvites(householdId: number): Promise<PendingInvite[]>
 }
 
 /**
- * Let in everybody whose acceptance checks out, without being asked.
+ * Whether a household this account was invited to has been granted yet.
  *
- * The button this replaces was a leftover from a design we do not use. Its job
- * in Bitwarden is to put a human in front of a fingerprint, because that
- * comparison is the only thing catching a substituted key. Here the MAC does
- * that, automatically, and cannot be rubber-stamped — so by the time anybody
- * could have pressed the button, everything it was for had already happened.
- *
- * Nor could it catch the wrong person accepting: an invitation can only be
- * taken up by the account at the address it names, so the row shows what was
- * typed and can hold no surprise.
- *
- * What is *not* automatic is the failure. A MAC that does not verify grants
- * nothing and stays on screen saying so, because that is the one case where
- * somebody has to decide something.
+ * For the invitee's waiting screen. Membership — and so the household in the
+ * listing — exists only once the owner has confirmed, so the listing is the
+ * thing to watch; when it appears, the households are opened again so it can be
+ * switched to. One request per call, and the screen calls it only while it is
+ * waiting.
  */
-export async function letInWhoeverIsReady(householdId: number): Promise<number> {
-  const invites = await loadInvites(householdId)
-  let admitted = 0
-
-  for (const invite of invites) {
-    if (!invite.accepted_at || !invite.verified) continue
-    try {
-      await confirmMember(householdId, invite)
-      admitted++
-    } catch {
-      // Left pending rather than retried in a loop. The panel will try again
-      // the next time it is opened, and a failure that repeats is one the
-      // mismatch warning is already the right answer to.
-    }
+export async function householdArrived(householdId: number): Promise<boolean> {
+  if (!mek) return false
+  let listed
+  try {
+    listed = await fetchHouseholds()
+  } catch {
+    return false
   }
-  return admitted
+  if (!listed.some(h => h.id === householdId)) return false
+  await loadHouseholds(mek)
+  return households.some(h => h.id === householdId)
 }
 
 /**

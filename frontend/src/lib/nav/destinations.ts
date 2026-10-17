@@ -1,5 +1,6 @@
 import { t } from '../i18n/index.svelte'
 import type { Screen } from './router.svelte'
+import { getInvitationState } from '../household/invitations.svelte'
 
 /**
  * The places the app has, as data.
@@ -25,7 +26,11 @@ export interface Destination {
    * label captured once would keep the language it was built in.
    */
   label: () => string
+  /** Whether something there is waiting on the user: a dot on the tab. */
+  attention?: () => boolean
 }
+
+const invitations = getInvitationState()
 
 /**
  * Profile is last in both lists, and at the foot of the rail. It is the only
@@ -35,7 +40,15 @@ const FOR_USER: Destination[] = [
   { screen: 'budget', path: '/budget', icon: 'budget', label: () => t('nav.budget') },
   { screen: 'accounts', path: '/accounts', icon: 'accounts', label: () => t('nav.accounts') },
   { screen: 'knowledge', path: '/knowledge', icon: 'knowledge', label: () => t('nav.knowledge') },
-  { screen: 'profile', path: '/profile', icon: 'profile', label: () => t('nav.profile') },
+  {
+    screen: 'profile',
+    path: '/profile',
+    icon: 'profile',
+    label: () => t('nav.profile'),
+    // Somebody accepted an invitation and waits to be confirmed, which is done
+    // on Profile — on whatever screen the owner happens to be.
+    attention: () => invitations.anyWaiting,
+  },
 ]
 
 /*

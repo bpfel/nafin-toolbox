@@ -20,10 +20,6 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
   withdrawInvite: vi.fn(),
   listMembers: vi.fn(async () => []),
   removeMember: vi.fn(),
-  // Called by an owner's panel on the way in. Absent, it threw inside the
-  // refresh, which catches everything — so the member list silently never
-  // loaded and every assertion about it failed for the wrong reason.
-  letInWhoeverIsReady: vi.fn(async () => 0),
   changeRole: vi.fn(),
 }))
 

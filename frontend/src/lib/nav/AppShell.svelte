@@ -15,6 +15,7 @@
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
   import UpkeepScreen from '../../screens/UpkeepScreen.svelte'
+  import { startInvitationWatch } from '../household/invitations.svelte'
 
   /**
    * The app once every gate has been passed: the places, and whichever one the
@@ -101,6 +102,15 @@
    * one `accounts` key. Deriving the screen is not on its own enough to stop
    * that; the effect still runs, and only this guard makes it a no-op.
    */
+  /**
+   * Somebody accepted an invitation and is waiting for this owner to let them
+   * in. Watched from here, the whole time the app is open, so the owner learns
+   * about it on whatever screen they are on — not only on the People panel.
+   */
+  $effect(() => {
+    if (!isAdmin && vaultState.unlocked) return startInvitationWatch()
+  })
+
   let screen = $derived(route.screen)
   let lastScreen: Screen | null = null
   $effect(() => {
