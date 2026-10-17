@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { getRoute, replace } from './router.svelte'
   import type { Screen } from './router.svelte'
   import { clearEditing } from '../util/editMode.svelte'
@@ -108,7 +109,7 @@
    * about it on whatever screen they are on — not only on the People panel.
    */
   $effect(() => {
-    if (!isAdmin && vaultState.unlocked) return startInvitationWatch()
+    if (!isAdmin && vaultState.unlocked) return untrack(startInvitationWatch)
   })
 
   let screen = $derived(route.screen)
