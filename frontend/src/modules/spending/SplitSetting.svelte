@@ -65,6 +65,11 @@
     draft = next
   }
 
+  /** "Anna 70% · Ben 30%", for the slider's spoken value. Names and numbers only. */
+  function sharesText(): string {
+    return members.map(m => `${m.name} ${draft[m.id]}%`).join(' · ')
+  }
+
   function save() {
     commit('setSplit', mode === 'equal' ? { mode: 'equal' } : { mode: 'shares', shares: { ...draft } })
     saveNow()
@@ -103,7 +108,7 @@
           step="1"
           value={draft[a.id]}
           aria-label={a.name}
-          aria-valuetext={`${a.name} ${draft[a.id]}% · ${b.name} ${draft[b.id]}%`}
+          aria-valuetext={sharesText()}
           oninput={e => move(a.id, Number(e.currentTarget.value))}
         />
       {:else}
