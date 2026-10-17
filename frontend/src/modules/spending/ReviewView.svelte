@@ -6,6 +6,8 @@
   import Money from '../../lib/util/Money.svelte'
   import RecordRow from './RecordRow.svelte'
   import { commit, saveNow } from '../../lib/crypto/vaultStore.svelte'
+  import { notify } from '../../lib/sync/notices.svelte'
+  import { emptyTape } from '../../lib/sync/source'
   import Balances from './Balances.svelte'
 
   /**
@@ -57,13 +59,29 @@
    * on a finished month — its copy is fixed — and not to a reader.
    */
   function mayAsk(row: ReviewRow): boolean {
-    return !readOnly && !review.closedAt && month === current && row.entryId !== null
-      && !row.automatic && (row.planned ?? 0) > 0 && row.spent === 0
+    return changeable && row.entryId !== null && !row.automatic && (row.planned ?? 0) > 0 && row.spent === 0
   }
 
-  function markAutomatic(entryId: string) {
+  /** Only this month's lines, and only by a writer: a finished month keeps its copy. */
+  let changeable = $derived(!readOnly && !review.closedAt && month === current)
+
+  /** Said, with Undo, because one tap is easy to make by mistake. */
+  function markAutomatic(row: ReviewRow) {
+    const entryId = row.entryId!
     commit('setEntryAutomatic', entryId, true)
     saveNow()
+    notify({
+      kind: 'automatic',
+      subject: row.entryName,
+      undo: { kind: 'setEntryAutomatic', args: [entryId, false], tape: emptyTape() },
+    })
+  }
+
+  /** Back to receipts: the line is offered for records again, and counts what they say. */
+  function unmarkAutomatic(entryId: string) {
+    commit('setEntryAutomatic', entryId, false)
+    saveNow()
+    open = null
   }
 
   function closedOn(iso: string): string {
@@ -95,7 +113,7 @@
         <button
           class="line"
           aria-expanded={open === key(row)}
-          disabled={row.belege.length === 0}
+          disabled={row.belege.length === 0 && !(row.automatic && changeable)}
           onclick={() => (open = open === key(row) ? null : key(row))}
         >
           <span class="name">
@@ -119,9 +137,12 @@
           {/if}
         </button>
         {#if mayAsk(row)}
-          <button class="ask" onclick={() => markAutomatic(row.entryId!)}>{t('spending.markAutomatic')}</button>
+          <button class="ask" onclick={() => markAutomatic(row)}>{t('spending.markAutomatic')}</button>
         {/if}
         {#if open === key(row)}
+          {#if row.automatic && changeable}
+            <button class="ask" onclick={() => unmarkAutomatic(row.entryId!)}>{t('spending.unmarkAutomatic')}</button>
+          {/if}
           <div class="records">
             {#each row.belege as beleg (beleg.id)}
               <RecordRow {beleg} {vault} {names} showEntry={false} onopen={onopen ? () => onopen(beleg) : undefined} />

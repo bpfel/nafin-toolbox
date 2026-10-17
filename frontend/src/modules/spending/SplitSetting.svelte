@@ -2,6 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { VaultData } from '../../lib/crypto/vault'
   import { commit, saveNow } from '../../lib/crypto/vaultStore.svelte'
+  import { integerInput } from '../../lib/util/money'
 
   /**
    * How a new record is divided: equally, or a percentage per member.
@@ -22,8 +23,10 @@
 
   let editing = $state(false)
   let mode = $state<'equal' | 'shares'>('equal')
-  /** Whole percentages, always adding up to 100: a slider moved takes from the others. */
+  /** Whole percentages, always adding up to 100: a share typed takes from the others. */
   let draft = $state<Record<string, number>>({})
+  /** Who was typed in, oldest first. Whoever was touched longest ago gives way first. */
+  let touched = $state<string[]>([])
 
   let summary = $derived(
     vault.split.mode === 'equal'
@@ -42,32 +45,32 @@
     const stored = vault.split.mode === 'shares' ? vault.split.shares : null
     const sum = stored ? members.reduce((t, m) => t + (stored[m.id] ?? 0), 0) : 0
     draft = stored && sum === 100 ? Object.fromEntries(members.map(m => [m.id, stored[m.id] ?? 0])) : even()
+    touched = []
     editing = true
   }
 
   /**
-   * One share moved: the rest is shared out among the others in the
-   * proportion they already had — evenly, if they had none — rounded to
-   * whole percents, with the odd ones to the largest. So it always adds to 100.
+   * One share typed: the others make up the difference, so it always adds to
+   * 100. For two people that is simply the other one. For more, whoever has not
+   * been typed in gives way first — the last in the list before the first —
+   * then whoever was typed in longest ago; each down to 0 or up to 100 before
+   * the next is touched. So typing Anna 50 and Ben 30 leaves Cleo the 20, and
+   * nothing you typed yourself moves unless it has to.
    */
-  function move(id: string, value: number) {
-    const others = members.filter(m => m.id !== id)
-    const rest = 100 - value
-    const had = others.reduce((t, m) => t + (draft[m.id] ?? 0), 0)
-    const next: Record<string, number> = { [id]: value }
-    let given = 0
-    for (const m of others) {
-      next[m.id] = Math.floor(had > 0 ? (rest * (draft[m.id] ?? 0)) / had : rest / others.length)
-      given += next[m.id]
+  function set(id: string, value: number) {
+    const v = Math.max(0, Math.min(100, Math.round(value)))
+    touched = [...touched.filter(t => t !== id), id]
+    const next = { ...draft, [id]: v }
+    const untouched = members.filter(m => m.id !== id && !touched.includes(m.id)).map(m => m.id).reverse()
+    const order = [...untouched, ...touched.filter(t => t !== id)]
+    let diff = 100 - members.reduce((t, m) => t + next[m.id], 0)
+    for (const m of order) {
+      if (diff === 0) break
+      const moved = Math.max(0, Math.min(100, next[m] + diff))
+      diff -= moved - next[m]
+      next[m] = moved
     }
-    const largest = [...others].sort((a, b) => next[b.id] - next[a.id])[0]
-    if (largest) next[largest.id] += rest - given
     draft = next
-  }
-
-  /** "Anna 70% · Ben 30%", for the slider's spoken value. Names and numbers only. */
-  function sharesText(): string {
-    return members.map(m => `${m.name} ${draft[m.id]}%`).join(' · ')
   }
 
   function save() {
@@ -93,43 +96,25 @@
       <label><input type="radio" bind:group={mode} value="shares" /> {t('spending.splitShares')}</label>
     </fieldset>
     {#if mode === 'shares'}
-      {#if members.length === 2}
-        <!-- Two people: one slider, since one share is the other's complement. -->
-        {@const [a, b] = members}
-        <div class="pair">
-          <span>{a.name} {draft[a.id]}%</span>
-          <span>{b.name} {draft[b.id]}%</span>
-        </div>
-        <input
-          class="slider"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={draft[a.id]}
-          aria-label={a.name}
-          aria-valuetext={sharesText()}
-          oninput={e => move(a.id, Number(e.currentTarget.value))}
-        />
-      {:else}
-        <div class="shares">
-          {#each members as member (member.id)}
-            <label class="share">
-              <span class="who">{member.name}</span>
-              <input
-                class="slider"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={draft[member.id]}
-                oninput={e => move(member.id, Number(e.currentTarget.value))}
-              />
-              <span class="pct">{draft[member.id]}%</span>
-            </label>
-          {/each}
-        </div>
-      {/if}
+      <div class="shares">
+        {#each members as member (member.id)}
+          <label class="share">
+            <span class="who">{member.name}</span>
+            <input
+              use:integerInput
+              inputmode="numeric"
+              value={draft[member.id]}
+              aria-label={member.name}
+              oninput={e => {
+                const typed = e.currentTarget.value.trim()
+                if (typed !== '' && Number.isFinite(Number(typed))) set(member.id, Number(typed))
+              }}
+              onblur={e => (e.currentTarget.value = String(draft[member.id]))}
+            />
+            <span class="pct">%</span>
+          </label>
+        {/each}
+      </div>
     {/if}
     <p class="hint">{t('spending.splitHint')}</p>
     <div class="buttons">
@@ -184,30 +169,20 @@
   }
 
   .share .who {
-    flex: 0 0 6rem;
+    flex: 1 1 auto;
     min-width: 0;
     overflow-wrap: anywhere;
   }
 
-  .share .pct {
-    flex: 0 0 3rem;
+  .share input {
+    width: 4.5rem;
+    font: inherit;
+    font-size: 1rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
     text-align: right;
     font-variant-numeric: tabular-nums;
-  }
-
-  .pair {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* A thumb target: tall enough to grab with the phone in one hand. */
-  .slider {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 36px;
-    accent-color: var(--accent);
   }
 
   .hint {

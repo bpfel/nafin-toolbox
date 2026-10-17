@@ -35,6 +35,8 @@ export type Notice =
   | { id: number; kind: 'readOnly'; count: number }
   /** This account is no longer in the household it had changes waiting for. */
   | { id: number; kind: 'removed'; household: string; count: number }
+  /** A line just marked as paid automatically — said, with Undo, in case of a slip. */
+  | { id: number; kind: 'automatic'; subject: string; undo: Action }
   /** Records kept as Unassigned because their entry was deleted elsewhere. */
   | { id: number; kind: 'unassigned'; count: number }
   /** Signed out under this tab, with changes waiting. */
@@ -42,7 +44,7 @@ export type Notice =
 
 type NewNotice = Notice extends infer N ? (N extends Notice ? Omit<N, 'id'> : never) : never
 
-const TOAST_MS = { merged: 5000, overwritten: 12000, unassigned: 12000 } as const
+const TOAST_MS = { merged: 5000, overwritten: 12000, unassigned: 12000, automatic: 8000 } as const
 
 let notices = $state<Notice[]>([])
 let nextId = 1

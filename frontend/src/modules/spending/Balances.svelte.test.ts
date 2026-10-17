@@ -54,35 +54,35 @@ describe('who owes whom', () => {
     expect(screen.queryByRole('button', { name: 'Change split' })).toBeNull()
   })
 
-  // One slider for two people: moving one share moves the other.
-  test('the split is one slider for two, and always adds up to 100', async () => {
+  // Two people: typing one share sets the other.
+  test('typing one share of two sets the other, so it always adds up to 100', async () => {
     show()
     await userEvent.click(screen.getByRole('button', { name: 'Change split' }))
     await userEvent.click(screen.getByLabelText('By share'))
 
-    await fireEvent.input(screen.getByRole('slider', { name: 'Anna' }), { target: { value: '70' } })
+    await fireEvent.input(screen.getByLabelText('Anna'), { target: { value: '70' } })
 
-    expect(screen.getByText('Anna 70%')).toBeTruthy()
-    expect(screen.getByText('Ben 30%')).toBeTruthy()
+    expect((screen.getByLabelText('Ben') as HTMLInputElement).value).toBe('30')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(store.vault!.split).toEqual({ mode: 'shares', shares: { '1': 70, '2': 30 } })
   })
 
-  // Three or more: a slider each, and the others share out the rest in the
-  // proportion they had.
-  test('with three, moving one shares the rest among the others', async () => {
+  // Three: whoever has not been typed in gives way, so what you typed stays.
+  test('with three, the one not typed in takes the rest', async () => {
     const three = [...members, { id: '3', name: 'Cleo' }]
     render(Balances, { vault: store.vault!, month: '2026-10', members: three, me: '1', readOnly: false })
     await userEvent.click(screen.getByRole('button', { name: 'Change split' }))
     await userEvent.click(screen.getByLabelText('By share'))
 
-    await fireEvent.input(screen.getByRole('slider', { name: /Anna/ }), { target: { value: '50' } })
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await fireEvent.input(screen.getByLabelText('Anna'), { target: { value: '50' } })
+    await fireEvent.input(screen.getByLabelText('Ben'), { target: { value: '30' } })
 
-    const shares = (store.vault!.split as { shares: Record<string, number> }).shares
-    expect(shares['1']).toBe(50)
-    expect(shares['2'] + shares['3']).toBe(50)
-    expect(Math.abs(shares['2'] - shares['3'])).toBeLessThanOrEqual(1)
+    expect((screen.getByLabelText('Anna') as HTMLInputElement).value).toBe('50')
+    expect((screen.getByLabelText('Cleo') as HTMLInputElement).value).toBe('20')
+
+    // Cleo typed in too: now Anna, typed longest ago, gives way.
+    await fireEvent.input(screen.getByLabelText('Cleo'), { target: { value: '40' } })
+    expect((screen.getByLabelText('Ben') as HTMLInputElement).value).toBe('30')
+    expect((screen.getByLabelText('Anna') as HTMLInputElement).value).toBe('30')
   })
-
 })
