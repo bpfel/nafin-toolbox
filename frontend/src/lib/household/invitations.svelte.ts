@@ -1,3 +1,4 @@
+import { untrack } from 'svelte'
 import { getVaultState, loadInvites, type PendingInvite } from '../crypto/vaultStore.svelte'
 
 /**
@@ -81,7 +82,11 @@ export async function sweep(all = false): Promise<void> {
  * also forgets everything, since the next account to sign in is not this one.
  */
 export function startInvitationWatch(): () => void {
-  void sweep(true)
+  // Untracked: this is called from an effect, and the sweep reads the list of
+  // households and the waiting counts before its first await. Tracked, every
+  // answer it recorded re-ran the effect — which tore the watch down, cleared
+  // the dot, and swept again, as fast as the server could answer.
+  void untrack(() => sweep(true))
 
   const timer = setInterval(() => {
     if (document.visibilityState === 'visible') void sweep()

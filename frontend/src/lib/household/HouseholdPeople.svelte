@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { t } from '../i18n/index.svelte'
   import {
     inviteToHousehold, loadInvites, withdrawInvite, listMembers, removeMember,
@@ -178,10 +179,15 @@
     }
   }
 
+  // On mount and when the household changes — nothing else. Both loaders read
+  // store state before their first await, which would otherwise make every
+  // change to that state reload the panel.
   $effect(() => {
     void householdId
-    void refresh()
-    void loadPeople()
+    untrack(() => {
+      void refresh()
+      void loadPeople()
+    })
   })
 
   /**
