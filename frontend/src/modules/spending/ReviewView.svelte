@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import type { Beleg, VaultData } from '../../lib/crypto/vault'
-  import { reviewMonth, type ReviewRow } from '../../lib/belege/belegeEngine'
+  import { reviewMonth, spentShare, type ReviewRow } from '../../lib/belege/belegeEngine'
   import { formatDate, thisMonth } from '../../lib/util/calendar'
   import { monthLabel } from '../../lib/util/months'
   import Money from '../../lib/util/Money.svelte'
@@ -128,7 +128,7 @@
       </span>
       {#if row.planned !== null && row.planned > 0}
         <span class="bar" aria-hidden="true">
-          <span class="fill" class:over style:width="{Math.min(100, (row.spent / row.planned) * 100)}%"></span>
+          <span class="fill" class:over style:width="{spentShare(row.spent, row.planned)}%"></span>
         </span>
       {/if}
     </button>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import Money from '../../lib/util/Money.svelte'
+  import { spentShare } from '../../lib/belege/belegeEngine'
 
   /**
    * A month in three figures: planned, spent, and what is left — the question
@@ -29,7 +30,7 @@
   let { title, planned, spent, basis, onprevious, onnext, stepper = false }: Props = $props()
 
   let left = $derived(planned - spent)
-  let share = $derived(planned > 0 ? Math.min(100, Math.round((spent / planned) * 100)) : 0)
+  let share = $derived(spentShare(spent, planned))
 </script>
 
 <div class="summary">

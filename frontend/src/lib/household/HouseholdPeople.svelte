@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { memberName } from './names'
   import { untrack } from 'svelte'
   import { t } from '../i18n/index.svelte'
   import {
@@ -50,7 +51,7 @@
 
   /** A member's name if the owner has given one, else the address as before. */
   function called(member: { user_id: number; email: string }): string {
-    return people[String(member.user_id)]?.name ?? member.email
+    return memberName(people, member)
   }
 
   /** Whose name is being edited, and the draft. */

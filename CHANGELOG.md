@@ -119,6 +119,16 @@ release may change things without a deprecation period. Each release is a tag on
   language, and says what to search for on any other browser. It is left out
   when the app is already opened from the home screen.
 
+### Changed
+
+- **Every dialog opens the same way.** On a phone, each one rises from the
+  bottom and can be dragged away; on a computer, it opens centred. Before, ten
+  dialogs each built their own, and they differed in height, layering and
+  how they closed. Their buttons share one look, and every delete button uses
+  the same red.
+- **Dates read dd.mm.yyyy everywhere.** The admin's list of invited users
+  followed the browser's language instead.
+
 ### Fixed
 
 - **An account corrected just after midnight is dated today.** Some dates

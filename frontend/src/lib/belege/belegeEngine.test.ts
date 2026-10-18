@@ -5,7 +5,7 @@ import {
   addBeleg, addSettlement, balances, belegeIn, buildMonthSnapshot, closeMonth, editBeleg, monthCopy,
   monthsToClose, recentEntries, reviewMonth, reviewableMonths, settleUp, sharesFor, splitRappen,
   startMonths,
-  spendableEntries, JOINT,
+  spendableEntries, JOINT, filedUnder, spentShare,
 } from './belegeEngine'
 import { thisMonth } from '../util/calendar'
 
@@ -381,5 +381,23 @@ describe('lines paid automatically', () => {
     budget.setAutomatic(v, rent.id, false)
 
     expect(reviewMonth(v, '2026-09').rows.find(r => r.entryId === rent.id)?.automatic).toBe(true)
+  })
+})
+
+describe('shared lookups', () => {
+  test('a record is filed under its line and that line’s category, or nothing', () => {
+    const v = vault()
+    const line = anyExpense(v)
+    const filed = filedUnder(v, { id: 'b', date: '2026-10-01', amount: '1.00', entryId: line.id, createdBy: '1', createdAt: 'z' })
+    expect(filed.entry?.id).toBe(line.id)
+    expect(filed.category?.id).toBe(line.categoryId)
+    expect(filedUnder(v, { id: 'c', date: '2026-10-01', amount: '1.00', entryId: null, createdBy: '1', createdAt: 'z' })).toEqual({ entry: undefined, category: undefined })
+  })
+
+  test('a bar fills by whole percent, never past full, and is empty with nothing planned', () => {
+    expect(spentShare(50, 200)).toBe(25)
+    expect(spentShare(300, 200)).toBe(100)
+    expect(spentShare(10, 0)).toBe(0)
+    expect(spentShare(10, null)).toBe(0)
   })
 })

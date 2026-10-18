@@ -1,4 +1,4 @@
-import type { Beleg, Settlement, Split, VaultData, VaultEntry, VaultSnapshot, VaultSnapshotLine } from '../crypto/vault'
+import type { Beleg, Settlement, Split, VaultCategory, VaultData, VaultEntry, VaultSnapshot, VaultSnapshotLine } from '../crypto/vault'
 import { categoryRank, snapshotLine } from '../budget/budgetEngine'
 import { newId, nowISO } from '../sync/source'
 import { centsOf, normalizeAmount } from '../util/money'
@@ -90,6 +90,22 @@ export function unassignRecordsOf(vault: VaultData, entryId: string): void {
 /** Records of one month, `'YYYY-MM'`. */
 export function belegeIn(vault: VaultData, month: string): Beleg[] {
   return vault.belege.filter(b => monthOf(b.date) === month)
+}
+
+/**
+ * The budget line a record is counted against and its category, as they stand
+ * now: neither for Unassigned or a line since deleted. Looked up in four places
+ * before, two of them in one file.
+ */
+export function filedUnder(vault: VaultData, beleg: Beleg): { entry?: VaultEntry; category?: VaultCategory } {
+  const entry = beleg.entryId === null ? undefined : vault.budget.entries.find(e => e.id === beleg.entryId)
+  const category = entry && vault.budget.categories.find(c => c.id === entry.categoryId)
+  return { entry, category }
+}
+
+/** How full a bar is: spent against planned, in whole percent, never past 100. */
+export function spentShare(spent: number, planned: number | null): number {
+  return planned && planned > 0 ? Math.min(100, Math.round((spent / planned) * 100)) : 0
 }
 
 export function monthOf(date: string): string {
@@ -410,8 +426,7 @@ export function reviewMonth(vault: VaultData, month: string): MonthReview {
     let row = beleg.entryId === null ? unassigned : byEntry.get(beleg.entryId)
     if (!row) {
       // Backdated into a closed month, against an entry made after it closed.
-      const entry = vault.budget.entries.find(e => e.id === beleg.entryId)
-      const category = vault.budget.categories.find(c => c.id === entry?.categoryId)
+      const { entry, category } = filedUnder(vault, beleg)
       row = { entryId: beleg.entryId, entryName: entry?.name ?? '', categoryName: category?.name ?? '', planned: null, spent: 0, belege: [], automatic: false }
       rows.push(row)
       byEntry.set(beleg.entryId, row)

@@ -2,6 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { VaultData } from '../../lib/crypto/vault'
   import { recentEntries, spendableEntries } from '../../lib/belege/belegeEngine'
+  import { listCategories } from '../../lib/budget/budgetEngine'
 
   /**
    * Which budget line a record counts against.
@@ -32,8 +33,7 @@
 
   /** Grouped by category, in the budget's order. */
   let groups = $derived(
-    [...vault.budget.categories]
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+    listCategories(vault)
       .map(c => ({ name: c.name, entries: entries.filter(e => e.categoryId === c.id) }))
       .filter(g => g.entries.length > 0),
   )
