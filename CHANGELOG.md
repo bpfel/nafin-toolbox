@@ -65,9 +65,10 @@ release may change things without a deprecation period. Each release is a tag on
 - **Budget steps back through earlier versions of the plan.** Arrows above the
   plan go from the plan now to the plan before each change — months that
   changed nothing are one step, such as *July – August 2026*. An earlier
-  version is shown whole and read-only, and each version lists what changed
-  from the one before — worked out by the app, every change, folded only when
-  it is long. This replaces the Archive. A record whose
+  version is shown whole and read-only, with what changed after it and from
+  which month — worked out by the app, every change, lines added and removed
+  marked + and −, folded only when it is long. The plan now stays as it was.
+  This replaces the Archive. A record whose
   budget line is deleted is kept as Unassigned, never lost.
   In a household, each record says who paid — a member or the joint
   account — and Review shows who owes whom, running on from month to month,

@@ -2,15 +2,22 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { VaultSnapshot } from '../../lib/crypto/vault'
   import SnapshotEditor from './SnapshotEditor.svelte'
+  import VersionChanges from './VersionChanges.svelte'
+  import type { PlanChange } from '../../lib/budget/changes'
 
   /**
    * An earlier version of the plan, as it stood: every line, read-only, with
-   * the budget's totals.
+   * the budget's totals — and above it, what changed after it, which is what
+   * somebody stepping back to it wants to know.
    */
-  let { copy }: { copy: VaultSnapshot } = $props()
+  let { copy, changes = [], changedFrom }: { copy: VaultSnapshot; changes?: PlanChange[]; changedFrom?: string } = $props()
 </script>
 
 <p class="hint">{t('budget.pastVersionHint')}</p>
+
+{#if changes.length > 0 && changedFrom}
+  <VersionChanges {changes} from={changedFrom} />
+{/if}
 
 <div class="card">
   {#key copy.id}

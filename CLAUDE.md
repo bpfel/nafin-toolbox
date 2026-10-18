@@ -183,7 +183,7 @@ is `category.side`.
   a later rename or delete. Every snapshot is a **month's copy** (`month: 'YYYY-MM'`),
   taken by the app as each month ends — the plan's history, and the plan Belege reads that
   month against. Budget steps back through *versions*: runs of months with identical copies
-  (`lib/budget/versions.ts`), each listing what changed from the one before
+  (`lib/budget/versions.ts`), each past one listing what changed after it
   (`lib/budget/changes.ts`). Snapshots taken by hand (with a name, before months were kept)
   were retired pre-beta and are dropped on load
   `budget.openMonth` is the month being recorded; set when the plan is made (or upgraded),

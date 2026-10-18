@@ -78,29 +78,48 @@ describe('earlier versions of the plan', () => {
     expect((screen.getByRole('button', { name: 'Earlier version' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  // What a step back would undo, worked out rather than typed in.
-  test('a version says what changed from the one before it', async () => {
+  // The plan now stays clean; stepping back says what came next, and from when.
+  test('a past version says what changed after it; the plan now shows no list', async () => {
     withHistory([copy('2026-08', '5600.00'), copy('2026-09', '6000.00')])
     render(BudgetModule)
-
-    expect(screen.getByRole('heading', { name: 'What changed from the version before' })).toBeTruthy()
-    const changes = screen.getByRole('heading', { name: 'What changed from the version before' }).closest('section')!
-    expect(changes.textContent).toMatch(/Salary/)
-    expect(changes.textContent).toMatch(/5.600\.00 → 6.000\.00/)
+    expect(screen.queryByRole('heading', { name: /Changed from/ })).toBeNull()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
-    // The oldest has nothing before it.
-    expect(screen.queryByRole('heading', { name: 'What changed from the version before' })).toBeNull()
+
+    const heading = screen.getByRole('heading', { name: 'Changed from September 2026' })
+    const changes = heading.closest('section')!
+    expect(changes.textContent).toMatch(/Salary/)
+    expect(changes.textContent).toMatch(/5.600\.00 → 6.000\.00/)
+  })
+
+  // Added and removed lines are marked, and still say so in words.
+  test('a line added later is marked +, a line removed later −, with what it was worth', async () => {
+    const before = copy('2026-08', '6000.00')
+    before.lines = [...before.lines, line('gym', 'Gym', 'expense', 'Lifestyle', '60.00')]
+    withHistory([before])
+    vaultState.vault!.budget.entries.push({ id: 'cleaning', name: 'Cleaning', type: 'expense', sortOrder: 30, archived: false, categoryId: 'g-housing', sourceAccountId: null, sinkAccountId: null })
+    vaultState.vault!.budget.plan.push({ entryId: 'cleaning', plannedAmount: '120.00' })
+    render(BudgetModule)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+    const changes = screen.getByRole('heading', { name: /Changed from/ }).closest('section')!
+
+    const added = [...changes.querySelectorAll('li')].find(li => li.textContent?.includes('Cleaning'))!
+    expect(added.querySelector('.added .mark')?.textContent).toBe('+')
+    expect(added.textContent).toMatch(/added/)
+    const removed = [...changes.querySelectorAll('li')].find(li => li.textContent?.includes('Gym'))!
+    expect(removed.querySelector('s')?.textContent).toBe('Gym')
+    expect(removed.textContent).toMatch(/removed · was 60\.00/)
   })
 
   // A move can touch a dozen lines; all of them are there, folded past six.
   test('a long list of changes folds, and opens to every one', async () => {
-    const many = (amount: string) => copy('2026-08', amount)
-    const before = many('5600.00')
+    const before = copy('2026-08', '5600.00')
     before.lines = Array.from({ length: 9 }, (_, i) => line(`e${i}`, `Line ${i}`, 'expense', 'Housing', '10.00'))
     withHistory([before])
     render(BudgetModule)
-    const changes = screen.getByRole('heading', { name: 'What changed from the version before' }).closest('section')!
+    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+    const changes = screen.getByRole('heading', { name: /Changed from/ }).closest('section')!
 
     expect(changes.querySelectorAll('li')).toHaveLength(6)
     await fireEvent.click(screen.getByRole('button', { name: /Show all \d+ changes/ }))

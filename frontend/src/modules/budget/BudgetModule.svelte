@@ -7,7 +7,6 @@
   import BudgetSetup from './BudgetSetup.svelte'
   import VersionStepper from './VersionStepper.svelte'
   import PastVersion from './PastVersion.svelte'
-  import VersionChanges from './VersionChanges.svelte'
   import { planVersions } from '../../lib/budget/versions'
   import { monthLabel } from '../../lib/util/months'
   import ResetBudgetModal from './ResetBudgetModal.svelte'
@@ -142,11 +141,8 @@
         onnext={index > 0 ? () => index-- : undefined}
       />
     {/if}
-    {#if shown && shown.changes.length > 0}
-      <VersionChanges changes={shown.changes} />
-    {/if}
     {#if shown && shown.copy}
-      <PastVersion copy={shown.copy} />
+      <PastVersion copy={shown.copy} changes={shown.changes} changedFrom={shown.changedFrom} />
     {:else}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">
