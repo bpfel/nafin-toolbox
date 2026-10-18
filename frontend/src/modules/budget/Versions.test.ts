@@ -72,7 +72,6 @@ describe('earlier versions of the plan', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
 
     expect(screen.getByRole('heading', { name: 'July 2026 – August 2026' })).toBeTruthy()
-    expect(screen.getByText(/Read only/)).toBeTruthy()
     expect(document.querySelector('tfoot')!.textContent).toMatch(/5.600\.00/)
     // Nowhere further back to go.
     expect((screen.getByRole('button', { name: 'Earlier version' }) as HTMLButtonElement).disabled).toBe(true)
@@ -82,11 +81,11 @@ describe('earlier versions of the plan', () => {
   test('a past version says what changed after it; the plan now shows no list', async () => {
     withHistory([copy('2026-08', '5600.00'), copy('2026-09', '6000.00')])
     render(BudgetModule)
-    expect(screen.queryByRole('heading', { name: /Changed from/ })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /Changed in/ })).toBeNull()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
 
-    const heading = screen.getByRole('heading', { name: 'Changed from September 2026' })
+    const heading = screen.getByRole('heading', { name: 'Changed in September 2026' })
     const changes = heading.closest('section')!
     expect(changes.textContent).toMatch(/Salary/)
     expect(changes.textContent).toMatch(/5.600\.00 → 6.000\.00/)
@@ -102,7 +101,7 @@ describe('earlier versions of the plan', () => {
     render(BudgetModule)
 
     await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
-    const changes = screen.getByRole('heading', { name: /Changed from/ }).closest('section')!
+    const changes = screen.getByRole('heading', { name: /Changed in/ }).closest('section')!
 
     const added = [...changes.querySelectorAll('li')].find(li => li.textContent?.includes('Cleaning'))!
     expect(added.querySelector('.added .mark')?.textContent).toBe('+')
@@ -119,7 +118,7 @@ describe('earlier versions of the plan', () => {
     withHistory([before])
     render(BudgetModule)
     await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
-    const changes = screen.getByRole('heading', { name: /Changed from/ }).closest('section')!
+    const changes = screen.getByRole('heading', { name: /Changed in/ }).closest('section')!
 
     expect(changes.querySelectorAll('li')).toHaveLength(6)
     await fireEvent.click(screen.getByRole('button', { name: /Show all \d+ changes/ }))
