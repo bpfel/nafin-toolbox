@@ -91,7 +91,7 @@
   {#if transfers.length === 0}
     <p class="hint">{t('spending.settled')}</p>
   {:else}
-    <ul class="transfers">
+    <ul class="transfers suggested">
       {#each transfers as transfer (transfer.from + transfer.to)}
         <li>
           <span class="what">
@@ -135,10 +135,13 @@
 </section>
 
 <style>
+  /* A card of its own: it is about people, not about the budget's lines. */
   .balances {
-    margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--rule);
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: var(--shadow-card);
   }
 
   h3 {
@@ -198,6 +201,13 @@
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+  }
+
+  /* What to do, set apart: the one line on this card that asks for an act. */
+  .suggested li {
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    background: var(--accent-soft);
   }
 
   .transfers li {
