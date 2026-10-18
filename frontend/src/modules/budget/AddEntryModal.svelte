@@ -13,6 +13,7 @@
   import { autofocus } from '../../lib/util/autofocus'
   import { formatAmount, parseAmount } from '../../lib/util/money'
   import { monthNames } from '../../lib/util/months'
+  import { thisMonth } from '../../lib/util/calendar'
 
   /**
    * Adding or editing one budget line.
@@ -66,8 +67,7 @@
   let useNewCategory = $state(false)
   let error = $state<string | null>(null)
 
-  const now = new Date()
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const currentMonth = thisMonth()
 
   /**
    * How often a bill comes round, in months.

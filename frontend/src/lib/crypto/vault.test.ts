@@ -1308,9 +1308,7 @@ describe('migrateVault — legacy versions forward', () => {
     expect(() => assertVaultShape(missing)).toThrow(/belege is missing/)
   })
 
-  // Belege's months were a map of their own in builds never released; a test
-  // vault from then folds into snapshots rather than failing to open.
-  // Retired before the beta: every month keeps its copy now.
+  // Hand-made snapshots were retired before the beta: every month keeps its copy now.
   test('a v11 vault drops its hand-made snapshots and keeps its months', () => {
     const v = createEmptyVault('Main')
     const old = {
@@ -1325,21 +1323,6 @@ describe('migrateVault — legacy versions forward', () => {
     }
 
     expect(migrateVault(old).budget.snapshots.map(s => s.id)).toEqual(['m9'])
-  })
-
-  test('a pre-release v11 vault folds its months into snapshots', () => {
-    const v = createEmptyVault('Main')
-    const old = {
-      ...v,
-      months: { '2026-09': { closedAt: '2026-10-01T08:00:00Z', lines: [{ entryId: 'e1', entryName: 'Rent', categoryName: 'Housing', plannedAmount: '1500.00', automatic: true }] } },
-    }
-
-    const migrated = migrateVault(old)
-
-    expect((migrated as unknown as { months?: unknown }).months).toBeUndefined()
-    const copy = migrated.budget.snapshots.find(s => s.month === '2026-09')!
-    expect(copy).toMatchObject({ createdAt: '2026-10-01T08:00:00Z' })
-    expect(copy.lines[0]).toMatchObject({ entryId: 'e1', type: 'expense', automatic: true })
   })
 
   test('a vault from a newer build is refused, not emptied', () => {

@@ -9,14 +9,8 @@
   } from '../../../lib/crypto/vault'
   import { isLegalRouting } from '../../../lib/accounts/routing'
   import { accountShortLabel } from '../../../lib/accounts/labels'
-  import {
-    addMonths,
-    fromCents,
-    monthsBetween,
-    nextDue,
-    requiredForItem,
-    toCents,
-  } from '../../../lib/accounts/reserveMath'
+  import { fromCents, nextDue, requiredForItem, toCents } from '../../../lib/accounts/reserveMath'
+  import { addMonths, monthsBetween } from '../../../lib/util/calendar'
   import { isEditing } from '../../../lib/util/editMode.svelte'
   import { monthLabel } from '../../../lib/util/months'
   import { formatAmount } from '../../../lib/util/money'

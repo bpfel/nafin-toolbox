@@ -131,6 +131,43 @@ describe('earlier versions of the plan', () => {
     expect(changes.querySelectorAll('li').length).toBeGreaterThan(6)
   })
 
+  // Undone on another device: the version on screen has become the plan now,
+  // and is shown as the plan now — not stuck read-only with no way forward.
+  test('a version that becomes the plan now is shown as the plan now, editable', async () => {
+    withHistory([copy('2026-08', '5600.00'), copy('2026-09', '6000.00')])
+    vaultState.vault!.budget.plan[0].plannedAmount = '6400.00'
+    let past = false
+    const { rerender } = render(BudgetModule, { get past() { return past }, set past(v) { past = v } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+    expect(screen.getByRole('heading', { name: 'September 2026' })).toBeTruthy()
+    expect(past).toBe(true)
+
+    // Back to 6'000: September and the plan now are one again.
+    vaultState.vault = { ...vaultState.vault!, budget: { ...vaultState.vault!.budget, plan: [
+      { entryId: 'salary', plannedAmount: '6000.00' }, { entryId: 'rent', plannedAmount: '1350.00' },
+    ] } }
+    await rerender({})
+
+    expect(screen.getByRole('heading', { name: 'Current budget' })).toBeTruthy()
+    expect(past).toBe(false)
+  })
+
+  // Edited on another device while looking back: a version appears in front,
+  // and the one on screen stays the one on screen.
+  test('a version appearing in front does not swap the one on screen', async () => {
+    withHistory([copy('2026-07', '5600.00'), copy('2026-08', '5600.00'), copy('2026-09', '6000.00')])
+    render(BudgetModule)
+    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+    expect(screen.getByRole('heading', { name: 'July 2026 – August 2026' })).toBeTruthy()
+
+    vaultState.vault = { ...vaultState.vault!, budget: { ...vaultState.vault!.budget, plan: [
+      { entryId: 'salary', plannedAmount: '6400.00' }, { entryId: 'rent', plannedAmount: '1350.00' },
+    ] } }
+    await new Promise(r => setTimeout(r))
+
+    expect(screen.getByRole('heading', { name: 'July 2026 – August 2026' })).toBeTruthy()
+  })
+
   // Read-only by switching edit mode off, which the table already obeys.
   test('stepping back ends edit mode: nothing in an earlier version can be changed', async () => {
     withHistory([copy('2026-08', '5600.00'), copy('2026-09', '6000.00')])

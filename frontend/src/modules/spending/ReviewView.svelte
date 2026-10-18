@@ -1,7 +1,8 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import type { Beleg, VaultData } from '../../lib/crypto/vault'
-  import { reviewMonth, thisMonth, type ReviewRow } from '../../lib/belege/belegeEngine'
+  import { reviewMonth, type ReviewRow } from '../../lib/belege/belegeEngine'
+  import { thisMonth } from '../../lib/util/calendar'
   import { monthLabel } from '../../lib/util/months'
   import Money from '../../lib/util/Money.svelte'
   import RecordRow from './RecordRow.svelte'

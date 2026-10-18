@@ -7,7 +7,7 @@
   import BudgetSetup from './BudgetSetup.svelte'
   import VersionStepper from './VersionStepper.svelte'
   import VersionChanges from './VersionChanges.svelte'
-  import { planVersions } from '../../lib/budget/versions'
+  import { planVersions, changesAfter } from '../../lib/budget/versions'
   import { monthLabel } from '../../lib/util/months'
   import ResetBudgetModal from './ResetBudgetModal.svelte'
   import { isEditing, clearEditing } from '../../lib/util/editMode.svelte'
@@ -75,20 +75,38 @@
    * change. Stepped through from the stepper above the plan. See `planVersions`.
    */
   let versions = $derived(vaultState.vault && version >= 0 ? planVersions(vaultState.vault) : [])
-  let index = $state(0)
-  let shown = $derived(versions[Math.min(index, versions.length - 1)])
+
+  /**
+   * The version stepped back to, by its first month; `null` for the plan now.
+   * Not by position: a version appearing in front — a month ending, an edit on
+   * another device — would silently swap what is on screen. A first month
+   * never moves (see `PlanVersion`), and if the version it names has since
+   * become the plan now, that is what is shown.
+   */
+  let selected = $state<string | null>(null)
+  let shownAt = $derived(Math.max(0, selected === null ? 0 : versions.findIndex(v => v.from === selected)))
+  let shown = $derived(versions[shownAt])
+
+  // Past is what is on screen, not what was asked for: a version that has
+  // become the plan now is the plan now, pen and all.
   $effect(() => {
-    past = index > 0
+    past = !!shown?.copy
     // An earlier version is read, not changed: whatever edit mode was on goes.
     if (past) clearEditing()
   })
 
+  function stepTo(at: number) {
+    const target = versions[at]
+    selected = target?.copy ? (target.from ?? null) : null
+  }
+
   /** What the summary and the table show: the plan now, or the version stepped back to. */
-  let pastSummary = $derived(shown?.copy ? engine.planSummaryOf(shown.copy.lines) : null)
+  let pastSummary = $derived(shown?.copy ? engine.planSummaryOf(shown.lines) : null)
+  let after = $derived(shown?.copy ? changesAfter(versions, shownAt) : null)
   // Another budget, another history: start again at its plan now.
   $effect(() => {
     void vaultState.currentVaultId
-    index = 0
+    selected = null
   })
 
   function range(from: string | undefined, to: string | null): string {
@@ -142,15 +160,15 @@
       <VersionStepper
         title={stepTitle}
         sub={stepSub}
-        onprevious={index < versions.length - 1 ? () => index++ : undefined}
-        onnext={index > 0 ? () => index-- : undefined}
+        onprevious={shownAt < versions.length - 1 ? () => stepTo(shownAt + 1) : undefined}
+        onnext={shownAt > 0 ? () => stepTo(shownAt - 1) : undefined}
       />
     {/if}
     {#if shown && shown.copy && pastSummary}
       <!-- The same summary and table as the plan now, read-only: edit mode is
            off while it is on screen, and nothing else in them changes a thing. -->
-      {#if shown.changes.length > 0 && shown.changedFrom}
-        <VersionChanges changes={shown.changes} from={shown.changedFrom} />
+      {#if after && after.changes.length > 0 && after.from}
+        <VersionChanges changes={after.changes} from={after.from} />
       {/if}
       <BudgetSummary summary={pastSummary} {viewMode} />
       <BudgetTable

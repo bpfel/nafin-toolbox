@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest'
 import { createEmptyVault, type VaultData } from '../crypto/vault'
 import * as budget from './budgetEngine'
 import { buildMonthSnapshot, closeMonth } from '../belege/belegeEngine'
-import { planVersions } from './versions'
+import { planVersions, changesAfter } from './versions'
 
 function plan(): VaultData {
   const v = createEmptyVault('Main')
@@ -70,13 +70,53 @@ describe('the plan’s versions', () => {
     budget.setPlanned(v, salary(v).id, '6400.00')
     close(v, '2026-09')
 
-    const [now, before] = planVersions(v)
+    const versions = planVersions(v)
 
-    expect(now.changes).toEqual([])
-    expect(before.changedFrom).toBe('2026-09')
-    expect(before.changes).toEqual([
-      expect.objectContaining({ kind: 'amount', name: salary(v).name, to: '6400.00' }),
-    ])
+    expect(changesAfter(versions, 0)).toEqual({ changes: [] })
+    expect(changesAfter(versions, 1)).toEqual({
+      from: '2026-09',
+      changes: [expect.objectContaining({ kind: 'amount', name: salary(v).name, to: '6400.00' })],
+    })
+  })
+
+  // Today's budget filed under March 2025 for a backdated receipt is not a
+  // version the budget ever had.
+  test('a backdated copy is no version', () => {
+    const v = plan()
+    close(v, '2026-08')
+    budget.setPlanned(v, salary(v).id, '6400.00')
+    close(v, '2026-09')
+    close(v, '2025-03')
+    expect(v.budget.snapshots.find(s => s.month === '2025-03')?.backdated).toBe(true)
+
+    const versions = planVersions(v)
+
+    expect(versions.map(x => x.from)).toEqual(['2026-09', '2026-08'])
+  })
+
+  // Gym archived mid-October, with a receipt from the 2nd: October's copy
+  // carries it for Belege, but the budget lost it in October, not November.
+  test('a line kept only for its records is not part of the version', () => {
+    const v = plan()
+    close(v, '2026-09')
+    const gym = v.budget.entries.find(e => e.type === 'expense' && !e.automatic)!
+    v.belege.push({ id: 'b', date: '2026-10-02', amount: '60.00', entryId: gym.id, createdBy: '1', createdAt: 'z' })
+    budget.updateEntry(v, gym.id, { archived: true })
+    close(v, '2026-10')
+
+    const versions = planVersions(v)
+
+    expect(versions.map(x => [x.from, x.to])).toEqual([['2026-10', null], ['2026-09', '2026-09']])
+    expect(versions[0].lines.some(l => l.entryId === gym.id)).toBe(false)
+    expect(changesAfter(versions, 1).changes).toEqual([expect.objectContaining({ kind: 'removed', name: gym.name })])
+  })
+
+  test('a month with no budget in it is no version', () => {
+    const v = plan()
+    close(v, '2026-08')
+    v.budget.snapshots.push({ id: 'empty', createdAt: 'z', month: '2026-09', lines: [] })
+
+    expect(planVersions(v)).toHaveLength(1)
   })
 })
 

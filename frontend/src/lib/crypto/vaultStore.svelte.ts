@@ -24,7 +24,8 @@ import { seedNamesFor } from '../budget/seedNames'
 import { getLocale } from '../i18n/index.svelte'
 import { perform, overwriteBy, type Action, type ActionArgs, type ActionKind, type ActionResult } from '../sync/actions'
 import { enqueue, replayAll } from '../sync/queue'
-import { buildMonthSnapshot, monthsToClose, thisMonth } from '../belege/belegeEngine'
+import { buildMonthSnapshot, monthsToClose } from '../belege/belegeEngine'
+import { thisMonth } from '../util/calendar'
 import { notify, clearNotices } from '../sync/notices.svelte'
 
 /**

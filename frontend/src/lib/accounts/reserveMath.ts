@@ -1,4 +1,5 @@
 import type { ReserveDefinition } from '../crypto/vault'
+import { addMonths, monthsBetween } from '../util/calendar'
 
 // Reserve math. Everything here is pure: a reserve definition plus the month you
 // are asking about yields the amount that should already have accumulated.
@@ -9,36 +10,7 @@ import type { ReserveDefinition } from '../crypto/vault'
 // *cumulative* figure instead (k x target / periodMonths, rounded once) makes
 // every month exact against the target and the final month land on it precisely.
 
-const MONTH_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/
 const MONEY_PATTERN = /^\s*(-?)(\d+)(?:\.(\d+))?\s*$/
-
-// --- Month arithmetic -------------------------------------------------------
-
-// Months since the epoch year 0, so month strings compare and subtract as plain
-// integers. Only differences are ever meaningful, never the absolute value.
-function monthIndex(month: string): number {
-  const match = MONTH_PATTERN.exec(month)
-  if (!match) {
-    throw new Error(`invalid month '${month}': expected 'YYYY-MM'`)
-  }
-  return Number(match[1]) * 12 + (Number(match[2]) - 1)
-}
-
-function formatMonth(index: number): string {
-  const year = Math.floor(index / 12)
-  const month = index - year * 12 + 1
-  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`
-}
-
-// Signed distance in months. Negative when `toMonth` precedes `fromMonth`.
-export function monthsBetween(fromMonth: string, toMonth: string): number {
-  return monthIndex(toMonth) - monthIndex(fromMonth)
-}
-
-// Add a signed number of months to a 'YYYY-MM'.
-export function addMonths(month: string, offset: number): string {
-  return formatMonth(monthIndex(month) + offset)
-}
 
 // --- Money ------------------------------------------------------------------
 

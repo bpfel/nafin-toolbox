@@ -7,6 +7,7 @@
   import AccountManagement from '../modules/accounts/management/AccountManagement.svelte'
   import AllocationScreen from '../modules/accounts/allocations/AllocationScreen.svelte'
   import { getVaultState } from '../lib/crypto/vaultStore.svelte'
+  import { thisMonth } from '../lib/util/calendar'
 
   const vaultState = getVaultState()
 
@@ -29,8 +30,7 @@
   // Both views need to know what month it is — balances are projected to it and
   // reserves cycle in it — but neither lets the user pick one. The budget is a
   // single standing plan, so the only month there is to show is this one.
-  const now = new Date()
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const currentMonth = thisMonth()
 
   /**
    * The accounts panel, so the strip's "+" can open its create form.

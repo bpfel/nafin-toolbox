@@ -15,7 +15,8 @@
     projectedBalance,
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
-  import { fromCents, monthsBetween, nextDue, toCents } from '../../../lib/accounts/reserveMath'
+  import { fromCents, nextDue, toCents } from '../../../lib/accounts/reserveMath'
+  import { monthsBetween, thisMonth } from '../../../lib/util/calendar'
   import { formatAmount } from '../../../lib/util/money'
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
@@ -55,11 +56,6 @@
   interface Props {
     /** 'YYYY-MM' the reserve and account figures are computed for. Defaults to now. */
     currentMonth?: string
-  }
-
-  function thisMonth(): string {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   }
 
   let { currentMonth = thisMonth() }: Props = $props()

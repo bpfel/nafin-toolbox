@@ -3,6 +3,7 @@ import { getVaultState, commit, beginPreview, endPreview } from '../crypto/vault
 import { resetBudget, seedDefaults, seedSharedDefaults } from '../budget/budgetEngine'
 import { getLocale } from '../i18n/index.svelte'
 import { isInstalled } from '../util/installHint'
+import { thisMonth } from '../util/calendar'
 
 /**
  * Where the tour is, if it is running.
@@ -132,8 +133,7 @@ function prepare(step: TourStep): void {
   if (!vault) return
 
   const seed = step.example === 'shared' ? seedSharedDefaults : seedDefaults
-  const now = new Date()
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const month = thisMonth()
   beginPreview(copy => {
     resetBudget(copy)
     seed(copy, getLocale(), month)

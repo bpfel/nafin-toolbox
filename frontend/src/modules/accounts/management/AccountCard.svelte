@@ -7,6 +7,7 @@
   import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
   import { autofocus } from '../../../lib/util/autofocus'
+  import { today } from '../../../lib/util/calendar'
   import ActionButton from '../../../lib/nav/ActionButton.svelte'
 
   interface Props {
@@ -49,10 +50,6 @@
   let dateInput = $state('')
   let correctionError = $state<string | null>(null)
 
-  function todayISO(): string {
-    return new Date().toISOString().slice(0, 10)
-  }
-
   function formatDate(iso: string): string {
     const d = new Date(iso)
     if (isNaN(d.getTime())) return iso
@@ -68,7 +65,7 @@
 
   function startCorrection() {
     amountInput = account.currentAmount
-    dateInput = todayISO()
+    dateInput = today()
     correctionError = null
     correcting = true
   }

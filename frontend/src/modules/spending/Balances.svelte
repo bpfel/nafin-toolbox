@@ -2,7 +2,8 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { VaultData } from '../../lib/crypto/vault'
   import { commit, saveNow } from '../../lib/crypto/vaultStore.svelte'
-  import { balances, balancesIn, monthOf, settleUp, today } from '../../lib/belege/belegeEngine'
+  import { balances, balancesIn, monthOf, settleUp } from '../../lib/belege/belegeEngine'
+  import { today } from '../../lib/util/calendar'
   import Money from '../../lib/util/Money.svelte'
   import SplitSetting from './SplitSetting.svelte'
 
