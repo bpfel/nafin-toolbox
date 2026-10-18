@@ -178,8 +178,13 @@ is `category.side`.
   the entry type is the discriminator, so the schedule is recorded once and
   `reserveMath` branches on the type directly
 - `VaultPlanEntry` — `entryId`, planned amount. One standing plan, not per month
-- `VaultSnapshot` — a named copy of the plan; its lines are denormalised to
-  `entryName` / `categoryName` so they survive a later rename or delete
+- `VaultSnapshot` — a copy of the plan; its lines are denormalised to
+  `entryName` / `categoryName` (with `entryId` and `automatic` beside them) so they survive
+  a later rename or delete. Two kinds: **named**, taken by hand, and a **month's copy**
+  (`month: 'YYYY-MM'`), taken by the app as each month ends — the plan's history, and the
+  plan Belege reads that month against. A month's copy may be named, never deleted.
+  `budget.openMonth` is the month being recorded; set when the plan is made (or upgraded),
+  so no history before it is invented
 - `VaultAccount` — name, kind, currency, `currentAmount` as at `lastCorrectedAt`
   (an anchor pair, never a running total), optional bank/IBAN/holder for QR bills
 - `people` (v10) — what a household calls its members, by user id. Set by the owner only;
@@ -188,9 +193,9 @@ is `category.side`.
   Unassigned), optional `note`; in a household `paidBy` (a user id or `'joint'`) and the
   `shares` copied from `split` when it was entered. Called a *record* in code. A record is
   never dropped: if its entry goes, it becomes Unassigned
-- `months` (v11) — a `ClosedMonth` per finished month that had records: the budget lines it
-  ended with, denormalised and frozen, taken by the first write after the month ends (no
-  server job — the server cannot read the plan, and the plan only changes through the app)
+- A finished month's copy is taken by the first write after it ends — no server job: the
+  server cannot read the plan, and the plan only changes through the app — so it is the
+  plan as the month ended. Months nobody wrote in get the same copy as the month before
 - `settlements` and `split` (v11) — households only: payments that even balances out, and
   how a new record is divided (equal, or a percentage per member adding to 100)
 

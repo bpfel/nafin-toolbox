@@ -26,6 +26,8 @@ function filled(): VaultData {
   const groceries = v.budget.entries.find(e => e.type === 'expense')!
   belege.addBeleg(v, { date: '2026-10-03', amount: '42.50', entryId: groceries.id, createdBy: '1' })
   belege.addSettlement(v, { date: '2026-10-04', from: '2', to: '1', amount: '10.00', createdBy: '2' })
+  // Not yet recording months, so starting them is something an action can do.
+  delete v.budget.openMonth
   return v
 }
 
@@ -87,7 +89,8 @@ const CASES: Case[] = [
   },
   { kind: 'editBeleg', args: v => [v.belege[0].id, { amount: '20.00', note: 'Market' }] },
   { kind: 'deleteBeleg', args: v => [v.belege[0].id] },
-  { kind: 'closeMonth', args: () => ['2026-09', { closedAt: '2026-10-01T00:00:00.000Z', lines: [] }] },
+  { kind: 'closeMonth', args: () => ['2026-09', { id: 'm9', name: '', createdAt: '2026-10-01T00:00:00.000Z', lines: [] }] },
+  { kind: 'startMonths', args: () => ['2026-10'] },
   {
     kind: 'addSettlement',
     args: () => [{ date: '2026-10-06', from: '1', to: '2', amount: '5', createdBy: '1' }],

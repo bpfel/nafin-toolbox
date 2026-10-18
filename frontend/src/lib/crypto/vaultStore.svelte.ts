@@ -24,7 +24,7 @@ import { seedNamesFor } from '../budget/seedNames'
 import { getLocale } from '../i18n/index.svelte'
 import { perform, overwriteBy, type Action, type ActionArgs, type ActionKind, type ActionResult } from '../sync/actions'
 import { enqueue, replayAll } from '../sync/queue'
-import { buildClosedMonth, monthsToClose, thisMonth } from '../belege/belegeEngine'
+import { buildMonthSnapshot, monthsToClose, thisMonth } from '../belege/belegeEngine'
 import { notify, clearNotices } from '../sync/notices.svelte'
 
 /**
@@ -1159,7 +1159,7 @@ export function commit<K extends ActionKind>(kind: K, ...args: ActionArgs<K>): A
   if (!vault) throw new Error('no vault is open')
   // Before anything else changes the plan, so a finished month is copied as it
   // ended — Rent raised on the 1st must not reach October's copy.
-  if (kind !== 'closeMonth') closeEndedMonths()
+  if (kind !== 'closeMonth' && kind !== 'startMonths') closeEndedMonths()
   const plain = $state.snapshot(args) as ActionArgs<K>
   const { action, result } = perform(vault, kind, plain)
 
@@ -1172,7 +1172,7 @@ export function commit<K extends ActionKind>(kind: K, ...args: ActionArgs<K>): A
   if (!current.waiting) scheduleSave()
   // And after: a record backdated into a finished month nobody wrote in has
   // made that month one to close, with the plan as it is now.
-  if (kind !== 'closeMonth') closeEndedMonths()
+  if (kind !== 'closeMonth' && kind !== 'startMonths') closeEndedMonths()
   return result
 }
 
@@ -1187,8 +1187,11 @@ export function commit<K extends ActionKind>(kind: K, ...args: ActionArgs<K>): A
 export function closeEndedMonths(): void {
   const vault = current.data
   if (!vault || current.parked || isReadOnly()) return
+  // From the first write on, every month is copied as it ends — but never one
+  // from before the plan was being kept.
+  if (!vault.budget.openMonth) commit('startMonths', thisMonth())
   for (const month of monthsToClose(vault, thisMonth())) {
-    commit('closeMonth', month, buildClosedMonth(vault, month))
+    commit('closeMonth', month, buildMonthSnapshot(vault, month))
   }
 }
 

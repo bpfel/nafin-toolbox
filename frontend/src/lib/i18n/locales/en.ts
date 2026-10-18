@@ -350,6 +350,8 @@ export const en = {
   'snapshot.newNamePlaceholder': 'e.g. Before the raise',
   'snapshot.create': 'Take a snapshot',
   'snapshot.none': 'No snapshots yet.',
+  'snapshot.months': 'Months',
+  'snapshot.monthsHint': 'Each finished month keeps the plan it ended with; Belege reads the month against it.',
   'snapshot.empty': 'This snapshot has no lines.',
   'snapshot.entryColumn': 'Entry',
   'snapshot.deleteOne': 'Delete snapshot {name}',

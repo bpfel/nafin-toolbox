@@ -864,8 +864,8 @@ describe('takeSnapshot', () => {
     expect(snapshot.id).toBeTruthy()
     expect(snapshot.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(snapshot.lines).toEqual([
-      { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
-      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
+      expect.objectContaining({ entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' }),
+      expect.objectContaining({ entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' }),
     ])
     expect(vault.budget.snapshots).toContain(snapshot)
   })
@@ -1478,8 +1478,8 @@ describe('resetBudget', () => {
     expect(vault.budget.snapshots).toHaveLength(1)
     expect(vault.budget.snapshots[0].name).toBe('Before the reset')
     expect(snapshot.lines).toEqual([
-      { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
-      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
+      expect.objectContaining({ entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' }),
+      expect.objectContaining({ entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' }),
     ])
   })
 

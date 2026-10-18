@@ -111,7 +111,6 @@ describe('the controls are in the DOM the moment edit mode is on', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [{

@@ -4,6 +4,9 @@
   import type { VaultData } from '../../lib/crypto/vault'
   import { commit } from '../../lib/crypto/vaultStore.svelte'
   import SnapshotEditor from './SnapshotEditor.svelte'
+  import Money from '../../lib/util/Money.svelte'
+  import { belegeIn, reviewMonth, rappen } from '../../lib/belege/belegeEngine'
+  import { monthLabel } from '../../lib/util/months'
   import DeleteSnapshotModal from './DeleteSnapshotModal.svelte'
 
   interface Props {
@@ -22,6 +25,22 @@
   let deleteTarget = $state<{ id: string; name: string; lineCount: number } | null>(null)
 
   let snapshots = $derived(version >= 0 ? engine.listSnapshots(vault) : [])
+  /** Taken by hand, named: the ones a person chose to keep. On top. */
+  let named = $derived(snapshots.filter(s => !s.month))
+  /**
+   * One per finished month, taken by the app: the plan's history, and the plan
+   * each month of Belege is read against. Newest first, under the named ones.
+   */
+  let months = $derived(snapshots.filter(s => s.month).sort((a, b) => b.month!.localeCompare(a.month!)))
+
+  /** What a month's receipts came to, per line, in rappen — for its Spent column. */
+  function spentIn(month: string): Map<string, number> | undefined {
+    const records = belegeIn(vault, month)
+    if (records.length === 0) return undefined
+    const spent = new Map<string, number>()
+    for (const b of records) if (b.entryId) spent.set(b.entryId, (spent.get(b.entryId) ?? 0) + rappen(b.amount))
+    return spent
+  }
 
   function takeSnapshotOfPlan() {
     try {
@@ -83,7 +102,7 @@
       </svg>
     </span>
     {t('snapshot.panelTitle')}
-    <span class="count">{snapshots.length}</span>
+    <span class="count">{named.length}</span>
   </button>
 
   {#if panelOpen}
@@ -109,11 +128,11 @@
         <p class="error" role="alert">{snapshotError}</p>
       {/if}
 
-      {#if snapshots.length === 0}
+      {#if named.length === 0}
         <p class="empty">{t('snapshot.none')}</p>
       {:else}
         <ul class="snapshot-list">
-          {#each snapshots as snapshot (snapshot.id)}
+          {#each named as snapshot (snapshot.id)}
             <li class="snapshot-item">
               <div class="snapshot-head">
                 <button
@@ -152,6 +171,48 @@
               {#if expandedId === snapshot.id}
                 <SnapshotEditor
                   {snapshot}
+                  onrename={(name) => renameSnapshot(snapshot.id, name)}
+                />
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
+      {#if months.length > 0}
+        <h4 class="months-title">{t('snapshot.months')}</h4>
+        <p class="blurb">{t('snapshot.monthsHint')}</p>
+        <ul class="snapshot-list">
+          {#each months as snapshot (snapshot.id)}
+            {@const review = belegeIn(vault, snapshot.month!).length > 0 ? reviewMonth(vault, snapshot.month!) : null}
+            <li class="snapshot-item">
+              <div class="snapshot-head">
+                <button
+                  class="snapshot-name"
+                  aria-expanded={expandedId === snapshot.id}
+                  onclick={() => toggleExpanded(snapshot.id)}
+                >
+                  <span class="chevron" class:open={expandedId === snapshot.id} aria-hidden="true">
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
+                      <path d="M4 2 L10 6 L4 10 Z" />
+                    </svg>
+                  </span>
+                  {snapshot.name || monthLabel(snapshot.month!)}
+                </button>
+                <span class="snapshot-meta">
+                  {#if snapshot.name}{monthLabel(snapshot.month!)} · {/if}
+                  {#if review}
+                    {t('spending.spent')} <Money value={review.spent} cents /> / <Money value={review.planned} cents />
+                  {:else}
+                    {snapshot.lines.length} {tn('snapshot.lines', snapshot.lines.length)}
+                  {/if}
+                </span>
+              </div>
+
+              {#if expandedId === snapshot.id}
+                <SnapshotEditor
+                  {snapshot}
+                  spent={spentIn(snapshot.month!)}
                   onrename={(name) => renameSnapshot(snapshot.id, name)}
                 />
               {/if}
@@ -288,6 +349,14 @@
     margin: 0;
     color: var(--ink-faint);
     font-size: 0.9rem;
+  }
+  .months-title {
+    margin: 1.25rem 0 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #495057;
   }
   .snapshot-list {
     list-style: none;

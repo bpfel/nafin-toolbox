@@ -37,12 +37,6 @@ export interface VaultData {
   people: Record<string, VaultPerson>
   /** What was actually spent: one record per receipt, the Belege module. */
   belege: Beleg[]
-  /**
-   * Each finished month that had records, with the budget it is read against,
-   * frozen when the month ended — by `'YYYY-MM'`. A past month read against
-   * today's plan would change its verdict every time the plan did.
-   */
-  months: Record<string, ClosedMonth>
   /** Households only: money one member paid another to even out. */
   settlements: Settlement[]
   /** Households only: how a record is divided between members when entered. */
@@ -74,23 +68,6 @@ export interface Beleg {
   createdBy: string
   /** When it was entered, not when it was spent. */
   createdAt: string
-}
-
-/** The budget a finished month is read against, as it stood when it ended. */
-export interface ClosedMonth {
-  closedAt: string
-  lines: ClosedMonthLine[]
-}
-
-/** Denormalised, like a snapshot's lines, so a later rename or delete cannot reach it. */
-export interface ClosedMonthLine {
-  entryId: string
-  entryName: string
-  categoryName: string
-  /** Monthly, as it stood. */
-  plannedAmount: string
-  /** Paid automatically, as it stood: counted as spent at its plan. */
-  automatic?: boolean
 }
 
 export interface Settlement {
@@ -174,8 +151,18 @@ export interface BudgetVaultData {
    * deliberately, as named snapshots, instead of accruing one row per month.
    */
   plan: VaultPlanEntry[]
-  /** Named snapshots of the plan. Called archives before v6. */
+  /**
+   * Copies of the plan: the ones taken by hand, named, and one per finished
+   * month, taken by the app. Called archives before v6.
+   */
   snapshots: VaultSnapshot[]
+  /**
+   * The month being recorded now, `'YYYY-MM'`: the oldest one without a copy
+   * yet. Set on the first write; from then on every month up to the current
+   * one is copied as it ends. Absent until the plan is first written, so a new
+   * plan never backfills months from before it existed.
+   */
+  openMonth?: string
 }
 
 export interface VaultPlanEntry {
@@ -200,16 +187,28 @@ export interface VaultPlanEntry {
  */
 export interface VaultSnapshot {
   id: string
+  /** Given by hand; may be empty on a month's copy, which is called by its month. */
   name: string
   createdAt: string
   lines: VaultSnapshotLine[]
+  /**
+   * `'YYYY-MM'` on the copy the app takes as a month ends: the plan that month
+   * is read against in Belege, and the plan's history for everybody. Absent on
+   * a snapshot taken by hand. One per month, and not deleted: a past month in
+   * Belege depends on it.
+   */
+  month?: string
 }
 
 export interface VaultSnapshotLine {
+  /** Which entry it was, for matching a month's records. Absent on old snapshots. */
+  entryId?: string
   entryName: string
   categoryName: string
   type: EntryType
   plannedAmount: string
+  /** Paid automatically, as it stood: Belege counts it as spent at its plan. */
+  automatic?: boolean
 }
 
 export type AccountKind =
@@ -424,9 +423,8 @@ export function assertVaultShape(vault: VaultData): void {
   }
 
   // v11's. A vault written without these would lose every record anybody typed.
-  const v11 = vault as unknown as { belege?: unknown; months?: unknown; settlements?: unknown; split?: unknown }
+  const v11 = vault as unknown as { belege?: unknown; settlements?: unknown; split?: unknown }
   if (!Array.isArray(v11.belege)) throw new VaultShapeError('belege is missing')
-  if (!v11.months || typeof v11.months !== 'object') throw new VaultShapeError('months is missing')
   if (!Array.isArray(v11.settlements)) throw new VaultShapeError('settlements is missing')
   if (!v11.split || typeof v11.split !== 'object') throw new VaultShapeError('split is missing')
 }
@@ -572,6 +570,13 @@ export function migrateVault(parsed: unknown): VaultData {
   // v11 added the Belege keys; `belege` stands for all four.
   const wearingV10Keys =
     vault.version === VAULT_VERSION && (vault as { belege?: unknown }).belege === undefined
+
+  // Belege's months were briefly a map of their own before they became
+  // snapshots, in builds that were never released. Folded in, so a test vault
+  // from then reads as one from now.
+  if (vault.version === VAULT_VERSION && (vault as { months?: unknown }).months !== undefined) {
+    foldMonthsIntoSnapshots(vault as unknown as PreReleaseV11)
+  }
 
   if (
     vault.version === VAULT_VERSION &&
@@ -1034,6 +1039,31 @@ interface V10Shape extends V9Shape {
   people: Record<string, VaultPerson>
 }
 
+interface PreReleaseV11 {
+  budget: { snapshots?: VaultSnapshot[] }
+  months?: Record<string, { closedAt: string; lines: { entryId: string; entryName: string; categoryName: string; plannedAmount: string; automatic?: boolean }[] }>
+}
+
+function foldMonthsIntoSnapshots(vault: PreReleaseV11): void {
+  const snapshots = (vault.budget.snapshots ??= [])
+  for (const [month, closed] of Object.entries(vault.months ?? {})) {
+    if (snapshots.some(s => s.month === month)) continue
+    snapshots.push({
+      id: crypto.randomUUID(),
+      name: '',
+      createdAt: closed.closedAt,
+      month,
+      lines: closed.lines.map(l => ({ ...l, type: 'expense' as const })),
+    })
+  }
+  delete vault.months
+}
+
+/** This month, `'YYYY-MM'`, by the local calendar. */
+function localMonth(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 /**
  * v10 -> v11: Belege. Nothing spent yet, no month closed, nobody owing
  * anybody, and the split even — the default a household would pick anyway.
@@ -1042,7 +1072,8 @@ function migrateV10ToV11(vault: V10Shape): VaultData {
   const migrated = vault as unknown as VaultData
   migrated.version = VAULT_VERSION
   migrated.belege = migrated.belege ?? []
-  migrated.months = migrated.months ?? {}
+  // Months are kept from now on, not from before: no history is invented.
+  migrated.budget.openMonth ??= localMonth()
   migrated.settlements = migrated.settlements ?? []
   migrated.split = migrated.split ?? { mode: 'equal' }
   return migrated
@@ -1063,6 +1094,8 @@ export function createEmptyVault(mainAccountName = 'Main'): VaultData {
       entries: [],
       plan: [],
       snapshots: [],
+      // A new plan's months start now: none is copied from before it existed.
+      openMonth: localMonth(),
     },
     // Invariant: a vault always holds at least one account, so every category
     // can be routed from the moment it is created.
@@ -1071,7 +1104,6 @@ export function createEmptyVault(mainAccountName = 'Main'): VaultData {
     tour: { completedAt: null, dismissedAt: null },
     people: {},
     belege: [],
-    months: {},
     settlements: [],
     split: { mode: 'equal' },
   }

@@ -325,10 +325,14 @@ export const ACTIONS = {
     apply: belege.deleteBeleg,
     check: (v, [id]) => (v.belege.some(b => b.id === id) ? 'go' : 'done'),
   }),
-  // Carries its lines, taken when it was made: the plan as the month ended.
+  // Carries its copy, taken when it was made: the plan as the month ended.
   closeMonth: def({
     apply: belege.closeMonth,
-    check: (v, [month]) => (v.months[month] ? 'done' : 'go'),
+    check: (v, [month]) => (belege.monthCopy(v, month) ? 'done' : 'go'),
+  }),
+  startMonths: def({
+    apply: belege.startMonths,
+    check: v => (v.budget.openMonth ? 'done' : 'go'),
   }),
   addSettlement: def({
     apply: belege.addSettlement,

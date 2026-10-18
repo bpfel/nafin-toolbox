@@ -41,7 +41,6 @@ function buildVault(): VaultData {
     trust: { pins: {}, epochs: {} },
     people: {},
     belege: [],
-    months: {},
     settlements: [],
     split: { mode: 'equal' as const },
     accounts: [
@@ -120,8 +119,8 @@ describe('SnapshotPanel — taking a snapshot', () => {
 
     expect(vault.budget.snapshots).toHaveLength(1)
     expect(vault.budget.snapshots[0].lines).toEqual([
-      { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
-      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
+      expect.objectContaining({ entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' }),
+      expect.objectContaining({ entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' }),
     ])
   })
 

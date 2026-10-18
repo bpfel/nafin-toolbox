@@ -143,7 +143,6 @@ describe('single-category budgets hide the category name', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [{

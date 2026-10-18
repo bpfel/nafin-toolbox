@@ -350,6 +350,8 @@ export const fr: Messages = {
   'snapshot.newNamePlaceholder': 'p. ex. avant l’augmentation',
   'snapshot.create': 'Prendre un instantané',
   'snapshot.none': 'Aucun instantané.',
+  'snapshot.months': 'Mois',
+  'snapshot.monthsHint': 'Chaque mois terminé garde le budget avec lequel il s’est achevé ; Tickets compare le mois à celui-ci.',
   'snapshot.empty': 'Cet instantané ne contient aucune ligne.',
   'snapshot.entryColumn': 'Entrée',
   'snapshot.deleteOne': 'Supprimer l’instantané {name}',
