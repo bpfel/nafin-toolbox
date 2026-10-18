@@ -207,9 +207,11 @@
 {/if}
 
 <style>
+  /* The full content width, as Budget's table and Accounts' cards take: a
+     money screen, not a settings page. It was capped while the entry form sat
+     on the page; that form is a dialog now. */
   .views {
     touch-action: pan-y;
-    max-width: 36rem;
   }
 
   .view-tabs {
