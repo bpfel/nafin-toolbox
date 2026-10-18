@@ -2,7 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { Beleg, VaultData } from '../../lib/crypto/vault'
   import { belegUnsaved } from '../../lib/crypto/vaultStore.svelte'
-  import { JOINT } from '../../lib/belege/belegeEngine'
+  import { JOINT, filedUnder } from '../../lib/belege/belegeEngine'
   import Money from '../../lib/util/Money.svelte'
 
   /**
@@ -21,11 +21,7 @@
 
   let { beleg, vault, names, showEntry = true, onopen }: Props = $props()
 
-  let entryName = $derived(
-    beleg.entryId === null
-      ? t('spending.unassigned')
-      : (vault.budget.entries.find(e => e.id === beleg.entryId)?.name ?? t('spending.unassigned')),
-  )
+  let entryName = $derived(filedUnder(vault, beleg).entry?.name ?? t('spending.unassigned'))
   let payer = $derived(
     !names || beleg.paidBy === undefined
       ? null

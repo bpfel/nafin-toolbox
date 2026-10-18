@@ -1,7 +1,8 @@
 <script lang="ts">
   import { t, tn } from '../../lib/i18n/index.svelte'
   import type { Beleg, VaultData } from '../../lib/crypto/vault'
-  import { monthOf, rappen } from '../../lib/belege/belegeEngine'
+  import { filedUnder, monthOf, rappen } from '../../lib/belege/belegeEngine'
+  import { listCategories } from '../../lib/budget/budgetEngine'
   import { monthLabel } from '../../lib/util/months'
   import Money from '../../lib/util/Money.svelte'
   import RecordRow from './RecordRow.svelte'
@@ -33,20 +34,18 @@
   let query = $state('')
   let category = $state(ALL)
 
-  let categories = $derived([...vault.budget.categories].sort((a, b) => a.sortOrder - b.sortOrder))
+  let categories = $derived(listCategories(vault))
 
   /** A receipt's category, as it stands now; none for Unassigned or a line since deleted. */
   function categoryOf(beleg: Beleg): string | null {
-    if (beleg.entryId === null) return null
-    return vault.budget.entries.find(e => e.id === beleg.entryId)?.categoryId ?? null
+    return filedUnder(vault, beleg).entry?.categoryId ?? null
   }
 
   function matches(beleg: Beleg, words: string[]): boolean {
     if (category === UNASSIGNED && categoryOf(beleg) !== null) return false
     if (category !== ALL && category !== UNASSIGNED && categoryOf(beleg) !== category) return false
     if (words.length === 0) return true
-    const entry = vault.budget.entries.find(e => e.id === beleg.entryId)
-    const cat = vault.budget.categories.find(c => c.id === entry?.categoryId)
+    const { entry, category: cat } = filedUnder(vault, beleg)
     const haystack = [
       beleg.note ?? '',
       entry?.name ?? t('spending.unassigned'),

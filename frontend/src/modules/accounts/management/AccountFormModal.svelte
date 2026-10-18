@@ -3,7 +3,7 @@
   import { t, tn } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { AccountKind, QRAddress, VaultAccount } from '../../../lib/crypto/vault'
-  import { isQRIban, ibanStatus } from '../../../lib/qrbill/validate'
+  import { isQRIban, ibanStatus, normalizeIBAN } from '../../../lib/qrbill/validate'
   import { formatIBANForDisplay } from '../../../lib/qrbill/format'
   import InfoButton from '../../../lib/nav/InfoButton.svelte'
   import InfoModal from '../../../lib/nav/InfoModal.svelte'
@@ -54,7 +54,7 @@
   // one, so the section starts closed unless this account already has data.
   let showAdvanced = $state(Boolean(initial?.iban || initial?.holder))
 
-  let cleanedIban = $derived(iban.replace(/\s/g, '').toUpperCase())
+  let cleanedIban = $derived(normalizeIBAN(iban))
 
   // Derived, never asked for: a mistyped kind would produce bills the bank
   // rejects, and the IBAN itself says which it is.

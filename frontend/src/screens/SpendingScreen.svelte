@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { memberName } from '../lib/household/names'
   import { untrack } from 'svelte'
   import { t } from '../lib/i18n/index.svelte'
   import { getRoute, navigate } from '../lib/nav/router.svelte'
@@ -60,7 +61,7 @@
         const listed = await listMembers(id)
         if (vaultState.currentVaultId !== id) return
         const people = vaultState.vault?.people ?? {}
-        members = listed.map(m => ({ id: String(m.user_id), name: people[String(m.user_id)]?.name ?? m.email }))
+        members = listed.map(m => ({ id: String(m.user_id), name: memberName(people, m) }))
       } catch {
         members = []
       }
