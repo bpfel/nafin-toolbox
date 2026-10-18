@@ -1,5 +1,6 @@
 import { cleanup, render, screen, fireEvent } from '@testing-library/svelte'
 import { describe, test, expect, afterEach } from 'vitest'
+import { toggleEditing, isEditing, clearEditing } from '../../lib/util/editMode.svelte'
 import type { VaultData, VaultSnapshot } from '../../lib/crypto/vault'
 
 import { getVaultState } from '../../lib/crypto/vaultStore.svelte'
@@ -7,7 +8,10 @@ import BudgetModule from './BudgetModule.svelte'
 
 const vaultState = getVaultState()
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  clearEditing()
+})
 
 const line = (entryId: string, name: string, type: 'income' | 'expense', category: string, amount: string) =>
   ({ entryId, entryName: name, categoryName: category, type, plannedAmount: amount })
@@ -72,7 +76,9 @@ describe('earlier versions of the plan', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
 
     expect(screen.getByRole('heading', { name: 'July 2026 – August 2026' })).toBeTruthy()
-    expect(document.querySelector('tfoot')!.textContent).toMatch(/5.600\.00/)
+    // The same summary card and table as the plan now, not a view of its own.
+    expect(document.querySelector('.summary-bar')!.textContent).toMatch(/5.600\.00/)
+    expect(document.querySelector('.budget-table')).toBeTruthy()
     // Nowhere further back to go.
     expect((screen.getByRole('button', { name: 'Earlier version' }) as HTMLButtonElement).disabled).toBe(true)
   })
@@ -123,5 +129,31 @@ describe('earlier versions of the plan', () => {
     expect(changes.querySelectorAll('li')).toHaveLength(6)
     await fireEvent.click(screen.getByRole('button', { name: /Show all \d+ changes/ }))
     expect(changes.querySelectorAll('li').length).toBeGreaterThan(6)
+  })
+
+  // Read-only by switching edit mode off, which the table already obeys.
+  test('stepping back ends edit mode: nothing in an earlier version can be changed', async () => {
+    withHistory([copy('2026-08', '5600.00'), copy('2026-09', '6000.00')])
+    toggleEditing('budget')
+    render(BudgetModule)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+
+    expect(isEditing('budget')).toBe(false)
+    expect(document.querySelector('.drag-handle')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Edit planned/ })).toBeNull()
+  })
+
+  // A copy keeps a bill's target and cycle, so its year reads exact, as live.
+  test('a bill in an earlier version reads its exact year, not twelve months', async () => {
+    const before = copy('2026-08', '5600.00')
+    before.lines = [...before.lines, { entryId: 'serafe', entryName: 'Serafe', categoryName: 'Housing', type: 'bill', plannedAmount: '27.92', reserve: { targetAmount: '335.00', periodMonths: 12 } }]
+    withHistory([before, copy('2026-09', '6000.00')])
+    render(BudgetModule)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+
+    const row = [...document.querySelectorAll('.entry-row')].find(r => r.textContent?.includes('Serafe'))!
+    expect(row.querySelector('.planned-yr-cell')!.textContent).toMatch(/335\.00/)
   })
 })

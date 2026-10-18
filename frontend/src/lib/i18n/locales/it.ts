@@ -361,8 +361,6 @@ export const it: Messages = {
   'category.mergeInto': 'Unisci a {name}',
 
   // --- Snapshots ---
-  'snapshot.empty': 'Questa istantanea non contiene righe.',
-  'snapshot.entryColumn': 'Voce',
 
   // --- Resetting ---
   'reset.title': 'Reimposta il budget',

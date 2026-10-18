@@ -445,7 +445,45 @@ function money(value: number): string {
 
 export function getPlanSummary(vault: VaultData): PlanSummary {
   const categories = vault.budget.categories
+  return summarize(
+    listEntries(vault).map(entry => {
+      const plannedAmount = plannedFor(vault, entry.id)
+      return {
+        entryId: entry.id,
+        entryName: entry.name,
+        entryType: entry.type,
+        categoryId: entry.categoryId,
+        categoryName: categories.find(g => g.id === entry.categoryId)?.name ?? '',
+        plannedAmount,
+        yearlyAmount: yearlyFor(entry, plannedAmount),
+      }
+    }),
+  )
+}
 
+/**
+ * An earlier version of the plan, in the shape the budget's own summary and
+ * table read — so stepping back shows the same screen, not a different one.
+ *
+ * Lines carry no category id; each category is keyed by its name and listed in
+ * the order the copy holds them, which is the budget's order when it was taken.
+ */
+export function planSummaryOf(lines: VaultSnapshotLine[]): PlanSummary {
+  return summarize(
+    lines.map((line, i) => ({
+      entryId: line.entryId ?? `line-${i}`,
+      entryName: line.entryName,
+      entryType: line.type,
+      categoryId: `copy:${line.categoryName}`,
+      categoryName: line.categoryName,
+      plannedAmount: line.plannedAmount,
+      yearlyAmount: yearlyFor({ reserve: line.reserve ? { ...line.reserve, anchorMonth: '' } : undefined }, line.plannedAmount),
+    })),
+  )
+}
+
+/** The totals over a plan's lines, live or copied. */
+function summarize(entries: PlanEntryView[]): PlanSummary {
   let totalPlannedIncome = 0
   let totalPlannedExpenses = 0
   let totalPlannedSavings = 0
@@ -457,29 +495,13 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
   let yearlyExpenses = 0
   let yearlySavings = 0
 
-  const entries: PlanEntryView[] = []
-
-  for (const cat of listEntries(vault)) {
-    const category = categories.find(g => g.id === cat.categoryId)
-    const plannedAmount = plannedFor(vault, cat.id)
-    const planned = Number(plannedAmount)
-    const yearlyAmount = yearlyFor(cat, plannedAmount)
-    const yearly = Number(yearlyAmount)
-
-    entries.push({
-      entryId: cat.id,
-      entryName: cat.name,
-      entryType: cat.type,
-      categoryId: cat.categoryId,
-      categoryName: category?.name ?? '',
-      plannedAmount,
-      yearlyAmount,
-    })
-
-    if (cat.type === 'income') {
+  for (const entry of entries) {
+    const planned = Number(entry.plannedAmount)
+    const yearly = Number(entry.yearlyAmount)
+    if (entry.entryType === 'income') {
       totalPlannedIncome += planned
       yearlyIncome += yearly
-    } else if (holdsMoney(cat.type)) {
+    } else if (holdsMoney(entry.entryType)) {
       totalPlannedSavings += planned
       yearlySavings += yearly
     } else {
@@ -517,7 +539,7 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
  * In centimes, because the whole point is the rappen. A stored monthly has at
  * most four places, so twelve of it never lands on a half-rappen to break.
  */
-function yearlyFor(entry: VaultEntry, plannedAmount: string): string {
+function yearlyFor(entry: Pick<VaultEntry, 'reserve'>, plannedAmount: string): string {
   const reserve = entry.reserve
   if (reserve && reserve.periodMonths > 0) {
     return fromCents(Math.round((toCents(reserve.targetAmount) * 12) / reserve.periodMonths))
@@ -527,37 +549,6 @@ function yearlyFor(entry: VaultEntry, plannedAmount: string): string {
 
 // --- Snapshots ---
 
-/**
- * A snapshot's totals, by the rules the budget's own summary uses: income;
- * expenses, consumed and gone; savings — savings, bills and purchases, out of
- * the account and still in the net worth; and what is left unallocated.
- *
- * Read off the lines' stored type, so an old snapshot adds up as it did then.
- * It added up only income and expense before, and called their difference
- * savings: every line of the other three types was left out of the sum.
- */
-export function snapshotTotals(snapshot: VaultSnapshot): {
-  income: string
-  expenses: string
-  savings: string
-  unallocated: string
-} {
-  let income = 0
-  let expenses = 0
-  let savings = 0
-  for (const line of snapshot.lines) {
-    const amount = Number(line.plannedAmount) || 0
-    if (line.type === 'income') income += amount
-    else if (holdsMoney(line.type)) savings += amount
-    else expenses += amount
-  }
-  return {
-    income: money(income),
-    expenses: money(expenses),
-    savings: money(savings),
-    unallocated: money(income - expenses - savings),
-  }
-}
 
 /**
  * One line of a copy of the plan, denormalised: the names as they are now, and
@@ -571,6 +562,8 @@ export function snapshotLine(vault: VaultData, entry: VaultEntry): VaultSnapshot
     type: entry.type,
     plannedAmount: plannedFor(vault, entry.id),
     ...(entry.automatic ? { automatic: true } : {}),
+    // So a year of a bill or a purchase reads exact, as it does live.
+    ...(entry.reserve ? { reserve: { targetAmount: entry.reserve.targetAmount, periodMonths: entry.reserve.periodMonths } } : {}),
   }
 }
 
