@@ -82,6 +82,8 @@ export const fr: Messages = {
   'field.name': 'Nom',
 
   // --- Sign in ---
+  'insecure.title': 'Cette page nécessite HTTPS',
+  'insecure.hint': 'Tes données sont chiffrées dans ton navigateur, et les navigateurs ne le permettent qu’en HTTPS ou sur cet ordinateur même (localhost). Ouvre l’app par son adresse HTTPS.',
   'auth.signIn': 'Se connecter',
   'auth.createFirstAccount': 'Créer le premier compte',
   'auth.createAccount': 'Créer le compte',

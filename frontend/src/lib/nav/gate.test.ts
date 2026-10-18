@@ -9,6 +9,7 @@ import { gateFor, type GateState } from './gate'
  */
 
 const CLEAR: GateState = {
+  canEncrypt: true,
   loading: false,
   onVerifyPath: false,
   user: { role: 'user', mustChangePassword: false },
@@ -29,6 +30,7 @@ describe('gateFor — one condition at a time', () => {
   })
 
   test.each([
+    ['opened over plain HTTP', { canEncrypt: false }, 'insecure'],
     ['loading', { loading: true }, 'loading'],
     ['on the verification link', { onVerifyPath: true }, 'verify'],
     ['signed out', { user: null }, 'login'],
@@ -112,5 +114,16 @@ describe('gateFor — administrators', () => {
     )
     expect(gateFor(state({ user: admin, enforce2FA: true }))).toBe('enforce2FA')
     expect(gateFor(state({ user: admin, loading: true }))).toBe('loading')
+  })
+})
+
+// Over plain HTTP nothing else can be fixed from where the user stands, so it
+// comes before every other screen — signing in too, which used to end in
+// "wrong password".
+describe('gateFor — no encryption in this browser', () => {
+  test('outranks everything, signed in or not, admin or not', () => {
+    expect(gateFor(state({ canEncrypt: false, loading: true }))).toBe('insecure')
+    expect(gateFor(state({ canEncrypt: false, user: null, onVerifyPath: true }))).toBe('insecure')
+    expect(gateFor(state({ canEncrypt: false, user: { role: 'admin', mustChangePassword: false } }))).toBe('insecure')
   })
 })

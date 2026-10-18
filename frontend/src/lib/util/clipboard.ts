@@ -1,11 +1,10 @@
 /**
  * Copy text to the clipboard, reporting whether it worked.
  *
- * `navigator.clipboard` only exists in a secure context. A self-hosted app
- * reached over plain http on a LAN is not one, so the modern API is genuinely
- * absent for a good share of this app's users rather than being a theoretical
- * edge case. It can also reject when the document is not focused, or when the
- * permission is denied.
+ * `navigator.clipboard` only exists in a secure context — but so does the
+ * crypto the vault needs, so wherever this app runs at all, it is there (see
+ * the `insecure` gate). What remains is that it can reject: when the document
+ * is not focused, or when the permission is denied.
  *
  * Every one of those falls back to `document.execCommand('copy')`, which is
  * deprecated but works without a secure context. Callers get a boolean so they
