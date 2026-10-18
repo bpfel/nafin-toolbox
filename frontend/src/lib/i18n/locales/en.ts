@@ -654,10 +654,15 @@ export const en = {
   'tour.offerDecline': 'Not now',
 
   // --- Belege ---
-  'spending.tabRecord': 'Records',
+  'spending.tabJournal': 'Journal',
+  'spending.search': 'Search…',
+  'spending.category': 'Category',
+  'spending.allCategories': 'All categories',
+  'spending.results.one': '1 receipt',
+  'spending.results.other': '{count} receipts',
+  'spending.noResults': 'Nothing matches.',
   'spending.add': 'Add record',
-  'spending.thisMonth': 'This month',
-  'spending.tabReview': 'Review',
+  'spending.tabOverview': 'Overview',
   'spending.viewsLabel': 'Spending views',
   'spending.empty': 'Record what you spend, and see it against your budget.',
   'spending.amount': 'Amount',

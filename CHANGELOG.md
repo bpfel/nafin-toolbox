@@ -48,9 +48,10 @@ release may change things without a deprecation period. Each release is a tag on
 - **Belege: what you actually spent, against the budget.** A new tab between
   Budget and Accounts. A receipt is entered from the **+**, in a dialog: the
   amount, the budget line — preselected to the one you used last, with your
-  recent ones as chips — the date and a note; it is saved at once. *Records*
-  lists the month's receipts, and *Review* shows a month line by line against
-  its plan. A finished month keeps the budget it
+  recent ones as chips — the date and a note; it is saved at once. The
+  *Overview* shows a month against its plan, line by line under the budget's
+  categories; the *Journal* lists every receipt, all the way back, with a
+  search and a category filter, and changes one only in edit mode. A finished month keeps the budget it
   ended with, so changing Rent today does not rewrite October. A record whose
   budget line is deleted is kept as Unassigned, never lost.
   In a household, each record says who paid — a member or the joint

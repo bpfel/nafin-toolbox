@@ -606,10 +606,15 @@ export const fr: Messages = {
   'tour.offerDecline': 'Plus tard',
 
   // --- Belege ---
-  'spending.tabRecord': 'Liste',
+  'spending.tabJournal': 'Journal',
+  'spending.search': 'Rechercher…',
+  'spending.category': 'Catégorie',
+  'spending.allCategories': 'Toutes les catégories',
+  'spending.results.one': '1 ticket',
+  'spending.results.other': '{count} tickets',
+  'spending.noResults': 'Aucun résultat.',
   'spending.add': 'Ajouter un ticket',
-  'spending.thisMonth': 'Ce mois-ci',
-  'spending.tabReview': 'Bilan',
+  'spending.tabOverview': 'Aperçu',
   'spending.viewsLabel': 'Vues des tickets',
   'spending.empty': 'Saisis ce que tu dépenses et compare-le à ton budget.',
   'spending.amount': 'Montant',
