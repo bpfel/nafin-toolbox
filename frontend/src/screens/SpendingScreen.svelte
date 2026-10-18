@@ -99,8 +99,7 @@
   let adding = $state(false)
 
   /**
-   * The month Review shows, chosen from the screen's controls as Budget's
-   * period is: it acts on the whole view, so it should not scroll away with it.
+   * The month Review shows, stepped from its summary card, beside its name.
    */
   let month = $state(thisMonth())
   let months = $derived(vaultState.vault ? reviewableMonths(vaultState.vault, thisMonth()) : [thisMonth()])
@@ -121,18 +120,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      </ActionButton>
-    {/if}
-    {#if onReview}
-      <ActionButton label={t('spending.previousMonth')} disabled={index >= months.length - 1} onclick={() => go(index + 1)}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-      </ActionButton>
-      <ActionButton label={t('spending.nextMonth')} disabled={index === 0} onclick={() => go(index - 1)}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="9 18 15 12 9 6" />
         </svg>
       </ActionButton>
     {/if}
@@ -200,6 +187,8 @@
       <ReviewView
         {vault}
         {month}
+        onprevious={index < months.length - 1 ? () => go(index + 1) : undefined}
+        onnext={index > 0 ? () => go(index - 1) : undefined}
         {names}
         {members}
         {me}

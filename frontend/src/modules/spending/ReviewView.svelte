@@ -15,8 +15,7 @@
    * A month against the budget it belongs to, in the pieces Budget is built
    * from: a summary card on top, then the lines on one card under the same
    * category headings Budget uses, then — in a household — who owes whom on a
-   * card of its own. The month is chosen in the screen's controls, where
-   * Budget keeps its own.
+   * card of its own. The month is stepped from the summary card's header.
    *
    * The current month reads against the live plan. A finished one reads
    * against its own frozen copy, so changing Rent today does not change what
@@ -31,9 +30,12 @@
     members?: { id: string; name: string }[]
     me?: string
     readOnly?: boolean
+    /** Stepping months; absent at the newest or the oldest. */
+    onprevious?: () => void
+    onnext?: () => void
   }
 
-  let { vault, month, names, onopen, members = [], me = '', readOnly = false }: Props = $props()
+  let { vault, month, names, onopen, members = [], me = '', readOnly = false, onprevious, onnext }: Props = $props()
 
   /** Only where there is somebody to owe: two members, or records that say who paid. */
   let shared = $derived(members.length > 1 || vault.belege.some(b => b.paidBy !== undefined))
@@ -151,6 +153,9 @@
     planned={review.planned}
     spent={review.spent}
     basis={review.closedAt ? t('spending.asOf', { date: closedOn(review.closedAt) }) : t('spending.live')}
+    {onprevious}
+    {onnext}
+    stepper
   />
 
   <div class="card">

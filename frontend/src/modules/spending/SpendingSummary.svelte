@@ -15,16 +15,41 @@
     spent: number
     /** What the month is compared with, in a sentence. */
     basis?: string
+    /**
+     * Stepping to another month, from the card that names it — beside the
+     * thing it changes rather than in the dial, where a month switcher was a
+     * control nobody thought to look for.
+     */
+    onprevious?: () => void
+    onnext?: () => void
+    /** Show the stepping arrows — disabled where there is no month to go to. */
+    stepper?: boolean
   }
 
-  let { title, planned, spent, basis }: Props = $props()
+  let { title, planned, spent, basis, onprevious, onnext, stepper = false }: Props = $props()
 
   let left = $derived(planned - spent)
   let share = $derived(planned > 0 ? Math.min(100, Math.round((spent / planned) * 100)) : 0)
 </script>
 
 <div class="summary">
-  <h3>{title}</h3>
+  {#if stepper}
+    <div class="head">
+      <button class="step" aria-label={t('spending.previousMonth')} disabled={!onprevious} onclick={() => onprevious?.()}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+      <h3>{title}</h3>
+      <button class="step" aria-label={t('spending.nextMonth')} disabled={!onnext} onclick={() => onnext?.()}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+    </div>
+  {:else}
+    <h3>{title}</h3>
+  {/if}
   <div class="figures">
     <div class="figure">
       <span class="label">{t('spending.planned')}</span>
@@ -62,6 +87,49 @@
     margin: 0 0 0.6rem;
     font-size: 1.05rem;
     font-weight: 500;
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: -0.35rem -0.5rem 0.6rem;
+  }
+
+  .head h3 {
+    margin: 0;
+    text-align: center;
+  }
+
+  /* 44px: thumb targets, at the top of the card where the month is named. */
+  .step {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .step:hover:not(:disabled) {
+    background: var(--sunken);
+  }
+
+  .step:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .step svg {
+    width: 20px;
+    height: 20px;
   }
 
   .figures {
