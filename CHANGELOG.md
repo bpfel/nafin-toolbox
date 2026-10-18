@@ -10,7 +10,22 @@ release may change things without a deprecation period. Each release is a tag on
 
 ## [Unreleased]
 
-### Upgrading
+## [0.5.0] — 2026-10-19
+
+Belege: what was actually spent, read against the budget, month by month — and
+the budget's own history, kept by itself. Households can be joined live, and
+changes from two devices both survive.
+
+### Upgrading from 0.4.0
+
+- **Rebuild both images.** There are no database migrations in this release;
+  everything new lives in the encrypted budget, which each person's app
+  upgrades the first time it opens it (vault v9 → v11). A tab still open on
+  0.4.0 when the new version saves will say it is out of date and offer to
+  reload — that is expected.
+- **Snapshots taken by hand are deleted** when each budget is first opened
+  after the upgrade (see *Removed*). Anyone who keeps something in one should
+  write down what they need before you upgrade.
 
 - **Ask everyone who uses two-factor sign-in to set it up again.** Until now
   the setup screen had a public web service draw the QR code, and handed it the
@@ -40,16 +55,14 @@ release may change things without a deprecation period. Each release is a tag on
   `docker-compose.synology.yml` and set `NAFIN_LISTEN=127.0.0.1:4000` in `.env`.
   [Self-hosting on a Synology NAS](readmore/synology-selfhosting.md#coming-from-an-earlier-version-of-this-chapter)
   has the commands.
-- The images are unchanged. Recreating the containers is enough, but rebuilding
-  does no harm.
 
 ### Removed
 
 - **Snapshots taken by hand are gone.** The Archive and taking snapshots by
-  hand are retired: every month keeps its own copy of the plan now. Snapshots
-  taken before are removed when a budget is next opened. (Pre-beta: no
-  migration to month copies, since a copy taken mid-month is not the plan a
-  month ended with.)
+  hand are retired: every month keeps its own copy of the budget now.
+  Snapshots taken before are removed when a budget is first opened after the
+  upgrade. (Pre-beta: they are not turned into month copies, since a copy
+  taken mid-month is not the budget a month ended with.)
 - **Reset budget is gone; Delete all data replaces it, in Profile.** Reset
   cleared the budget but kept its history, receipts and accounts, so a fresh
   budget arrived with the old one's past attached. Delete all data, beside
@@ -60,32 +73,29 @@ release may change things without a deprecation period. Each release is a tag on
 ### New
 
 - **Belege: what you actually spent, against the budget.** A new tab between
-  Budget and Accounts. A receipt is entered from the **+**, in a dialog: the
-  amount, the budget line — preselected to the one you used last, with your
-  recent ones as chips — the date and a note; it is saved at once. The
-  *Overview* shows a month against its plan, line by line under the budget's
-  categories; the *Journal* lists every receipt, all the way back, with a
-  search and a category filter, and changes one only in edit mode. A finished month keeps the budget it
-  ended with, so changing Rent today does not rewrite October. That copy is the
-  whole plan, and every month gets one, Belege or not.
-- **Budget steps back through earlier versions of the plan.** Arrows above the
-  plan go from the plan now to the plan before each change — months that
+  Budget and Accounts. A receipt is entered from the **+**: the amount, the
+  budget line — preselected to the one you used last, with your recent ones as
+  chips — the date and a note, saved at once. **Overview** shows a month
+  against its budget, line by line under the budget's categories; **Journal**
+  lists every receipt, all the way back, with a search and a category filter.
+  Receipts are changed with the pen. A receipt whose budget line is deleted is
+  kept as Unassigned, never lost.
+- **Paid automatically.** A budget line paid by standing order or direct debit
+  — rent, health insurance — can be marked so in Overview: it is not offered
+  for a receipt, and the month counts it as paid at its budget, so a month's
+  total is the whole month. Overview asks about a line with nothing recorded,
+  and the starter budgets come with the usual ones marked.
+- **Belege in a household.** Each receipt says who paid — a member or the joint
+  account — and a balances card shows who owes whom, running on from month to
+  month, with the fewest payments that settle it. The split is equal or by
+  share, and always adds up to 100.
+- **The budget keeps its own history.** Every finished month keeps a copy of
+  the budget it ended with, so changing Rent today does not rewrite October in
+  Belege. Budget's ‹ › arrows step back through earlier versions — months that
   changed nothing are one step, such as *July – August 2026*. An earlier
-  version is shown exactly as the plan now is — the same summary and table,
-  monthly or yearly — read-only, with what changed after it and in which
-  month — worked out by the app, every change, lines added and removed
-  marked + and −, folded only when it is long. The plan now stays as it was.
-  This replaces the Archive. A record whose
-  budget line is deleted is kept as Unassigned, never lost.
-  In a household, each record says who paid — a member or the joint
-  account — and Review shows who owes whom, running on from month to month,
-  with the fewest payments that settle it, and a split that is equal or by
-  share, always adding up to 100.
-  A budget line paid by standing order or direct debit — rent, health
-  insurance — can be marked *paid automatically*: it is not offered for a
-  receipt, and Review counts it as paid at its plan, so a month's total is the
-  whole month. Review asks about a planned line with nothing recorded, and the
-  starter budgets come with the usual ones marked.
+  version looks exactly like the current budget, read-only, with what changed
+  after it and in which month: lines added and removed marked + and −. This
+  replaces the Archive.
 - **Letting somebody into a household is a Confirm button, and it is live.**
   Once the invited person accepts, Confirm appears on the household's People
   panel without reloading, and a dot on Profile, in the household switcher and
