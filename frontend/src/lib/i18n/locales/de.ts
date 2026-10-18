@@ -68,6 +68,8 @@ export const de: Messages = {
   'action.done': 'Fertig',
 
   // --- Sign in ---
+  'insecure.title': 'Diese Seite braucht HTTPS',
+  'insecure.hint': 'Deine Daten werden in deinem Browser verschlüsselt, und das erlauben Browser nur über HTTPS oder auf diesem Computer selbst (localhost). Öffne die App über ihre HTTPS-Adresse.',
   'auth.signIn': 'Anmelden',
   'auth.createFirstAccount': 'Erstes Konto erstellen',
   'auth.createAccount': 'Konto erstellen',

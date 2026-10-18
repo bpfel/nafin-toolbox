@@ -154,6 +154,7 @@
   /** Which enforcement screen stands in the way, if any. See lib/nav/gate.ts. */
   let gate = $derived(
     gateFor({
+      canEncrypt: typeof crypto !== 'undefined' && crypto.subtle !== undefined,
       loading: authState.loading,
       onVerifyPath: route.screen === 'verify',
       user: authState.currentUser
@@ -191,7 +192,16 @@
 {/if}
 
 
-{#if gate === 'loading'}
+{#if gate === 'insecure'}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>{t('insecure.title')}</h1>
+        <p class="hint">{t('insecure.hint')}</p>
+      </div>
+    </div>
+  </main>
+{:else if gate === 'loading'}
   <main>
     <p class="loading">{t('state.loading')}</p>
   </main>

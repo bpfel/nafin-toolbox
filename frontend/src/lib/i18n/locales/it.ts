@@ -82,6 +82,8 @@ export const it: Messages = {
   'field.name': 'Nome',
 
   // --- Sign in ---
+  'insecure.title': 'Questa pagina richiede HTTPS',
+  'insecure.hint': 'I tuoi dati vengono cifrati nel browser, e i browser lo consentono solo tramite HTTPS o su questo computer stesso (localhost). Apri l’app tramite il suo indirizzo HTTPS.',
   'auth.signIn': 'Accedi',
   'auth.createFirstAccount': 'Crea il primo account',
   'auth.createAccount': 'Crea l’account',

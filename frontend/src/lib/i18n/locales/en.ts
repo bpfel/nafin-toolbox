@@ -76,6 +76,8 @@ export const en = {
   'action.done': 'Done',
 
   // --- Sign in ---
+  'insecure.title': 'This page needs HTTPS',
+  'insecure.hint': 'Your data is encrypted in your browser, and browsers only allow that over HTTPS or on this computer itself (localhost). Open the app through its HTTPS address.',
   'auth.signIn': 'Sign In',
   'auth.createFirstAccount': 'Create First Account',
   'auth.createAccount': 'Create Account',

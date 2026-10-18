@@ -26,9 +26,8 @@
 
   let { link, email, onclose }: Props = $props()
 
-  // The shared copier, not the clipboard directly: on an instance served over
-  // plain HTTP the browser has no clipboard API, and this button used to fail
-  // there without a word.
+  // The shared copier, not the clipboard directly: the browser can refuse the
+  // clipboard, and this button used to fail then without a word.
   const copier = createCopier()
 
   function onKeydown(e: KeyboardEvent) {

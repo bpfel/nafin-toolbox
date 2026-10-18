@@ -129,10 +129,14 @@ release may change things without a deprecation period. Each release is a tag on
   account to `1’234.50` and pressing Enter was refused as not an amount: the
   correction had its own copy of the amount reader, which knew only the
   straight `'`.
-- **Copy link works on an instance served over plain HTTP.** The household
-  invitation's Copy button used a browser feature that only exists over
-  HTTPS, and failed without a word. It falls back like the other copy buttons
-  now, and if nothing reaches the clipboard it says so and shows the link.
+- **Opened over plain HTTP, the app says it needs HTTPS.** Browsers only
+  allow the encryption the app relies on over HTTPS or on localhost. Over
+  plain HTTP, signing in ended in "wrong password", which sent people looking
+  in the wrong place. The app now shows what is actually needed instead.
+- **Copy link says when it could not copy.** The household invitation's Copy
+  button failed without a word when the browser refused the clipboard. It
+  falls back like the other copy buttons now, and if nothing reaches the
+  clipboard it says so and shows the link.
 - **A third decimal rounds the same everywhere.** `1.005` became 1.00 in some
   places and 1.01 in others; it is 1.01 everywhere now.
 - **Two devices no longer overwrite each other's budget.** Loading the

@@ -1,7 +1,7 @@
 /**
  * Which screen stands between the user and the app, if any.
  *
- * There are ten of them — signing in, verifying an address, a forced password
+ * There are eleven of them — a browser that cannot encrypt, signing in, verifying an address, a forced password
  * change, an enforced 2FA setup, four vault states and the lock screen. Each is
  * a centred card with no navigation, because navigating away from any of them
  * would be meaningless.
@@ -24,6 +24,7 @@
  *   that matters can be asserted without rendering anything.
  */
 export type Gate =
+  | 'insecure'
   | 'loading'
   | 'verify'
   | 'login'
@@ -36,6 +37,11 @@ export type Gate =
   | 'vaultLocked'
 
 export interface GateState {
+  /**
+   * The browser offers the Web Crypto API. It does only on HTTPS or localhost;
+   * over plain HTTP the vault cannot be opened at all.
+   */
+  canEncrypt: boolean
   /** The session is still being established; nothing is known yet. */
   loading: boolean
   /** The address bar is on the verification link. */
@@ -54,6 +60,13 @@ export interface GateState {
 }
 
 export function gateFor(state: GateState): Gate | null {
+  // First of all, and for everyone: without the browser's crypto nothing past
+  // sign-in can work, and signing in anyway ended in "wrong password" — a
+  // message that sent people to the one thing that was not wrong. An admin, who
+  // has no vault, is stopped too: their password would cross the network in
+  // the clear just the same.
+  if (!state.canEncrypt) return 'insecure'
+
   if (state.loading) return 'loading'
 
   // Ahead of the session check: following a verification link is how an account
