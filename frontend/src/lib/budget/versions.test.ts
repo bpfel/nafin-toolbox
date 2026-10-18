@@ -62,29 +62,18 @@ describe('the plan’s versions', () => {
     expect(before).toMatchObject({ from: '2026-09', to: '2026-09' })
   })
 
-  test('a name given to any month of a version names the version', () => {
+  // Instead of a name somebody would have to type: what is different.
+  test('each version says what changed from the one before; the oldest says nothing', () => {
     const v = plan()
-    close(v, '2026-07')
     close(v, '2026-08')
     budget.setPlanned(v, salary(v).id, '6400.00')
     close(v, '2026-09')
-    v.budget.snapshots.find(s => s.month === '2026-08')!.name = 'Before the raise'
-
-    expect(planVersions(v)[1].name).toBe('Before the raise')
-  })
-
-  test('a snapshot taken by hand goes with the version that was the plan then', () => {
-    const v = plan()
-    close(v, '2026-07')
-    close(v, '2026-08')
-    budget.setPlanned(v, salary(v).id, '6400.00')
-    close(v, '2026-09')
-    const named = { ...budget.buildSnapshot(v, 'Mid August'), createdAt: '2026-08-15T10:00:00Z' }
-    budget.insertSnapshot(v, named)
 
     const [now, before] = planVersions(v)
 
-    expect(before.saved.map(s => s.name)).toEqual(['Mid August'])
-    expect(now.saved).toEqual([])
+    expect(now.changes).toEqual([
+      expect.objectContaining({ kind: 'amount', name: salary(v).name, to: '6400.00' }),
+    ])
+    expect(before.changes).toEqual([])
   })
 })

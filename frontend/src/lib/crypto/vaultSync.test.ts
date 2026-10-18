@@ -396,16 +396,16 @@ describe('order and bulk', () => {
     expect(kinds()).toEqual(['merged'])
   })
 
-  test('20. a snapshot keeps the plan as it was seen here', async () => {
+  test('20. a month’s copy keeps the plan as it was seen here', async () => {
     const rent = expense(state.vault!).id
     const seen = budget.plannedFor(state.vault!, rent)
-    commit('takeSnapshot', budget.buildSnapshot(state.vault!, 'As seen'))
+    commit('closeMonth', '2026-09', belege.buildMonthSnapshot(state.vault!, '2026-09'))
     await elsewhere(v => budget.setPlanned(v, rent, '9999.00'))
 
     await saveVault()
 
     const saved = await onServer()
-    const snap = saved.budget.snapshots.find(s => s.name === 'As seen')!
+    const snap = saved.budget.snapshots.find(s => s.month === '2026-09')!
     const rentName = saved.budget.entries.find(e => e.id === rent)!.name
     expect(snap.lines.find(l => l.entryName === rentName)?.plannedAmount).toBe(seen)
   })
@@ -416,7 +416,7 @@ describe('order and bulk', () => {
 describe('lost answers and lifecycles', () => {
   test('21. a save that landed but whose answer was lost does not double anything', async () => {
     commit('createEntry', { name: 'Dentist', type: 'expense', categoryName: 'Health' })
-    commit('takeSnapshot', budget.buildSnapshot(state.vault!, 'Once'))
+    commit('addBeleg', { date: '2026-10-05', amount: '12.00', entryId: null, note: 'Once', createdBy: '1' })
     // The server stores it, and the answer never arrives.
     api.putVault.mockImplementationOnce(async (body: never) => {
       serve(body)
@@ -429,7 +429,7 @@ describe('lost answers and lifecycles', () => {
 
     const saved = await onServer()
     expect(saved.budget.entries.filter(e => e.name === 'Dentist')).toHaveLength(1)
-    expect(saved.budget.snapshots.filter(s => s.name === 'Once')).toHaveLength(1)
+    expect(saved.belege.filter(b => b.note === 'Once')).toHaveLength(1)
     expect(state.dirty).toBe(false)
     expect(state.waiting).toBe(null)
   })
@@ -874,7 +874,7 @@ describe('Belege', () => {
     commit('addBeleg', record('2026-10-05', '12.00'))
     await saveVault()
     itIs(2026, 11, 1)
-    await elsewhere(v => belege.closeMonth(v, '2026-10', { id: 'theirs', name: '', createdAt: 'theirs', lines: [] }))
+    await elsewhere(v => belege.closeMonth(v, '2026-10', { id: 'theirs', month: '2026-10', createdAt: 'theirs', lines: [] }))
 
     commit('addBeleg', record('2026-11-01', '5.00'))
     await saveVault()

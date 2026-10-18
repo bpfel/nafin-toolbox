@@ -239,7 +239,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'February',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [
               { entryName: 'Salary', categoryName: 'Income', type: 'income', plannedAmount: '5000.00' },
@@ -387,19 +387,19 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'January',
+            month: '2026-01',
             createdAt: '2026-01-01T00:00:00.000Z',
             lines: [{ entryName: 'Salary', categoryName: 'Income', type: 'income', plannedAmount: '5000.00' }],
           },
           {
             id: 'ar2',
-            name: 'February',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [{ entryName: 'Salary', categoryName: 'Income', type: 'income', plannedAmount: '5200.00' }],
           },
           {
             id: 'ar3',
-            name: 'An snapshot of an empty plan',
+            month: '2026-01',
             createdAt: '2026-03-01T00:00:00.000Z',
             lines: [],
           },
@@ -411,7 +411,7 @@ describe('encryptVault and decryptVault', () => {
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
     expect(decrypted.budget.snapshots.length).toBe(3)
-    expect(decrypted.budget.snapshots[0].name).toBe('January')
+    expect(decrypted.budget.snapshots[0].month).toBe('2026-01')
     expect(decrypted.budget.snapshots[0].createdAt).toBe('2026-01-01T00:00:00.000Z')
     expect(decrypted.budget.snapshots[0].lines[0].plannedAmount).toBe('5000.00')
     expect(decrypted.budget.snapshots[2].lines).toEqual([])
@@ -470,7 +470,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'Last year',
+            month: '2026-01',
             createdAt: '2025-12-31T00:00:00.000Z',
             lines: [{ entryName: 'Groceries', categoryName: 'Expenses', type: 'expense', plannedAmount: '67.89' }],
           },
@@ -508,7 +508,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'Line 1\nLine 2\tTabbed',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [],
           },
@@ -521,7 +521,7 @@ describe('encryptVault and decryptVault', () => {
 
     expect(decrypted.budget.categories[0].name).toBe('Émoji 🎉 & Special "chars"')
     expect(decrypted.budget.entries[0].name).toBe('Salary (CHF)')
-    expect(decrypted.budget.snapshots[0].name).toBe('Line 1\nLine 2\tTabbed')
+    expect(decrypted.budget.snapshots[0].month).toBe('2026-01')
     expect(decrypted.accounts[0].name).toBe('Zürich «Haupt»')
   })
 
@@ -606,7 +606,7 @@ describe('encryptVault and decryptVault', () => {
         })),
         snapshots: Array.from({ length: 24 }, (_, snapshotIndex) => ({
           id: `ar${snapshotIndex}`,
-          name: `Snapshot ${snapshotIndex}`,
+          month: '2026-01',
           createdAt: `2026-01-01T00:00:00.${String(snapshotIndex).padStart(3, '0')}Z`,
           lines: Array.from({ length: 30 }, (_, lineIndex) => ({
             entryName: `Entry ${lineIndex}`,
@@ -649,7 +649,7 @@ describe('encryptVault and decryptVault', () => {
         ],
         plan: [{ entryId: '', plannedAmount: '' }],
         snapshots: [
-          { id: '', name: '', createdAt: '', lines: [{ entryName: '', categoryName: '', type: 'income', plannedAmount: '' }] },
+          { id: '', month: '', createdAt: '', lines: [{ entryName: '', categoryName: '', type: 'income', plannedAmount: '' }] },
         ],
       },
     }
@@ -660,7 +660,7 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.budget.categories[0].id).toBe('')
     expect(decrypted.budget.categories[0].name).toBe('')
     expect(decrypted.budget.entries[0].name).toBe('')
-    expect(decrypted.budget.snapshots[0].name).toBe('')
+    expect(decrypted.budget.snapshots[0].month).toBe('')
     expect(decrypted.budget.plan[0].plannedAmount).toBe('')
     expect(decrypted.accounts[0].name).toBe('')
   })
@@ -685,7 +685,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: '  leading and trailing spaces  ',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [],
           },
@@ -696,7 +696,7 @@ describe('encryptVault and decryptVault', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.snapshots[0].name).toBe('  leading and trailing spaces  ')
+    expect(decrypted.budget.snapshots[0].month).toBe('2026-01')
   })
 
   test('ciphertext length is proportional to plaintext size', async () => {
@@ -883,12 +883,10 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrated.budget.plan).toEqual([{ entryId: 'c1', plannedAmount: '1350.00' }])
   })
 
-  test('archived lines keep both names, under the new ones', () => {
-    const migrated = migrateVault(v4Vault())
-
-    expect(migrated.budget.snapshots[0].lines).toEqual([
-      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1300.00' },
-    ])
+  // Archives were taken by hand, without a month: retired at v11 with every
+  // other hand-made snapshot, however old.
+  test('old archives do not outlive the move to v11', () => {
+    expect(migrateVault(v4Vault()).budget.snapshots).toEqual([])
   })
 
   test('routing survives the rename', () => {
@@ -959,13 +957,13 @@ describe('migrateVault — legacy versions forward', () => {
     }
   }
 
-  test('v5 archives become v6 snapshots, contents untouched', () => {
+  // Carried from v5 to v6 as snapshots — and, taken by hand with no month,
+  // retired on the way to v11 like every other one.
+  test('v5 archives are carried forward, then retired with all hand-made snapshots', () => {
     const migrated = migrateVault(v5Vault())
 
     expect(migrated.version).toBe(VAULT_VERSION)
-    expect(migrated.budget.snapshots).toHaveLength(1)
-    expect(migrated.budget.snapshots[0].name).toBe('Q1')
-    expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
+    expect(migrated.budget.snapshots).toEqual([])
     // A key move, not a transformation: nothing else may shift.
     expect(migrated.budget.entries).toEqual(v5Vault().budget.entries)
     expect(migrated.budget.plan).toEqual(v5Vault().budget.plan)
@@ -985,8 +983,8 @@ describe('migrateVault — legacy versions forward', () => {
 
     const migrated = migrateVault(mislabelled)
 
-    expect(migrated.budget.snapshots).toHaveLength(1)
-    expect(migrated.budget.snapshots[0].name).toBe('Q1')
+    expect('archives' in migrated.budget).toBe(false)
+    expect(migrated.budget.snapshots).toEqual([])
   })
 
   // --- v6 -> v7: five entry types, and a category has a side ---------------
@@ -1075,7 +1073,6 @@ describe('migrateVault — legacy versions forward', () => {
     const migrated = migrateVault(v6Vault())
 
     expect(migrated.budget.plan).toEqual(v6Vault().budget.plan)
-    expect(migrated.budget.snapshots).toEqual(v6Vault().budget.snapshots)
     expect(migrated.accounts).toEqual(v6Vault().accounts)
   })
 
@@ -1104,8 +1101,7 @@ describe('migrateVault — legacy versions forward', () => {
     const migrated = migrateVault(v4Vault())
 
     expect(migrated.version).toBe(VAULT_VERSION)
-    expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
-    expect(migrated.budget.snapshots[0].lines[0].categoryName).toBe('Housing')
+    expect(migrated.budget.entries[0].name).toBe('Rent')
   })
 
   /**
@@ -1314,6 +1310,23 @@ describe('migrateVault — legacy versions forward', () => {
 
   // Belege's months were a map of their own in builds never released; a test
   // vault from then folds into snapshots rather than failing to open.
+  // Retired before the beta: every month keeps its copy now.
+  test('a v11 vault drops its hand-made snapshots and keeps its months', () => {
+    const v = createEmptyVault('Main')
+    const old = {
+      ...v,
+      budget: {
+        ...v.budget,
+        snapshots: [
+          { id: 'hand', name: 'Before the raise', createdAt: '2026-08-28T10:00:00Z', lines: [] },
+          { id: 'm9', month: '2026-09', createdAt: '2026-10-01T08:00:00Z', lines: [] },
+        ],
+      },
+    }
+
+    expect(migrateVault(old).budget.snapshots.map(s => s.id)).toEqual(['m9'])
+  })
+
   test('a pre-release v11 vault folds its months into snapshots', () => {
     const v = createEmptyVault('Main')
     const old = {
@@ -1325,7 +1338,7 @@ describe('migrateVault — legacy versions forward', () => {
 
     expect((migrated as unknown as { months?: unknown }).months).toBeUndefined()
     const copy = migrated.budget.snapshots.find(s => s.month === '2026-09')!
-    expect(copy).toMatchObject({ name: '', createdAt: '2026-10-01T08:00:00Z' })
+    expect(copy).toMatchObject({ createdAt: '2026-10-01T08:00:00Z' })
     expect(copy.lines[0]).toMatchObject({ entryId: 'e1', type: 'expense', automatic: true })
   })
 
@@ -1392,7 +1405,7 @@ describe('encryptVault — large vaults', () => {
     // ~2000 snapshot lines: a few years of monthly snapshots.
     vault.budget.snapshots = Array.from({ length: 40 }, (_, a) => ({
       id: `snapshot-${a}`,
-      name: `Snapshot ${a}`,
+      month: `2026-${String((a % 12) + 1).padStart(2, '0')}`,
       createdAt: '2026-08-16',
       lines: Array.from({ length: 50 }, (_, l) => ({
         entryName: `A reasonably long entry name ${a}-${l}`,

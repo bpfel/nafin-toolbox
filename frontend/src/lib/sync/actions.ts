@@ -1,4 +1,4 @@
-import { savesTowardsTarget, sideOf, type EntryType, type VaultData, type VaultSnapshot } from '../crypto/vault'
+import { savesTowardsTarget, sideOf, type EntryType, type VaultData } from '../crypto/vault'
 import * as budget from '../budget/budgetEngine'
 import * as accounts from '../accounts/accountsEngine'
 import * as belege from '../belege/belegeEngine'
@@ -29,7 +29,6 @@ export type RefusalCode =
   | 'entryChanged'
   | 'categoryGone'
   | 'nameTaken'
-  | 'snapshotGone'
   | 'accountGone'
   | 'lastAccount'
   | 'pinMismatch'
@@ -74,7 +73,6 @@ const entry = (vault: VaultData, id: string) => vault.budget.entries.find(e => e
 const category = (vault: VaultData, id: string) => vault.budget.categories.find(c => c.id === id)
 const account = (vault: VaultData, id: string | null) =>
   id === null ? null : vault.accounts.find(a => a.id === id)
-const snapshot = (vault: VaultData, id: string) => vault.budget.snapshots.find(s => s.id === id)
 
 /** The id of the category a name refers to now, on the side an entry type sits on. */
 const categoryIdFor = (vault: VaultData, name: string, type: EntryType) =>
@@ -190,31 +188,6 @@ export const ACTIONS = {
     subject: (v, [fromId]) => category(v, fromId)?.name,
   }),
   reorderCategories: def({ apply: budget.reorderCategories }),
-
-  // --- snapshots ---
-  // Carries the snapshot as built on screen, not the name to build one from:
-  // see `buildSnapshot`.
-  takeSnapshot: def({
-    // A copy, so the vault and the queued action never share one object.
-    apply: (v: VaultData, built: VaultSnapshot) => budget.insertSnapshot(v, structuredClone(built)),
-    check: (v, [built]) => (snapshot(v, built.id) ? 'done' : 'go'),
-    subject: (_v, [built]) => built.name,
-  }),
-  renameSnapshot: def({
-    apply: budget.renameSnapshot,
-    check: (v, [id]) => (snapshot(v, id) ? 'go' : 'snapshotGone'),
-    subject: (v, [id]) => snapshot(v, id)?.name,
-    sets: {
-      read: (v, [id]) => snapshot(v, id)?.name,
-      written: ([, name]) => name.trim(),
-      with: ([id], name) => tuple(id, name),
-    },
-  }),
-  deleteSnapshot: def({
-    apply: budget.deleteSnapshot,
-    check: (v, [id]) => (snapshot(v, id) ? 'go' : 'done'),
-    subject: (v, [id]) => snapshot(v, id)?.name,
-  }),
 
   // --- the whole budget ---
   resetBudget: def({ apply: budget.resetBudget }),

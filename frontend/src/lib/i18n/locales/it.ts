@@ -275,7 +275,16 @@ export const it: Messages = {
   'budget.previousVersion': 'Versione precedente',
   'budget.nextVersion': 'Versione successiva',
   'budget.pastVersionHint': 'Il budget com’era allora. Solo lettura.',
-  'budget.alsoSaved': 'Salvato anche allora',
+  'budget.changesTitle': 'Cosa è cambiato rispetto alla versione precedente',
+  'change.added': 'aggiunto',
+  'change.removed': 'rimosso',
+  'change.renamed': 'rinominato in {name}',
+  'change.moved': 'spostato in {category}',
+  'change.automaticOn': 'ora pagato automaticamente',
+  'change.automaticOff': 'non più pagato automaticamente',
+  'change.showAll': 'Mostra tutte le {count} modifiche',
+  'change.showFewer': 'Mostra meno',
+  'reset.versionsKept': 'Le versioni precedenti del budget restano conservate.',
   'budget.perYear': '/anno',
   'budget.plannedMo': 'Previsto/mese',
   'budget.plannedYr': 'Previsto/anno',
@@ -334,7 +343,7 @@ export const it: Messages = {
   'guide.purchase.body': 'Un computer portatile, un’auto, un acquisto importante che sai già di dover fare. Indica il costo previsto e la durata attesa, l’importo mensile ne deriva — oppure fissa quanto puoi mettere da parte ogni mese, e scoprirai quando avrai risparmiato abbastanza.',
   'guide.purchase.reset': 'Una volta comprato, inserisci la data sotto «Acquistato» e il conteggio riparte.',
   'entry.deleteTitle': 'Elimina la voce',
-  'entry.deleteExplain': 'Rimuovere {name} dal tuo budget? Il suo importo previsto sparisce con essa. Un’istantanea che l’ha già registrata ne conserva la copia.',
+  'entry.deleteExplain': 'Rimuovere {name} dal budget? L’importo previsto se ne va con esso. Le versioni precedenti del budget ne conservano la copia.',
 
   // --- Category dialog ---
   'category.editTitle': 'Modifica la categoria',
@@ -354,19 +363,12 @@ export const it: Messages = {
   // --- Snapshots ---
   'snapshot.empty': 'Questa istantanea non contiene righe.',
   'snapshot.entryColumn': 'Voce',
-  'snapshot.deleteOne': 'Elimina l’istantanea {name}',
-  'snapshot.deleteTitle': 'Elimina l’istantanea',
-  'snapshot.unrecoverable': 'Questa istantanea non può essere recuperata.',
-  'snapshot.deleteExplain.one': 'Eliminare {name} e la sua {count} riga?',
-  'snapshot.deleteExplain.other': 'Eliminare {name} e le sue {count} righe?',
 
   // --- Resetting ---
   'reset.title': 'Reimposta il budget',
   'reset.explain.one': 'Questo rimuove l’unica voce, la sua categoria e ogni importo previsto. Riparti da un budget vuoto.',
   'reset.explain.other': 'Questo rimuove tutte le {count} voci, le loro categorie e ogni importo previsto. Riparti da un budget vuoto.',
-  'reset.snapshotsKept.one': 'La tua {count} istantanea è una registrazione di quanto era stato preventivato e viene conservata.',
-  'reset.snapshotsKept.other': 'Le tue {count} istantanee sono registrazioni di quanto era stato preventivato e vengono conservate.',
-  'reset.noSnapshots': 'Non ci sono istantanee, quindi non resterà alcuna registrazione di questo piano. Annulla e scattane una prima, se vuoi conservarla.',
+  'reset.noSnapshots': 'Da quando questo budget è stato creato non si è ancora concluso alcun mese, quindi non ne resterà traccia.',
 
   // --- Accounts ---
   'accounts.add': 'Aggiungi',
@@ -518,7 +520,6 @@ export const it: Messages = {
   'sync.dropped.entryChanged': '{subject} è stato modificato altrove e la tua modifica non vi si applica più.',
   'sync.dropped.categoryGone': 'La categoria {subject} è stata eliminata altrove.',
   'sync.dropped.nameTaken': 'Rinominare {subject}: quel nome è stato preso altrove.',
-  'sync.dropped.snapshotGone': 'L’istantanea {subject} è stata eliminata altrove.',
   'sync.dropped.accountGone': 'Un conto di cui ha bisogno la tua modifica a {subject} è stato eliminato altrove.',
   'sync.dropped.lastAccount': '{subject} non è stato eliminato: ora è l’unico conto.',
   'sync.dropped.pinMismatch': 'La chiave di un membro dell’economia domestica è cambiata. Non è stata accettata.',
@@ -556,8 +557,6 @@ export const it: Messages = {
   'accountDelete.collapsing.one': '{count} voce sposta attualmente denaro tra {account} e {target}. Dopo lo spostamento entrambe le estremità saranno {target}, quindi diventa denaro accantonato all’interno di un unico conto. È consentito, ma non significa più la stessa cosa.',
   'accountDelete.collapsing.other': '{count} voci spostano attualmente denaro tra {account} e {target}. Dopo lo spostamento entrambe le estremità saranno {target}, quindi diventano denaro accantonato all’interno di un unico conto. È consentito, ma non significa più la stessa cosa.',
   'error.saveCategory': 'non è stato possibile salvare questa categoria',
-  'error.renameSnapshot': 'non è stato possibile rinominare questa istantanea',
-  'error.takeSnapshot': 'non è stato possibile scattare un’istantanea',
   'password.mustChange': 'Imposta una nuova password per continuare.',
 
   // --- Sentences assembled around their values ---

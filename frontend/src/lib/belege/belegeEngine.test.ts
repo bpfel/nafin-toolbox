@@ -76,7 +76,7 @@ describe('the entry a record is counted against', () => {
 })
 
 describe('closing a month', () => {
-  const copy = (name = '') => ({ id: name || 'x', name, createdAt: name || 'now', lines: [] })
+  const copy = (stamp = 'now') => ({ id: stamp, month: '2026-01', createdAt: stamp, lines: [] })
 
   test('from the month being recorded up to this one, and any earlier month a record was backdated into', () => {
     const v = vault()
@@ -180,28 +180,11 @@ describe('closing a month', () => {
   })
 })
 
-describe('the copies the archive keeps', () => {
-  test('a month’s copy cannot be deleted; a snapshot taken by hand can', () => {
+describe('the copies months keep', () => {
+  test('carry no name: a month is called by its month', () => {
     const v = vault()
     closeMonth(v, '2026-09', buildMonthSnapshot(v, '2026-09'))
-    budget.insertSnapshot(v, budget.buildSnapshot(v, 'Before the move'))
-    const [month, named] = [monthCopy(v, '2026-09')!, v.budget.snapshots.find(s => s.name === 'Before the move')!]
-
-    budget.deleteSnapshot(v, month.id)
-    budget.deleteSnapshot(v, named.id)
-
-    expect(v.budget.snapshots.map(s => s.id)).toEqual([month.id])
-  })
-
-  test('a month’s copy can be named, and the name cleared back to its month', () => {
-    const v = vault()
-    closeMonth(v, '2026-09', buildMonthSnapshot(v, '2026-09'))
-    const month = monthCopy(v, '2026-09')!
-
-    budget.renameSnapshot(v, month.id, 'Moving month')
-    expect(month.name).toBe('Moving month')
-    budget.renameSnapshot(v, month.id, '')
-    expect(month.name).toBe('')
+    expect(Object.keys(monthCopy(v, '2026-09')!)).not.toContain('name')
   })
 })
 

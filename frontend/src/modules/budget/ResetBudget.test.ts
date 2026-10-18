@@ -137,23 +137,23 @@ describe('resetting the budget', () => {
     expect(await screen.findByRole('heading', { name: 'Set up your budget' })).toBeTruthy()
   })
 
-  test('says snapshots survive when there are any', async () => {
-    load([{ id: 'a1', name: 'Q1', createdAt: '2026-01-01', lines: [] }])
+  test('says earlier versions survive when there are any', async () => {
+    load([{ id: 'a1', month: '2026-01', createdAt: '2026-02-01', lines: [] }])
     toggleEditing('budget')
     render(BudgetModule)
 
     await fireEvent.click(resetButton()!)
 
-    expect(await screen.findByText(/1 snapshot is/i)).toBeTruthy()
+    expect(await screen.findByText(/Earlier versions of the plan are kept/i)).toBeTruthy()
   })
 
-  test('warns when there are no snapshots', async () => {
+  test('warns when no month has ended yet', async () => {
     load()
     toggleEditing('budget')
     render(BudgetModule)
 
     await fireEvent.click(resetButton()!)
 
-    expect(await screen.findByText(/no snapshots/i)).toBeTruthy()
+    expect(await screen.findByText(/no record of it will remain/i)).toBeTruthy()
   })
 })

@@ -43,6 +43,14 @@ release may change things without a deprecation period. Each release is a tag on
 - The images are unchanged. Recreating the containers is enough, but rebuilding
   does no harm.
 
+### Removed
+
+- **Snapshots taken by hand are gone.** The Archive and taking snapshots by
+  hand are retired: every month keeps its own copy of the plan now. Snapshots
+  taken before are removed when a budget is next opened. (Pre-beta: no
+  migration to month copies, since a copy taken mid-month is not the plan a
+  month ended with.)
+
 ### New
 
 - **Belege: what you actually spent, against the budget.** A new tab between
@@ -57,10 +65,9 @@ release may change things without a deprecation period. Each release is a tag on
 - **Budget steps back through earlier versions of the plan.** Arrows above the
   plan go from the plan now to the plan before each change — months that
   changed nothing are one step, such as *July – August 2026*. An earlier
-  version is shown whole and read-only, and can be given a name. This replaces
-  the Archive: snapshots are no longer taken by hand, since every month keeps
-  one; snapshots taken before are kept, listed with the version that was the
-  plan when they were taken. A record whose
+  version is shown whole and read-only, and each version lists what changed
+  from the one before — worked out by the app, every change, folded only when
+  it is long. This replaces the Archive. A record whose
   budget line is deleted is kept as Unassigned, never lost.
   In a household, each record says who paid — a member or the joint
   account — and Review shows who owes whom, running on from month to month,

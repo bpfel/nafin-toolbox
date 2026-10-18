@@ -262,19 +262,19 @@ describe('splitting a sentence around a slot', () => {
   test('gives the text either side of the placeholder', async () => {
     const { tAround } = await load()
 
-    const [before, after] = tAround('snapshot.deleteOne', 'name')
+    const [before, after] = tAround('entry.deleteExplain', 'name')
 
-    expect(before).toBe('Delete snapshot ')
-    expect(after).toBe('')
+    expect(before).toBe('Remove ')
+    expect(after).toMatch(/^ from your budget\?/)
   })
 
   test('fills the other placeholders as usual', async () => {
     const { tAround } = await load()
 
-    const [before, after] = tAround('snapshot.deleteExplain.one', 'name', { count: 3 })
+    const [before, after] = tAround('spending.transfer', 'from', { to: 'Ben' })
 
-    expect(before).toBe('Delete ')
-    expect(after).toBe(' and its 3 line?')
+    expect(before).toBe('')
+    expect(after).toBe(' pays Ben')
   })
 
   test('a sentence without that placeholder comes back whole', async () => {

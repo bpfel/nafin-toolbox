@@ -180,12 +180,12 @@ is `category.side`.
 - `VaultPlanEntry` — `entryId`, planned amount. One standing plan, not per month
 - `VaultSnapshot` — a copy of the plan; its lines are denormalised to
   `entryName` / `categoryName` (with `entryId` and `automatic` beside them) so they survive
-  a later rename or delete. A **month's copy** (`month: 'YYYY-MM'`) is taken by the
-  app as each month ends — the plan's history, and the plan Belege reads that month
-  against; it may be named, never deleted. Budget steps back through *versions* — runs
-  of months with identical copies (`lib/budget/versions.ts`). Snapshots without a `month`
-  were taken by hand before months were kept: no new ones are made; the old ones are shown
-  with the version they belong to, and can be deleted
+  a later rename or delete. Every snapshot is a **month's copy** (`month: 'YYYY-MM'`),
+  taken by the app as each month ends — the plan's history, and the plan Belege reads that
+  month against. Budget steps back through *versions*: runs of months with identical copies
+  (`lib/budget/versions.ts`), each listing what changed from the one before
+  (`lib/budget/changes.ts`). Snapshots taken by hand (with a name, before months were kept)
+  were retired pre-beta and are dropped on load
   `budget.openMonth` is the month being recorded; set when the plan is made (or upgraded),
   so no history before it is invented
 - `VaultAccount` — name, kind, currency, `currentAmount` as at `lastCorrectedAt`

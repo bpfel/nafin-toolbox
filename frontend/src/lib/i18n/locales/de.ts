@@ -262,7 +262,16 @@ export const de: Messages = {
   'budget.previousVersion': 'Frühere Version',
   'budget.nextVersion': 'Spätere Version',
   'budget.pastVersionHint': 'Das Budget, wie es damals war. Nur lesbar.',
-  'budget.alsoSaved': 'Damals ebenfalls gespeichert',
+  'budget.changesTitle': 'Was sich gegenüber der Version davor geändert hat',
+  'change.added': 'neu',
+  'change.removed': 'entfernt',
+  'change.renamed': 'umbenannt in {name}',
+  'change.moved': 'verschoben nach {category}',
+  'change.automaticOn': 'jetzt automatisch bezahlt',
+  'change.automaticOff': 'nicht mehr automatisch bezahlt',
+  'change.showAll': 'Alle {count} Änderungen zeigen',
+  'change.showFewer': 'Weniger zeigen',
+  'reset.versionsKept': 'Frühere Versionen des Budgets bleiben erhalten.',
   'budget.perYear': '/J.',
   'budget.plannedMo': 'Geplant/Mt.',
   'budget.plannedYr': 'Geplant/J.',
@@ -326,9 +335,6 @@ export const de: Messages = {
   // --- Snapshots ---
   'snapshot.empty': 'Diese Momentaufnahme hat keine Zeilen.',
   'snapshot.entryColumn': 'Eintrag',
-  'snapshot.deleteOne': 'Momentaufnahme {name} löschen',
-  'snapshot.deleteTitle': 'Momentaufnahme löschen',
-  'snapshot.unrecoverable': 'Diese Momentaufnahme kann nicht wiederhergestellt werden.',
 
   'field.name': 'Name',
 
@@ -336,14 +342,10 @@ export const de: Messages = {
   'reset.title': 'Budget zurücksetzen',
   'reset.explain.one': 'Damit werden der eine Eintrag, seine Kategorie und alle geplanten Beträge entfernt. Du beginnst wieder mit einem leeren Budget.',
   'reset.explain.other': 'Damit werden alle {count} Einträge, ihre Kategorien und alle geplanten Beträge entfernt. Du beginnst wieder mit einem leeren Budget.',
-  'reset.snapshotsKept.one': 'Deine {count} Momentaufnahme ist eine Aufzeichnung des damals Budgetierten und bleibt erhalten.',
-  'reset.snapshotsKept.other': 'Deine {count} Momentaufnahmen sind Aufzeichnungen des damals Budgetierten und bleiben erhalten.',
-  'reset.noSnapshots': 'Es gibt keine Momentaufnahmen, es bleibt also keine Aufzeichnung dieses Plans. Brich ab und erstell zuerst eine, wenn du eine behalten möchtest.',
+  'reset.noSnapshots': 'Seit dieses Budget erstellt wurde, ist noch kein Monat zu Ende gegangen, also bleibt keine Aufzeichnung davon.',
 
-  'entry.deleteExplain': 'Soll {name} aus deinem Budget entfernt werden? Der geplante Betrag geht mit. Eine Momentaufnahme, die ihn bereits erfasst hat, behält ihre Kopie.',
+  'entry.deleteExplain': '{name} aus dem Budget entfernen? Der geplante Betrag geht mit. Frühere Versionen des Budgets behalten ihre Kopie davon.',
 
-  'snapshot.deleteExplain.one': '{name} und die {count} Zeile löschen?',
-  'snapshot.deleteExplain.other': '{name} und seine {count} Zeilen löschen?',
 
   // --- Accounts ---
   'accounts.add': 'Hinzufügen',
@@ -525,7 +527,6 @@ export const de: Messages = {
   'sync.dropped.entryChanged': '{subject} wurde anderswo geändert, und deine Änderung passt nicht mehr dazu.',
   'sync.dropped.categoryGone': 'Die Kategorie {subject} wurde anderswo gelöscht.',
   'sync.dropped.nameTaken': '{subject} umbenennen: Der Name wurde anderswo vergeben.',
-  'sync.dropped.snapshotGone': 'Der Schnappschuss {subject} wurde anderswo gelöscht.',
   'sync.dropped.accountGone': 'Ein Konto, das deine Änderung an {subject} braucht, wurde anderswo gelöscht.',
   'sync.dropped.lastAccount': '{subject} konnte nicht gelöscht werden: Es ist jetzt das einzige Konto.',
   'sync.dropped.pinMismatch': 'Der Schlüssel eines Haushaltsmitglieds hat sich geändert. Er wurde nicht akzeptiert.',
@@ -563,8 +564,6 @@ export const de: Messages = {
   'accountDelete.collapsing.one': '{count} Eintrag verschiebt derzeit Geld zwischen {account} und {target}. Nach der Verschiebung sind beide Enden {target}, der Eintrag wird also zu einer Rückstellung innerhalb eines einzigen Kontos. Das ist zulässig, bedeutet aber nicht mehr dasselbe.',
   'accountDelete.collapsing.other': '{count} Einträge verschieben derzeit Geld zwischen {account} und {target}. Nach der Verschiebung sind beide Enden {target}, die Einträge werden also zu Rückstellungen innerhalb eines einzigen Kontos. Das ist zulässig, bedeutet aber nicht mehr dasselbe.',
   'error.saveCategory': 'diese Kategorie konnte nicht gespeichert werden',
-  'error.renameSnapshot': 'diese Momentaufnahme konnte nicht umbenannt werden',
-  'error.takeSnapshot': 'es konnte keine Momentaufnahme erstellt werden',
   'password.mustChange': 'Bitte leg ein neues Passwort fest, um fortzufahren.',
 
   // --- Sentences assembled around their values ---

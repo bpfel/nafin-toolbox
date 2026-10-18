@@ -287,7 +287,16 @@ export const en = {
   'budget.previousVersion': 'Earlier version',
   'budget.nextVersion': 'Later version',
   'budget.pastVersionHint': 'The plan as it stood then. Read only.',
-  'budget.alsoSaved': 'Also saved then',
+  'budget.changesTitle': 'What changed from the version before',
+  'change.added': 'added',
+  'change.removed': 'removed',
+  'change.renamed': 'renamed to {name}',
+  'change.moved': 'moved to {category}',
+  'change.automaticOn': 'now paid automatically',
+  'change.automaticOff': 'no longer paid automatically',
+  'change.showAll': 'Show all {count} changes',
+  'change.showFewer': 'Show fewer',
+  'reset.versionsKept': 'Earlier versions of the plan are kept.',
   'budget.perYear': '/yr',
   'budget.plannedMo': 'Planned/mo',
   'budget.plannedYr': 'Planned/yr',
@@ -354,9 +363,6 @@ export const en = {
   // --- Snapshots ---
   'snapshot.empty': 'This snapshot has no lines.',
   'snapshot.entryColumn': 'Entry',
-  'snapshot.deleteOne': 'Delete snapshot {name}',
-  'snapshot.deleteTitle': 'Delete snapshot',
-  'snapshot.unrecoverable': 'This snapshot cannot be recovered.',
 
   'field.name': 'Name',
 
@@ -367,14 +373,10 @@ export const en = {
   'reset.title': 'Reset budget',
   'reset.explain.one': 'This removes all {count} entry, its category and every planned amount. You start again from an empty budget.',
   'reset.explain.other': 'This removes all {count} entries, their categories and every planned amount. You start again from an empty budget.',
-  'reset.snapshotsKept.one': 'Your {count} snapshot is a record of what was budgeted and is kept.',
-  'reset.snapshotsKept.other': 'Your {count} snapshots are records of what was budgeted and are kept.',
-  'reset.noSnapshots': 'There are no snapshots, so no record of this plan will remain. Cancel and take one first if you want to keep it.',
+  'reset.noSnapshots': 'No month has ended since this plan was made, so no record of it will remain.',
 
-  'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Any snapshot that already recorded it keeps its copy.',
+  'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Earlier versions of the plan keep their copy of it.',
 
-  'snapshot.deleteExplain.one': 'Delete {name} and its {count} line?',
-  'snapshot.deleteExplain.other': 'Delete {name} and its {count} lines?',
 
   // --- Accounts ---
   'accounts.add': 'Add',
@@ -564,7 +566,6 @@ export const en = {
   'sync.dropped.entryChanged': '{subject} was changed elsewhere, and your change no longer fits it.',
   'sync.dropped.categoryGone': 'The category {subject} was deleted elsewhere.',
   'sync.dropped.nameTaken': 'Renaming {subject}: that name was taken elsewhere.',
-  'sync.dropped.snapshotGone': 'The snapshot {subject} was deleted elsewhere.',
   'sync.dropped.accountGone': 'An account your change to {subject} needs was deleted elsewhere.',
   'sync.dropped.lastAccount': '{subject} could not be deleted: it is now the only account.',
   'sync.dropped.pinMismatch': 'A household member\'s key changed. It was not accepted.',
@@ -602,8 +603,6 @@ export const en = {
   'accountDelete.collapsing.one': '{count} entry currently moves money between {account} and {target}. After the move both ends are {target}, so it becomes money set aside within one account. That is allowed, but it no longer means the same thing.',
   'accountDelete.collapsing.other': '{count} entries currently move money between {account} and {target}. After the move both ends are {target}, so they become money set aside within one account. That is allowed, but it no longer means the same thing.',
   'error.saveCategory': 'could not save this category',
-  'error.renameSnapshot': 'could not rename this snapshot',
-  'error.takeSnapshot': 'could not take a snapshot',
   'password.mustChange': 'Please set a new password to continue.',
 
   // --- Sentences assembled around their values ---

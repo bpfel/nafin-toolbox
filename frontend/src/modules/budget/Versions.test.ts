@@ -14,7 +14,6 @@ const line = (entryId: string, name: string, type: 'income' | 'expense', categor
 
 const copy = (month: string, salary: string, extra: Partial<VaultSnapshot> = {}): VaultSnapshot => ({
   id: `copy-${month}`,
-  name: '',
   createdAt: `${month}-28T12:00:00Z`,
   month,
   lines: [line('salary', 'Salary', 'income', 'Employment', salary), line('rent', 'Rent', 'expense', 'Housing', '1350.00')],
@@ -79,24 +78,32 @@ describe('earlier versions of the plan', () => {
     expect((screen.getByRole('button', { name: 'Earlier version' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  test('a named version shows its name, with its months beneath', async () => {
-    withHistory([copy('2026-08', '5600.00', { name: 'Before the raise' }), copy('2026-09', '6000.00')])
+  // What a step back would undo, worked out rather than typed in.
+  test('a version says what changed from the one before it', async () => {
+    withHistory([copy('2026-08', '5600.00'), copy('2026-09', '6000.00')])
     render(BudgetModule)
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+    expect(screen.getByRole('heading', { name: 'What changed from the version before' })).toBeTruthy()
+    const changes = screen.getByRole('heading', { name: 'What changed from the version before' }).closest('section')!
+    expect(changes.textContent).toMatch(/Salary/)
+    expect(changes.textContent).toMatch(/5.600\.00 → 6.000\.00/)
 
-    expect(screen.getByRole('heading', { name: 'Before the raise' })).toBeTruthy()
-    expect(screen.getByText('August 2026')).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
+    // The oldest has nothing before it.
+    expect(screen.queryByRole('heading', { name: 'What changed from the version before' })).toBeNull()
   })
 
-  test('a snapshot taken by hand back then is listed with that version', async () => {
-    const handMade: VaultSnapshot = { ...copy('2026-08', '5600.00'), id: 'hand', name: 'Mid August', month: undefined, createdAt: '2026-08-15T10:00:00Z' }
-    withHistory([copy('2026-08', '5600.00'), copy('2026-09', '6000.00'), handMade])
+  // A move can touch a dozen lines; all of them are there, folded past six.
+  test('a long list of changes folds, and opens to every one', async () => {
+    const many = (amount: string) => copy('2026-08', amount)
+    const before = many('5600.00')
+    before.lines = Array.from({ length: 9 }, (_, i) => line(`e${i}`, `Line ${i}`, 'expense', 'Housing', '10.00'))
+    withHistory([before])
     render(BudgetModule)
+    const changes = screen.getByRole('heading', { name: 'What changed from the version before' }).closest('section')!
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))
-
-    expect(screen.getByText('Also saved then')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Mid August' })).toBeTruthy()
+    expect(changes.querySelectorAll('li')).toHaveLength(6)
+    await fireEvent.click(screen.getByRole('button', { name: /Show all \d+ changes/ }))
+    expect(changes.querySelectorAll('li').length).toBeGreaterThan(6)
   })
 })

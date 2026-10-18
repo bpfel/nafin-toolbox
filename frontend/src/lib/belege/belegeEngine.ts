@@ -169,9 +169,9 @@ function monthLines(vault: VaultData, month: string): VaultSnapshotLine[] {
     .map(e => snapshotLine(vault, e))
 }
 
-/** The copy a month ends with, unnamed: it is called by its month. */
+/** The copy a month ends with. */
 export function buildMonthSnapshot(vault: VaultData, month: string): VaultSnapshot {
-  return { id: newId('snapshot'), name: '', createdAt: nowISO(), month, lines: monthLines(vault, month) }
+  return { id: newId('snapshot'), createdAt: nowISO(), month, lines: monthLines(vault, month) }
 }
 
 /**
