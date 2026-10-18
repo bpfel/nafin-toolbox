@@ -1,7 +1,8 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
-  import type { VaultSnapshot, VaultSnapshotLine } from '../../lib/crypto/vault'
+  import { holdsMoney, sideOf, type VaultSnapshot, type VaultSnapshotLine } from '../../lib/crypto/vault'
+  import { snapshotTotals } from '../../lib/budget/budgetEngine'
   import Money from '../../lib/util/Money.svelte'
 
   interface Props {
@@ -31,10 +32,15 @@
     rows: LineRow[]
   }
 
-  function categoriesFor(type: 'income' | 'expense'): LineCategory[] {
+  /**
+   * Under their categories, income side first, as the budget lays them out —
+   * every type, not two. Savings, bills and purchases sit on the expense side
+   * with the expenses, and were left out of the view altogether before.
+   */
+  function categoriesFor(side: 'income' | 'expense'): LineCategory[] {
     const map = new Map<string, LineCategory>()
     snapshot.lines.forEach((line, index) => {
-      if (line.type !== type) return
+      if (sideOf(line.type) !== side) return
       const key = line.categoryName || ''
       if (!map.has(key)) map.set(key, { categoryName: key, rows: [] })
       map.get(key)!.rows.push({ line, index })
@@ -44,16 +50,7 @@
 
   let incomeCategories = $derived(categoriesFor('income'))
   let expenseCategories = $derived(categoriesFor('expense'))
-
-  function totalFor(type: 'income' | 'expense'): number {
-    return snapshot.lines
-      .filter(l => l.type === type)
-      .reduce((sum, l) => sum + Number(l.plannedAmount), 0)
-  }
-
-  let incomeTotal = $derived(totalFor('income'))
-  let expenseTotal = $derived(totalFor('expense'))
-  let balance = $derived(incomeTotal - expenseTotal)
+  let totals = $derived(snapshotTotals(snapshot))
 
   function commitName() {
     if (nameDraft.trim() === snapshot.name) {
@@ -106,13 +103,13 @@
           <th class="right col-amount">{t('budget.plannedMo')}</th>
         </tr>
       </thead>
-      {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + category.rows[0].line.type)}
+      {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + sideOf(category.rows[0].line.type))}
         <tbody>
           <tr class="line-category">
             <td colspan="2">{category.categoryName || t('budget.uncategorised')}</td>
           </tr>
           {#each category.rows as row (row.index)}
-            <tr class="line-row" class:income={row.line.type === 'income'}>
+            <tr class="line-row" class:income={row.line.type === 'income'} class:held={holdsMoney(row.line.type)}>
               <td class="line-name">{row.line.entryName}</td>
               <td class="line-amount"><Money value={row.line.plannedAmount} /></td>
             </tr>
@@ -122,16 +119,20 @@
       <tfoot>
         <tr>
           <td>{t('budget.income')}</td>
-          <td class="right total income-total"><Money value={incomeTotal} /></td>
+          <td class="right total income-total"><Money value={totals.income} /></td>
         </tr>
         <tr>
           <td>{t('budget.expenses')}</td>
-          <td class="right total expense-total"><Money value={expenseTotal} /></td>
+          <td class="right total"><Money value={totals.expenses} /></td>
         </tr>
         <tr>
           <td>{t('budget.savings')}</td>
-          <td class="right total" class:income-total={balance >= 0} class:expense-total={balance < 0}>
-            <Money value={balance} />
+          <td class="right total held-total"><Money value={totals.savings} /></td>
+        </tr>
+        <tr>
+          <td>{t('budget.unallocated')}</td>
+          <td class="right total" class:income-total={Number(totals.unallocated) >= 0} class:expense-total={Number(totals.unallocated) < 0}>
+            <Money value={totals.unallocated} />
           </td>
         </tr>
       </tfoot>
@@ -244,4 +245,7 @@
   }
   .income-total { color: #2d6a4f; }
   .expense-total { color: #c0392b; }
+  /* Savings, bills and purchases: held, not spent — the budget's blue. */
+  .line-row.held .line-amount,
+  .held-total { color: var(--money-held); }
 </style>

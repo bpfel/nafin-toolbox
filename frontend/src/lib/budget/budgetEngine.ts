@@ -535,6 +535,38 @@ export function listSnapshots(vault: VaultData): VaultSnapshot[] {
 }
 
 /**
+ * A snapshot's totals, by the rules the budget's own summary uses: income;
+ * expenses, consumed and gone; savings — savings, bills and purchases, out of
+ * the account and still in the net worth; and what is left unallocated.
+ *
+ * Read off the lines' stored type, so an old snapshot adds up as it did then.
+ * It added up only income and expense before, and called their difference
+ * savings: every line of the other three types was left out of the sum.
+ */
+export function snapshotTotals(snapshot: VaultSnapshot): {
+  income: string
+  expenses: string
+  savings: string
+  unallocated: string
+} {
+  let income = 0
+  let expenses = 0
+  let savings = 0
+  for (const line of snapshot.lines) {
+    const amount = Number(line.plannedAmount) || 0
+    if (line.type === 'income') income += amount
+    else if (holdsMoney(line.type)) savings += amount
+    else expenses += amount
+  }
+  return {
+    income: money(income),
+    expenses: money(expenses),
+    savings: money(savings),
+    unallocated: money(income - expenses - savings),
+  }
+}
+
+/**
  * Snapshots the current plan under a name.
  *
  * The lines are DENORMALISED — entry and category names are copied in, not

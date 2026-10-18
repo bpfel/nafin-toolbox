@@ -98,6 +98,11 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Fixed
 
+- **A snapshot shows every line, and adds up like the budget.** It showed
+  only income and expense lines, and called income minus expenses its
+  savings, so savings, bills and purchases were stored but never shown or
+  counted. They are listed now under their categories, and the totals are the
+  budget's own: income, expenses, savings and unallocated.
 - **Two devices no longer overwrite each other's budget.** Loading the
   personal vault left out when it was last saved, so a device's first save
   after loading went through unconditionally and replaced whatever another
