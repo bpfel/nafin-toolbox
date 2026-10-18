@@ -12,7 +12,7 @@ vi.mock('../../lib/crypto/vaultStore.svelte', async () => {
 })
 
 import ReviewView from './ReviewView.svelte'
-import { thisMonth } from '../../lib/belege/belegeEngine'
+import { thisMonth } from '../../lib/util/calendar'
 import { getNotices, clearNotices } from '../../lib/sync/notices.svelte'
 
 beforeEach(() => {

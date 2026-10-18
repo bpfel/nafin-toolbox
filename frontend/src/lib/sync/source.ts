@@ -1,3 +1,4 @@
+import { today } from '../util/calendar'
 /**
  * Where the engines get their ids and their sense of the time.
  *
@@ -72,9 +73,9 @@ export function nowISO(): string {
   return now
 }
 
-/** Today as `YYYY-MM-DD`, drawn from the same clock as `nowISO`. */
+/** Today as `YYYY-MM-DD` by the local calendar, drawn from the same clock as `nowISO`. */
 export function todayISO(): string {
-  return nowISO().slice(0, 10)
+  return today(new Date(nowISO()))
 }
 
 /** Run `fn`, writing down every id and time it is handed. */

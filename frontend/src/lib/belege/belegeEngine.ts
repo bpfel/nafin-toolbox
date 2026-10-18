@@ -2,6 +2,7 @@ import type { Beleg, Settlement, Split, VaultData, VaultEntry, VaultSnapshot, Va
 import { snapshotLine } from '../budget/budgetEngine'
 import { newId, nowISO } from '../sync/source'
 import { normalizeAmount } from '../util/money'
+import { nextMonth } from '../util/calendar'
 
 /**
  * Belege: what was actually spent, and how a month went against the budget.
@@ -95,16 +96,6 @@ export function monthOf(date: string): string {
   return date.slice(0, 7)
 }
 
-/** This month, `'YYYY-MM'`, by the local calendar — a receipt's day is the one on the wall. */
-export function thisMonth(now: Date = new Date()): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
-/** Today, `'YYYY-MM-DD'`, by the local calendar. */
-export function today(now: Date = new Date()): string {
-  return `${thisMonth(now)}-${String(now.getDate()).padStart(2, '0')}`
-}
-
 // --- choosing an entry -------------------------------------------------------
 
 /**
@@ -145,12 +136,6 @@ export function recentEntries(vault: VaultData, userId: string, count = 6): stri
 // month read against today's plan would change its verdict every time the plan
 // did. Taken by hand, a snapshot has no month; taken as a month ends, it does.
 
-/** The month after `month`, `'YYYY-MM'`. */
-export function nextMonth(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
-}
-
 /** A month's copy of the plan, if it has one. */
 export function monthCopy(vault: VaultData, month: string): VaultSnapshot | undefined {
   return vault.budget.snapshots.find(s => s.month === month)
@@ -166,20 +151,36 @@ function monthLines(vault: VaultData, month: string): VaultSnapshotLine[] {
   return vault.budget.entries
     .filter(e => !e.archived || pointedAt.has(e.id))
     .sort((a, b) => (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0) || a.sortOrder - b.sortOrder)
-    .map(e => snapshotLine(vault, e))
+    .map(e => (e.archived ? { ...snapshotLine(vault, e), archived: true as const } : snapshotLine(vault, e)))
 }
 
-/** The copy a month ends with. */
+/**
+ * The copy a month ends with. A month from before the budget's history began
+ * is one a record was backdated into: its copy is today's budget, and says so.
+ */
 export function buildMonthSnapshot(vault: VaultData, month: string): VaultSnapshot {
-  return { id: newId('snapshot'), createdAt: nowISO(), month, lines: monthLines(vault, month) }
+  const open = vault.budget.openMonth
+  return {
+    id: newId('snapshot'),
+    createdAt: nowISO(),
+    month,
+    lines: monthLines(vault, month),
+    ...(open && month < open ? { backdated: true as const } : {}),
+  }
 }
 
 /**
  * Keep a month's copy, and move on to the month after it. The first copy kept
  * stays: two devices closing October leave one.
+ *
+ * A month that ends with no budget and no records keeps nothing — the months
+ * between signing up and starting a budget are not versions of it — but still
+ * moves on. One with records keeps its copy even empty, or it would be found
+ * unclosed again on every write.
  */
 export function closeMonth(vault: VaultData, month: string, copy: VaultSnapshot): void {
-  if (!monthCopy(vault, month)) vault.budget.snapshots.unshift({ ...copy, month })
+  const keep = copy.lines.length > 0 || belegeIn(vault, month).length > 0
+  if (keep && !monthCopy(vault, month)) vault.budget.snapshots.unshift({ ...copy, month })
   if (!vault.budget.openMonth || vault.budget.openMonth <= month) vault.budget.openMonth = nextMonth(month)
 }
 

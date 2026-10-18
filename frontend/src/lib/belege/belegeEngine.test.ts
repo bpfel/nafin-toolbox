@@ -3,10 +3,11 @@ import { createEmptyVault, type VaultData } from '../crypto/vault'
 import * as budget from '../budget/budgetEngine'
 import {
   addBeleg, addSettlement, balances, belegeIn, buildMonthSnapshot, closeMonth, editBeleg, monthCopy,
-  monthsToClose, nextMonth, recentEntries, reviewMonth, reviewableMonths, settleUp, sharesFor, splitRappen,
+  monthsToClose, recentEntries, reviewMonth, reviewableMonths, settleUp, sharesFor, splitRappen,
   startMonths,
-  spendableEntries, thisMonth, today, JOINT,
+  spendableEntries, JOINT,
 } from './belegeEngine'
+import { thisMonth } from '../util/calendar'
 
 function vault(): VaultData {
   const v = createEmptyVault('Main')
@@ -76,7 +77,10 @@ describe('the entry a record is counted against', () => {
 })
 
 describe('closing a month', () => {
-  const copy = (stamp = 'now') => ({ id: stamp, month: '2026-01', createdAt: stamp, lines: [] })
+  const copy = (stamp = 'now') => ({
+    id: stamp, month: '2026-01', createdAt: stamp,
+    lines: [{ entryId: 'x', entryName: 'X', categoryName: 'C', type: 'expense' as const, plannedAmount: '1.00' }],
+  })
 
   test('from the month being recorded up to this one, and any earlier month a record was backdated into', () => {
     const v = vault()
@@ -174,9 +178,46 @@ describe('closing a month', () => {
     expect(row.spent).toBe(20000)
   })
 
-  test('the month after December is January', () => {
-    expect(nextMonth('2026-12')).toBe('2027-01')
-    expect(nextMonth('2026-09')).toBe('2026-10')
+  // Signing up in January and starting a budget in June is not five months
+  // of an empty budget.
+  test('a month that ends with no budget and no records keeps nothing, and moves on', () => {
+    const v = createEmptyVault('Main')
+    v.budget.openMonth = '2026-01'
+    for (const m of monthsToClose(v, '2026-06')) closeMonth(v, m, buildMonthSnapshot(v, m))
+
+    expect(v.budget.snapshots).toEqual([])
+    expect(v.budget.openMonth).toBe('2026-06')
+    expect(monthsToClose(v, '2026-06')).toEqual([])
+  })
+
+  test('a month with records keeps its copy even with no budget, so it is not closed again', () => {
+    const v = createEmptyVault('Main')
+    v.budget.openMonth = '2026-03'
+    addBeleg(v, { date: '2026-03-05', amount: '9', entryId: null, createdBy: '1' })
+    closeMonth(v, '2026-03', buildMonthSnapshot(v, '2026-03'))
+
+    expect(monthCopy(v, '2026-03')).toBeTruthy()
+    expect(monthsToClose(v, '2026-04')).toEqual([])
+  })
+
+  // Today's budget filed under an old month: Belege needs it, but it is not
+  // what the budget was then.
+  test('a month before the history starts is copied as backdated', () => {
+    const v = vault()
+    v.budget.openMonth = '2026-10'
+    expect(buildMonthSnapshot(v, '2025-03').backdated).toBe(true)
+    expect(buildMonthSnapshot(v, '2026-10').backdated).toBeUndefined()
+  })
+
+  test('an archived line kept for its records is marked as such', () => {
+    const v = vault()
+    const gym = anyExpense(v, 1)
+    gym.archived = true
+    v.belege.push({ id: 'b', date: '2026-10-02', amount: '1.00', entryId: gym.id, createdBy: '1', createdAt: 'z' })
+    const lines = buildMonthSnapshot(v, '2026-10').lines
+
+    expect(lines.find(l => l.entryId === gym.id)?.archived).toBe(true)
+    expect(lines.filter(l => l.archived)).toHaveLength(1)
   })
 })
 
@@ -296,13 +337,6 @@ describe('who owes whom', () => {
   })
 })
 
-describe('the calendar', () => {
-  test('is the local one', () => {
-    const late = new Date(2026, 9, 31, 23, 30)
-    expect(thisMonth(late)).toBe('2026-10')
-    expect(today(late)).toBe('2026-10-31')
-  })
-})
 
 
 /**

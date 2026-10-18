@@ -1,3 +1,5 @@
+import { thisMonth, today } from '../util/calendar'
+
 const NONCE_LENGTH = 12
 
 export const VAULT_VERSION = 11
@@ -198,6 +200,13 @@ export interface VaultSnapshot {
    * those are dropped on load (see `migrateVault`), so every snapshot has one.
    */
   month: string
+  /**
+   * Taken late, for a month before the budget's history starts: a receipt was
+   * backdated into it. A copy of the budget as it is now, not as it was then —
+   * Belege needs some yardstick for the month, but Budget's history must not
+   * present it as a version the budget once had.
+   */
+  backdated?: true
 }
 
 export interface VaultSnapshotLine {
@@ -211,6 +220,12 @@ export interface VaultSnapshotLine {
   automatic?: boolean
   /** A bill's or a purchase's target and cycle, as they stood: a year of it reads exact. */
   reserve?: { targetAmount: string; periodMonths: number }
+  /**
+   * Already archived when the month ended, and only in the copy because a
+   * record that month was counted against it. Belege shows it; it was not part
+   * of the budget then, so Budget's history and totals leave it out.
+   */
+  archived?: true
 }
 
 export type AccountKind =
@@ -573,12 +588,6 @@ export function migrateVault(parsed: unknown): VaultData {
   const wearingV10Keys =
     vault.version === VAULT_VERSION && (vault as { belege?: unknown }).belege === undefined
 
-  // Belege's months were briefly a map of their own before they became
-  // snapshots, in builds that were never released. Folded in, so a test vault
-  // from then reads as one from now.
-  if (vault.version === VAULT_VERSION && (vault as { months?: unknown }).months !== undefined) {
-    foldMonthsIntoSnapshots(vault as unknown as PreReleaseV11)
-  }
   if (vault.version === VAULT_VERSION) dropHandMadeSnapshots(vault as unknown as { budget?: { snapshots?: { month?: string }[] } })
 
   if (
@@ -1054,11 +1063,6 @@ interface V10Shape extends V9Shape {
   people: Record<string, VaultPerson>
 }
 
-interface PreReleaseV11 {
-  budget: { snapshots?: VaultSnapshot[] }
-  months?: Record<string, { closedAt: string; lines: { entryId: string; entryName: string; categoryName: string; plannedAmount: string; automatic?: boolean }[] }>
-}
-
 /**
  * Snapshots taken by hand, from before the app kept a copy of every month.
  * Retired before the beta: every month has its copy now, and two kinds of copy
@@ -1067,25 +1071,6 @@ interface PreReleaseV11 {
  */
 function dropHandMadeSnapshots(vault: { budget?: { snapshots?: { month?: string }[] } }): void {
   if (vault.budget?.snapshots) vault.budget.snapshots = vault.budget.snapshots.filter(s => s.month !== undefined)
-}
-
-function foldMonthsIntoSnapshots(vault: PreReleaseV11): void {
-  const snapshots = (vault.budget.snapshots ??= [])
-  for (const [month, closed] of Object.entries(vault.months ?? {})) {
-    if (snapshots.some(s => s.month === month)) continue
-    snapshots.push({
-      id: crypto.randomUUID(),
-      createdAt: closed.closedAt,
-      month,
-      lines: closed.lines.map(l => ({ ...l, type: 'expense' as const })),
-    })
-  }
-  delete vault.months
-}
-
-/** This month, `'YYYY-MM'`, by the local calendar. */
-function localMonth(now: Date = new Date()): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
 /**
@@ -1098,7 +1083,7 @@ function migrateV10ToV11(vault: V10Shape): VaultData {
   migrated.belege = migrated.belege ?? []
   dropHandMadeSnapshots(migrated)
   // Months are kept from now on, not from before: no history is invented.
-  migrated.budget.openMonth ??= localMonth()
+  migrated.budget.openMonth ??= thisMonth()
   migrated.settlements = migrated.settlements ?? []
   migrated.split = migrated.split ?? { mode: 'equal' }
   return migrated
@@ -1120,7 +1105,7 @@ export function createEmptyVault(mainAccountName = 'Main'): VaultData {
       plan: [],
       snapshots: [],
       // A new plan's months start now: none is copied from before it existed.
-      openMonth: localMonth(),
+      openMonth: thisMonth(),
     },
     // Invariant: a vault always holds at least one account, so every category
     // can be routed from the moment it is created.
@@ -1141,10 +1126,6 @@ function createMainAccount(name: string): VaultAccount {
     kind: 'transactional',
     currency: 'CHF',
     currentAmount: '0.00',
-    lastCorrectedAt: todayISO(),
+    lastCorrectedAt: today(),
   }
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
 }

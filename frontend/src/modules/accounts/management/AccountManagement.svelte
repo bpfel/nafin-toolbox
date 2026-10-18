@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
   import Sortable from 'sortablejs'
+  import { thisMonth } from '../../../lib/util/calendar'
   import { getVaultState, commit } from '../../../lib/crypto/vaultStore.svelte'
   import {
     allocationBreakdown,
@@ -29,11 +30,6 @@
   interface Props {
     /** 'YYYY-MM' the figures are computed for. Defaults to the current month. */
     currentMonth?: string
-  }
-
-  function thisMonth(): string {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   }
 
   let { currentMonth = thisMonth() }: Props = $props()

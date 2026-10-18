@@ -115,6 +115,10 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Fixed
 
+- **An account corrected just after midnight is dated today.** Some dates
+  were taken in UTC, so until 01:00 in winter and 02:00 in summer a
+  correction was dated the day before, while a receipt entered at the same
+  moment was dated correctly.
 - **Two devices no longer overwrite each other's budget.** Loading the
   personal vault left out when it was last saved, so a device's first save
   after loading went through unconditionally and replaced whatever another
