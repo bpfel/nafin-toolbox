@@ -35,11 +35,11 @@
       {tn('reset.explain', entryCount)}
     </p>
 
-    <!-- Whether anything survives this depends entirely on whether the user ever
-         archived, and they should not have to remember which. -->
+    <!-- Whether anything survives this depends on whether a month has ended
+         since the plan was made: each one keeps its copy. -->
     {#if snapshotCount > 0}
       <p class="kept">
-        {tn('reset.snapshotsKept', snapshotCount)}
+        {t('reset.versionsKept')}
       </p>
     {:else}
       <p class="warning">

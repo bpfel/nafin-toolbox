@@ -3,6 +3,7 @@ import { committingTo } from '../../lib/sync/testing'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { VaultData } from '../../lib/crypto/vault'
 import { createEmptyVault } from '../../lib/crypto/vault'
+import { buildMonthSnapshot, closeMonth } from '../../lib/belege/belegeEngine'
 import * as engine from '../../lib/budget/budgetEngine'
 import { toggleEditing, clearEditing } from '../../lib/util/editMode.svelte'
 
@@ -95,13 +96,14 @@ describe('deleting an entry from the dialog', () => {
     await fireEvent.click(within(editor).getByRole('button', { name: 'Delete' }))
     const confirm = await screen.findByRole('dialog', { name: 'Delete entry' })
 
-    expect(confirm.textContent).toMatch(/snapshot/i)
+    expect(confirm.textContent).toMatch(/earlier versions/i)
     expect(confirm.textContent).not.toMatch(/periods/i)
   })
 
-  test('snapshots really do keep the entry after it is deleted', async () => {
+  test('earlier versions really do keep the entry after it is deleted', async () => {
     const vault = makeVault()
-    const snapshot = engine.takeSnapshot(vault, 'Before the cull')
+    const snapshot = buildMonthSnapshot(vault, '2026-09')
+    closeMonth(vault, '2026-09', snapshot)
     toggleEditing('budget')
     show(vault)
 
@@ -111,7 +113,7 @@ describe('deleting an entry from the dialog', () => {
     await fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }))
 
     expect(engine.listEntries(vault).map(c => c.name)).toEqual(['Food'])
-    expect(snapshot.lines.map(l => l.entryName)).toContain('Rent')
+    expect(snapshot.lines.map((l: { entryName: string }) => l.entryName)).toContain('Rent')
   })
 
   test('confirming removes the entry', async () => {

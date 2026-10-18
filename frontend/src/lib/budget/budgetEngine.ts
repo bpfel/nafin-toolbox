@@ -527,57 +527,36 @@ function yearlyFor(entry: VaultEntry, plannedAmount: string): string {
 
 // --- Snapshots ---
 
-/** Snapshots, newest first. */
-export function listSnapshots(vault: VaultData): VaultSnapshot[] {
-  // Stable sort over an already newest-first array, so two snapshots created in
-  // the same millisecond keep the order they were made in.
-  return [...vault.budget.snapshots].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-}
-
 /**
- * Snapshots the current plan under a name.
+ * A snapshot's totals, by the rules the budget's own summary uses: income;
+ * expenses, consumed and gone; savings — savings, bills and purchases, out of
+ * the account and still in the net worth; and what is left unallocated.
  *
- * The lines are DENORMALISED — entry and category names are copied in, not
- * referenced. An snapshot that pointed at live entries would be rewritten by
- * the next rename and would lose lines to the next delete, which would make it
- * a view of the present rather than a record of the past.
- *
- * The snapshot covers what the plan summary shows: every non-archived entry,
- * including those left at 0.00, so an snapshot reads the same as the plan it was
- * taken from.
+ * Read off the lines' stored type, so an old snapshot adds up as it did then.
+ * It added up only income and expense before, and called their difference
+ * savings: every line of the other three types was left out of the sum.
  */
-export function takeSnapshot(vault: VaultData, name: string): VaultSnapshot {
-  const snapshot = buildSnapshot(vault, name)
-  insertSnapshot(vault, snapshot)
-  return snapshot
-}
-
-/**
- * The snapshot `takeSnapshot` would store, without storing it.
- *
- * Separate because a snapshot is a record of the plan *as the user saw it*.
- * Kept as an action and replayed onto a vault somebody else has since changed,
- * rebuilding it there would copy their plan, not the one on screen when the
- * button was pressed — so the action carries this result, and replaying it
- * only inserts it.
- */
-export function buildSnapshot(vault: VaultData, name: string): VaultSnapshot {
-  const trimmed = name.trim()
-  if (trimmed === '') {
-    // An unnamed snapshot cannot be told apart from any other, so it could never
-    // be found again — better to refuse than to store something unusable.
-    throw new Error('an snapshot needs a name')
+export function snapshotTotals(snapshot: VaultSnapshot): {
+  income: string
+  expenses: string
+  savings: string
+  unallocated: string
+} {
+  let income = 0
+  let expenses = 0
+  let savings = 0
+  for (const line of snapshot.lines) {
+    const amount = Number(line.plannedAmount) || 0
+    if (line.type === 'income') income += amount
+    else if (holdsMoney(line.type)) savings += amount
+    else expenses += amount
   }
-
-  const lines: VaultSnapshotLine[] = listEntries(vault).map(entry => snapshotLine(vault, entry))
-
-  const snapshot: VaultSnapshot = {
-    id: newId('snapshot'),
-    name: trimmed,
-    createdAt: nowISO(),
-    lines,
+  return {
+    income: money(income),
+    expenses: money(expenses),
+    savings: money(savings),
+    unallocated: money(income - expenses - savings),
   }
-  return snapshot
 }
 
 /**
@@ -595,32 +574,6 @@ export function snapshotLine(vault: VaultData, entry: VaultEntry): VaultSnapshot
   }
 }
 
-/** Stores a built snapshot, newest first. Storing one already there does nothing. */
-export function insertSnapshot(vault: VaultData, snapshot: VaultSnapshot): void {
-  if (vault.budget.snapshots.some(a => a.id === snapshot.id)) return
-  vault.budget.snapshots.unshift(snapshot)
-}
-
-/**
- * Renames a snapshot. An empty name is rejected, as it is on creation — except
- * on a month's copy, which is called by its month and goes back to that.
- */
-export function renameSnapshot(vault: VaultData, id: string, name: string): void {
-  const trimmed = name.trim()
-  const snapshot = vault.budget.snapshots.find(a => a.id === id)
-  if (trimmed === '' && !snapshot?.month) {
-    throw new Error('an snapshot needs a name')
-  }
-  if (snapshot) snapshot.name = trimmed
-}
-
-/**
- * Deletes a snapshot taken by hand. A month's copy stays: Belege reads that
- * month against it, and a month without one would be read against today's plan.
- */
-export function deleteSnapshot(vault: VaultData, id: string): void {
-  vault.budget.snapshots = vault.budget.snapshots.filter(a => a.id !== id || a.month !== undefined)
-}
 
 /**
  * Empties the budget: every entry, every category, and the plan itself.

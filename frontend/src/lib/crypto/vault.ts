@@ -187,17 +187,17 @@ export interface VaultPlanEntry {
  */
 export interface VaultSnapshot {
   id: string
-  /** Given by hand; may be empty on a month's copy, which is called by its month. */
-  name: string
   createdAt: string
   lines: VaultSnapshotLine[]
   /**
-   * `'YYYY-MM'` on the copy the app takes as a month ends: the plan that month
-   * is read against in Belege, and the plan's history for everybody. Absent on
-   * a snapshot taken by hand. One per month, and not deleted: a past month in
-   * Belege depends on it.
+   * The month this is the copy of, `'YYYY-MM'`, taken as that month ended: the
+   * plan the month is read against in Belege, and the plan's history Budget
+   * steps back through. One per month.
+   *
+   * Snapshots used to be taken by hand and named, before the app kept months;
+   * those are dropped on load (see `migrateVault`), so every snapshot has one.
    */
-  month?: string
+  month: string
 }
 
 export interface VaultSnapshotLine {
@@ -577,6 +577,7 @@ export function migrateVault(parsed: unknown): VaultData {
   if (vault.version === VAULT_VERSION && (vault as { months?: unknown }).months !== undefined) {
     foldMonthsIntoSnapshots(vault as unknown as PreReleaseV11)
   }
+  if (vault.version === VAULT_VERSION) dropHandMadeSnapshots(vault as unknown as { budget?: { snapshots?: { month?: string }[] } })
 
   if (
     vault.version === VAULT_VERSION &&
@@ -823,6 +824,17 @@ interface V6Entry {
 }
 
 /**
+ * A snapshot as the versions before v11 stored it: taken by hand and named,
+ * with no month. Only the migrations speak this; v11 drops them on load.
+ */
+interface LegacySnapshot {
+  id: string
+  name: string
+  createdAt: string
+  lines: VaultSnapshotLine[]
+}
+
+/**
  * The v5 shape: everything v6 has, under the name `archives`.
  */
 interface V5Shape {
@@ -831,7 +843,7 @@ interface V5Shape {
     categories?: V6Category[]
     entries?: V6Entry[]
     plan?: VaultPlanEntry[]
-    archives?: VaultSnapshot[]
+    archives?: LegacySnapshot[]
   }
   accounts?: VaultAccount[]
 }
@@ -843,7 +855,7 @@ interface V6Shape {
     categories?: V6Category[]
     entries?: V6Entry[]
     plan?: VaultPlanEntry[]
-    snapshots?: VaultSnapshot[]
+    snapshots?: LegacySnapshot[]
   }
   accounts?: VaultAccount[]
 }
@@ -925,7 +937,8 @@ function migrateV6ToV7(vault: V6Shape): V7Shape {
       }
     }),
     plan: budget.plan ?? [],
-    snapshots: budget.snapshots ?? [],
+    // Carried as they are; v11 drops the ones without a month on load.
+    snapshots: (budget.snapshots ?? []) as unknown as VaultSnapshot[],
   }
   return migrated
 }
@@ -1044,13 +1057,22 @@ interface PreReleaseV11 {
   months?: Record<string, { closedAt: string; lines: { entryId: string; entryName: string; categoryName: string; plannedAmount: string; automatic?: boolean }[] }>
 }
 
+/**
+ * Snapshots taken by hand, from before the app kept a copy of every month.
+ * Retired before the beta: every month has its copy now, and two kinds of copy
+ * for one idea was what made the Archive confusing. Dropped, not converted — a
+ * copy taken on the 15th is not the plan a month ended with.
+ */
+function dropHandMadeSnapshots(vault: { budget?: { snapshots?: { month?: string }[] } }): void {
+  if (vault.budget?.snapshots) vault.budget.snapshots = vault.budget.snapshots.filter(s => s.month !== undefined)
+}
+
 function foldMonthsIntoSnapshots(vault: PreReleaseV11): void {
   const snapshots = (vault.budget.snapshots ??= [])
   for (const [month, closed] of Object.entries(vault.months ?? {})) {
     if (snapshots.some(s => s.month === month)) continue
     snapshots.push({
       id: crypto.randomUUID(),
-      name: '',
       createdAt: closed.closedAt,
       month,
       lines: closed.lines.map(l => ({ ...l, type: 'expense' as const })),
@@ -1072,6 +1094,7 @@ function migrateV10ToV11(vault: V10Shape): VaultData {
   const migrated = vault as unknown as VaultData
   migrated.version = VAULT_VERSION
   migrated.belege = migrated.belege ?? []
+  dropHandMadeSnapshots(migrated)
   // Months are kept from now on, not from before: no history is invented.
   migrated.budget.openMonth ??= localMonth()
   migrated.settlements = migrated.settlements ?? []

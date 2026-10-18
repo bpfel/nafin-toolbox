@@ -22,7 +22,6 @@ function filled(): VaultData {
   const v = createEmptyVault('Main')
   budget.seedDefaults(v, 'en', '2026-01')
   accounts.createAccount(v, { name: 'Savings', kind: 'savings' })
-  budget.takeSnapshot(v, 'January')
   const groceries = v.budget.entries.find(e => e.type === 'expense')!
   belege.addBeleg(v, { date: '2026-10-03', amount: '42.50', entryId: groceries.id, createdBy: '1' })
   belege.addSettlement(v, { date: '2026-10-04', from: '2', to: '1', amount: '10.00', createdBy: '2' })
@@ -62,9 +61,6 @@ const CASES: Case[] = [
     },
   },
   { kind: 'reorderCategories', args: v => [[...v.budget.categories].reverse().map(c => c.id)] },
-  { kind: 'takeSnapshot', args: v => [budget.buildSnapshot(v, 'February')] },
-  { kind: 'renameSnapshot', args: v => [v.budget.snapshots[0].id, 'Renamed snapshot'] },
-  { kind: 'deleteSnapshot', args: v => [v.budget.snapshots[0].id] },
   { kind: 'resetBudget', args: () => [] },
   { kind: 'createAccount', args: () => [{ name: 'Cash', kind: 'cash' }] },
   { kind: 'renameAccount', args: v => [v.accounts[1].id, 'Renamed account'] },
@@ -89,7 +85,7 @@ const CASES: Case[] = [
   },
   { kind: 'editBeleg', args: v => [v.belege[0].id, { amount: '20.00', note: 'Market' }] },
   { kind: 'deleteBeleg', args: v => [v.belege[0].id] },
-  { kind: 'closeMonth', args: () => ['2026-09', { id: 'm9', name: '', createdAt: '2026-10-01T00:00:00.000Z', lines: [] }] },
+  { kind: 'closeMonth', args: () => ['2026-09', { id: 'm9', month: '2026-09', createdAt: '2026-10-01T00:00:00.000Z', lines: [] }] },
   { kind: 'startMonths', args: () => ['2026-10'] },
   {
     kind: 'addSettlement',
@@ -170,12 +166,6 @@ describe('refused where what it changes is gone', () => {
       reason: 'categoryGone',
     },
     {
-      name: 'renameSnapshot on a deleted snapshot',
-      c: caseOf('renameSnapshot'),
-      remove: v => budget.deleteSnapshot(v, v.budget.snapshots[0].id),
-      reason: 'snapshotGone',
-    },
-    {
       name: 'renameAccount on a deleted account',
       c: caseOf('renameAccount'),
       remove: v => accounts.deleteAccount(v, v.accounts[1].id, v.accounts[0].id),
@@ -241,16 +231,16 @@ describe('what an action keeps', () => {
     expect(action.subject).toBe(rent.name)
   })
 
-  test('a snapshot replays as it was taken, not as the plan is now', () => {
+  test('a month’s copy replays as it was taken, not as the plan is now', () => {
     const before = filled()
-    const { after, action } = made(before, { kind: 'takeSnapshot', args: v => [budget.buildSnapshot(v, 'As seen')] })
-    const taken = after.budget.snapshots.find(s => s.name === 'As seen')!
+    const { after, action } = made(before, { kind: 'closeMonth', args: v => ['2026-09', belege.buildMonthSnapshot(v, '2026-09')] })
+    const taken = belege.monthCopy(after, '2026-09')!
 
     const elsewhere = clone(before)
     budget.setPlanned(elsewhere, firstEntry(elsewhere, 'expense').id, '9999.00')
 
     const { vault } = reapply(elsewhere, action)
-    expect(vault.budget.snapshots.find(s => s.name === 'As seen')).toEqual(taken)
+    expect(belege.monthCopy(vault, '2026-09')).toEqual(taken)
   })
 
   test('an entry added to a category deleted elsewhere keeps its id, and the category comes back', () => {

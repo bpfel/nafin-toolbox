@@ -1,17 +1,11 @@
 <script lang="ts">
   import { t } from '../../lib/i18n/index.svelte'
-  import { untrack } from 'svelte'
-  import type { VaultSnapshot, VaultSnapshotLine } from '../../lib/crypto/vault'
+  import { holdsMoney, sideOf, type VaultSnapshot, type VaultSnapshotLine } from '../../lib/crypto/vault'
+  import { snapshotTotals } from '../../lib/budget/budgetEngine'
   import Money from '../../lib/util/Money.svelte'
-  import { monthLabel } from '../../lib/util/months'
 
   interface Props {
     snapshot: VaultSnapshot
-    /**
-     * Commits a new name. May throw — the engine refuses an empty name — and the
-     * message is caught here so it lands next to the field the user typed in.
-     */
-    onrename: (name: string) => void
     /**
      * A month's copy with receipts: what each line's receipts came to, in
      * rappen, by entry id — a Spent column beside the plan, as Belege shows it.
@@ -19,12 +13,7 @@
     spent?: Map<string, number>
   }
 
-  let { snapshot, onrename, spent }: Props = $props()
-
-  // Seeded once: the editor is mounted fresh per snapshot, and the draft must not
-  // be yanked out from under a half-typed rename.
-  let nameDraft = $state(untrack(() => snapshot.name))
-  let nameError = $state<string | null>(null)
+  let { snapshot, spent }: Props = $props()
 
   interface LineRow {
     line: VaultSnapshotLine
@@ -37,10 +26,15 @@
     rows: LineRow[]
   }
 
-  function categoriesFor(type: 'income' | 'expense'): LineCategory[] {
+  /**
+   * Under their categories, income side first, as the budget lays them out —
+   * every type, not two. Savings, bills and purchases sit on the expense side
+   * with the expenses, and were left out of the view altogether before.
+   */
+  function categoriesFor(side: 'income' | 'expense'): LineCategory[] {
     const map = new Map<string, LineCategory>()
     snapshot.lines.forEach((line, index) => {
-      if (line.type !== type) return
+      if (sideOf(line.type) !== side) return
       const key = line.categoryName || ''
       if (!map.has(key)) map.set(key, { categoryName: key, rows: [] })
       map.get(key)!.rows.push({ line, index })
@@ -50,59 +44,11 @@
 
   let incomeCategories = $derived(categoriesFor('income'))
   let expenseCategories = $derived(categoriesFor('expense'))
+  let totals = $derived(snapshotTotals(snapshot))
 
-  function totalFor(type: 'income' | 'expense'): number {
-    return snapshot.lines
-      .filter(l => l.type === type)
-      .reduce((sum, l) => sum + Number(l.plannedAmount), 0)
-  }
-
-  let incomeTotal = $derived(totalFor('income'))
-  let expenseTotal = $derived(totalFor('expense'))
-  let balance = $derived(incomeTotal - expenseTotal)
-
-  function commitName() {
-    if (nameDraft.trim() === snapshot.name) {
-      nameError = null
-      return
-    }
-    try {
-      onrename(nameDraft)
-      nameError = null
-    } catch (e) {
-      nameError = e instanceof Error ? e.message : t('error.renameSnapshot')
-    }
-  }
-
-  function handleNameKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      ;(e.target as HTMLInputElement).blur()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      nameDraft = snapshot.name
-      nameError = null
-      ;(e.target as HTMLInputElement).blur()
-    }
-  }
 </script>
 
 <div class="editor">
-  <label class="rename-field">
-    <span class="rename-label">{t('field.name')}</span>
-    <input
-      type="text"
-      class="rename-input"
-      placeholder={snapshot.month ? monthLabel(snapshot.month) : undefined}
-      bind:value={nameDraft}
-      onblur={commitName}
-      onkeydown={handleNameKeydown}
-    />
-  </label>
-  {#if nameError}
-    <p class="error" role="alert">{nameError}</p>
-  {/if}
-
   {#if snapshot.lines.length === 0}
     <p class="empty">{t('snapshot.empty')}</p>
   {:else}
@@ -114,13 +60,13 @@
           {#if spent}<th class="right col-amount">{t('spending.spent')}</th>{/if}
         </tr>
       </thead>
-      {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + category.rows[0].line.type)}
+      {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + sideOf(category.rows[0].line.type))}
         <tbody>
           <tr class="line-category">
             <td colspan={spent ? 3 : 2}>{category.categoryName || t('budget.uncategorised')}</td>
           </tr>
           {#each category.rows as row (row.index)}
-            <tr class="line-row" class:income={row.line.type === 'income'}>
+            <tr class="line-row" class:income={row.line.type === 'income'} class:held={holdsMoney(row.line.type)}>
               <td class="line-name">{row.line.entryName}</td>
               <td class="line-amount"><Money value={row.line.plannedAmount} /></td>
               {#if spent}
@@ -136,16 +82,20 @@
       <tfoot>
         <tr>
           <td>{t('budget.income')}</td>
-          <td class="right total income-total"><Money value={incomeTotal} /></td>
+          <td class="right total income-total"><Money value={totals.income} /></td>
         </tr>
         <tr>
           <td>{t('budget.expenses')}</td>
-          <td class="right total expense-total"><Money value={expenseTotal} /></td>
+          <td class="right total"><Money value={totals.expenses} /></td>
         </tr>
         <tr>
           <td>{t('budget.savings')}</td>
-          <td class="right total" class:income-total={balance >= 0} class:expense-total={balance < 0}>
-            <Money value={balance} />
+          <td class="right total held-total"><Money value={totals.savings} /></td>
+        </tr>
+        <tr>
+          <td>{t('budget.unallocated')}</td>
+          <td class="right total" class:income-total={Number(totals.unallocated) >= 0} class:expense-total={Number(totals.unallocated) < 0}>
+            <Money value={totals.unallocated} />
           </td>
         </tr>
       </tfoot>
@@ -159,37 +109,6 @@
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.75rem 0 0.25rem;
-  }
-  .rename-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    max-width: 22rem;
-  }
-  .rename-label {
-    font-size: 0.75rem;
-    color: var(--ink-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .rename-input {
-    padding: 0.45rem 0.6rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    outline: none;
-  }
-  .rename-input:focus {
-    border-color: #2d6a4f;
-    box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
-  }
-  .error {
-    color: #c0392b;
-    font-size: 0.85rem;
-    margin: 0;
-    padding: 0.4rem 0.5rem;
-    background: #fdecea;
-    border-radius: 4px;
   }
   .empty {
     color: var(--ink-faint);
@@ -259,4 +178,7 @@
   .income-total { color: #2d6a4f; }
   .line-amount.over { color: var(--alarm); }
   .expense-total { color: #c0392b; }
+  /* Savings, bills and purchases: held, not spent — the budget's blue. */
+  .line-row.held .line-amount,
+  .held-total { color: var(--money-held); }
 </style>

@@ -7,6 +7,7 @@
   import BudgetSetup from './BudgetSetup.svelte'
   import VersionStepper from './VersionStepper.svelte'
   import PastVersion from './PastVersion.svelte'
+  import VersionChanges from './VersionChanges.svelte'
   import { planVersions } from '../../lib/budget/versions'
   import { monthLabel } from '../../lib/util/months'
   import ResetBudgetModal from './ResetBudgetModal.svelte'
@@ -92,12 +93,8 @@
     return from === to ? monthLabel(from) : `${monthLabel(from)} – ${monthLabel(to)}`
   }
 
-  let stepTitle = $derived(
-    !shown ? '' : shown.to === null ? t('budget.currentPlan') : shown.name || range(shown.from, shown.to),
-  )
-  let stepSub = $derived(
-    !shown ? undefined : shown.to === null ? range(shown.from, null) || undefined : shown.name ? range(shown.from, shown.to) : undefined,
-  )
+  let stepTitle = $derived(!shown ? '' : shown.to === null ? t('budget.currentPlan') : range(shown.from, shown.to))
+  let stepSub = $derived(!shown || shown.to !== null ? undefined : range(shown.from, null) || undefined)
 
   /**
    * Passed straight through from the screen's "+" to the table that owns the
@@ -145,8 +142,11 @@
         onnext={index > 0 ? () => index-- : undefined}
       />
     {/if}
+    {#if shown && shown.changes.length > 0}
+      <VersionChanges changes={shown.changes} />
+    {/if}
     {#if shown && shown.copy}
-      <PastVersion version={shown} readOnly={vaultState.readOnly} onchange={() => version++} />
+      <PastVersion copy={shown.copy} />
     {:else}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">
@@ -166,9 +166,6 @@
       onentrydeleted={handleEntryChange}
       oncategorychanged={handleEntryChange}
     />
-    {#if shown && shown.saved.length > 0}
-      <PastVersion version={shown} readOnly={vaultState.readOnly} onchange={() => version++} savedOnly />
-    {/if}
     {/if}
 
     {#if confirmingReset}
