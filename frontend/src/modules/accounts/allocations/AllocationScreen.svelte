@@ -15,9 +15,9 @@
     projectedBalance,
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
-  import { fromCents, nextDue, toCents } from '../../../lib/accounts/reserveMath'
+  import { nextDue } from '../../../lib/accounts/reserveMath'
   import { monthsBetween, thisMonth } from '../../../lib/util/calendar'
-  import { formatAmount } from '../../../lib/util/money'
+  import { formatAmount, fromCents, toCents } from '../../../lib/util/money'
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import AllocationRow from './AllocationRow.svelte'
@@ -126,9 +126,6 @@
     return new Map(engine.listCategories(vault).map(g => [g.id, g]))
   })
 
-  function categoryOrder(categoryId: string): number {
-    return categoriesById.get(categoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
-  }
 
   // An entry whose category was deleted still has to show up, so an unknown
   // category id collapses into the unnamed "Other" bucket that sorts last.
@@ -145,8 +142,10 @@
       bucket.rows.push(row)
       bucket.cents += cents(row.plannedAmount)
     }
+    if (!vaultState.vault) return []
+    const rank = engine.categoryRank(vaultState.vault)
     return Array.from(map.values())
-      .sort((a, b) => categoryOrder(a.categoryId) - categoryOrder(b.categoryId))
+      .sort((a, b) => rank(a.categoryId) - rank(b.categoryId))
       .map(b => ({
         categoryId: b.categoryId,
         categoryName: b.categoryName,

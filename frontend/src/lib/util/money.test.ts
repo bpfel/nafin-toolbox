@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { formatAmount, normalizeAmount, parseAmount } from './money'
+import { formatAmount, normalizeAmount, parseAmount, centsOf, fromCents, toCents } from './money'
 
 describe('normalizeAmount — the 0.00 prefill problem', () => {
   // The field is seeded with a stored '0.00'. Without select-on-focus, typing
@@ -83,5 +83,33 @@ describe('formatAmount — one formatter instead of twelve', () => {
     // 'NaN' at the user. Showing the stored string back is what makes a corrupt
     // amount recognisable instead of merely broken.
     expect(formatAmount('not an amount')).toBe('not an amount')
+  })
+})
+
+/**
+ * One way into cents, exactly. There used to be three, two by floating point:
+ * 1.005 × 100 is 100.49999…, so a third decimal of 5 was rounded down there and
+ * up here.
+ */
+describe('cents — exact, whichever way the amount came in', () => {
+  test('a third decimal of 5 rounds away from zero, typed or stored', () => {
+    expect(toCents('1.005')).toBe(101)
+    expect(centsOf('1.005')).toBe(101)
+    expect(normalizeAmount('1.005')).toBe('1.01')
+    expect(toCents('-1.005')).toBe(-101)
+  })
+
+  test('a typed amount reads as people type it', () => {
+    expect(centsOf('1’234,5')).toBe(123450)
+    expect(centsOf("1'234.50")).toBe(123450)
+    expect(centsOf('.5')).toBe(50)
+    expect(centsOf('12.')).toBe(1200)
+    expect(centsOf('')).toBe(0)
+    expect(centsOf('abc')).toBe(0)
+  })
+
+  test('and back out, with two places and the sign', () => {
+    expect(fromCents(123450)).toBe('1234.50')
+    expect(fromCents(-5)).toBe('-0.05')
   })
 })

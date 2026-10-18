@@ -114,11 +114,8 @@
     // Order by the category's own sortOrder. This used to be inferred from wherever
     // each category's first entry landed in the entry sort, which meant
     // dragging an entry could silently reshuffle whole categories.
-    return Array.from(map.values()).sort((a, b) => categoryOrder(a.categoryId) - categoryOrder(b.categoryId))
-  }
-
-  function categoryOrder(categoryId: string): number {
-    return vault.budget.categories.find(g => g.id === categoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
+    const rank = engine.categoryRank(vault)
+    return Array.from(map.values()).sort((a, b) => rank(a.categoryId) - rank(b.categoryId))
   }
 
   let incomeCategories = $derived(categoryEntries(incomeEntries))

@@ -125,6 +125,16 @@ release may change things without a deprecation period. Each release is a tag on
   were taken in UTC, so until 01:00 in winter and 02:00 in summer a
   correction was dated the day before, while a receipt entered at the same
   moment was dated correctly.
+- **A balance typed with an iPhone's apostrophe is accepted.** Correcting an
+  account to `1’234.50` and pressing Enter was refused as not an amount: the
+  correction had its own copy of the amount reader, which knew only the
+  straight `'`.
+- **Copy link works on an instance served over plain HTTP.** The household
+  invitation's Copy button used a browser feature that only exists over
+  HTTPS, and failed without a word. It falls back like the other copy buttons
+  now, and if nothing reaches the clipboard it says so and shows the link.
+- **A third decimal rounds the same everywhere.** `1.005` became 1.00 in some
+  places and 1.01 in others; it is 1.01 everywhere now.
 - **Two devices no longer overwrite each other's budget.** Loading the
   personal vault left out when it was last saved, so a device's first save
   after loading went through unconditionally and replaced whatever another

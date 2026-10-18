@@ -1,5 +1,6 @@
 import type { ReserveDefinition } from '../crypto/vault'
 import { addMonths, monthsBetween } from '../util/calendar'
+import { fromCents, toCents } from '../util/money'
 
 // Reserve math. Everything here is pure: a reserve definition plus the month you
 // are asking about yields the amount that should already have accumulated.
@@ -10,31 +11,8 @@ import { addMonths, monthsBetween } from '../util/calendar'
 // *cumulative* figure instead (k x target / periodMonths, rounded once) makes
 // every month exact against the target and the final month land on it precisely.
 
-const MONEY_PATTERN = /^\s*(-?)(\d+)(?:\.(\d+))?\s*$/
 
 // --- Money ------------------------------------------------------------------
-
-// Exported so every accounts figure goes through one parser: money crosses the
-// module boundary as a decimal string and is integer cents everywhere inside.
-export function toCents(amount: string): number {
-  const match = MONEY_PATTERN.exec(amount)
-  if (!match) {
-    throw new Error(`invalid amount '${amount}': expected a decimal string`)
-  }
-  const [, sign, whole, fraction = ''] = match
-  const padded = `${fraction}000`
-  const cents = Number(whole) * 100 + Number(padded.slice(0, 2))
-  // A third decimal (or more) rounds half away from zero, matching the display
-  // rounding a user would expect rather than truncating their money away.
-  const rounded = Number(padded[2]) >= 5 ? cents + 1 : cents
-  return sign === '-' ? -rounded : rounded
-}
-
-export function fromCents(cents: number): string {
-  const sign = cents < 0 ? '-' : ''
-  const absolute = Math.abs(cents)
-  return `${sign}${Math.floor(absolute / 100)}.${String(absolute % 100).padStart(2, '0')}`
-}
 
 function roundHalfAwayFromZero(value: number): number {
   return value < 0 ? -Math.round(-value) : Math.round(value)

@@ -49,17 +49,15 @@ export function formatAmount(
  * silently swallowing it.
  */
 export function normalizeAmount(raw: string): string {
-  // Apostrophe, right single quote (what iOS substitutes), and any whitespace.
-  const cleaned = raw.replace(/['’\s]/g, '').replace(',', '.')
+  const cleaned = cleanAmount(raw)
   if (cleaned === '') return ''
   if (!/^\d*\.?\d*$/.test(cleaned) || cleaned === '.') return cleaned
 
-  const value = Number(cleaned)
-  if (!Number.isFinite(value)) return cleaned
-  // toFixed both pads to two places and drops leading zeros, and it rounds rather
-  // than truncates — the normalised value is shown back to the user, so a rounded
-  // third decimal is visible rather than silent.
-  return value.toFixed(2)
+  // Padded to two places, leading zeros dropped, and a third decimal rounded
+  // half away from zero rather than truncated — the normalised value is shown
+  // back to the user, so the rounding is visible rather than silent. Exactly,
+  // through cents: `toFixed` turned 1.005 into 1.00.
+  return fromCents(centsOf(cleaned))
 }
 
 /**
@@ -76,7 +74,17 @@ export function normalizeAmount(raw: string): string {
  * it rather than being rejected.
  */
 export function parseAmount(raw: string): number {
-  return Number(raw.replace(/['’\s]/g, '').replace(',', '.'))
+  return Number(cleanAmount(raw))
+}
+
+/**
+ * A typed amount with the noise taken out — apostrophe, right single quote
+ * (what iOS substitutes, and what de-CH formats with), any whitespace — and a
+ * decimal comma made a point. For a field with rules of its own, such as one
+ * that allows a minus; everything else wants `normalizeAmount` or `parseAmount`.
+ */
+export function cleanAmount(raw: string): string {
+  return raw.replace(/['’\s]/g, '').replace(',', '.')
 }
 
 /**
@@ -139,4 +147,46 @@ export function integerInput(node: HTMLInputElement) {
       node.removeEventListener('focus', onFocus)
     },
   }
+}
+
+// --- Cents ------------------------------------------------------------------
+//
+// Money is a decimal string on the outside and integer cents (rappen) inside.
+// One way in and one way out: there used to be three ways in, two of them by
+// floating point, which rounded a third decimal differently from this one.
+
+const MONEY_PATTERN = /^\s*(-?)(\d+)(?:\.(\d+))?\s*$/
+
+/**
+ * A stored amount in cents, exactly — no floating point. Throws on anything
+ * that is not a decimal string: for figures that are stored, and so already
+ * clean. A typed amount goes through `centsOf`.
+ */
+export function toCents(amount: string): number {
+  const match = MONEY_PATTERN.exec(amount)
+  if (!match) {
+    throw new Error(`invalid amount '${amount}': expected a decimal string`)
+  }
+  const [, sign, whole, fraction = ''] = match
+  const padded = `${fraction}000`
+  const cents = Number(whole) * 100 + Number(padded.slice(0, 2))
+  // A third decimal (or more) rounds half away from zero, matching the display
+  // rounding a user would expect rather than truncating their money away.
+  const rounded = Number(padded[2]) >= 5 ? cents + 1 : cents
+  return sign === '-' ? -rounded : rounded
+}
+
+export function fromCents(cents: number): string {
+  const sign = cents < 0 ? '-' : ''
+  const absolute = Math.abs(cents)
+  return `${sign}${Math.floor(absolute / 100)}.${String(absolute % 100).padStart(2, '0')}`
+}
+
+/**
+ * A typed amount in cents, by the same rules: `1’234,5` is 123450. What is not
+ * an amount at all is 0, as an empty field is — validation is the field's job.
+ */
+export function centsOf(raw: string): number {
+  const exact = cleanAmount(raw).replace(/^(-?)\./, (_, sign) => `${sign}0.`).replace(/\.$/, '')
+  return MONEY_PATTERN.test(exact) ? toCents(exact) : 0
 }

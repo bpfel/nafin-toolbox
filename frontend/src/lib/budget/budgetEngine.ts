@@ -12,13 +12,23 @@ import {
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
 import { seedNamesFor, type SeedKey } from './seedNames'
 import type { Locale } from '../i18n/index.svelte'
-import { fromCents, toCents } from '../accounts/reserveMath'
+import { fromCents, toCents } from '../util/money'
 import { newId, nowISO } from '../sync/source'
 
 // --- Entry Categories ---
 
 export function listCategories(vault: VaultData): VaultCategory[] {
   return [...vault.budget.categories].sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+/**
+ * Where a category sorts, by id. One that no longer exists sorts last — the
+ * budget table, the allocations and a month's copy all used to decide this for
+ * themselves, and a month's copy put it first.
+ */
+export function categoryRank(vault: VaultData): (categoryId: string) => number {
+  const order = new Map(vault.budget.categories.map(c => [c.id, c.sortOrder]))
+  return id => order.get(id) ?? Number.MAX_SAFE_INTEGER
 }
 
 export function createCategory(

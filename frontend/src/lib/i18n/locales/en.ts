@@ -184,6 +184,7 @@ export const en = {
   'invite.linkWhy': 'Sending it yourself is what lets the app check their key for you. Scanning the code is the surest way.',
   'invite.copy': 'Copy link',
   'invite.copied': 'Copied',
+  'invite.copyFailed': 'Could not reach the clipboard. Copy the link here:',
   'invite.done': 'Done',
   // One word each. They sit in a row beside an address, a role and two
   // symbols, and at 400px the long forms — "Invited, waiting for them",

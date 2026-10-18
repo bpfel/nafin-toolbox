@@ -3,6 +3,7 @@
   import { focusTrap } from '../util/focusTrap'
   import { closeOnBack } from '../nav/closeOnBack'
   import InviteQR from './InviteQR.svelte'
+  import { createCopier } from '../util/copier.svelte'
 
   /**
    * The code, shown big and alone.
@@ -25,13 +26,10 @@
 
   let { link, email, onclose }: Props = $props()
 
-  let copied = $state(false)
-
-  async function copy() {
-    await navigator.clipboard.writeText(link)
-    copied = true
-    setTimeout(() => (copied = false), 2000)
-  }
+  // The shared copier, not the clipboard directly: on an instance served over
+  // plain HTTP the browser has no clipboard API, and this button used to fail
+  // there without a word.
+  const copier = createCopier()
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') onclose()
@@ -54,14 +52,33 @@
       feature is a verb with an obvious mark; the clipboard has none that anybody
       reads at a glance — and this is the route for somebody who cannot scan.
     -->
-    <button class="btn-secondary" onclick={copy}>
-      {copied ? t('invite.copied') : t('invite.copy')}
+    <button class="btn-secondary" onclick={() => copier.copy(link)}>
+      {copier.copied ? t('invite.copied') : t('invite.copy')}
     </button>
     <button class="btn-primary" onclick={onclose}>{t('invite.doneAction')}</button>
   </div>
+  <!-- Nothing reached the clipboard: the link itself, to copy by hand. -->
+  {#if copier.failed}
+    <p class="copy-failed" role="alert">{t('invite.copyFailed')}</p>
+    <input class="link" readonly value={link} aria-label={t('invite.copy')} onfocus={e => e.currentTarget.select()} />
+  {/if}
 </div>
 
 <style>
+  .copy-failed {
+    margin: 0.75rem 0 0.35rem;
+    font-size: 0.85rem;
+    color: var(--alarm);
+  }
+
+  .link {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.4rem 0.5rem;
+    font: inherit;
+    font-size: 0.8rem;
+  }
+
   .backdrop {
     position: fixed;
     inset: 0;
