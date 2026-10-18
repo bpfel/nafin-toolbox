@@ -62,8 +62,9 @@ describe('the plan’s versions', () => {
     expect(before).toMatchObject({ from: '2026-09', to: '2026-09' })
   })
 
-  // Instead of a name somebody would have to type: what is different.
-  test('each version says what changed from the one before; the oldest says nothing', () => {
+  // Instead of a name somebody would have to type: what came next. The plan
+  // now has nothing after it, and stays clean.
+  test('a past version says what changed after it, and from when; the plan now says nothing', () => {
     const v = plan()
     close(v, '2026-08')
     budget.setPlanned(v, salary(v).id, '6400.00')
@@ -71,9 +72,10 @@ describe('the plan’s versions', () => {
 
     const [now, before] = planVersions(v)
 
-    expect(now.changes).toEqual([
+    expect(now.changes).toEqual([])
+    expect(before.changedFrom).toBe('2026-09')
+    expect(before.changes).toEqual([
       expect.objectContaining({ kind: 'amount', name: salary(v).name, to: '6400.00' }),
     ])
-    expect(before.changes).toEqual([])
   })
 })

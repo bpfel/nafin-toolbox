@@ -21,8 +21,13 @@ export interface PlanVersion {
   to: string | null
   /** The copy to show; `null` for the live plan. */
   copy: VaultSnapshot | null
-  /** What is different from the version before it; empty for the oldest. */
+  /**
+   * What changed after it — what made the next version different — and the
+   * month that next version started. Shown on a past version, so the plan now
+   * stays clean; empty on the plan now, which has nothing after it.
+   */
   changes: PlanChange[]
+  changedFrom?: string
 }
 
 /** What a line says, apart from when it was copied. Order does not count. */
@@ -59,8 +64,11 @@ export function planVersions(vault: VaultData): PlanVersion[] {
     versions.push({ from: last ? nextOf(last.to!) : vault.budget.openMonth, to: null, copy: null, changes: [], sig: live, lines: liveLines })
   }
 
-  // Each against the one before it: what a step back would undo.
-  for (let i = 1; i < versions.length; i++) versions[i].changes = planChanges(versions[i - 1].lines, versions[i].lines)
+  // Each against the one after it: what came next.
+  for (let i = 0; i < versions.length - 1; i++) {
+    versions[i].changes = planChanges(versions[i].lines, versions[i + 1].lines)
+    versions[i].changedFrom = versions[i + 1].from
+  }
 
   return versions.reverse().map(({ sig: _sig, lines: _lines, ...v }) => v)
 }

@@ -2,14 +2,19 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { PlanChange } from '../../lib/budget/changes'
   import Money from '../../lib/util/Money.svelte'
+  import { monthLabel } from '../../lib/util/months'
 
   /**
-   * What is different from the version before: worked out by the app, not
-   * written by anybody. Every change is listed; past a handful the list folds,
-   * and opens to all of them — a move touches a dozen lines, and the one being
-   * looked for must not be the one that was cut.
+   * What changed after a past version, from the month the next one started:
+   * worked out by the app, not written by anybody. Every change is listed;
+   * past a handful the list folds, and opens to all of them — a move touches a
+   * dozen lines, and the one being looked for must not be the one that was cut.
+   *
+   * A line added or removed is marked + or − and coloured, and still says so
+   * in words, so the colour is never the only way to tell; a removed line says
+   * what it was worth.
    */
-  let { changes }: { changes: PlanChange[] } = $props()
+  let { changes, from }: { changes: PlanChange[]; from: string } = $props()
 
   const FOLDED = 6
   let open = $state(false)
@@ -17,7 +22,7 @@
 </script>
 
 <section class="changes">
-  <h3>{t('budget.changesTitle')}</h3>
+  <h3>{t('budget.changesTitle', { month: monthLabel(from) })}</h3>
   <ul>
     {#each shown as change, i (i)}
       <li>
@@ -25,11 +30,17 @@
           <span class="name">{change.name}</span>
           <span class="what"><Money value={change.from} /> → <Money value={change.to} /></span>
         {:else if change.kind === 'added'}
-          <span class="name">{change.name}</span>
+          <span class="name added">
+            <span class="mark" aria-hidden="true">+</span>{change.name}
+            {#if change.category}<span class="category">{change.category}</span>{/if}
+          </span>
           <span class="what">{t('change.added')} · <Money value={change.amount} /></span>
         {:else if change.kind === 'removed'}
-          <span class="name">{change.name}</span>
-          <span class="what">{t('change.removed')}</span>
+          <span class="name removed">
+            <span class="mark" aria-hidden="true">−</span><s>{change.name}</s>
+            {#if change.category}<span class="category">{change.category}</span>{/if}
+          </span>
+          <span class="what">{t('change.removed')} · {t('change.was')} <Money value={change.amount} /></span>
         {:else if change.kind === 'renamed'}
           <span class="name">{change.from}</span>
           <span class="what">{t('change.renamed', { name: change.to })}</span>
@@ -92,6 +103,30 @@
   .name {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .mark {
+    display: inline-block;
+    width: 1em;
+    font-weight: 600;
+  }
+
+  .added .mark {
+    color: var(--money-in);
+  }
+
+  .removed .mark {
+    color: var(--alarm);
+  }
+
+  .removed s {
+    text-decoration-color: var(--alarm);
+  }
+
+  .category {
+    margin-left: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
   }
 
   .what {
