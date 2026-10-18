@@ -64,6 +64,18 @@ describe('AddEntryModal — the only way to change an amount', () => {
     expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
   })
 
+  // Exactly, not by floating point: 1.005 × 100 is 100.4999…, which used to
+  // round down to 1.00.
+  test('a third decimal of 5 rounds up, to 1.01', async () => {
+    const { onsave, entryId, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1.005' } })
+    await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onsave).toHaveBeenCalledWith(entryId, '1.01')
+  })
+
   test('saves a figure retyped without a separator', async () => {
     const { onsave, entryId, monthly } = openOn('1350.00')
 

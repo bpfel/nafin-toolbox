@@ -276,6 +276,19 @@ describe('AccountManagement edit mode', () => {
     expect(store.vault!.accounts[0].currentAmount).toBe('1234.50')
   })
 
+  // An overdrawn account is corrected like any other.
+  test('a correction below zero is taken', async () => {
+    store.vault = vault(account('a', 'Main'))
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Correct the balance of Main' }))
+    const amount = document.querySelector('.correction input[inputmode="decimal"]') as HTMLInputElement
+    await fireEvent.input(amount, { target: { value: '-50' } })
+    await fireEvent.keyDown(amount, { key: 'Enter' })
+
+    expect(store.vault!.accounts[0].currentAmount).toBe('-50.00')
+  })
+
   test('toggling edit mode after render takes effect without a remount', async () => {
     store.vault = vault(account('a', 'Main'), account('b', 'Reserves'))
 
