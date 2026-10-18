@@ -56,3 +56,33 @@ export function addMonths(month: string, offset: number): string {
 export function nextMonth(month: string): string {
   return addMonths(month, 1)
 }
+
+// --- as people read them ------------------------------------------------------
+//
+// Always dd.mm.yyyy, whatever language the interface is in: it is how a date is
+// written in Switzerland in all four languages, as a franc amount is 1’234.50
+// in all of them. Four screens used to format dates four ways, and one followed
+// the browser's language rather than the app's.
+
+const DAY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
+/**
+ * `'2026-10-03'` or a timestamp → `03.10.2026`. A plain day is read as written,
+ * not as midnight UTC, which west of Greenwich is the day before. Anything that
+ * is not a date comes back unchanged, so a corrupt value shows as itself.
+ */
+export function formatDate(value: string): string {
+  const day = DAY_PATTERN.exec(value)
+  if (day) return `${day[3]}.${day[2]}.${day[1]}`
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return value
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`
+}
+
+/** A timestamp → `03.10.2026, 14:05`, or with `seconds`, `14:05:09`. Local time. */
+export function formatDateTime(value: string, options: { seconds?: boolean } = {}): string {
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return value
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}${options.seconds ? `:${pad(d.getSeconds())}` : ''}`
+  return `${formatDate(value)}, ${time}`
+}

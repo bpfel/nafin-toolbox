@@ -1,4 +1,5 @@
-import { sign, verify, ownBuffer, toBase64, fromBase64 } from './identity'
+import { sign, verify } from './identity'
+import { fromBase64, ownBuffer, toBase64 } from './bytes'
 
 /**
  * Handing a household key to somebody else, so they can tell it came from you.

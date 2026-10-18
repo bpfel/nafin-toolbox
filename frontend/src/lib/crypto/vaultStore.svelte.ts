@@ -19,7 +19,8 @@ import {
   sealGrant, macPublicKey, verifyPublicKeyMAC, generateInviteSecret, generateInviteToken,
   hashInviteToken,
 } from './grant'
-import { fromBase64, toBase64, importPublicKey, openUnder, sealUnder } from './identity'
+import { importPublicKey, openUnder, sealUnder } from './identity'
+import { fromBase64, toBase64 } from './bytes'
 import { seedNamesFor } from '../budget/seedNames'
 import { getLocale } from '../i18n/index.svelte'
 import { perform, overwriteBy, type Action, type ActionArgs, type ActionKind, type ActionResult } from '../sync/actions'
@@ -294,14 +295,14 @@ async function landOnRecalled(): Promise<void> {
 /** Export MEK to sessionStorage so it survives page refreshes. */
 async function cacheMEK(key: CryptoKey): Promise<void> {
   const raw = await crypto.subtle.exportKey('raw', key)
-  sessionStorage.setItem(MEK_STORAGE_KEY, btoa(String.fromCharCode(...new Uint8Array(raw))))
+  sessionStorage.setItem(MEK_STORAGE_KEY, toBase64(new Uint8Array(raw)))
 }
 
 /** Restore MEK from sessionStorage. Returns null if not cached. */
 async function restoreMEK(): Promise<CryptoKey | null> {
   const stored = sessionStorage.getItem(MEK_STORAGE_KEY)
   if (!stored) return null
-  const raw = Uint8Array.from(atob(stored), c => c.charCodeAt(0))
+  const raw = fromBase64(stored)
   return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt'])
 }
 

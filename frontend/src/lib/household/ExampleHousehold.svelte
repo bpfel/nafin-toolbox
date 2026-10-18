@@ -41,7 +41,7 @@
   Labelled rather than silent: to a screen reader this is one described thing,
   not a list of controls that have mysteriously stopped working.
 -->
-<div class="example" inert aria-label={t('invite.codeFor').replace('{name}', EMAIL)}>
+<div class="example" inert aria-label={t('invite.codeFor', { name: EMAIL })}>
   <div class="row household">
     <HouseMark initials={initialsOf(NAME)} />
     <span class="name">{NAME}</span>

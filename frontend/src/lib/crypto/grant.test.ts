@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest'
-import { generateIdentity, sealIdentity, openIdentity, toBase64, fromBase64 } from './identity'
+import { generateIdentity, sealIdentity, openIdentity } from './identity'
+import { fromBase64, toBase64 } from './bytes'
 import { generateHouseholdKey, sealName, openName } from './household'
 import {
   sealGrant, openGrant, GrantError, macPublicKey, verifyPublicKeyMAC,

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDate } from '../util/calendar'
   import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, getSettings, type User, getAuthState } from './authStore.svelte'
   import DeleteUserModal from './DeleteUserModal.svelte'
 
@@ -164,7 +165,7 @@
                 <span class="status-badge mfa">2FA</span>
               {/if}
             </td>
-            <td class="created">{new Date(u.created_at).toLocaleDateString()}</td>
+            <td class="created">{formatDate(u.created_at)}</td>
             <td>
               <div class="actions">
                 {#if !u.email_verified}

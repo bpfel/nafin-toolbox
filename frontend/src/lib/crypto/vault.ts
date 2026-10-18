@@ -1,4 +1,5 @@
 import { thisMonth, today } from '../util/calendar'
+import { fromBase64, toBase64 } from './bytes'
 import { newId, todayISO } from '../sync/source'
 
 const NONCE_LENGTH = 12
@@ -464,27 +465,9 @@ export async function encryptVault(
   )
 
   return {
-    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
-    nonce: bytesToBase64(nonce),
+    ciphertext: toBase64(new Uint8Array(encrypted)),
+    nonce: toBase64(nonce),
   }
-}
-
-/**
- * Base64-encodes bytes in chunks.
- *
- * `String.fromCharCode(...bytes)` spreads every byte as a separate argument and
- * overflows the call stack somewhere around a hundred kilobytes — which is to
- * say, it fails on a large vault by throwing while SAVING. Snapshots make large
- * vaults ordinary, so this is the difference between growing a vault and being
- * unable to persist it.
- */
-function bytesToBase64(bytes: Uint8Array): string {
-  const CHUNK_SIZE = 0x8000
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK_SIZE))
-  }
-  return btoa(binary)
 }
 
 export async function decryptVault(
@@ -492,8 +475,8 @@ export async function decryptVault(
   nonce: string,
   mek: CryptoKey,
 ): Promise<VaultData> {
-  const ciphertextBytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0))
-  const nonceBytes = Uint8Array.from(atob(nonce), c => c.charCodeAt(0))
+  const ciphertextBytes = fromBase64(ciphertext)
+  const nonceBytes = fromBase64(nonce)
 
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: nonceBytes },

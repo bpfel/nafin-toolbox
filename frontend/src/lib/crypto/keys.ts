@@ -1,3 +1,5 @@
+import { splitNonce, withNonce } from './bytes'
+
 const PBKDF2_HASH = 'SHA-256'
 const AES_ALGO = 'AES-GCM'
 const KEK_KEY_LENGTH = 256
@@ -54,22 +56,14 @@ export async function wrapMEK(mek: CryptoKey, kek: CryptoKey): Promise<string> {
     name: AES_ALGO,
     iv: nonce,
   })
-
-  // Concatenate nonce + wrapped key bytes
-  const combined = new Uint8Array(NONCE_LENGTH + wrapped.byteLength)
-  combined.set(nonce, 0)
-  combined.set(new Uint8Array(wrapped), NONCE_LENGTH)
-
-  return btoa(String.fromCharCode(...combined))
+  return withNonce(nonce, wrapped)
 }
 
 /**
  * Unwrap (decrypt) MEK from base64 string using KEK.
  */
 export async function unwrapMEK(encryptedMEK: string, kek: CryptoKey): Promise<CryptoKey> {
-  const combined = Uint8Array.from(atob(encryptedMEK), c => c.charCodeAt(0))
-  const nonce = combined.slice(0, NONCE_LENGTH)
-  const wrapped = combined.slice(NONCE_LENGTH)
+  const { nonce, payload: wrapped } = splitNonce(encryptedMEK, NONCE_LENGTH)
 
   return crypto.subtle.unwrapKey(
     'raw',
@@ -108,9 +102,10 @@ export function generateRecoveryKey(): string {
 }
 
 /**
- * Wrap MEK using a recovery key (derive a key from it first via PBKDF2).
+ * The key a recovery key stands for, derived via PBKDF2. Wrapping and
+ * unwrapping derived it in two copies that differed only in the usage asked for.
  */
-export async function wrapMEKWithRecovery(mek: CryptoKey, recoveryKey: string): Promise<string> {
+async function recoveryKEK(recoveryKey: string, usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
   const enc = new TextEncoder()
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -120,7 +115,7 @@ export async function wrapMEKWithRecovery(mek: CryptoKey, recoveryKey: string): 
     ['deriveKey'],
   )
 
-  const recoveryKEK = await crypto.subtle.deriveKey(
+  return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt: enc.encode('nafin-recovery'),
@@ -130,59 +125,20 @@ export async function wrapMEKWithRecovery(mek: CryptoKey, recoveryKey: string): 
     keyMaterial,
     { name: AES_ALGO, length: KEK_KEY_LENGTH },
     false,
-    ['wrapKey'],
+    [usage],
   )
+}
 
-  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH))
-  const wrapped = await crypto.subtle.wrapKey('raw', mek, recoveryKEK, {
-    name: AES_ALGO,
-    iv: nonce,
-  })
-
-  const combined = new Uint8Array(NONCE_LENGTH + wrapped.byteLength)
-  combined.set(nonce, 0)
-  combined.set(new Uint8Array(wrapped), NONCE_LENGTH)
-
-  return btoa(String.fromCharCode(...combined))
+/**
+ * Wrap MEK using a recovery key (derive a key from it first via PBKDF2).
+ */
+export async function wrapMEKWithRecovery(mek: CryptoKey, recoveryKey: string): Promise<string> {
+  return wrapMEK(mek, await recoveryKEK(recoveryKey, 'wrapKey'))
 }
 
 /**
  * Unwrap MEK using a recovery key.
  */
 export async function unwrapMEKWithRecovery(encryptedMEK: string, recoveryKey: string): Promise<CryptoKey> {
-  const enc = new TextEncoder()
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(recoveryKey),
-    'PBKDF2',
-    false,
-    ['deriveKey'],
-  )
-
-  const recoveryKEK = await crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: enc.encode('nafin-recovery'),
-      iterations: 600000,
-      hash: PBKDF2_HASH,
-    },
-    keyMaterial,
-    { name: AES_ALGO, length: KEK_KEY_LENGTH },
-    false,
-    ['unwrapKey'],
-  )
-
-  const combined = Uint8Array.from(atob(encryptedMEK), c => c.charCodeAt(0))
-  const nonce = combined.slice(0, NONCE_LENGTH)
-  const wrapped = combined.slice(NONCE_LENGTH)
-
-  return crypto.subtle.unwrapKey(
-    'raw',
-    wrapped,
-    recoveryKEK,
-    { name: AES_ALGO, iv: nonce },
-    { name: AES_ALGO, length: 256 },
-    true,
-    ['encrypt', 'decrypt'],
-  )
+  return unwrapMEK(encryptedMEK, await recoveryKEK(recoveryKey, 'unwrapKey'))
 }
