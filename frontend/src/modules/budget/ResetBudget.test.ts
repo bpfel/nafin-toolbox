@@ -144,7 +144,7 @@ describe('resetting the budget', () => {
 
     await fireEvent.click(resetButton()!)
 
-    expect(await screen.findByText(/Earlier versions of the plan are kept/i)).toBeTruthy()
+    expect(await screen.findByText(/Earlier versions of the budget are kept/i)).toBeTruthy()
   })
 
   test('warns when no month has ended yet', async () => {
