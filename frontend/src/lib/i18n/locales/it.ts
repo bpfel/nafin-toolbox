@@ -232,6 +232,11 @@ export const it: Messages = {
   'security.deletePrompt': 'Inserisci la password per confermare l’eliminazione dell’account:',
   'security.deleteMyAccount': 'Elimina il mio account',
   'security.deleting': 'Eliminazione...',
+  'security.deleteDataTitle': 'Elimina tutti i dati',
+  'security.deleteDataHint': 'Il tuo budget con le versioni precedenti, le tue spese e i tuoi conti vengono eliminati. Mantieni il tuo accesso e le tue economie domestiche. L’operazione è irreversibile.',
+  'security.deleteDataPrompt': 'Inserisci la password per eliminare tutti i tuoi dati:',
+  'security.deleteMyData': 'Elimina tutti i miei dati',
+  'security.wrongPassword': 'La password non è corretta.',
 
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Attiva l’autenticazione a due fattori',
@@ -284,7 +289,6 @@ export const it: Messages = {
   'change.automaticOff': 'non più pagato automaticamente',
   'change.showAll': 'Mostra tutte le {count} modifiche',
   'change.showFewer': 'Mostra meno',
-  'reset.versionsKept': 'Le versioni precedenti del budget restano conservate.',
   'budget.perYear': '/anno',
   'budget.plannedMo': 'Previsto/mese',
   'budget.plannedYr': 'Previsto/anno',
@@ -300,7 +304,6 @@ export const it: Messages = {
   'budget.editCategoryOf': 'Modifica la categoria {category}',
   'budget.addEntryTo': 'Aggiungi una voce a {category}',
   'budget.uncategorised': 'Altro',
-  'budget.reset': 'Reimposta il budget',
   'budget.setupTitle': 'Configura il tuo budget',
   'budget.setupHint': 'Inizia con voci svizzere predefinite, basate sull’indagine sul budget delle economie domestiche dell’UST (HABE 2023, persona sola). Potrai adattare tutto in seguito.',
   'budget.setupHintHousehold': 'Inizia con voci svizzere predefinite per un’economia domestica di due persone, basate sull’indagine sul budget delle economie domestiche dell’UST (HABE 2020–2021, coppie sotto i 65 anni senza figli). Potrai adattare tutto in seguito.',
@@ -363,10 +366,6 @@ export const it: Messages = {
   // --- Snapshots ---
 
   // --- Resetting ---
-  'reset.title': 'Reimposta il budget',
-  'reset.explain.one': 'Questo rimuove l’unica voce, la sua categoria e ogni importo previsto. Riparti da un budget vuoto.',
-  'reset.explain.other': 'Questo rimuove tutte le {count} voci, le loro categorie e ogni importo previsto. Riparti da un budget vuoto.',
-  'reset.noSnapshots': 'Da quando questo budget è stato creato non si è ancora concluso alcun mese, quindi non ne resterà traccia.',
 
   // --- Accounts ---
   'accounts.add': 'Aggiungi',

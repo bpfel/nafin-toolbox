@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest'
-import { encryptVault, decryptVault, createEmptyVault, migrateVault, assertVaultShape, VaultVersionAheadError, type VaultData,
+import { encryptVault, decryptVault, createEmptyVault, deleteAllData, migrateVault, assertVaultShape, VaultVersionAheadError, type VaultData,
   VAULT_VERSION,
 } from './vault'
 import { generateMEK } from './keys'
@@ -1484,5 +1484,40 @@ describe('the first account', () => {
     const names = (['de', 'fr', 'it'] as const).map(l => seedNamesFor(l).mainAccount)
 
     expect(names).toEqual(['Hauptkonto', 'Compte principal', 'Conto principale'])
+  })
+})
+
+/**
+ * Delete all data: the vault a new sign-up gets, short of what is about the
+ * person rather than their money.
+ */
+describe('deleteAllData', () => {
+  test('leaves one empty account and nothing else of the money', () => {
+    const v = createEmptyVault('Main')
+    v.budget.entries.push({ id: 'e', name: 'Rent', type: 'expense', sortOrder: 1, archived: false, categoryId: 'c', sourceAccountId: null, sinkAccountId: null })
+    v.budget.snapshots.push({ id: 's', createdAt: 'z', month: '2026-09', lines: [] })
+    v.belege.push({ id: 'b', date: '2026-09-02', amount: '5.00', entryId: null, createdBy: '1', createdAt: 'z' })
+    v.accounts.push({ ...v.accounts[0], id: 'savings', name: 'Savings' })
+
+    deleteAllData(v, 'Hauptkonto')
+
+    expect(v.budget.entries).toEqual([])
+    expect(v.budget.snapshots).toEqual([])
+    expect(v.belege).toEqual([])
+    expect(v.accounts.map(a => a.name)).toEqual(['Hauptkonto'])
+    expect(v.accounts[0].currentAmount).toBe('0.00')
+  })
+
+  // Clearing the pins would quietly undo a key verification.
+  test('keeps whose keys were checked, and the tour', () => {
+    const v = createEmptyVault('Main')
+    v.trust.pins['7'] = 'fingerprint'
+    v.tour.completedAt = '2026-09-01T00:00:00Z'
+
+    deleteAllData(v, 'Main')
+
+    expect(v.trust.pins['7']).toBe('fingerprint')
+    expect(v.tour.completedAt).toBe('2026-09-01T00:00:00Z')
+    expect(() => assertVaultShape(v)).not.toThrow()
   })
 })

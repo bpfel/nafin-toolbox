@@ -221,6 +221,11 @@ export const de: Messages = {
   'security.deletePrompt': 'Gib dein Passwort ein, um die Kontolöschung zu bestätigen:',
   'security.deleteMyAccount': 'Mein Konto löschen',
   'security.deleting': 'Wird gelöscht...',
+  'security.deleteDataTitle': 'Alle Daten löschen',
+  'security.deleteDataHint': 'Dein Budget mit seinen früheren Versionen, deine Belege und deine Konten werden gelöscht. Dein Login und deine Haushalte bleiben. Dies kann nicht rückgängig gemacht werden.',
+  'security.deleteDataPrompt': 'Gib dein Passwort ein, um alle deine Daten zu löschen:',
+  'security.deleteMyData': 'Alle meine Daten löschen',
+  'security.wrongPassword': 'Das Passwort stimmt nicht.',
 
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Zwei-Faktor-Authentifizierung aktivieren',
@@ -271,7 +276,6 @@ export const de: Messages = {
   'change.automaticOff': 'nicht mehr automatisch bezahlt',
   'change.showAll': 'Alle {count} Änderungen zeigen',
   'change.showFewer': 'Weniger zeigen',
-  'reset.versionsKept': 'Frühere Versionen des Budgets bleiben erhalten.',
   'budget.perYear': '/J.',
   'budget.plannedMo': 'Geplant/Mt.',
   'budget.plannedYr': 'Geplant/J.',
@@ -287,7 +291,6 @@ export const de: Messages = {
   'budget.editCategoryOf': 'Kategorie {category} bearbeiten',
   'budget.addEntryTo': 'Eintrag zu {category} hinzufügen',
   'budget.uncategorised': 'Übrige',
-  'budget.reset': 'Budget zurücksetzen',
   'budget.setupTitle': 'Budget einrichten',
   'budget.setupHint': 'Beginn mit Schweizer Standardeinträgen auf Basis der BFS-Haushaltsbudgeterhebung (HABE 2023, Einpersonenhaushalt). Du kannst später alles anpassen.',
   'budget.setupHintHousehold': 'Beginn mit Schweizer Standardeinträgen für einen Zweipersonenhaushalt auf Basis der BFS-Haushaltsbudgeterhebung (HABE 2020–2021, Paare unter 65 ohne Kinder). Du kannst später alles anpassen.',
@@ -337,10 +340,6 @@ export const de: Messages = {
   'field.name': 'Name',
 
   // --- Destructive confirmations ---
-  'reset.title': 'Budget zurücksetzen',
-  'reset.explain.one': 'Damit werden der eine Eintrag, seine Kategorie und alle geplanten Beträge entfernt. Du beginnst wieder mit einem leeren Budget.',
-  'reset.explain.other': 'Damit werden alle {count} Einträge, ihre Kategorien und alle geplanten Beträge entfernt. Du beginnst wieder mit einem leeren Budget.',
-  'reset.noSnapshots': 'Seit dieses Budget erstellt wurde, ist noch kein Monat zu Ende gegangen, also bleibt keine Aufzeichnung davon.',
 
   'entry.deleteExplain': '{name} aus dem Budget entfernen? Der geplante Betrag geht mit. Frühere Versionen des Budgets behalten ihre Kopie davon.',
 

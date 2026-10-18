@@ -246,6 +246,11 @@ export const en = {
   'security.deletePrompt': 'Enter your password to confirm account deletion:',
   'security.deleteMyAccount': 'Delete My Account',
   'security.deleting': 'Deleting...',
+  'security.deleteDataTitle': 'Delete all data',
+  'security.deleteDataHint': 'Your budget and its history, your receipts and your accounts are deleted. You keep your login and your households. This cannot be undone.',
+  'security.deleteDataPrompt': 'Enter your password to delete all your data:',
+  'security.deleteMyData': 'Delete all my data',
+  'security.wrongPassword': 'That password is not right.',
 
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Enable Two-Factor Authentication',
@@ -296,7 +301,6 @@ export const en = {
   'change.automaticOff': 'no longer paid automatically',
   'change.showAll': 'Show all {count} changes',
   'change.showFewer': 'Show fewer',
-  'reset.versionsKept': 'Earlier versions of the budget are kept.',
   'budget.perYear': '/yr',
   'budget.plannedMo': 'Planned/mo',
   'budget.plannedYr': 'Planned/yr',
@@ -312,7 +316,6 @@ export const en = {
   'budget.editCategoryOf': 'Edit category {category}',
   'budget.addEntryTo': 'Add an entry to {category}',
   'budget.uncategorised': 'Other',
-  'budget.reset': 'Reset budget',
   'budget.setupTitle': 'Set up your budget',
   'budget.setupHint': 'Start with default Swiss budget entries based on BFS household survey data (HABE 2023, single person). You can customize everything later.',
   // The household variant. A different population and a different wave of
@@ -368,10 +371,6 @@ export const en = {
   //
   // Whole sentences with slots, not fragments: the counted forms sit in the
   // translation so a language can put the number where it belongs.
-  'reset.title': 'Reset budget',
-  'reset.explain.one': 'This removes all {count} entry, its category and every planned amount. You start again from an empty budget.',
-  'reset.explain.other': 'This removes all {count} entries, their categories and every planned amount. You start again from an empty budget.',
-  'reset.noSnapshots': 'No month has ended since this budget was made, so no record of it will remain.',
 
   'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Earlier versions of the budget keep their copy of it.',
 

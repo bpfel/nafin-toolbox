@@ -61,7 +61,7 @@ const CASES: Case[] = [
     },
   },
   { kind: 'reorderCategories', args: v => [[...v.budget.categories].reverse().map(c => c.id)] },
-  { kind: 'resetBudget', args: () => [] },
+  { kind: 'deleteAllData', args: () => ['Main'] },
   { kind: 'createAccount', args: () => [{ name: 'Cash', kind: 'cash' }] },
   { kind: 'renameAccount', args: v => [v.accounts[1].id, 'Renamed account'] },
   { kind: 'deleteAccount', args: v => [v.accounts[1].id, v.accounts[0].id] },
