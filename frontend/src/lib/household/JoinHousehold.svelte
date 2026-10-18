@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
   import { acceptInvite, getVaultState, householdArrived, switchTo } from '../crypto/vaultStore.svelte'
-  import { fromBase64 } from '../crypto/identity'
+  import { fromBase64 } from '../crypto/bytes'
   import { navigate } from '../nav/router.svelte'
 
   /**

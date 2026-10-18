@@ -2,7 +2,7 @@
   import { t } from '../../lib/i18n/index.svelte'
   import type { Beleg, VaultData } from '../../lib/crypto/vault'
   import { reviewMonth, type ReviewRow } from '../../lib/belege/belegeEngine'
-  import { thisMonth } from '../../lib/util/calendar'
+  import { formatDate, thisMonth } from '../../lib/util/calendar'
   import { monthLabel } from '../../lib/util/months'
   import Money from '../../lib/util/Money.svelte'
   import RecordRow from './RecordRow.svelte'
@@ -106,11 +106,6 @@
     commit('setEntryAutomatic', entryId, false)
     saveNow()
   }
-
-  function closedOn(iso: string): string {
-    const d = new Date(iso)
-    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`
-  }
 </script>
 
 {#snippet line(row: ReviewRow)}
@@ -155,7 +150,7 @@
     title={monthLabel(month)}
     planned={review.planned}
     spent={review.spent}
-    basis={review.closedAt ? t('spending.asOf', { date: closedOn(review.closedAt) }) : t('spending.live')}
+    basis={review.closedAt ? t('spending.asOf', { date: formatDate(review.closedAt) }) : t('spending.live')}
     {onprevious}
     {onnext}
     stepper

@@ -175,7 +175,7 @@
             </form>
           {:else if confirmingId === household.id}
             <div class="confirm-box">
-              <p>{t('household.deletePrompt').replace('{name}', household.name)}</p>
+              <p>{t('household.deletePrompt', { name: household.name })}</p>
               <div class="btn-row">
                 <button class="btn-danger" onclick={() => remove(household.id)} disabled={busy}>
                   {busy ? t('household.deleting') : t('household.delete')}

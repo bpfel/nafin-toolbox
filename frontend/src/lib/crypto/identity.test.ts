@@ -7,12 +7,11 @@ import {
   importPublicKey,
   sealUnder,
   openUnder,
-  toBase64,
-  fromBase64,
   sign,
   verify,
   type SealedIdentity,
 } from './identity'
+import { fromBase64, toBase64 } from './bytes'
 
 async function aMEK(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])

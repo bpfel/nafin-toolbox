@@ -1,4 +1,5 @@
-import { sealUnder, openUnder, ownBuffer, toBase64, fromBase64, type OpenIdentity } from './identity'
+import { sealUnder, openUnder, type OpenIdentity } from './identity'
+import { fromBase64, ownBuffer, toBase64 } from './bytes'
 import { openGrant, claimedSender, fingerprintOf, GrantError } from './grant'
 import type { VaultTrust } from './vault'
 

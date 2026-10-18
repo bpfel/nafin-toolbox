@@ -7,7 +7,7 @@
   import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
   import { autofocus } from '../../../lib/util/autofocus'
-  import { today } from '../../../lib/util/calendar'
+  import { formatDate, today } from '../../../lib/util/calendar'
   import ActionButton from '../../../lib/nav/ActionButton.svelte'
 
   interface Props {
@@ -49,12 +49,6 @@
   let amountInput = $state('')
   let dateInput = $state('')
   let correctionError = $state<string | null>(null)
-
-  function formatDate(iso: string): string {
-    const d = new Date(iso)
-    if (isNaN(d.getTime())) return iso
-    return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  }
 
   /**
    * Accepts 1234.5, 1’234.50 and 1234,50, and a minus — an overdrawn account

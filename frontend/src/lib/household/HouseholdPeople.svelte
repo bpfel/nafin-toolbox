@@ -334,7 +334,7 @@
           {/if}
         </span>
         {#if isOwner}
-          <ActionButton label={t('people.name').replace('{name}', member.email)} onclick={() => startNaming(member)}>
+          <ActionButton label={t('people.name', { name: member.email })} onclick={() => startNaming(member)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12 20h9" />
               <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
@@ -364,8 +364,8 @@
         {#if isOwner && member.role !== 'owner' && changingRole !== member.user_id}
           <button
             class="tag tag-button"
-            aria-label={t('invite.changeRole').replace('{name}', called(member))}
-            title={t('invite.changeRole').replace('{name}', called(member))}
+            aria-label={t('invite.changeRole', { name: called(member) })}
+            title={t('invite.changeRole', { name: called(member) })}
             onclick={() => (changingRole = member.user_id)}
           >
             {t(`role.${member.role}` as 'role.owner')}
@@ -392,7 +392,7 @@
             <p>{t('invite.removeWarning')}</p>
             <div class="btn-row">
               <button class="btn-danger" onclick={() => remove(member.user_id)} disabled={busy}>
-                {t('invite.removeConfirm').replace('{name}', called(member))}
+                {t('invite.removeConfirm', { name: called(member) })}
               </button>
               <button class="btn-secondary" onclick={() => (confirmingRemoval = null)}>
                 {t('action.cancel')}
@@ -444,7 +444,7 @@
           -->
           {#if !invite.accepted_at && invite.link}
             <ActionButton
-              label={t('invite.showCode').replace('{name}', invite.invited_email)}
+              label={t('invite.showCode', { name: invite.invited_email })}
               onclick={() => (showingCode = invite.id)}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -480,9 +480,9 @@
     <div class="confirm-box">
       <p>
         {#if isOwner && successor}
-          {t('invite.leaveOwner').replace('{name}', householdName).replace('{successor}', called(successor))}
+          {t('invite.leaveOwner', { name: householdName, successor: called(successor) })}
         {:else}
-          {t('invite.leaveWarning').replace('{name}', householdName)}
+          {t('invite.leaveWarning', { name: householdName })}
         {/if}
       </p>
       <div class="btn-row">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDateTime } from '../util/calendar'
   import { fetchAuditLogs, listUsers, type AuditLogEntry, type User } from './authStore.svelte'
 
   const PAGE_SIZE = 50
@@ -103,14 +104,6 @@
     expandedId = expandedId === id ? null : id
   }
 
-  function formatDate(iso: string): string {
-    const d = new Date(iso)
-    return d.toLocaleString('de-CH', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    })
-  }
-
   // Load on mount
   load()
   loadUsers()
@@ -165,7 +158,7 @@
         <tbody>
           {#each entries as entry (entry.id)}
             <tr>
-              <td class="nowrap">{formatDate(entry.created_at)}</td>
+              <td class="nowrap">{formatDateTime(entry.created_at, { seconds: true })}</td>
               <td>
                 <span
                   class="badge"

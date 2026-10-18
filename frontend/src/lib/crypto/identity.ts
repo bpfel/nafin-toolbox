@@ -1,4 +1,5 @@
 import { ed25519 } from '@noble/curves/ed25519.js'
+import { fromBase64, ownBuffer, splitNonce, toBase64, withNonce } from './bytes'
 
 /**
  * The two keypairs that let one person hand a vault key to another.
@@ -67,44 +68,6 @@ export interface OpenIdentity {
   verifyingKey: Uint8Array
 }
 
-// --- base64, chunked ---
-//
-// `btoa(String.fromCharCode(...bytes))` is the idiom used elsewhere in this
-// directory and it is fine for a 44-byte key, but it passes every byte as a
-// separate argument and a pkcs8 RSA key is well over a thousand of them. The
-// limit is an engine's argument count rather than a documented number, so it is
-// the kind of thing that works on a desktop and throws on a phone. Chunked.
-
-const CHUNK = 0x8000
-
-export function toBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-  }
-  return btoa(binary)
-}
-
-/**
- * WebCrypto asks for a `BufferSource` whose buffer is definitely not shared,
- * and a `Uint8Array` sliced out of another one carries `ArrayBufferLike` — which
- * could be a `SharedArrayBuffer` as far as the types know. Copying out is a few
- * hundred bytes at these sizes and removes the question entirely, which beats a
- * cast that asserts something the compiler is right to doubt.
- */
-export function ownBuffer(bytes: Uint8Array): ArrayBuffer {
-  const copy = new ArrayBuffer(bytes.byteLength)
-  new Uint8Array(copy).set(bytes)
-  return copy
-}
-
-export function fromBase64(value: string): Uint8Array {
-  const binary = atob(value)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
-
 // --- sealing bytes under a symmetric key ---
 //
 // Both private halves are sealed the same way, as bytes, rather than one
@@ -120,17 +83,12 @@ export async function sealUnder(bytes: Uint8Array, mek: CryptoKey): Promise<stri
   const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH))
   const ciphertext = await crypto.subtle.encrypt({ name: AES_ALGO, iv: nonce }, mek, ownBuffer(bytes))
 
-  const combined = new Uint8Array(NONCE_LENGTH + ciphertext.byteLength)
-  combined.set(nonce, 0)
-  combined.set(new Uint8Array(ciphertext), NONCE_LENGTH)
-  return toBase64(combined)
+  return withNonce(nonce, ciphertext)
 }
 
 export async function openUnder(sealed: string, mek: CryptoKey): Promise<Uint8Array> {
-  const combined = fromBase64(sealed)
-  const nonce = combined.subarray(0, NONCE_LENGTH)
-  const ciphertext = combined.subarray(NONCE_LENGTH)
-  const plain = await crypto.subtle.decrypt({ name: AES_ALGO, iv: ownBuffer(nonce) }, mek, ownBuffer(ciphertext))
+  const { nonce, payload: ciphertext } = splitNonce(sealed, NONCE_LENGTH)
+  const plain = await crypto.subtle.decrypt({ name: AES_ALGO, iv: nonce }, mek, ciphertext)
   return new Uint8Array(plain)
 }
 
