@@ -41,7 +41,12 @@
       data-tour={destination.screen === 'knowledge' ? 'nav-knowledge' : undefined}
       onclick={(event) => go(event, destination.path)}
     >
-      <NavIcon name={destination.icon} />
+      <span class="icon">
+        <NavIcon name={destination.icon} />
+        {#if destination.attention?.()}
+          <span class="attention" role="img" aria-label={t('invite.waiting')} title={t('invite.waiting')}></span>
+        {/if}
+      </span>
       <span class="label">{destination.label()}</span>
     </a>
   {/each}
@@ -97,6 +102,24 @@
   .item:focus-visible {
     outline: 2px solid #2d6a4f;
     outline-offset: -2px;
+  }
+
+  /* The dot sits on the icon's corner, so it reads as belonging to the tab in
+     the bar and in the rail alike, and costs the label no room. */
+  .icon {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .attention {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: #2d6a4f;
+    box-shadow: 0 0 0 2px #fff;
   }
 
   .label {

@@ -5,6 +5,7 @@
   import Sheet from '../nav/Sheet.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
   import { createCopier } from '../util/copier.svelte'
+  import { deleteAllMyData } from '../crypto/vaultStore.svelte'
 
 
   const authState = getAuthState()
@@ -13,6 +14,7 @@
   let showDisable = $state(false)
   let showRegenCodes = $state(false)
   let showDeleteAccount = $state(false)
+  let showDeleteData = $state(false)
   let showChangePassword = $state(false)
 
   let password = $state('')
@@ -48,6 +50,23 @@
       error = result.error
     } else {
       recoveryCodes = result.recovery_codes
+    }
+  }
+
+  /** Back to an empty vault, logged in still: the budget screen offers to start again. */
+  async function handleDeleteData() {
+    const email = authState.currentUser?.email
+    if (!password || !email) return
+    loading = true
+    error = null
+    const result = await deleteAllMyData(password, email)
+    loading = false
+
+    if (result === 'wrong-password') {
+      error = t('security.wrongPassword')
+    } else {
+      showDeleteData = false
+      password = ''
     }
   }
 
@@ -160,6 +179,36 @@
     <button class="btn-secondary" onclick={() => showChangePassword = true}>{t('password.changeTitle')}</button>
   </div>
 
+  <!--
+    Delete all data: everything in the vault, short of the account itself. It
+    replaced Reset budget, which cleared the budget and left its history, its
+    receipts and its accounts behind — a reset that kept a history of the
+    budget it had just removed. Here, beside Delete account, because it is the
+    same kind of act, asks for the same proof, and is as final.
+  -->
+  <div class="settings-card">
+    <h3>{t('security.deleteDataTitle')}</h3>
+    <p class="info">{t('security.deleteDataHint')}</p>
+
+    {#if showDeleteData}
+      <div class="confirm-box">
+        <p>{t('security.deleteDataPrompt')}</p>
+        <input type="password" bind:value={password} placeholder={t('security.currentPasswordPlaceholder')} disabled={loading} />
+        {#if error}
+          <p class="error">{error}</p>
+        {/if}
+        <div class="btn-row">
+          <button class="btn-danger" onclick={handleDeleteData} disabled={loading || !password}>
+            {loading ? t('security.deleting') : t('security.deleteMyData')}
+          </button>
+          <button class="btn-secondary" onclick={() => { showDeleteData = false; error = null; password = '' }}>{t('action.cancel')}</button>
+        </div>
+      </div>
+    {:else}
+      <button class="btn-danger-outline" onclick={() => { showDeleteData = true; showDeleteAccount = false; error = null; password = '' }}>{t('security.deleteDataTitle')}</button>
+    {/if}
+  </div>
+
   <!-- Delete Account Section -->
   <div class="settings-card">
     <h3>{t('security.deleteAccountTitle')}</h3>
@@ -180,7 +229,7 @@
         </div>
       </div>
     {:else}
-      <button class="btn-danger-outline" onclick={() => showDeleteAccount = true}>{t('security.deleteAccountTitle')}</button>
+      <button class="btn-danger-outline" onclick={() => { showDeleteAccount = true; showDeleteData = false; error = null; password = '' }}>{t('security.deleteAccountTitle')}</button>
     {/if}
   </div>
 </div>
@@ -234,10 +283,10 @@
   }
 
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.85rem;
     padding: 0.4rem 0.6rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 6px;
   }
 
@@ -276,21 +325,21 @@
   .btn-secondary:hover { background: #ccc; }
 
   .btn-danger {
-    background: #dc3545;
+    background: var(--alarm);
     color: white;
     padding: 0.35rem 1rem;
     font-size: 0.85rem;
   }
-  .btn-danger:hover { background: #c82333; }
+  .btn-danger:hover { background: var(--alarm-strong); }
 
   .btn-danger-outline {
     background: white;
-    color: #dc3545;
-    border: 1px solid #dc3545;
+    color: var(--alarm);
+    border: 1px solid var(--alarm);
     padding: 0.35rem 1rem;
     font-size: 0.85rem;
   }
-  .btn-danger-outline:hover { background: #fdecea; }
+  .btn-danger-outline:hover { background: var(--alarm-soft); }
 
   .codes-grid {
     display: grid;
@@ -318,7 +367,7 @@
   }
 
   .copy-status.failed {
-    color: #c0392b;
+    color: var(--alarm);
   }
 
   button:disabled {

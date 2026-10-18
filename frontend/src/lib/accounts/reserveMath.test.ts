@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest'
-import { monthsBetween, addMonths, nextDue, requiredForItem } from './reserveMath'
+import { nextDue, requiredForItem } from './reserveMath'
+import { monthsBetween, addMonths } from '../util/calendar'
 import type { ReserveDefinition } from '../crypto/vault'
 
 function bill(overrides: Partial<ReserveDefinition> = {}): ReserveDefinition {

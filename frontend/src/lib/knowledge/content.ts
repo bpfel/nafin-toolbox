@@ -77,6 +77,15 @@ export interface TourCopy {
    * not, which is the case that matters.
    */
   hoverNote?: string
+  /**
+   * Links to read further, shown under the text and opened in a new tab.
+   *
+   * For a step that describes something outside the app — installing it is
+   * the case — where the vendor's own instructions are better and longer
+   * lived than any we could write. Localised by URL, since the vendors
+   * publish their own translations.
+   */
+  links?: { label: string; url: string }[]
 }
 
 export interface Content {

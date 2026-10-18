@@ -1,7 +1,6 @@
 <script lang="ts">
+  import Sheet from '../../../lib/nav/Sheet.svelte'
   import { t } from '../../../lib/i18n/index.svelte'
-  import { focusTrap } from '../../../lib/util/focusTrap'
-  import { closeOnBack } from '../../../lib/nav/closeOnBack'
   import { monthLabel } from '../../../lib/util/months'
   import Money from '../../../lib/util/Money.svelte'
   import type { AllocationPart } from '../../../lib/accounts/accountMath'
@@ -34,19 +33,12 @@
 
   let { accountName, parts, total, onclose }: Props = $props()
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose()
-  }
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) onclose()
-  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('allocated.title', { account: accountName })} use:focusTrap use:closeOnBack={onclose}>
+<Sheet label={t('allocated.title', { account: accountName })} {onclose}>
+  <!-- One block, so the dialog keeps its own spacing rather than the sheet's. -->
+  <div>
     <h3>{t('allocated.title', { account: accountName })}</h3>
 
     {#if parts.length === 0}
@@ -88,33 +80,9 @@
       <button class="btn cancel" onclick={onclose}>{t('action.close')}</button>
     </div>
   </div>
-</div>
+</Sheet>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 1rem;
-  }
-  .modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 460px;
-    /* An account with a dozen reserves makes a list longer than the screen, and
-       a dialog whose close button cannot be reached is a trap. `dvh` for the
-       same reason as everywhere else: on a phone it is the browser chrome's
-       height that decides whether the last row is visible. */
-    max-height: 88dvh;
-    overflow-y: auto;
-    box-shadow: var(--shadow-modal);
-  }
   h3 {
     margin: 0 0 0.35rem;
     font-size: 1.1rem;
@@ -198,31 +166,5 @@
     display: flex;
     gap: 0.75rem;
     justify-content: flex-end;
-  }
-  .btn {
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .cancel {
-    background: #f1f3f5;
-    border: 1px solid #dee2e6;
-    color: #333;
-  }
-  .cancel:hover:not(:disabled) {
-    background: #e9ecef;
-  }
-
-  @media (max-width: 480px) {
-    .backdrop {
-      align-items: flex-end;
-      padding: 0;
-    }
-    .modal {
-      max-width: 100%;
-      border-radius: 16px 16px 0 0;
-      padding: 1.5rem 1.25rem 2rem;
-    }
   }
 </style>

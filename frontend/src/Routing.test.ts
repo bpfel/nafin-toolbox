@@ -52,6 +52,7 @@ vi.mock('./lib/auth/authStore.svelte', () => ({
 }))
 
 vi.mock('./lib/crypto/vaultStore.svelte', () => ({
+  sessionEndedElsewhere: vi.fn(),
   getVaultState: () => ({
     unlocked: true,
     vault: null,
@@ -67,11 +68,16 @@ vi.mock('./lib/crypto/vaultStore.svelte', () => ({
     currentVaultId: 'personal',
     currentHousehold: null,
   }),
-  markDirty: vi.fn(),
   switchTo: vi.fn(),
   createHousehold: vi.fn(),
   renameHousehold: vi.fn(),
   deleteHousehold: vi.fn(),
+  // Belege is mounted with the shell, and closes finished months on the way in.
+  closeEndedMonths: vi.fn(),
+  listMembers: vi.fn(async () => []),
+  commit: vi.fn(),
+  saveNow: vi.fn(),
+  belegUnsaved: () => false,
 }))
 
 vi.mock('./lib/util/buildVersion.svelte', () => ({
@@ -139,21 +145,21 @@ describe('the shell', () => {
 
     const nav = await screen.findByRole('navigation', { name: 'Sections' })
     const labels = [...nav.querySelectorAll('a')].map((a) => a.textContent?.trim())
-    expect(labels).toEqual(['Budget', 'Accounts', 'Knowledge', 'Profile'])
+    expect(labels).toEqual(['Budget', 'Spending', 'Accounts', 'Knowledge', 'Profile'])
   })
 
   /**
-   * Four, and the reason it is worth asserting the count rather than only the
-   * contents: the bar was drawn against a 320px screen and four labels is what
-   * fits. A fifth destination has to be a decision about what stops being one,
+   * Five, and the reason it is worth asserting the count rather than only the
+   * contents: the bar is drawn against a 320px screen. The fifth, Belege, was a
+   * decision, checked at 320px in every language; a sixth has to be one too,
    * not something that arrives with a feature.
    */
-  test('a user has four places, which is what the bar was drawn for', async () => {
+  test('a user has five places, which is what the bar was checked for', async () => {
     currentUser = user
     render(App)
 
     const nav = await screen.findByRole('navigation', { name: 'Sections' })
-    expect(nav.querySelectorAll('a').length).toBe(4)
+    expect(nav.querySelectorAll('a').length).toBe(5)
   })
 
   /**

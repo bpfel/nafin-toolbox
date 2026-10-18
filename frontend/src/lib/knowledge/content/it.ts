@@ -20,25 +20,29 @@ export const it: PartialContent = {
   tour: {
     welcome: {
       title: 'Un pianificatore',
-      body: 'Questa app non ha alcun collegamento con la tua banca e non vede mai le tue spese reali. Il budget dice invece quanto deve restare alla fine del mese, perché gli impegni futuri siano sempre coperti.',
+      body: 'Questa app non ha alcun collegamento con la tua banca e non vede mai il tuo conto. Il budget dice invece quanto deve restare alla fine del mese, perché gli impegni futuri siano sempre coperti.',
     },
     places: {
       title: 'Le diverse schermate',
-      body: 'Budget è dove pianifichi un mese. Conti mostra i saldi reali corrispondenti. Sapere ospita questo tour e brevi testi sulle finanze svizzere.',
+      body: 'Budget è dove pianifichi un mese. Spese registra quanto è costato davvero un mese. Conti mostra i saldi reali corrispondenti. Sapere ospita questo tour e brevi testi sulle finanze svizzere.',
     },
     types: {
       title: 'Diverse voci di budget',
       body: 'Ne esistono vari tipi, presentati uno dopo l’altro.',
     },
     budget: {
-      title: 'Un piano permanente',
-      body: 'Non un registro mensile. Descrivi un mese tipico una volta sola e scatti un’istantanea con un nome quando qualcosa cambia abbastanza da valerne la pena.',
+      title: 'Un budget permanente',
+      body: 'Non un registro mensile. Descrivi un mese tipico una volta sola; l’app ne conserva una copia per ogni mese, e le frecce sopra il budget tornano alle versioni precedenti.',
       note: 'A titolo di esempio usiamo alcuni valori svizzeri predefiniti.',
     },
     controls: {
       title: 'I comandi',
       body: 'Tutte le opzioni per la schermata corrente sono qui.',
       hoverNote: 'Passa il puntatore su un simbolo per vedere che cosa fa.',
+    },
+    spending: {
+      title: 'Quello che spendi davvero',
+      body: 'In Spese registri le uscite man mano: l’importo e la voce di budget a cui contano. La panoramica confronta un mese con il budget; le voci pagate con ordine permanente contano da sole come pagate. In un’economia domestica mostra anche chi deve cosa a chi.',
     },
     accounts: {
       title: 'Conti',
@@ -47,6 +51,15 @@ export const it: PartialContent = {
     allocations: {
       title: 'Assegnazioni',
       body: 'Qui colleghi ogni voce di budget alla provenienza e alla destinazione del suo denaro. Lo stipendio arriva sul conto principale; l’accantonamento per il computer portatile e la fattura Serafe vanno dove non verranno spesi. Ne risultano un saldo per ciascuno e una proiezione delle riserve necessarie.',
+    },
+    install: {
+      title: 'Sulla schermata Home',
+      body: 'Installata, l’app si apre come le altre, a schermo intero e senza il browser attorno. Si fa dal menu del browser, in un minuto.',
+      note: 'Un altro browser? Cerca il suo nome con «installare web app».',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/it-ch/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=it' },
+      ],
     },
     knowledge: {
       title: 'Puoi tornare qui',
@@ -62,7 +75,11 @@ export const it: PartialContent = {
     },
     sharedInvite: {
       title: 'Invitare altre persone',
-      body: 'Apri un’economia domestica per invitare qualcuno. Per l’invito usa l’e-mail del suo account e passa il link di condivisione — copiato, oppure come codice QR. Decidi tu se può solo leggere il budget condiviso o anche modificarlo.',
+      body: 'Apri un’economia domestica per invitare qualcuno. Per l’invito usa l’e-mail del suo account e passa il link di condivisione — copiato, oppure come codice QR. Decidi tu se può solo leggere il budget condiviso o anche modificarlo. Quando accetta, la fai entrare.',
+    },
+    sharedConfirm: {
+      title: 'Farli entrare',
+      body: 'Appena la persona accetta, qui compare il pulsante «Conferma». È confermando che le consegni la chiave dell’economia domestica: prima non vede nulla. Poi, con la matita accanto a ogni persona, puoi darle un nome.',
     },
     sharedSwitch: {
       title: 'Cambiare budget',
@@ -84,12 +101,23 @@ export const it: PartialContent = {
     },
   },
   articles: {
+    'about-belege': {
+      title: 'Registrare quello che spendi',
+      body: [
+        'Spese è l’altra metà del budget: il budget dice quanto dovrebbe costare un mese, Spese registra quanto è costato. Ogni spesa è un importo, un giorno e la voce di budget a cui conta – o nessuna, come «non assegnata».',
+        'La panoramica confronta un mese con il suo budget, voce per voce. Una voce pagata con ordine permanente o addebito diretto, come l’affitto, può essere segnata come pagata automaticamente: non viene più proposta per le spese e conta come pagata al suo importo previsto, così il totale mostra tutto il mese.',
+        'Il journal elenca ogni spesa, fino alla prima, e ne ritrova una da ciò che ricordi: una nota, una voce, un importo.',
+        'Finito un mese, conserva il budget con cui si è chiuso. Cambiare il budget dopo non riscrive un mese passato.',
+        'In un’economia domestica, ogni spesa dice chi ha pagato – un membro o il conto comune. La panoramica mostra chi deve cosa a chi, riportato di mese in mese, e i pagamenti minimi per pareggiare. La ripartizione, in parti uguali o per quota, vale per le spese registrate da quel momento.',
+      ],
+    },
+
     'about-budget': {
       title: 'A cosa serve il budget',
       body: [
         'Il budget descrive un mese tipico: ciò che entra, ciò che esce e ciò che viene tenuto da parte. Lo aggiorni tu, non è un registro dei movimenti — l’app non vede mai la tua banca.',
         'Le voci stanno sotto intestazioni che scegli tu. Ogni voce ha un tipo, ed è quello che conta: entrate e uscite sono denaro che arriva e che se n’è andato, mentre risparmi, fatture e acquisti lasciano il tuo conto senza lasciare il tuo patrimonio.',
-        'C’è un solo piano, non uno al mese. Quando qualcosa cambia abbastanza da valere la pena di ricordarlo — un aumento, un trasloco, una nuova assicurazione — scatta un’istantanea con un nome: continua a vivere accanto a essa.',
+        'C’è un solo budget, non uno al mese. L’app ne conserva una copia per ogni mese concluso. Quando qualcosa cambia — un aumento, un trasloco, una nuova assicurazione — la versione precedente resta un passo indietro, con ciò che è cambiato.',
       ],
     },
 
@@ -104,7 +132,7 @@ export const it: PartialContent = {
       sources: [
         {
           label: 'ch.ch — il 3° pilastro',
-          url: 'https://www.ch.ch/it/pensionamento/rendita-di-vecchiaia/il-3-pilastro/',
+          url: 'https://www.ch.ch/it/pensionamento/previdenza-per-la-vecchiaia/il-terzo-pilastro--previdenza-privata-/',
         },
         {
           label: 'Amministrazione federale delle contribuzioni — deduzioni massime pilastro 3a',

@@ -37,11 +37,14 @@ import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 import {
-  getVaultState, tryRestoreVault, clearVault, switchTo, markDirty, saveVault,
+  getVaultState, tryRestoreVault, clearVault, switchTo, commit, saveVault,
   createHousehold, renameHousehold, deleteHousehold, removeMember,
 } from './vaultStore.svelte'
 
 const state = getVaultState()
+
+/** Whose vault the tests open, for what is remembered per user. */
+const USER = 42
 
 /** A household as the server would list it, sealed for this MEK. */
 async function listed(id: number, name: string, mek: CryptoKey, isOwner = true) {
@@ -70,6 +73,7 @@ async function signIn(): Promise<CryptoKey> {
 
 beforeEach(() => {
   clearVault()
+  localStorage.clear()
   vi.clearAllMocks()
   api.fetchVault.mockResolvedValue(null)
   api.fetchHouseholds.mockResolvedValue([])
@@ -84,7 +88,7 @@ describe('listing households', () => {
     const anna = await listed(3, 'Flat with Anna', mek)
     api.fetchHouseholds.mockResolvedValue([anna.listing])
 
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     expect(state.households.map(h => h.name)).toEqual(['Flat with Anna'])
     // The whole reason the name is its own ciphertext: a menu should not cost
@@ -99,7 +103,7 @@ describe('listing households', () => {
       { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']))
     api.fetchHouseholds.mockResolvedValue([mine.listing, theirs.listing])
 
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     expect(state.households.map(h => h.name)).toEqual(['Mine'])
   })
@@ -108,7 +112,7 @@ describe('listing households', () => {
     await signIn()
     api.fetchHouseholds.mockRejectedValue(new Error('offline'))
 
-    expect(await tryRestoreVault()).toBe(true)
+    expect(await tryRestoreVault(USER)).toBe(true)
     expect(state.unlocked).toBe(true)
     expect(state.households).toEqual([])
   })
@@ -119,7 +123,7 @@ describe('switching', () => {
     const mek = await signIn()
     const anna = await listed(3, 'Flat with Anna', mek)
     api.fetchHouseholds.mockResolvedValue([anna.listing])
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     const householdData = createEmptyVault()
     householdData.budget.categories.push({ id: 'h', name: 'Rent', side: 'expense', sortOrder: 1 })
@@ -165,7 +169,7 @@ describe('switching', () => {
   // is current.
   test('flushes an unsaved edit before putting a vault aside', async () => {
     await withHousehold()
-    markDirty()
+    commit('createAccount', { name: 'Unsaved' })
 
     await switchTo(3)
 
@@ -176,7 +180,7 @@ describe('switching', () => {
   test('an unsaved warning belongs to its own vault', async () => {
     await withHousehold()
     await switchTo(3)
-    markDirty()
+    commit('createAccount', { name: 'Unsaved' })
     expect(state.dirty).toBe(true)
 
     await switchTo('personal')
@@ -208,7 +212,7 @@ describe('saving', () => {
     const mek = await signIn()
     const anna = await listed(3, 'Flat with Anna', mek)
     api.fetchHouseholds.mockResolvedValue([anna.listing])
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     const payload = await encryptVault(createEmptyVault(), anna.key)
     api.fetchHouseholdVault.mockResolvedValue({ ...payload, version: 8, updated_at: '2026-03-03T00:00:00Z' })
     await switchTo(3)
@@ -236,7 +240,7 @@ describe('saving', () => {
 
   test('writes the personal vault to the personal endpoint', async () => {
     await signIn()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     await saveVault()
 
@@ -248,7 +252,7 @@ describe('saving', () => {
 describe('creating, renaming and deleting', () => {
   test('creating one switches to it and names it', async () => {
     await signIn()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     api.createHousehold.mockResolvedValue({ id: 7, updated_at: '2026-04-04T00:00:00Z' })
 
     const id = await createHousehold('Zuhause')
@@ -265,7 +269,7 @@ describe('creating, renaming and deleting', () => {
     const mek = await signIn()
     const anna = await listed(3, 'Old', mek)
     api.fetchHouseholds.mockResolvedValue([anna.listing])
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     await renameHousehold(3, 'New')
 
@@ -277,7 +281,7 @@ describe('creating, renaming and deleting', () => {
     const mek = await signIn()
     const anna = await listed(3, 'Flat', mek)
     api.fetchHouseholds.mockResolvedValue([anna.listing])
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     const payload = await encryptVault(createEmptyVault(), anna.key)
     api.fetchHouseholdVault.mockResolvedValue({ ...payload, version: 8, updated_at: 'x' })
     await switchTo(3)
@@ -294,7 +298,7 @@ describe('signing out', () => {
     const mek = await signIn()
     const anna = await listed(3, 'Flat', mek)
     api.fetchHouseholds.mockResolvedValue([anna.listing])
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     const payload = await encryptVault(createEmptyVault(), anna.key)
     api.fetchHouseholdVault.mockResolvedValue({ ...payload, version: 8, updated_at: 'x' })
     await switchTo(3)
@@ -335,7 +339,7 @@ describe('staying where you were', () => {
 
   test('creating a household opens it, without being asked twice', async () => {
     await signIn()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     api.createHousehold.mockResolvedValue({ id: 7, updated_at: 'x' })
 
     await createHousehold('Zuhause')
@@ -345,38 +349,90 @@ describe('staying where you were', () => {
 
   test('and a reload lands back on it', async () => {
     await withHouseholds()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     await switchTo(3)
     expect(state.currentVaultId).toBe(3)
 
     // What a refresh does: the module state goes, the session storage stays.
     clearVaultKeepingSession()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     expect(state.currentVaultId).toBe(3)
   })
 
   test('a household that has since gone falls back to personal', async () => {
     await withHouseholds()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     await switchTo(3)
 
     clearVaultKeepingSession()
     // Signed in again, but that household is no longer theirs.
     api.fetchHouseholds.mockResolvedValue([])
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     expect(state.currentVaultId).toBe('personal')
   })
 
-  test('signing out forgets it, so the next person starts on their own', async () => {
+  test('signing back in opens the budget last opened, not the personal one', async () => {
     await withHouseholds()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     await switchTo(3)
 
     clearVault()
     await withHouseholds()
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
+
+    expect(state.currentVaultId).toBe(3)
+  })
+
+  test('nor does it hand that budget to the next person on the same browser', async () => {
+    await withHouseholds()
+    await tryRestoreVault(USER)
+    await switchTo(3)
+
+    clearVault()
+    // Somebody else, who belongs to the same household and has never opened it here.
+    await withHouseholds()
+    await tryRestoreVault(USER + 1)
+
+    expect(state.currentVaultId).toBe('personal')
+  })
+
+  test('going back to the personal budget is remembered as well', async () => {
+    await withHouseholds()
+    await tryRestoreVault(USER)
+    await switchTo(3)
+    await switchTo('personal')
+
+    clearVault()
+    await withHouseholds()
+    await tryRestoreVault(USER)
+
+    expect(state.currentVaultId).toBe('personal')
+  })
+
+  test('a reload keeps this tab where it was, whatever another tab opened since', async () => {
+    await withHouseholds()
+    await tryRestoreVault(USER)
+    // This tab is on its personal budget; another tab of the same user last
+    // opened the household.
+    localStorage.setItem(`vault_last:${USER}`, '3')
+
+    clearVaultKeepingSession()
+    await tryRestoreVault(USER)
+
+    expect(state.currentVaultId).toBe('personal')
+  })
+
+  test('a remembered household that has since gone falls back to personal', async () => {
+    await withHouseholds()
+    await tryRestoreVault(USER)
+    await switchTo(3)
+
+    clearVault()
+    await withHouseholds()
+    api.fetchHouseholds.mockResolvedValue([])
+    await tryRestoreVault(USER)
 
     expect(state.currentVaultId).toBe('personal')
   })
@@ -408,7 +464,7 @@ describe('leaving a household', () => {
     const mek = await signIn()
     const anna = await listed(3, 'Flat with Anna', mek)
     api.fetchHouseholds.mockResolvedValue([anna.listing])
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
     const payload = await encryptVault(createEmptyVault(), anna.key)
     api.fetchHouseholdVault.mockResolvedValue({ ...payload, version: 9, updated_at: 'x' })
   }
@@ -454,7 +510,7 @@ describe('an account without a keypair', () => {
     await signIn()
     api.fetchVaultKeys.mockResolvedValue({ encrypted_mek: '', iterations: 600000 })
 
-    expect(await tryRestoreVault()).toBe(true)
+    expect(await tryRestoreVault(USER)).toBe(true)
 
     expect(api.setupIdentity).toHaveBeenCalledTimes(1)
     const sent = api.setupIdentity.mock.calls[0][0]
@@ -470,7 +526,7 @@ describe('an account without a keypair', () => {
     const sealed = await sealIdentity(await generateIdentity(), mek)
     api.fetchVaultKeys.mockResolvedValue({ encrypted_mek: '', iterations: 600000, ...sealed })
 
-    await tryRestoreVault()
+    await tryRestoreVault(USER)
 
     expect(api.setupIdentity).not.toHaveBeenCalled()
     expect(state.identity).not.toBeNull()
@@ -483,7 +539,7 @@ describe('an account without a keypair', () => {
     api.fetchVaultKeys.mockResolvedValue({ encrypted_mek: '', iterations: 600000 })
     api.setupIdentity.mockRejectedValueOnce(new Error('identity already set up'))
 
-    expect(await tryRestoreVault()).toBe(true)
+    expect(await tryRestoreVault(USER)).toBe(true)
 
     expect(state.identity).toBeNull()
     expect(state.unlocked).toBe(true)

@@ -15,6 +15,7 @@ import type { IllustrationName } from './Illustration.svelte'
 export type ArticleId =
   // --- About this app ---
   | 'about-budget'
+  | 'about-belege'
   // --- Swiss basics ---
   | 'pillar-3a'
 
@@ -42,6 +43,7 @@ export interface ArticleMeta {
  */
 export const ARTICLES: ArticleMeta[] = [
   { id: 'about-budget', section: 'about', illustration: 'budget' },
+  { id: 'about-belege', section: 'about', illustration: 'budget' },
   { id: 'pillar-3a', section: 'swiss', illustration: 'pillars' },
 ]
 

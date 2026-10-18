@@ -1,8 +1,9 @@
 import { TOURS, numbering, type TourId, type TourStep } from './steps'
-import { getVaultState, markDirty, beginPreview, endPreview } from '../crypto/vaultStore.svelte'
-import { recordCompleted, recordDismissed } from './tourState'
+import { getVaultState, commit, beginPreview, endPreview } from '../crypto/vaultStore.svelte'
 import { resetBudget, seedDefaults, seedSharedDefaults } from '../budget/budgetEngine'
 import { getLocale } from '../i18n/index.svelte'
+import { isInstalled } from '../util/installHint'
+import { thisMonth } from '../util/calendar'
 
 /**
  * Where the tour is, if it is running.
@@ -24,9 +25,20 @@ let running = $state(false)
  */
 let which = $state<TourId>('basics')
 
-/** The steps of the tour currently selected. */
+/**
+ * Whether the app was opened from the home screen. Read once at start: it
+ * cannot change while the page is open.
+ */
+let installed = false
+
+/**
+ * The steps of the tour currently selected, less any that do not apply here.
+ *
+ * Filtered rather than skipped at show time, so the counter and the Finish
+ * button agree with what will actually be shown.
+ */
 function steps(): TourStep[] {
-  return TOURS[which]
+  return TOURS[which].filter(s => !(s.browserOnly && installed))
 }
 
 /**
@@ -70,7 +82,11 @@ export function getTourState() {
      * `exampleHousehold` on `TourStep`.
      */
     get showingExampleHousehold() {
-      return running && steps()[index]?.exampleHousehold === true
+      return running && steps()[index]?.exampleHousehold !== undefined
+    },
+    /** Which moment of an invitation the example shows. */
+    get exampleHouseholdStage(): 'pending' | 'accepted' {
+      return steps()[index]?.exampleHousehold ?? 'pending'
     },
     get atFirst() {
       return index === 0
@@ -117,8 +133,7 @@ function prepare(step: TourStep): void {
   if (!vault) return
 
   const seed = step.example === 'shared' ? seedSharedDefaults : seedDefaults
-  const now = new Date()
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const month = thisMonth()
   beginPreview(copy => {
     resetBudget(copy)
     seed(copy, getLocale(), month)
@@ -134,6 +149,7 @@ function prepare(step: TourStep): void {
  */
 export function startTour(tour: TourId): void {
   which = tour
+  installed = isInstalled()
   index = 0
   direction = 1
   running = true
@@ -190,11 +206,7 @@ export function finishTour(): void {
   // and not the copy the tour was showing.
   endPreview()
   if (which !== 'basics') return
-  const vault = getVaultState().vault
-  if (vault) {
-    recordCompleted(vault)
-    markDirty()
-  }
+  if (getVaultState().vault) commit('recordTourCompleted')
 }
 
 /**
@@ -210,11 +222,7 @@ export function abandonTour(): void {
   // and not the copy the tour was showing.
   endPreview()
   if (which !== 'basics') return
-  const vault = getVaultState().vault
-  if (vault) {
-    recordDismissed(vault)
-    markDirty()
-  }
+  if (getVaultState().vault) commit('recordTourDismissed')
 }
 
 /**
@@ -224,11 +232,7 @@ export function abandonTour(): void {
  * `shouldOfferTour`.
  */
 export function declineTour(): void {
-  const vault = getVaultState().vault
-  if (vault) {
-    recordDismissed(vault)
-    markDirty()
-  }
+  if (getVaultState().vault) commit('recordTourDismissed')
 }
 
 /** Test seam, and the logout path: forget where we were without recording it. */

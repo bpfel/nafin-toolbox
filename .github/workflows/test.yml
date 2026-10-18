@@ -52,6 +52,34 @@ jobs:
         if: always()
         run: go vet ./...
 
+  # Production must publish the frontend and nothing else. The database and the
+  # API were once published anyway on Compose before 2.24, which ignores the
+  # `!override` the production file used to remove the development ports. The
+  # runner's Compose is newer and would never have shown it, so this checks for
+  # the tag as well as the result. See docker-compose.yml.
+  compose-ports:
+    name: Compose ports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No tags an older Compose ignores
+        run: |
+          if grep -nE '^[^#]*!(override|reset)' docker-compose*.yml; then
+            echo "Compose before 2.24 ignores these. Publish ports in a layer instead."
+            exit 1
+          fi
+      - name: Production publishes the frontend only
+        env:
+          POSTGRES_PASSWORD: x
+          CORS_ORIGINS: x
+          APP_URL: x
+          ENCRYPTION_KEY: x
+        run: |
+          published=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml config --format json \
+            | jq -r '.services | to_entries[] | select(.value.ports) | .key' | sort -u)
+          echo "Services with published ports: $published"
+          [ "$published" = "frontend" ]
+
   frontend-tests:
     name: Frontend tests
     runs-on: ubuntu-latest

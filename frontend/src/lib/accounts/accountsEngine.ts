@@ -1,12 +1,10 @@
 import type { VaultAccount, VaultData } from '../crypto/vault'
+import { isLegalRouting } from './routing'
+import { newId, todayISO } from '../sync/source'
 
 // CRUD over the account list, with one rule the rest of the module leans on:
 // the vault always holds at least one account. Every other invariant here —
 // no unrouted entry, no orphan reassignment target — follows from it.
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
 
 // Defaults describe the ordinary case: a CHF transactional account, empty,
 // anchored today. `opts` overrides any of them, including the generated id.
@@ -15,7 +13,7 @@ export function createAccount(
   opts: Partial<VaultAccount> & { name: string },
 ): VaultAccount {
   const account: VaultAccount = {
-    id: crypto.randomUUID(),
+    id: newId('account'),
     kind: 'transactional',
     currency: 'CHF',
     currentAmount: '0.00',
@@ -94,6 +92,50 @@ export function correctBalance(vault: VaultData, id: string, amount: string, atD
   const account = findAccount(vault, id)
   account.currentAmount = amount
   account.lastCorrectedAt = atDate
+}
+
+// The descriptive fields: what kind of account it is, and the bank details a
+// QR bill needs. They carry no invariant, so this only stores them — clearing
+// a field removes the key rather than storing an empty string, keeping the
+// vault shape identical to a fresh one.
+export type AccountDetailFields = Pick<VaultAccount, 'kind'> &
+  Partial<Pick<VaultAccount, 'bankName' | 'iban' | 'ibanKind' | 'holder'>>
+
+export function setAccountDetails(vault: VaultData, id: string, details: AccountDetailFields): void {
+  const account = findAccount(vault, id)
+  account.kind = details.kind
+  if (details.bankName) account.bankName = details.bankName
+  else delete account.bankName
+  if (details.iban) {
+    account.iban = details.iban
+    account.ibanKind = details.ibanKind
+  } else {
+    delete account.iban
+    delete account.ibanKind
+  }
+  if (details.holder) account.holder = { ...details.holder }
+  else delete account.holder
+}
+
+// Where an entry's money comes from and goes to. Refuses an illegal pair
+// rather than storing it: the allocation screen's controls cannot produce one,
+// and this is the assertion that keeps that true if they ever change. A reserve
+// has to accumulate somewhere, so routing back to spending (no sink) drops it
+// rather than leaving it to linger illegally.
+export function setRouting(
+  vault: VaultData,
+  entryId: string,
+  sourceAccountId: string | null,
+  sinkAccountId: string | null,
+): void {
+  const entry = vault.budget.entries.find(e => e.id === entryId)
+  if (!entry) throw new Error(`entry ${entryId} not found`)
+  if (!isLegalRouting(entry.type, sourceAccountId, sinkAccountId)) {
+    throw new Error(`a ${entry.type} entry cannot be routed from ${sourceAccountId} to ${sinkAccountId}`)
+  }
+  entry.sourceAccountId = sourceAccountId
+  entry.sinkAccountId = sinkAccountId
+  if (sinkAccountId === null) delete entry.reserve
 }
 
 function findAccount(vault: VaultData, id: string, role = 'account'): VaultAccount {

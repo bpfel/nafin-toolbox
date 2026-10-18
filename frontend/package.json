@@ -1,7 +1,7 @@
 {
   "name": "finance-tracker-frontend",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -11,7 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "links": "vitest run --config vitest.links.config.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",

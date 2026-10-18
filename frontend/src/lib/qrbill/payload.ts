@@ -1,4 +1,5 @@
 import type { QRBillRequest } from './types'
+import { normalizeIBAN } from './validate'
 
 /**
  * Builds the SPC v2.3 payload: a 31-line newline-delimited string with no
@@ -28,8 +29,8 @@ export function buildPayload(req: QRBillRequest): string {
   lines[1] = '0200'
   lines[2] = '1'
 
-  // Creditor IBAN (strip spaces)
-  lines[3] = req.iban.replace(/ /g, '')
+  // Creditor IBAN, unspaced, by the same rule validation used
+  lines[3] = normalizeIBAN(req.iban)
 
   // Creditor address (structured: type S)
   lines[4] = 'S'

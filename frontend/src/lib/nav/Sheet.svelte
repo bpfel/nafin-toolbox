@@ -56,7 +56,8 @@
 
   /** Only where it is a sheet. On a wide screen it is a centred dialog. */
   function isSheet(): boolean {
-    return window.matchMedia('(max-width: 767px)').matches
+    // Absent in some embedded browsers and in the test DOM: then it is not a sheet.
+    return window.matchMedia?.('(max-width: 767px)').matches ?? false
   }
 
   function down(event: PointerEvent) {

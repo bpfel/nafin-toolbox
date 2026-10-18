@@ -21,6 +21,13 @@
     <line x1="6" y1="20" x2="6" y2="14" />
     <line x1="12" y1="20" x2="12" y2="4" />
     <line x1="18" y1="20" x2="18" y2="10" />
+  {:else if name === 'spending'}
+    <!-- A receipt with a torn lower edge. Feather has none; drawn to its
+         outlines, the same weight and corners as the card beside it. -->
+    <path d="M5 2h14v20l-2.33-1.5L14.33 22 12 20.5 9.67 22 7.33 20.5 5 22z" />
+    <line x1="9" y1="7" x2="15" y2="7" />
+    <line x1="9" y1="11" x2="15" y2="11" />
+    <line x1="9" y1="15" x2="13" y2="15" />
   {:else if name === 'accounts'}
     <rect x="2" y="5" width="20" height="14" rx="2" />
     <line x1="2" y1="10" x2="22" y2="10" />

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { formatAmount, normalizeAmount, parseAmount } from './money'
+import { formatAmount, normalizeAmount, parseAmount, centsOf, fromCents, toCents } from './money'
 
 describe('normalizeAmount — the 0.00 prefill problem', () => {
   // The field is seeded with a stored '0.00'. Without select-on-focus, typing
@@ -83,5 +83,52 @@ describe('formatAmount — one formatter instead of twelve', () => {
     // 'NaN' at the user. Showing the stored string back is what makes a corrupt
     // amount recognisable instead of merely broken.
     expect(formatAmount('not an amount')).toBe('not an amount')
+  })
+})
+
+/**
+ * One way into cents, exactly. There used to be three, two by floating point:
+ * 1.005 × 100 is 100.49999…, so a third decimal of 5 was rounded down there and
+ * up here.
+ */
+describe('cents — exact, whichever way the amount came in', () => {
+  test('a third decimal of 5 rounds away from zero, typed or stored', () => {
+    expect(toCents('1.005')).toBe(101)
+    expect(centsOf('1.005')).toBe(101)
+    expect(normalizeAmount('1.005')).toBe('1.01')
+    expect(toCents('-1.005')).toBe(-101)
+  })
+
+  test('a typed amount reads as people type it', () => {
+    expect(centsOf('1’234,5')).toBe(123450)
+    expect(centsOf("1'234.50")).toBe(123450)
+    expect(centsOf('.5')).toBe(50)
+    expect(centsOf('12.')).toBe(1200)
+    expect(centsOf('')).toBe(0)
+    expect(centsOf('abc')).toBe(0)
+  })
+
+  test('and back out, with two places and the sign', () => {
+    expect(fromCents(123450)).toBe('1234.50')
+    expect(fromCents(-5)).toBe('-0.05')
+  })
+})
+
+/**
+ * Moving Belege, the entry dialog and the balances from floating point to the
+ * exact conversion must not move any figure already stored: every stored
+ * amount has two decimals, and for those the two always agreed.
+ */
+describe('cents — no stored figure changes', () => {
+  test('every two-decimal amount reads the same as the floating-point way did', () => {
+    // Every rappen from -10.00 to 10.00, then a sparse sweep to 25'000.00.
+    const amounts = [...Array.from({ length: 2001 }, (_, i) => i - 1000), ...Array.from({ length: 2500 }, (_, i) => i * 997)]
+    for (const n of amounts) {
+      const stored = fromCents(n)
+      const floating = Math.round(Number(stored) * 100)
+      expect(centsOf(stored)).toBe(floating)
+      expect(toCents(stored)).toBe(floating)
+      expect(normalizeAmount(stored.replace('-', ''))).toBe((Math.abs(floating) / 100).toFixed(2))
+    }
   })
 })

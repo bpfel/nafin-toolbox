@@ -20,25 +20,29 @@ export const de: PartialContent = {
   tour: {
     welcome: {
       title: 'Ein Planer',
-      body: 'Diese App hat keine Verbindung zu deiner Bank und sieht deine tatsächlichen Ausgaben nie. Das Budget sagt stattdessen, wie viel bis Ende Monat übrig bleiben muss, damit die anstehenden Verpflichtungen immer gedeckt sind.',
+      body: 'Diese App hat keine Verbindung zu deiner Bank und sieht dein Konto nie. Das Budget sagt stattdessen, wie viel bis Ende Monat übrig bleiben muss, damit die anstehenden Verpflichtungen immer gedeckt sind.',
     },
     places: {
       title: 'Die Bildschirme',
-      body: 'Budget ist, wo du einen Monat planst. Konten zeigt die tatsächlichen Salden dahinter. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen.',
+      body: 'Budget ist, wo du einen Monat planst. Belege hält fest, was ein Monat wirklich gekostet hat. Konten zeigt die tatsächlichen Salden dahinter. Wissen beherbergt diesen Rundgang und kurze Texte zu Schweizer Finanzthemen.',
     },
     types: {
       title: 'Verschiedene Budgeteinträge',
       body: 'Es gibt mehrere Arten von Einträgen, die nacheinander vorgestellt werden.',
     },
     budget: {
-      title: 'Ein stehender Plan',
-      body: 'Kein monatliches Journal. Du beschreibst einen typischen Monat einmal und erstellst eine benannte Momentaufnahme, wenn sich etwas ändert, das festgehalten werden soll.',
+      title: 'Ein stehendes Budget',
+      body: 'Kein monatliches Journal. Du beschreibst einen typischen Monat einmal; die App behält für jeden Monat eine Kopie, und die Pfeile über dem Budget führen zu früheren Versionen.',
       note: 'Zur Veranschaulichung verwenden wir Schweizer Standardwerte.',
     },
     controls: {
       title: 'Bedienelemente',
       body: 'Alle Optionen für den aktuellen Bildschirm sind hier.',
       hoverNote: 'Fahr mit der Maus über ein Symbol, um zu sehen, was es tut.',
+    },
+    spending: {
+      title: 'Was du wirklich ausgibst',
+      body: 'In den Belegen erfasst du Quittungen laufend: den Betrag und die Budgetzeile, auf die er zählt. Die Übersicht vergleicht einen Monat mit dem Budget; Zeilen per Dauerauftrag gelten von selbst als bezahlt. Im Haushalt zeigt sie auch, wer wem was schuldet.',
     },
     accounts: {
       title: 'Konten',
@@ -47,6 +51,15 @@ export const de: PartialContent = {
     allocations: {
       title: 'Zuordnungen',
       body: 'Hier verknüpfst du jeden Budgeteintrag damit, woher sein Geld kommt und wohin es geht. Dein Lohn landet auf dem Hauptkonto; der Laptop-Topf und die Serafe-Rechnung wandern dorthin, wo sie nicht ausgegeben werden. Daraus ergeben sich die Salden und eine Vorschau der nötigen Reserven.',
+    },
+    install: {
+      title: 'Auf den Startbildschirm',
+      body: 'Installiert öffnet sich die App wie jede andere, im Vollbild und ohne Browser drumherum. Das geht über das Menü des Browsers und dauert eine Minute.',
+      note: 'Anderer Browser? Suche nach seinem Namen und «Web-App installieren».',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/de-ch/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=de' },
+      ],
     },
     knowledge: {
       title: 'Du kannst zurückkommen',
@@ -62,7 +75,11 @@ export const de: PartialContent = {
     },
     sharedInvite: {
       title: 'Andere einladen',
-      body: 'Klapp einen Haushalt auf, um andere einzuladen. Verwende für die Einladung ihre Konto-E-Mail und gib ihnen den Link zum Teilen — entweder kopiert oder als QR-Code. Du entscheidest, ob sie das geteilte Budget nur lesen oder auch ändern dürfen.',
+      body: 'Klapp einen Haushalt auf, um andere einzuladen. Verwende für die Einladung ihre Konto-E-Mail und gib ihnen den Link zum Teilen — entweder kopiert oder als QR-Code. Du entscheidest, ob sie das geteilte Budget nur lesen oder auch ändern dürfen. Nehmen sie an, lässt du sie herein.',
+    },
+    sharedConfirm: {
+      title: 'Hereinlassen',
+      body: 'Sobald die Person annimmt, erscheint hier «Bestätigen». Erst mit dem Bestätigen erhält sie den Schlüssel des Haushalts: Bis dahin sieht sie nichts. Danach gibst du mit dem Stift neben jeder Person einen Namen.',
     },
     sharedSwitch: {
       title: 'Budget wechseln',
@@ -84,12 +101,23 @@ export const de: PartialContent = {
     },
   },
   articles: {
+    'about-belege': {
+      title: 'Erfassen, was du ausgibst',
+      body: [
+        'Die Belege sind die andere Hälfte des Budgets: Das Budget sagt, was ein Monat kosten soll, die Belege halten fest, was er gekostet hat. Jeder Beleg ist ein Betrag, ein Tag und die Budgetzeile, auf die er zählt – oder keine, als «nicht zugeordnet».',
+        'Die Übersicht vergleicht einen Monat Zeile für Zeile mit seinem Budget. Eine Zeile, die per Dauerauftrag oder Lastschrift bezahlt wird, etwa die Miete, kannst du als automatisch bezahlt markieren: Sie wird nicht für Belege angeboten und zählt mit ihrem Planbetrag als bezahlt, damit das Total den ganzen Monat zeigt.',
+        'Das Journal listet jeden Beleg bis zum ersten und findet einen über das, was du noch weisst: eine Notiz, eine Zeile, einen Betrag.',
+        'Ist ein Monat vorbei, behält er das Budget, mit dem er geendet hat. Spätere Änderungen am Budget schreiben einen vergangenen Monat nicht um.',
+        'Im Haushalt sagt jeder Beleg, wer bezahlt hat – ein Mitglied oder das gemeinsame Konto. Die Übersicht zeigt, wer wem was schuldet, über die Monate weitergeführt, und die wenigsten Zahlungen zum Ausgleich. Die Aufteilung, gleichmässig oder nach Anteil, gilt für Belege, die ab dann erfasst werden.',
+      ],
+    },
+
     'about-budget': {
       title: 'Wozu das Budget da ist',
       body: [
         'Das Budget beschreibt einen typischen Monat: was hereinkommt, was hinausgeht und was zurückgehalten wird. Es ist etwas, das du pflegst, und keine Aufzeichnung von Transaktionen — die App sieht deine Bank nie.',
         'Einträge stehen unter Überschriften, die du selbst wählst. Jeder Eintrag hat eine Art, und die ist entscheidend: Einnahmen und Ausgaben meinen eingehendes und verbrauchtes Geld, während Sparen, Rechnungen und Anschaffungen zwar dein Konto verlassen, nicht aber dein Vermögen.',
-        'Es gibt einen Plan, nicht einen pro Monat. Ändert sich etwas, das es zu behalten lohnt — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, erstellst du eine benannte Momentaufnahme, und er läuft daneben weiter.',
+        'Es gibt ein Budget, nicht eines pro Monat. Die App behält für jeden abgeschlossenen Monat eine Kopie davon. Ändert sich etwas — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, bleibt die Version davor einen Schritt zurück erreichbar, mit dem, was sich geändert hat.',
       ],
     },
 
@@ -104,7 +132,7 @@ export const de: PartialContent = {
       sources: [
         {
           label: 'ch.ch — die 3. Säule',
-          url: 'https://www.ch.ch/de/pensionierung/altersrente/die-3-saeule/',
+          url: 'https://www.ch.ch/de/pensionierung/altersvorsorge/3-saule--private-vorsorge-/',
         },
         {
           label: 'Eidgenössische Steuerverwaltung — Höchstabzüge Säule 3a',

@@ -60,6 +60,7 @@ export const rm: Partial<Messages> = {
 
   // --- Navigation ---
   'nav.budget': 'Budget',
+  'nav.spending': 'Quittanzas',
   'nav.accounts': 'Contos',
   'nav.knowledge': 'Savida',
   'nav.profile': 'Profil',
@@ -113,7 +114,6 @@ export const rm: Partial<Messages> = {
   'section.expense': 'Expensas',
   'section.savings': 'Spargn',
   'entry.add': 'Agiuntar',
-  'snapshot.panelTitle': 'Archiv',
 
   // --- Accounts ---
   'accounts.add': 'Agiuntar',

@@ -33,6 +33,7 @@ import { leaveLayers } from './closeOnBack'
 export type Screen =
   | 'home'
   | 'budget'
+  | 'spending'
   | 'accounts'
   | 'knowledge'
   | 'profile'
@@ -44,6 +45,7 @@ export type Screen =
 
 const SCREENS: Record<string, Screen> = {
   budget: 'budget',
+  spending: 'spending',
   accounts: 'accounts',
   knowledge: 'knowledge',
   profile: 'profile',

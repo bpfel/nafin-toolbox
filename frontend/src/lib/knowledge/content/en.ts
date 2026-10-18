@@ -18,25 +18,29 @@ export const en: Content = {
   tour: {
     welcome: {
       title: 'This is a planner',
-      body: 'This app has no connection to your bank and never sees your actual spending. The budget instead says how much must remain by the end of the month, so the commitments ahead of you are always covered.',
+      body: 'This app has no connection to your bank and never sees your account. The budget instead says how much must remain by the end of the month, so the commitments ahead of you are always covered.',
     },
     places: {
       title: 'The different screens',
-      body: 'Budget is where you plan a month. Accounts lists the real balances behind it. Knowledge holds this tour and short pieces on Swiss finance.',
+      body: 'Budget is where you plan a month. Spending records what a month actually cost. Accounts lists the real balances behind it. Knowledge holds this tour and short pieces on Swiss finance.',
     },
     types: {
       title: 'Different budget entries',
       body: 'There are several types of entry, each presented in turn.',
     },
     budget: {
-      title: 'One standing plan',
-      body: 'Not a record of every month. You describe a typical one once, and take a named snapshot when something changes enough to be worth keeping.',
+      title: 'One standing budget',
+      body: 'Not a record of every month. You describe a typical one once; the app keeps a copy of it for every month, and the arrows above it step back to earlier versions.',
       note: 'We’ll use some Swiss defaults for illustration.',
     },
     controls: {
       title: 'Controls',
       body: 'All the options for the current screen are here.',
       hoverNote: 'Hover over a symbol to see what it does.',
+    },
+    spending: {
+      title: 'What you actually spent',
+      body: 'Spending records receipts as you go: the amount, and the budget line it counts against. The overview reads a month against the budget; lines paid by standing order count as paid by themselves. In a household it also shows who owes whom.',
     },
     accounts: {
       title: 'Accounts',
@@ -45,6 +49,15 @@ export const en: Content = {
     allocations: {
       title: 'Allocations',
       body: 'Here you link every budget entry to where its money comes from and goes. Your salary arrives in the main account; the laptop fund and the Serafe bill move somewhere they will not be spent. What falls out is a balance for each one, and a projection of the reserves you need.',
+    },
+    install: {
+      title: 'Put it on your home screen',
+      body: 'Installed, the app opens like any other, full-screen and without the browser around it. You do it from your browser’s menu, and it takes a minute.',
+      note: 'Using another browser? Search for its name with “install web app”.',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=en' },
+      ],
     },
     knowledge: {
       title: 'You can come back',
@@ -66,7 +79,11 @@ export const en: Content = {
     },
     sharedInvite: {
       title: 'Inviting others',
-      body: 'Unfold a household entry to invite other people. To extend an invitation, use their account e-mail and give them the sharing link — either by copying it or via QR code. You can decide whether they are only able to read the shared budget, or whether they can write to it as well.',
+      body: 'Unfold a household entry to invite other people. To extend an invitation, use their account e-mail and give them the sharing link — either by copying it or via QR code. You can decide whether they are only able to read the shared budget, or whether they can write to it as well. Once they accept, you let them in.',
+    },
+    sharedConfirm: {
+      title: 'Letting them in',
+      body: 'Once they accept, a Confirm button appears here. Confirming is what hands them the household’s key: until you do, they can’t see anything. Afterwards, the pen beside each person lets you give them a name.',
     },
     sharedSwitch: {
       title: 'How to switch budgets',
@@ -89,12 +106,23 @@ export const en: Content = {
   },
 
   articles: {
+    'about-belege': {
+      title: 'Recording what you spend',
+      body: [
+        'Spending is the other half of the budget: the budget says what a month should cost, and Spending records what it did. Each receipt is an amount, a day and the budget line it counts against — or none, as Unassigned.',
+        'The overview reads a month against its budget, line by line. A line paid by standing order or direct debit, such as rent, can be marked paid automatically: it is not offered for receipts and counts as paid at its planned amount, so the month’s total is the whole month.',
+        'The journal lists every receipt, all the way back, and finds one by what you remember of it: a note, a line, an amount.',
+        'When a month is over it keeps the budget it ended with. Changing the budget afterwards does not rewrite a month already past.',
+        'In a household, each receipt says who paid — a member, or the joint account. The overview shows who owes whom, carried on from month to month, and the fewest payments that settle it. The split, equal or by share, applies to receipts entered from then on.',
+      ],
+    },
+
     'about-budget': {
       title: 'What the budget is for',
       body: [
         'The budget is a description of a typical month: what comes in, what goes out, and what is held back. You maintain it yourself, and it is not a log of transactions — the app never sees your bank.',
         'Entries are grouped under headings you choose. Each entry has a type, and the type is what matters most: income and expense are money arriving and money gone, while savings, bills and purchases all leave your account without leaving your net worth.',
-        'There is one standing plan, not one per month. When something changes enough to record — a raise, a move, a new insurance — take a named snapshot, and it carries on live beside that copy.',
+        'There is one standing budget, not one per month. The app keeps a copy of it for every month that ends. When something changes — a raise, a move, a new insurance — the version before stays one step back, with what changed listed on it.',
       ],
     },
 

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest'
-import { encryptVault, decryptVault, createEmptyVault, migrateVault, assertVaultShape, VaultVersionAheadError, type VaultData,
+import { encryptVault, decryptVault, createEmptyVault, deleteAllData, migrateVault, assertVaultShape, VaultVersionAheadError, type VaultData,
   VAULT_VERSION,
 } from './vault'
 import { generateMEK } from './keys'
@@ -42,6 +42,7 @@ describe('createEmptyVault', () => {
       entries: [],
       plan: [],
       snapshots: [],
+      openMonth: expect.stringMatching(/^\d{4}-\d{2}$/),
     })
     expect(vault.accounts.length).toBe(1)
   })
@@ -212,9 +213,13 @@ describe('encryptVault and decryptVault', () => {
   test('round-trip encryption and decryption preserves data', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -234,7 +239,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'February',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [
               { entryName: 'Salary', categoryName: 'Income', type: 'income', plannedAmount: '5000.00' },
@@ -361,9 +366,13 @@ describe('encryptVault and decryptVault', () => {
   test('preserves complex vault with multiple snapshots', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -378,19 +387,19 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'January',
+            month: '2026-01',
             createdAt: '2026-01-01T00:00:00.000Z',
             lines: [{ entryName: 'Salary', categoryName: 'Income', type: 'income', plannedAmount: '5000.00' }],
           },
           {
             id: 'ar2',
-            name: 'February',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [{ entryName: 'Salary', categoryName: 'Income', type: 'income', plannedAmount: '5200.00' }],
           },
           {
             id: 'ar3',
-            name: 'An snapshot of an empty plan',
+            month: '2026-01',
             createdAt: '2026-03-01T00:00:00.000Z',
             lines: [],
           },
@@ -402,7 +411,7 @@ describe('encryptVault and decryptVault', () => {
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
     expect(decrypted.budget.snapshots.length).toBe(3)
-    expect(decrypted.budget.snapshots[0].name).toBe('January')
+    expect(decrypted.budget.snapshots[0].month).toBe('2026-01')
     expect(decrypted.budget.snapshots[0].createdAt).toBe('2026-01-01T00:00:00.000Z')
     expect(decrypted.budget.snapshots[0].lines[0].plannedAmount).toBe('5000.00')
     expect(decrypted.budget.snapshots[2].lines).toEqual([])
@@ -411,9 +420,13 @@ describe('encryptVault and decryptVault', () => {
   test('preserves archived flag in entries', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -438,9 +451,13 @@ describe('encryptVault and decryptVault', () => {
   test('preserves decimal precision in amounts', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '1234.05', lastCorrectedAt: '2026-08-15' },
       ],
@@ -453,7 +470,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'Last year',
+            month: '2026-01',
             createdAt: '2025-12-31T00:00:00.000Z',
             lines: [{ entryName: 'Groceries', categoryName: 'Expenses', type: 'expense', plannedAmount: '67.89' }],
           },
@@ -472,9 +489,13 @@ describe('encryptVault and decryptVault', () => {
   test('preserves special characters in text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Zürich «Haupt»', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -487,7 +508,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: 'Line 1\nLine 2\tTabbed',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [],
           },
@@ -500,16 +521,20 @@ describe('encryptVault and decryptVault', () => {
 
     expect(decrypted.budget.categories[0].name).toBe('Émoji 🎉 & Special "chars"')
     expect(decrypted.budget.entries[0].name).toBe('Salary (CHF)')
-    expect(decrypted.budget.snapshots[0].name).toBe('Line 1\nLine 2\tTabbed')
+    expect(decrypted.budget.snapshots[0].month).toBe('2026-01')
     expect(decrypted.accounts[0].name).toBe('Zürich «Haupt»')
   })
 
   test('preserves sortOrder values', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -543,9 +568,13 @@ describe('encryptVault and decryptVault', () => {
 
     // Create a large vault with many entries
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: Array.from({ length: 5 }, (_, i) => ({
         id: `a${i}`,
         name: `Account ${i}`,
@@ -577,7 +606,7 @@ describe('encryptVault and decryptVault', () => {
         })),
         snapshots: Array.from({ length: 24 }, (_, snapshotIndex) => ({
           id: `ar${snapshotIndex}`,
-          name: `Snapshot ${snapshotIndex}`,
+          month: '2026-01',
           createdAt: `2026-01-01T00:00:00.${String(snapshotIndex).padStart(3, '0')}Z`,
           lines: Array.from({ length: 30 }, (_, lineIndex) => ({
             entryName: `Entry ${lineIndex}`,
@@ -603,9 +632,13 @@ describe('encryptVault and decryptVault', () => {
   test('handles empty strings in all text fields', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: '', name: '', kind: 'cash', currency: 'CHF', currentAmount: '', lastCorrectedAt: '' },
       ],
@@ -616,7 +649,7 @@ describe('encryptVault and decryptVault', () => {
         ],
         plan: [{ entryId: '', plannedAmount: '' }],
         snapshots: [
-          { id: '', name: '', createdAt: '', lines: [{ entryName: '', categoryName: '', type: 'income', plannedAmount: '' }] },
+          { id: '', month: '', createdAt: '', lines: [{ entryName: '', categoryName: '', type: 'income', plannedAmount: '' }] },
         ],
       },
     }
@@ -627,7 +660,7 @@ describe('encryptVault and decryptVault', () => {
     expect(decrypted.budget.categories[0].id).toBe('')
     expect(decrypted.budget.categories[0].name).toBe('')
     expect(decrypted.budget.entries[0].name).toBe('')
-    expect(decrypted.budget.snapshots[0].name).toBe('')
+    expect(decrypted.budget.snapshots[0].month).toBe('')
     expect(decrypted.budget.plan[0].plannedAmount).toBe('')
     expect(decrypted.accounts[0].name).toBe('')
   })
@@ -635,9 +668,13 @@ describe('encryptVault and decryptVault', () => {
   test('preserves exact JSON structure including whitespace in strings', async () => {
     const mek = await generateMEK()
     const vault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [
         { id: 'a1', name: 'Main', kind: 'transactional', currency: 'CHF', currentAmount: '0.00', lastCorrectedAt: '2026-08-15' },
       ],
@@ -648,7 +685,7 @@ describe('encryptVault and decryptVault', () => {
         snapshots: [
           {
             id: 'ar1',
-            name: '  leading and trailing spaces  ',
+            month: '2026-01',
             createdAt: '2026-02-01T00:00:00.000Z',
             lines: [],
           },
@@ -659,7 +696,7 @@ describe('encryptVault and decryptVault', () => {
     const encrypted = await encryptVault(vault, mek)
     const decrypted = await decryptVault(encrypted.ciphertext, encrypted.nonce, mek)
 
-    expect(decrypted.budget.snapshots[0].name).toBe('  leading and trailing spaces  ')
+    expect(decrypted.budget.snapshots[0].month).toBe('2026-01')
   })
 
   test('ciphertext length is proportional to plaintext size', async () => {
@@ -669,9 +706,13 @@ describe('encryptVault and decryptVault', () => {
     const encryptedSmall = await encryptVault(smallVault, mek)
 
     const largeVault: VaultData = {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [],
       budget: {
         categories: Array.from({ length: 50 }, (_, i) => ({
@@ -842,12 +883,10 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrated.budget.plan).toEqual([{ entryId: 'c1', plannedAmount: '1350.00' }])
   })
 
-  test('archived lines keep both names, under the new ones', () => {
-    const migrated = migrateVault(v4Vault())
-
-    expect(migrated.budget.snapshots[0].lines).toEqual([
-      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1300.00' },
-    ])
+  // Archives were taken by hand, without a month: retired at v11 with every
+  // other hand-made snapshot, however old.
+  test('old archives do not outlive the move to v11', () => {
+    expect(migrateVault(v4Vault()).budget.snapshots).toEqual([])
   })
 
   test('routing survives the rename', () => {
@@ -918,13 +957,13 @@ describe('migrateVault — legacy versions forward', () => {
     }
   }
 
-  test('v5 archives become v6 snapshots, contents untouched', () => {
+  // Carried from v5 to v6 as snapshots — and, taken by hand with no month,
+  // retired on the way to v11 like every other one.
+  test('v5 archives are carried forward, then retired with all hand-made snapshots', () => {
     const migrated = migrateVault(v5Vault())
 
     expect(migrated.version).toBe(VAULT_VERSION)
-    expect(migrated.budget.snapshots).toHaveLength(1)
-    expect(migrated.budget.snapshots[0].name).toBe('Q1')
-    expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
+    expect(migrated.budget.snapshots).toEqual([])
     // A key move, not a transformation: nothing else may shift.
     expect(migrated.budget.entries).toEqual(v5Vault().budget.entries)
     expect(migrated.budget.plan).toEqual(v5Vault().budget.plan)
@@ -944,8 +983,8 @@ describe('migrateVault — legacy versions forward', () => {
 
     const migrated = migrateVault(mislabelled)
 
-    expect(migrated.budget.snapshots).toHaveLength(1)
-    expect(migrated.budget.snapshots[0].name).toBe('Q1')
+    expect('archives' in migrated.budget).toBe(false)
+    expect(migrated.budget.snapshots).toEqual([])
   })
 
   // --- v6 -> v7: five entry types, and a category has a side ---------------
@@ -1034,7 +1073,6 @@ describe('migrateVault — legacy versions forward', () => {
     const migrated = migrateVault(v6Vault())
 
     expect(migrated.budget.plan).toEqual(v6Vault().budget.plan)
-    expect(migrated.budget.snapshots).toEqual(v6Vault().budget.snapshots)
     expect(migrated.accounts).toEqual(v6Vault().accounts)
   })
 
@@ -1063,8 +1101,7 @@ describe('migrateVault — legacy versions forward', () => {
     const migrated = migrateVault(v4Vault())
 
     expect(migrated.version).toBe(VAULT_VERSION)
-    expect(migrated.budget.snapshots[0].lines[0].entryName).toBe('Rent')
-    expect(migrated.budget.snapshots[0].lines[0].categoryName).toBe('Housing')
+    expect(migrated.budget.entries[0].name).toBe('Rent')
   })
 
   /**
@@ -1209,13 +1246,104 @@ describe('migrateVault — legacy versions forward', () => {
   // And the shape check refuses to write one, which is what stops a bad
   // migration outliving the tab that made it.
   test('a vault without a trust record cannot be saved', () => {
-    const missing = { ...v8Vault(), version: 9 } as unknown as VaultData
+    const missing = { ...v8Vault(), version: 11, people: {}, belege: [], settlements: [], split: { mode: 'equal' } } as unknown as VaultData
 
     expect(() => assertVaultShape(missing)).toThrow(/trust is missing/)
   })
 
+  /**
+   * v9 -> v10: what a household calls its members. Empty for everybody; until
+   * the owner names somebody, the app shows their email as it always did.
+   */
+  function v9Vault() {
+    return { ...v8Vault(), version: 9, trust: { pins: { '7': 'key' }, epochs: {} } }
+  }
+
+  test('a v9 vault gains an empty list of names, and keeps its trust', () => {
+    const migrated = migrateVault(v9Vault())
+
+    expect(migrated.version).toBe(VAULT_VERSION)
+    expect(migrated.people).toEqual({})
+    expect(migrated.trust.pins).toEqual({ '7': 'key' })
+  })
+
+  test('a vault stamped v10 without names is migrated, not taken at its word', () => {
+    expect(migrateVault({ ...v9Vault(), version: 10 }).people).toEqual({})
+  })
+
+  test('a vault stamped v10 with names but no trust record keeps its names', () => {
+    const migrated = migrateVault({ ...v8Vault(), version: 10, people: { '7': { name: 'Ben' } } })
+
+    expect(migrated.trust).toEqual({ pins: {}, epochs: {} })
+    expect(migrated.people).toEqual({ '7': { name: 'Ben' } })
+  })
+
+  test('a vault without names cannot be saved', () => {
+    const missing = { ...v9Vault(), version: 11, belege: [], settlements: [], split: { mode: 'equal' } } as unknown as VaultData
+
+    expect(() => assertVaultShape(missing)).toThrow(/people is missing/)
+  })
+
+  /**
+   * v10 -> v11: Belege. Nothing spent, nothing closed, nobody owing anybody,
+   * and an even split — the default a household would pick anyway.
+   */
+  test('a v10 vault gains empty Belege, and keeps its names', () => {
+    const migrated = migrateVault({ ...v9Vault(), version: 10, people: { '7': { name: 'Ben' } } })
+
+    expect(migrated.version).toBe(VAULT_VERSION)
+    expect(migrated.belege).toEqual([])
+    expect(migrated.settlements).toEqual([])
+    expect(migrated.split).toEqual({ mode: 'equal' })
+    expect(migrated.people).toEqual({ '7': { name: 'Ben' } })
+  })
+
+  test('a vault stamped v11 without records is migrated, not taken at its word', () => {
+    expect(migrateVault({ ...v9Vault(), version: 11, people: {} }).belege).toEqual([])
+  })
+
+  test('a vault without its records cannot be saved', () => {
+    const missing = { ...v9Vault(), version: 11, people: {} } as unknown as VaultData
+
+    expect(() => assertVaultShape(missing)).toThrow(/belege is missing/)
+  })
+
+  // Hand-made snapshots were retired before the beta: every month keeps its copy now.
+  test('a v11 vault drops its hand-made snapshots and keeps its months', () => {
+    const v = createEmptyVault('Main')
+    const old = {
+      ...v,
+      budget: {
+        ...v.budget,
+        snapshots: [
+          { id: 'hand', name: 'Before the raise', createdAt: '2026-08-28T10:00:00Z', lines: [] },
+          { id: 'm9', month: '2026-09', createdAt: '2026-10-01T08:00:00Z', lines: [] },
+        ],
+      },
+    }
+
+    expect(migrateVault(old).budget.snapshots.map(s => s.id)).toEqual(['m9'])
+  })
+
+  // Belege's months were a map of their own on develop; a vault from then
+  // folds into snapshots that Belege reads and Budget's history skips.
+  test('a develop v11 vault folds its months into copies for Belege only', () => {
+    const v = createEmptyVault('Main')
+    const old = {
+      ...v,
+      months: { '2026-09': { closedAt: '2026-10-01T08:00:00Z', lines: [{ entryId: 'e1', entryName: 'Rent', categoryName: 'Housing', plannedAmount: '1500.00', automatic: true }] } },
+    }
+
+    const migrated = migrateVault(old)
+
+    expect((migrated as unknown as { months?: unknown }).months).toBeUndefined()
+    const copy = migrated.budget.snapshots.find(s => s.month === '2026-09')!
+    expect(copy).toMatchObject({ createdAt: '2026-10-01T08:00:00Z', forBelegeOnly: true })
+    expect(copy.lines[0]).toMatchObject({ entryId: 'e1', type: 'expense', automatic: true })
+  })
+
   test('a vault from a newer build is refused, not emptied', () => {
-    expect(() => migrateVault({ version: 10, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
+    expect(() => migrateVault({ version: 12, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
     expect(() => migrateVault({ version: 99, budget: { entries: [] } })).toThrow(/newer version/)
   })
 
@@ -1226,20 +1354,20 @@ describe('migrateVault — legacy versions forward', () => {
    * how a save silently drops whatever that build added.
    */
   test('a newer vault is refused even though it is missing this version’s keys', () => {
-    expect(() => migrateVault({ version: 10, budget: { entries: [] }, accounts: [] })).toThrow(
+    expect(() => migrateVault({ version: 12, budget: { entries: [] }, accounts: [] })).toThrow(
       VaultVersionAheadError,
     )
   })
 
   test('the refusal names both versions, so the log says what to do', () => {
     try {
-      migrateVault({ version: 10, budget: { entries: [] } })
+      migrateVault({ version: 12, budget: { entries: [] } })
       throw new Error('should have refused')
     } catch (e) {
       expect(e).toBeInstanceOf(VaultVersionAheadError)
-      expect((e as VaultVersionAheadError).found).toBe(10)
+      expect((e as VaultVersionAheadError).found).toBe(12)
       // Both numbers: the one found, and the one this build can read.
-      expect((e as Error).message).toContain('v10')
+      expect((e as Error).message).toContain('v12')
       expect((e as Error).message).toContain(`v${VAULT_VERSION}`)
     }
   })
@@ -1277,7 +1405,7 @@ describe('encryptVault — large vaults', () => {
     // ~2000 snapshot lines: a few years of monthly snapshots.
     vault.budget.snapshots = Array.from({ length: 40 }, (_, a) => ({
       id: `snapshot-${a}`,
-      name: `Snapshot ${a}`,
+      month: `2026-${String((a % 12) + 1).padStart(2, '0')}`,
       createdAt: '2026-08-16',
       lines: Array.from({ length: 50 }, (_, l) => ({
         entryName: `A reasonably long entry name ${a}-${l}`,
@@ -1373,5 +1501,40 @@ describe('the first account', () => {
     const names = (['de', 'fr', 'it'] as const).map(l => seedNamesFor(l).mainAccount)
 
     expect(names).toEqual(['Hauptkonto', 'Compte principal', 'Conto principale'])
+  })
+})
+
+/**
+ * Delete all data: the vault a new sign-up gets, short of what is about the
+ * person rather than their money.
+ */
+describe('deleteAllData', () => {
+  test('leaves one empty account and nothing else of the money', () => {
+    const v = createEmptyVault('Main')
+    v.budget.entries.push({ id: 'e', name: 'Rent', type: 'expense', sortOrder: 1, archived: false, categoryId: 'c', sourceAccountId: null, sinkAccountId: null })
+    v.budget.snapshots.push({ id: 's', createdAt: 'z', month: '2026-09', lines: [] })
+    v.belege.push({ id: 'b', date: '2026-09-02', amount: '5.00', entryId: null, createdBy: '1', createdAt: 'z' })
+    v.accounts.push({ ...v.accounts[0], id: 'savings', name: 'Savings' })
+
+    deleteAllData(v, 'Hauptkonto')
+
+    expect(v.budget.entries).toEqual([])
+    expect(v.budget.snapshots).toEqual([])
+    expect(v.belege).toEqual([])
+    expect(v.accounts.map(a => a.name)).toEqual(['Hauptkonto'])
+    expect(v.accounts[0].currentAmount).toBe('0.00')
+  })
+
+  // Clearing the pins would quietly undo a key verification.
+  test('keeps whose keys were checked, and the tour', () => {
+    const v = createEmptyVault('Main')
+    v.trust.pins['7'] = 'fingerprint'
+    v.tour.completedAt = '2026-09-01T00:00:00Z'
+
+    deleteAllData(v, 'Main')
+
+    expect(v.trust.pins['7']).toBe('fingerprint')
+    expect(v.tour.completedAt).toBe('2026-09-01T00:00:00Z')
+    expect(() => assertVaultShape(v)).not.toThrow()
   })
 })

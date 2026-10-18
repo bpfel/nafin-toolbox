@@ -28,6 +28,10 @@ docker compose up -d --build
 | Mailpit (catches all email) | http://localhost:8025 |
 | PostgreSQL | `localhost:5432`, user, password and database all `finance` |
 
+These ports come from `docker-compose.override.yml`, which Compose loads by itself
+when no `-f` is given. `docker-compose.yml` publishes no ports, so production,
+which names its files with `-f`, publishes only the frontend.
+
 The same command rebuilds after a change: about 15 s for the Go side, a few seconds
 for the frontend. There is no hot-reload overlay; the local stack runs production
 builds.
@@ -46,11 +50,22 @@ docker run --rm -v "$PWD/frontend":/app -w /app node:22-alpine sh -c "npm ci && 
 
 # Dependency advisories
 docker run --rm -v "$PWD/frontend":/app -w /app node:22-alpine npm audit --audit-level=moderate
+
+# Whether every page the app links to still exists (needs the network)
+docker run --rm -v "$PWD/frontend":/app -w /app node:22-alpine npm run links
 ```
 
 CI (`.github/workflows/test.yml`) runs Go unit tests, `gofmt` and `go vet`,
 frontend tests, `svelte-check`, `npm audit` and the integration tests, which use
 the `integration` build tag and a PostgreSQL service.
+
+**External links** live in two places only: Knowledge content
+(`lib/knowledge/content/`) and the upkeep register (`lib/upkeep/register.ts`).
+`lib/sources/registry.ts` collects them, and `npm test` fails on an `https://`
+anywhere else in the source. Whether the pages still exist is checked by
+`.github/workflows/links.yml`: weekly against main, on pull requests that touch a
+link, and by hand. A weekly failure opens an issue. A site that refuses scripts
+(401, 403, 429) is a warning, not a failure.
 
 ## A manual walkthrough
 

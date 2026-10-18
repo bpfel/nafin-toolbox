@@ -4,6 +4,8 @@
   import { initialsOf } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import Sheet from '../nav/Sheet.svelte'
+  import WaitingDot from './WaitingDot.svelte'
+  import { getInvitationState } from './invitations.svelte'
 
   /**
    * Which budget is on screen, and how to change it.
@@ -33,6 +35,7 @@
    * with it. Same breakpoint the dial itself folds on.
    */
   const vaultState = getVaultState()
+  const invitations = getInvitationState()
 
   let open = $state(false)
   let trigger = $state<HTMLButtonElement | null>(null)
@@ -100,6 +103,9 @@
           >
             <HouseMark initials={initialsOf(household.name)} />
             <span class="label">{household.name}</span>
+            {#if invitations.waitingIn(household.id) > 0}
+              <WaitingDot />
+            {/if}
           </button>
         </li>
       {/each}

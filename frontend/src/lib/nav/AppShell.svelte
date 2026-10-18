@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { getRoute, replace } from './router.svelte'
   import type { Screen } from './router.svelte'
   import { clearEditing } from '../util/editMode.svelte'
@@ -6,6 +7,7 @@
   import AppNav from './AppNav.svelte'
   import BudgetScreen from '../../screens/BudgetScreen.svelte'
   import AccountsScreen from '../../screens/AccountsScreen.svelte'
+  import SpendingScreen from '../../screens/SpendingScreen.svelte'
   import KnowledgeScreen from '../../screens/KnowledgeScreen.svelte'
   import TourOffer from '../tour/TourOffer.svelte'
   import { getVaultState } from '../crypto/vaultStore.svelte'
@@ -15,6 +17,7 @@
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
   import UpkeepScreen from '../../screens/UpkeepScreen.svelte'
+  import { startInvitationWatch } from '../household/invitations.svelte'
 
   /**
    * The app once every gate has been passed: the places, and whichever one the
@@ -101,6 +104,15 @@
    * one `accounts` key. Deriving the screen is not on its own enough to stop
    * that; the effect still runs, and only this guard makes it a no-op.
    */
+  /**
+   * Somebody accepted an invitation and is waiting for this owner to let them
+   * in. Watched from here, the whole time the app is open, so the owner learns
+   * about it on whatever screen they are on — not only on the People panel.
+   */
+  $effect(() => {
+    if (!isAdmin && vaultState.unlocked) return untrack(startInvitationWatch)
+  })
+
   let screen = $derived(route.screen)
   let lastScreen: Screen | null = null
   $effect(() => {
@@ -135,7 +147,7 @@
         back. `hidden` takes a screen out of the tab order and the accessibility
         tree exactly as removal would, and leaves it mounted.
 
-        Only the two money screens. Profile is cheap to build and holds nothing
+        Only the money screens. Profile is cheap to build and holds nothing
         worth keeping.
       -->
       {#if offerTour}
@@ -144,6 +156,9 @@
 
       <div class="screen" hidden={route.screen !== 'budget'}>
         <BudgetScreen />
+      </div>
+      <div class="screen" hidden={route.screen !== 'spending'}>
+        <SpendingScreen {userId} />
       </div>
       <div class="screen" hidden={route.screen !== 'accounts'}>
         <AccountsScreen />

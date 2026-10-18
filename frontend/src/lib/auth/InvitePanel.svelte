@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDate } from '../util/calendar'
   import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, getSettings, type User, getAuthState } from './authStore.svelte'
   import DeleteUserModal from './DeleteUserModal.svelte'
 
@@ -164,7 +165,7 @@
                 <span class="status-badge mfa">2FA</span>
               {/if}
             </td>
-            <td class="created">{new Date(u.created_at).toLocaleDateString()}</td>
+            <td class="created">{formatDate(u.created_at)}</td>
             <td>
               <div class="actions">
                 {#if !u.email_verified}
@@ -403,11 +404,11 @@
 
   .btn-danger-small {
     background: white;
-    color: #dc3545;
-    border: 1px solid #dc3545;
+    color: var(--alarm);
+    border: 1px solid var(--alarm);
   }
 
-  .btn-danger-small:hover { background: #fdecea; }
+  .btn-danger-small:hover { background: var(--alarm-soft); }
 
   .confirm-reset {
     display: flex;
@@ -418,7 +419,7 @@
   .confirm-label {
     font-size: 0.75rem;
     font-weight: 500;
-    color: #dc3545;
+    color: var(--alarm);
   }
 
   .temp-password-box {
@@ -495,10 +496,10 @@
   }
 
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.85rem;
     padding: 0.4rem 0.6rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 6px;
     margin-top: 0.5rem;
   }

@@ -1,4 +1,5 @@
-import { sealUnder, openUnder, ownBuffer, toBase64, fromBase64, type OpenIdentity } from './identity'
+import { sealUnder, openUnder, type OpenIdentity } from './identity'
+import { fromBase64, ownBuffer, toBase64 } from './bytes'
 import { openGrant, claimedSender, fingerprintOf, GrantError } from './grant'
 import type { VaultTrust } from './vault'
 
@@ -217,3 +218,12 @@ export async function openGrantedKey(params: {
  * cannot check it: a name is ciphertext by the time it arrives.
  */
 export const HOUSEHOLD_NAME_MAX = 18
+
+/**
+ * How long a member's name may be, in characters.
+ *
+ * A name is what Belege will print in "Anna paid" and "you owe Ben", lines
+ * that sit beside an amount on a phone. Twenty covers a first name and a
+ * surname initial in any of the four languages, or a nickname, with room.
+ */
+export const PERSON_NAME_MAX = 20

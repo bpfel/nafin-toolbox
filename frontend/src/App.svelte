@@ -1,7 +1,7 @@
 <script lang="ts">
   import { setOnUnauthorized } from './lib/api/client'
   import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
-  import { getVaultState } from './lib/crypto/vaultStore.svelte'
+  import { getVaultState, sessionEndedElsewhere } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
   import VerifyEmailPage from './lib/auth/VerifyEmailPage.svelte'
@@ -10,9 +10,11 @@
   import { clearEditing } from './lib/util/editMode.svelte'
   import { autofocus } from './lib/util/autofocus'
   import { startBuildVersionWatch } from './lib/util/buildVersion.svelte'
+  import { startSessionWatch } from './lib/auth/sessionWatch'
   import UpdateBanner from './lib/util/UpdateBanner.svelte'
   import VersionTag from './lib/util/VersionTag.svelte'
   import UnsavedBanner from './lib/crypto/UnsavedBanner.svelte'
+  import SyncNotices from './lib/sync/SyncNotices.svelte'
   import TourOverlay from './lib/tour/TourOverlay.svelte'
   import { resetTour } from './lib/tour/tourStore.svelte'
   import AppShell from './lib/nav/AppShell.svelte'
@@ -66,6 +68,12 @@
 
   // Watch for deploys that leave this tab running chunks the server no longer has.
   $effect(() => startBuildVersionWatch())
+
+  // Watch for this session being ended from another device, so a tab left open
+  // does not go on showing the budget after "Log out everywhere".
+  $effect(() => {
+    if (authState.currentUser) return startSessionWatch(sessionEndedElsewhere)
+  })
 
   $effect(() => {
     if (authState.currentUser) {
@@ -146,6 +154,7 @@
   /** Which enforcement screen stands in the way, if any. See lib/nav/gate.ts. */
   let gate = $derived(
     gateFor({
+      canEncrypt: typeof crypto !== 'undefined' && crypto.subtle !== undefined,
       loading: authState.loading,
       onVerifyPath: route.screen === 'verify',
       user: authState.currentUser
@@ -183,7 +192,16 @@
 {/if}
 
 
-{#if gate === 'loading'}
+{#if gate === 'insecure'}
+  <main>
+    <div class="enforcement-container">
+      <div class="enforcement-card">
+        <h1>{t('insecure.title')}</h1>
+        <p class="hint">{t('insecure.hint')}</p>
+      </div>
+    </div>
+  </main>
+{:else if gate === 'loading'}
   <main>
     <p class="loading">{t('state.loading')}</p>
   </main>
@@ -342,6 +360,7 @@
 <!-- Outside the branch chain: a stale tab is worth flagging on every screen. -->
 <UpdateBanner />
 <UnsavedBanner />
+<SyncNotices />
 <!-- Here rather than inside a screen: the tour walks across screens, and a
      component owned by one of them would be destroyed halfway through. It
      renders nothing unless the tour is running. -->
@@ -421,10 +440,10 @@
   .link-btn:hover { color: #245a42; }
 
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.9rem;
     padding: 0.5rem 0.75rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 6px;
     margin-top: 1rem;
   }

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tick } from 'svelte'
 import Sortable from 'sortablejs'
@@ -8,13 +8,13 @@ import type { VaultAccount, VaultEntry, VaultData } from '../../../lib/crypto/va
 // stubbed with a live getter rather than a snapshot.
 const store = vi.hoisted(() => ({ vault: null as VaultData | null }))
 
-vi.mock('../../../lib/crypto/vaultStore.svelte', () => ({
+vi.mock('../../../lib/crypto/vaultStore.svelte', async () => ({
   getVaultState: () => ({
     get vault() {
       return store.vault
     },
   }),
-  markDirty: vi.fn(),
+  commit: (await import('../../../lib/sync/testing')).committerFor(() => store.vault),
 }))
 
 import { clearEditing, toggleEditing } from '../../../lib/util/editMode.svelte'
@@ -38,9 +38,13 @@ function account(id: string, name: string, currentAmount = '100.00'): VaultAccou
 
 function vault(...accounts: VaultAccount[]): VaultData {
   return {
-    version: 9,
+    version: 11,
     tour: { completedAt: null, dismissedAt: null },
     trust: { pins: {}, epochs: {} },
+    people: {},
+    belege: [],
+    settlements: [],
+    split: { mode: 'equal' as const },
     budget: { categories: [], entries: [], plan: [], snapshots: [] },
     accounts,
   }
@@ -115,13 +119,13 @@ describe('reading what Allocated is made of', () => {
 
   test("the dialog's total is the figure on the card behind it", async () => {
     store.vault = vaultWithReserves()
-    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
     screen.getByRole('button', { name: 'What is allocated on Reserves' }).click()
     await tick()
 
     // Both bills are due this month, so the whole of each target is required.
-    const total = container.querySelector('.total-figure .money')
+    const total = screen.getByRole('dialog').querySelector('.total-figure .money')
     expect((total?.textContent ?? '').replace(/[^\d.-]/g, '')).toBe('3360.00')
   })
 
@@ -256,6 +260,33 @@ describe('AccountManagement edit mode', () => {
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
     expect(screen.getAllByRole('button', { name: 'Correct the balance of Main' })).toHaveLength(1)
+  })
+
+  // Enter submits before the field tidies itself on blur, so the correction
+  // reads the amount exactly as typed — with the ’ an iPhone puts in.
+  test('a correction typed with the iPhone’s apostrophe and sent with Enter is taken', async () => {
+    store.vault = vault(account('a', 'Main'))
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Correct the balance of Main' }))
+    const amount = document.querySelector('.correction input[inputmode="decimal"]') as HTMLInputElement
+    await fireEvent.input(amount, { target: { value: '1’234.50' } })
+    await fireEvent.keyDown(amount, { key: 'Enter' })
+
+    expect(store.vault!.accounts[0].currentAmount).toBe('1234.50')
+  })
+
+  // An overdrawn account is corrected like any other.
+  test('a correction below zero is taken', async () => {
+    store.vault = vault(account('a', 'Main'))
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Correct the balance of Main' }))
+    const amount = document.querySelector('.correction input[inputmode="decimal"]') as HTMLInputElement
+    await fireEvent.input(amount, { target: { value: '-50' } })
+    await fireEvent.keyDown(amount, { key: 'Enter' })
+
+    expect(store.vault!.accounts[0].currentAmount).toBe('-50.00')
   })
 
   test('toggling edit mode after render takes effect without a remount', async () => {

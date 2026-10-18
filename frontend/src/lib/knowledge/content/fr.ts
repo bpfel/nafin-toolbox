@@ -21,25 +21,29 @@ export const fr: PartialContent = {
   tour: {
     welcome: {
       title: 'Un planificateur',
-      body: 'Cette application n’a aucun lien avec ta banque et ne voit jamais tes dépenses réelles. Le budget dit plutôt combien doit rester à la fin du mois, pour que les engagements à venir soient toujours couverts.',
+      body: 'Cette application n’a aucun lien avec ta banque et ne voit jamais ton compte. Le budget dit plutôt combien doit rester à la fin du mois, pour que les engagements à venir soient toujours couverts.',
     },
     places: {
       title: 'Les différents écrans',
-      body: 'Budget, c’est là que tu planifies un mois. Comptes montre les soldes réels correspondants. Savoir abrite cette visite et de courts textes sur les finances suisses.',
+      body: 'Budget, c’est là que tu planifies un mois. Tickets note ce qu’un mois a vraiment coûté. Comptes montre les soldes réels correspondants. Savoir abrite cette visite et de courts textes sur les finances suisses.',
     },
     types: {
       title: 'Différentes entrées budgétaires',
       body: 'Il en existe plusieurs types, présentés l’un après l’autre.',
     },
     budget: {
-      title: 'Un plan permanent',
-      body: 'Pas un journal mensuel. Tu décris un mois type une seule fois, et tu prends un instantané nommé quand quelque chose change assez pour mériter d’être gardé.',
+      title: 'Un budget permanent',
+      body: 'Pas un journal mensuel. Tu décris un mois type une seule fois ; l’app en garde une copie pour chaque mois, et les flèches au-dessus du budget remontent aux versions précédentes.',
       note: 'Nous utilisons des valeurs suisses par défaut à titre d’illustration.',
     },
     controls: {
       title: 'Les commandes',
       body: 'Toutes les options pour l’écran en cours sont ici.',
       hoverNote: 'Survole un symbole pour voir ce qu’il fait.',
+    },
+    spending: {
+      title: 'Ce que tu dépenses vraiment',
+      body: 'Dans Tickets, tu saisis tes dépenses au fil de l’eau : le montant et la ligne de budget concernée. L’aperçu compare un mois au budget ; les lignes payées par ordre permanent comptent d’elles-mêmes comme payées. Dans un ménage, il montre aussi qui doit quoi.',
     },
     accounts: {
       title: 'Comptes',
@@ -48,6 +52,15 @@ export const fr: PartialContent = {
     allocations: {
       title: 'Affectations',
       body: 'Tu relies ici chaque entrée budgétaire à la provenance et à la destination de son argent. Ton salaire arrive sur le compte principal ; la provision pour l’ordinateur portable et la facture Serafe partent là où elles ne seront pas dépensées. Il en ressort un solde pour chacun et une projection des réserves nécessaires.',
+    },
+    install: {
+      title: 'Sur l’écran d’accueil',
+      body: 'Installée, l’app s’ouvre comme les autres, en plein écran et sans le navigateur autour. Cela se fait depuis le menu du navigateur, en une minute.',
+      note: 'Un autre navigateur ? Cherche son nom avec « installer une web app ».',
+      links: [
+        { label: 'iPhone (Safari)', url: 'https://support.apple.com/fr-ch/guide/iphone/iphea86e5236/ios' },
+        { label: 'Android (Chrome)', url: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=fr' },
+      ],
     },
     knowledge: {
       title: 'Tu peux revenir',
@@ -63,7 +76,11 @@ export const fr: PartialContent = {
     },
     sharedInvite: {
       title: 'Inviter d’autres personnes',
-      body: 'Déplie un ménage pour y inviter quelqu’un. Pour l’invitation, utilise son e-mail de compte et donne-lui le lien de partage — copié, ou sous forme de QR code. Tu décides si la personne peut seulement lire le budget partagé ou aussi le modifier.',
+      body: 'Déplie un ménage pour y inviter quelqu’un. Pour l’invitation, utilise son e-mail de compte et donne-lui le lien de partage — copié, ou sous forme de QR code. Tu décides si la personne peut seulement lire le budget partagé ou aussi le modifier. Quand elle accepte, tu la fais entrer.',
+    },
+    sharedConfirm: {
+      title: 'Faire entrer',
+      body: 'Dès que la personne accepte, un bouton « Confirmer » apparaît ici. C’est en confirmant que tu lui remets la clé du ménage : avant, elle ne voit rien. Ensuite, le crayon à côté de chaque personne te permet de lui donner un nom.',
     },
     sharedSwitch: {
       title: 'Changer de budget',
@@ -85,12 +102,23 @@ export const fr: PartialContent = {
     },
   },
   articles: {
+    'about-belege': {
+      title: 'Saisir ce que tu dépenses',
+      body: [
+        'Tickets est l’autre moitié du budget : le budget dit ce qu’un mois devrait coûter, Tickets note ce qu’il a coûté. Chaque ticket est un montant, un jour et la ligne de budget concernée – ou aucune, comme « non attribué ».',
+        'L’aperçu compare un mois à son budget, ligne par ligne. Une ligne payée par ordre permanent ou prélèvement, comme le loyer, peut être marquée payée automatiquement : elle n’est plus proposée pour les tickets et compte comme payée à son montant prévu, pour que le total montre tout le mois.',
+        'Le journal liste chaque ticket, jusqu’au premier, et en retrouve un par ce dont tu te souviens : une note, une ligne, un montant.',
+        'Une fois terminé, un mois garde le budget avec lequel il s’est achevé. Modifier le budget ensuite ne réécrit pas un mois passé.',
+        'Dans un ménage, chaque ticket dit qui a payé – un membre ou le compte commun. L’aperçu montre qui doit quoi, reporté d’un mois à l’autre, et le moins de paiements pour équilibrer. La répartition, à parts égales ou par part, vaut pour les tickets saisis à partir de là.',
+      ],
+    },
+
     'about-budget': {
       title: 'À quoi sert le budget',
       body: [
         'Le budget décrit un mois ordinaire : ce qui entre, ce qui sort et ce qui est mis de côté. Tu le tiens à jour ; ce n’est pas un relevé d’opérations — l’application ne voit jamais ta banque.',
         'Les entrées sont regroupées sous des titres que tu choisis. Chaque entrée a un type, et c’est lui qui importe : revenus et dépenses sont de l’argent qui arrive et qui repart, tandis que l’épargne, les factures et les achats quittent ton compte sans quitter ton patrimoine.',
-        'Il y a un seul plan, pas un par mois. Quand quelque chose change assez pour mériter d’être retenu — une augmentation, un déménagement, une nouvelle assurance —, prends un instantané nommé : il continue de vivre en parallèle.',
+        'Il y a un seul budget, pas un par mois. L’app en garde une copie pour chaque mois terminé. Quand quelque chose change — une augmentation, un déménagement, une nouvelle assurance —, la version d’avant reste à un pas en arrière, avec ce qui a changé.',
       ],
     },
 
@@ -105,7 +133,7 @@ export const fr: PartialContent = {
       sources: [
         {
           label: 'ch.ch — le 3e pilier',
-          url: 'https://www.ch.ch/fr/retraite/rente-de-vieillesse/le-3e-pilier/',
+          url: 'https://www.ch.ch/fr/retraite/prevoyance-vieillesse/prevoyance-privee-3e-pilier/',
         },
         {
           label: 'Administration fédérale des contributions — déductions maximales pilier 3a',

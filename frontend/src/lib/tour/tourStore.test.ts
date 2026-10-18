@@ -2,14 +2,21 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 import type { VaultData } from '../crypto/vault'
 import { TOUR_STEPS, SHARED_STEPS } from './steps'
 
-const markDirty = vi.fn()
+const committed = vi.fn()
 
-// The real store, with only the save stubbed. The tour writes to the vault
+// The real store, with the change spied on. The tour writes to the vault
 // through it, and what those writes are is most of what is worth asserting.
-vi.mock('../crypto/vaultStore.svelte', async importOriginal => ({
-  ...(await importOriginal<typeof import('../crypto/vaultStore.svelte')>()),
-  markDirty: () => markDirty(),
-}))
+vi.mock('../crypto/vaultStore.svelte', async importOriginal => {
+  const real = await importOriginal<typeof import('../crypto/vaultStore.svelte')>()
+  // Spied on, and passed through: the change must still happen for the
+  // screen to show it.
+  const passOn = real.commit as (...args: unknown[]) => unknown
+  const commit = ((...args: unknown[]) => {
+    committed(...args)
+    return passOn(...args)
+  }) as typeof real.commit
+  return { ...real, commit }
+})
 
 import { getVaultState } from '../crypto/vaultStore.svelte'
 import { numbering } from './steps'
@@ -37,8 +44,12 @@ const tour = getTourState()
  */
 function emptyVault(): VaultData {
   return {
-    version: 9,
+    version: 11,
     trust: { pins: {}, epochs: {} },
+    people: {},
+    belege: [],
+    settlements: [],
+    split: { mode: 'equal' as const },
     budget: { categories: [], entries: [], plan: [], snapshots: [] },
     accounts: [
       {
@@ -56,7 +67,7 @@ function emptyVault(): VaultData {
 
 beforeEach(() => {
   resetTour()
-  markDirty.mockClear()
+  committed.mockClear()
   vaultState.vault = emptyVault()
 })
 
@@ -120,7 +131,7 @@ describe('what the vault is told', () => {
     expect(tour.running).toBe(false)
     expect(vaultState.vault?.tour.completedAt).not.toBeNull()
     expect(vaultState.vault?.tour.dismissedAt).toBeNull()
-    expect(markDirty).toHaveBeenCalled()
+    expect(committed).toHaveBeenCalled()
   })
 
   test('skipping partway through does not', () => {
@@ -153,7 +164,7 @@ describe('what the vault is told', () => {
 
     expect(tour.running).toBe(false)
     expect(vaultState.vault?.tour.dismissedAt).not.toBeNull()
-    expect(markDirty).toHaveBeenCalled()
+    expect(committed).toHaveBeenCalled()
   })
 
   /** Someone who has taken the tour has taken it, whatever they do later. */
@@ -170,7 +181,7 @@ describe('what the vault is told', () => {
     vaultState.vault = null
     startTour('basics')
     expect(() => abandonTour()).not.toThrow()
-    expect(markDirty).not.toHaveBeenCalled()
+    expect(committed).not.toHaveBeenCalled()
   })
 })
 
@@ -222,7 +233,7 @@ describe('the shared-budgets walkthrough', () => {
     expect(tour.running).toBe(false)
     expect(vaultState.vault?.tour.completedAt).toBeNull()
     expect(vaultState.vault?.tour.dismissedAt).toBeNull()
-    expect(markDirty).not.toHaveBeenCalled()
+    expect(committed).not.toHaveBeenCalled()
   })
 
   test('abandoning it writes nothing either', () => {
@@ -231,7 +242,7 @@ describe('the shared-budgets walkthrough', () => {
     abandonTour()
 
     expect(vaultState.vault?.tour.dismissedAt).toBeNull()
-    expect(markDirty).not.toHaveBeenCalled()
+    expect(committed).not.toHaveBeenCalled()
   })
 
   test('the first tour is still recorded', () => {
@@ -343,13 +354,13 @@ describe('the example budget is only on loan', () => {
   /**
    * That the *tour* never asks for a save. Whether the store would refuse one
    * anyway is its own question, tested against the real store in
-   * `crypto/vaultPreview.test.ts` — `markDirty` is stubbed in this file, so
+   * `crypto/vaultPreview.test.ts` — `committed` is stubbed in this file, so
    * asserting the guard here would only be asserting the stub.
    */
   test('the tour never marks the vault as needing saving', () => {
     reachExample()
 
-    expect(markDirty).not.toHaveBeenCalled()
+    expect(committed).not.toHaveBeenCalled()
   })
 
   /**
@@ -391,5 +402,36 @@ describe('the example budget is only on loan', () => {
     expect(vaultState.vault).toBe(vault)
     expect(vaultState.vault!.budget.entries).toHaveLength(1)
     expect(vaultState.vault!.budget.entries[0].id).toBe('e1')
+  })
+})
+
+describe('the step about installing the app', () => {
+  const ids = () => {
+    const seen: string[] = []
+    startTour('basics')
+    while (tour.running) {
+      seen.push(tour.step!.id)
+      moveTour(1)
+    }
+    return seen
+  }
+
+  test('is shown in a browser tab', () => {
+    expect(ids()).toContain('install')
+  })
+
+  test('is left out of a tour opened from the home screen, counter and all', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(display-mode: standalone)' }))
+    try {
+      startTour('basics')
+      const last = TOUR_STEPS.length - 2
+      for (let i = 0; i < last; i++) moveTour(1)
+      expect(tour.atLast).toBe(true)
+      expect(tour.step?.id).toBe('knowledge')
+      resetTour()
+      expect(ids()).not.toContain('install')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

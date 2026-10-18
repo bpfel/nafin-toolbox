@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { encodeQR, utf8ToBytes } from 'qr'
+  import QrCode from '../util/QrCode.svelte'
 
   /**
    * An invitation link as a code to scan.
@@ -15,55 +15,13 @@
    * so the inviter shows and the invitee scans — which makes the inviter the
    * deliverer, which is exactly what the check requires.
    *
-   * Encoded here rather than through `qrbill/encode`, which pins the error
-   * correction and byte mode the Swiss QR bill standard mandates. Those are its
-   * rules, not ours; a link is longer than a payment payload and wants a higher
-   * correction level, not the one a bill is specified with.
+   * Drawn by `QrCode`, which the two-factor setup shares.
    */
   interface Props {
     link: string
   }
 
   let { link }: Props = $props()
-
-  // 'high' rather than 'medium': this is read off a screen at an angle, often a
-  // bright one, and a link has no second chance — a misread is a person who
-  // cannot join and does not know why.
-  const matrix = $derived(
-    encodeQR(link, 'raw', { ecc: 'high', encoding: 'byte', textEncoder: utf8ToBytes, border: 1 }),
-  )
-  const size = $derived(matrix.length)
 </script>
 
-<svg
-  viewBox="0 0 {size} {size}"
-  role="img"
-  aria-label={link}
-  shape-rendering="crispEdges"
->
-  <!--
-    Always black on white, never the theme's colours. A camera reads contrast,
-    and a dark-mode code drawn in muted foreground on muted background is one a
-    phone will hesitate over or refuse.
-  -->
-  <rect width={size} height={size} fill="#fff" />
-  {#each matrix as row, y}
-    {#each row as dark, x}
-      {#if dark}
-        <rect x={x} y={y} width="1" height="1" fill="#000" />
-      {/if}
-    {/each}
-  {/each}
-</svg>
-
-<style>
-  svg {
-    width: 100%;
-    max-width: 15rem;
-    height: auto;
-    border-radius: 0.4rem;
-    /* Its own quiet zone, in case it lands on a coloured card. */
-    border: 8px solid #fff;
-    background: #fff;
-  }
-</style>
+<QrCode value={link} label={link} />

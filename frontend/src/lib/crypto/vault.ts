@@ -1,6 +1,10 @@
+import { thisMonth, today } from '../util/calendar'
+import { fromBase64, toBase64 } from './bytes'
+import { newId, todayISO } from '../sync/source'
+
 const NONCE_LENGTH = 12
 
-export const VAULT_VERSION = 9
+export const VAULT_VERSION = 11
 
 /**
  * A stored vault written by a build newer than this one.
@@ -19,14 +23,69 @@ export class VaultVersionAheadError extends Error {
 // --- Vault data types ---
 
 export interface VaultData {
-  version: 9
+  version: 11
   budget: BudgetVaultData
   accounts: VaultAccount[]
   /** Whether the guided tour has been taken, or turned down. */
   tour: TourState
   /** What this client has decided to believe about other people. */
   trust: VaultTrust
+  /**
+   * What the household calls its members, by user id. Household vaults only:
+   * a personal vault carries an empty map and nothing reads it.
+   *
+   * In the vault rather than on the server, because a name is personal data and
+   * the server's whole job is not to read any. Kept when a member leaves, so a
+   * record that mentions them — who paid, in Belege — can still say who.
+   */
+  people: Record<string, VaultPerson>
+  /** What was actually spent: one record per receipt, the Belege module. */
+  belege: Beleg[]
+  /** Households only: money one member paid another to even out. */
+  settlements: Settlement[]
+  /** Households only: how a record is divided between members when entered. */
+  split: Split
 }
+
+export interface VaultPerson {
+  name: string
+}
+
+/** One thing spent. A *record* in code; a *Beleg* to a German reader. */
+export interface Beleg {
+  id: string
+  /** The day it was spent, `YYYY-MM-DD`, in local time. */
+  date: string
+  /** In CHF, as typed and normalised: `'12.50'`. */
+  amount: string
+  /** The budget line it counts against; `null` is Unassigned. Expense entries only. */
+  entryId: string | null
+  note?: string
+  /** Households: a user id, or `'joint'` for the joint account. */
+  paidBy?: string
+  /**
+   * Households: each member's weight in this record, copied from `split` when
+   * it was entered, so changing the split later does not rewrite old records.
+   */
+  shares?: Record<string, number>
+  /** User id of whoever entered it. */
+  createdBy: string
+  /** When it was entered, not when it was spent. */
+  createdAt: string
+}
+
+export interface Settlement {
+  id: string
+  date: string
+  from: string
+  to: string
+  amount: string
+  createdBy: string
+  createdAt: string
+}
+
+/** Equal between members, or a weight per member (percentages that add to 100). */
+export type Split = { mode: 'equal' } | { mode: 'shares'; shares: Record<string, number> }
 
 /**
  * The things a client must remember in order not to be lied to twice.
@@ -96,8 +155,18 @@ export interface BudgetVaultData {
    * deliberately, as named snapshots, instead of accruing one row per month.
    */
   plan: VaultPlanEntry[]
-  /** Named snapshots of the plan. Called archives before v6. */
+  /**
+   * Copies of the plan: the ones taken by hand, named, and one per finished
+   * month, taken by the app. Called archives before v6.
+   */
   snapshots: VaultSnapshot[]
+  /**
+   * The month being recorded now, `'YYYY-MM'`: the oldest one without a copy
+   * yet. Set on the first write; from then on every month up to the current
+   * one is copied as it ends. Absent until the plan is first written, so a new
+   * plan never backfills months from before it existed.
+   */
+  openMonth?: string
 }
 
 export interface VaultPlanEntry {
@@ -122,16 +191,44 @@ export interface VaultPlanEntry {
  */
 export interface VaultSnapshot {
   id: string
-  name: string
   createdAt: string
   lines: VaultSnapshotLine[]
+  /**
+   * The month this is the copy of, `'YYYY-MM'`, taken as that month ended: the
+   * plan the month is read against in Belege, and the plan's history Budget
+   * steps back through. One per month.
+   *
+   * Snapshots used to be taken by hand and named, before the app kept months;
+   * those are dropped on load (see `migrateVault`), so every snapshot has one.
+   */
+  month: string
+  /**
+   * A yardstick for Belege, not a version of the budget, so Budget's history
+   * skips it. Two kinds: a month before the history starts that a receipt was
+   * backdated into, copied late from the budget as it is now rather than as it
+   * was then; and a month closed by a develop build before months became
+   * snapshots, which kept only the expense lines.
+   */
+  forBelegeOnly?: true
 }
 
 export interface VaultSnapshotLine {
+  /** Which entry it was, for matching a month's records. Absent on old snapshots. */
+  entryId?: string
   entryName: string
   categoryName: string
   type: EntryType
   plannedAmount: string
+  /** Paid automatically, as it stood: Belege counts it as spent at its plan. */
+  automatic?: boolean
+  /** A bill's or a purchase's target and cycle, as they stood: a year of it reads exact. */
+  reserve?: { targetAmount: string; periodMonths: number }
+  /**
+   * Already archived when the month ended, and only in the copy because a
+   * record that month was counted against it. Belege shows it; it was not part
+   * of the budget then, so Budget's history and totals leave it out.
+   */
+  archived?: true
 }
 
 export type AccountKind =
@@ -246,6 +343,12 @@ export interface VaultEntry {
   sourceAccountId: string | null
   sinkAccountId: string | null
   reserve?: ReserveDefinition
+  /**
+   * Paid without a receipt — a standing order, a direct debit: rent, health
+   * insurance. Belege does not offer it for a record and counts it as paid at
+   * its planned amount, so a month's total is the whole month. Absent is false.
+   */
+  automatic?: boolean
 }
 
 /** A vault whose contents do not match the version it declares. */
@@ -332,6 +435,18 @@ export function assertVaultShape(vault: VaultData): void {
   if (!trust.epochs || typeof trust.epochs !== 'object') {
     throw new VaultShapeError('trust.epochs is missing')
   }
+
+  // v10's. Without it a household would forget what everybody is called.
+  const people = (vault as unknown as { people?: unknown }).people
+  if (!people || typeof people !== 'object') {
+    throw new VaultShapeError('people is missing')
+  }
+
+  // v11's. A vault written without these would lose every record anybody typed.
+  const v11 = vault as unknown as { belege?: unknown; settlements?: unknown; split?: unknown }
+  if (!Array.isArray(v11.belege)) throw new VaultShapeError('belege is missing')
+  if (!Array.isArray(v11.settlements)) throw new VaultShapeError('settlements is missing')
+  if (!v11.split || typeof v11.split !== 'object') throw new VaultShapeError('split is missing')
 }
 
 // --- Encrypt / decrypt ---
@@ -350,27 +465,9 @@ export async function encryptVault(
   )
 
   return {
-    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
-    nonce: bytesToBase64(nonce),
+    ciphertext: toBase64(new Uint8Array(encrypted)),
+    nonce: toBase64(nonce),
   }
-}
-
-/**
- * Base64-encodes bytes in chunks.
- *
- * `String.fromCharCode(...bytes)` spreads every byte as a separate argument and
- * overflows the call stack somewhere around a hundred kilobytes — which is to
- * say, it fails on a large vault by throwing while SAVING. Snapshots make large
- * vaults ordinary, so this is the difference between growing a vault and being
- * unable to persist it.
- */
-function bytesToBase64(bytes: Uint8Array): string {
-  const CHUNK_SIZE = 0x8000
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK_SIZE))
-  }
-  return btoa(binary)
 }
 
 export async function decryptVault(
@@ -378,8 +475,8 @@ export async function decryptVault(
   nonce: string,
   mek: CryptoKey,
 ): Promise<VaultData> {
-  const ciphertextBytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0))
-  const nonceBytes = Uint8Array.from(atob(nonce), c => c.charCodeAt(0))
+  const ciphertextBytes = fromBase64(ciphertext)
+  const nonceBytes = fromBase64(nonce)
 
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: nonceBytes },
@@ -464,7 +561,24 @@ export function migrateVault(parsed: unknown): VaultData {
   // narrowing. Only a vault claiming to be current while missing what a current
   // vault always writes; anything older is handled by its own branch.
   const wearingV8Keys =
-    vault.version === VAULT_VERSION && (vault as { trust?: unknown }).trust === undefined
+    (vault.version === 9 || vault.version === 10 || vault.version === VAULT_VERSION) &&
+    (vault as { trust?: unknown }).trust === undefined
+
+  // v10 added `people`; the same narrowing again.
+  const wearingV9Keys =
+    (vault.version === 10 || vault.version === VAULT_VERSION) &&
+    (vault as { people?: unknown }).people === undefined
+
+  // v11 added the Belege keys; `belege` stands for all four.
+  const wearingV10Keys =
+    vault.version === VAULT_VERSION && (vault as { belege?: unknown }).belege === undefined
+
+  // Belege's months were a map of their own on develop before they became
+  // snapshots. Folded in, so a vault from then reads as one from now.
+  if (vault.version === VAULT_VERSION && (vault as { months?: unknown }).months !== undefined) {
+    foldMonthsIntoSnapshots(vault as unknown as DevelopV11)
+  }
+  if (vault.version === VAULT_VERSION) dropHandMadeSnapshots(vault as unknown as { budget?: { snapshots?: { month?: string }[] } })
 
   if (
     vault.version === VAULT_VERSION &&
@@ -472,39 +586,45 @@ export function migrateVault(parsed: unknown): VaultData {
     !wearingV5Keys &&
     !wearingV6Keys &&
     !wearingV7Keys &&
-    !wearingV8Keys
+    !wearingV8Keys &&
+    !wearingV9Keys &&
+    !wearingV10Keys
   ) {
     return vault as unknown as VaultData
   }
   // Chained, so a v2 vault is carried all the way forward rather than scrubbed
-  // for being four steps behind.
+  // for being four steps behind. Everything from v8 on is purely additive, so
+  // those last steps are one helper rather than one more wrapper on each line.
+  const fromV8 = (v8: V8Shape) => migrateV10ToV11(migrateV9ToV10(migrateV8ToV9(v8)))
   if (vault.version === 2) {
-    return migrateV8ToV9(
+    return fromV8(
       migrateV7ToV8(
         migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(vault))))),
       ),
     )
   }
   if (vault.version === 3) {
-    return migrateV8ToV9(
+    return fromV8(
       migrateV7ToV8(
         migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(vault as unknown as V3Shape)))),
       ),
     )
   }
   if (vault.version === 4 || wearingV4Keys) {
-    return migrateV8ToV9(
+    return fromV8(
       migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(vault as unknown as V4Shape)))),
     )
   }
   if (vault.version === 5 || wearingV5Keys) {
-    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape))))
+    return fromV8(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(vault as unknown as V5Shape))))
   }
   if (vault.version === 6 || wearingV6Keys) {
-    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(vault as unknown as V6Shape)))
+    return fromV8(migrateV7ToV8(migrateV6ToV7(vault as unknown as V6Shape)))
   }
-  if (vault.version === 7 || wearingV7Keys) return migrateV8ToV9(migrateV7ToV8(vault as unknown as V7Shape))
-  if (vault.version === 8 || wearingV8Keys) return migrateV8ToV9(vault as unknown as V8Shape)
+  if (vault.version === 7 || wearingV7Keys) return fromV8(migrateV7ToV8(vault as unknown as V7Shape))
+  if (vault.version === 8 || wearingV8Keys) return fromV8(vault as unknown as V8Shape)
+  if (vault.version === 9 || wearingV9Keys) return migrateV10ToV11(migrateV9ToV10(vault as unknown as V9Shape))
+  if (vault.version === 10 || wearingV10Keys) return migrateV10ToV11(vault as unknown as V10Shape)
 
   // Ahead of us, not behind: there is nothing to migrate and nothing wrong with
   // the data. Refuse it so the app can say so, instead of handing back an empty
@@ -705,6 +825,17 @@ interface V6Entry {
 }
 
 /**
+ * A snapshot as the versions before v11 stored it: taken by hand and named,
+ * with no month. Only the migrations speak this; v11 drops them on load.
+ */
+interface LegacySnapshot {
+  id: string
+  name: string
+  createdAt: string
+  lines: VaultSnapshotLine[]
+}
+
+/**
  * The v5 shape: everything v6 has, under the name `archives`.
  */
 interface V5Shape {
@@ -713,7 +844,7 @@ interface V5Shape {
     categories?: V6Category[]
     entries?: V6Entry[]
     plan?: VaultPlanEntry[]
-    archives?: VaultSnapshot[]
+    archives?: LegacySnapshot[]
   }
   accounts?: VaultAccount[]
 }
@@ -725,7 +856,7 @@ interface V6Shape {
     categories?: V6Category[]
     entries?: V6Entry[]
     plan?: VaultPlanEntry[]
-    snapshots?: VaultSnapshot[]
+    snapshots?: LegacySnapshot[]
   }
   accounts?: VaultAccount[]
 }
@@ -807,7 +938,8 @@ function migrateV6ToV7(vault: V6Shape): V7Shape {
       }
     }),
     plan: budget.plan ?? [],
-    snapshots: budget.snapshots ?? [],
+    // Carried as they are; v11 drops the ones without a month on load.
+    snapshots: (budget.snapshots ?? []) as unknown as VaultSnapshot[],
   }
   return migrated
 }
@@ -887,10 +1019,90 @@ interface V8Shape {
  * nobody made, and a pin nobody checked is worse than no pin at all — it would
  * silently accept whatever key happened to be there first.
  */
-function migrateV8ToV9(vault: V8Shape): VaultData {
+function migrateV8ToV9(vault: V8Shape): V9Shape {
+  const migrated = vault as unknown as V9Shape
+  // 9 rather than VAULT_VERSION, for the reason given in `migrateV7ToV8`.
+  migrated.version = 9
+  migrated.trust = { pins: {}, epochs: {} }
+  return migrated
+}
+
+interface V9Shape {
+  version: number
+  budget: BudgetVaultData
+  accounts: VaultAccount[]
+  tour: TourState
+  trust: VaultTrust
+}
+
+/**
+ * v9 -> v10: what a household calls its members.
+ *
+ * Empty for everybody. Nobody has been named yet, and every place that shows a
+ * member falls back to their email address, which is all the app knew before.
+ */
+function migrateV9ToV10(vault: V9Shape): V10Shape {
+  const migrated = vault as unknown as V10Shape
+  // 10 rather than VAULT_VERSION, for the reason given in `migrateV7ToV8`.
+  migrated.version = 10
+  migrated.people = migrated.people ?? {}
+  return migrated
+}
+
+interface V10Shape extends V9Shape {
+  people: Record<string, VaultPerson>
+}
+
+interface DevelopV11 {
+  budget: { snapshots?: VaultSnapshot[] }
+  months?: Record<string, { closedAt: string; lines: { entryId: string; entryName: string; categoryName: string; plannedAmount: string; automatic?: boolean }[] }>
+}
+
+/**
+ * A develop build kept a closed month's expense lines in `months`, apart from
+ * the snapshots. They become that month's copy, for Belege only: a copy of the
+ * expense side alone, compared with a whole budget, would read as every income
+ * and saving line removed.
+ */
+function foldMonthsIntoSnapshots(vault: DevelopV11): void {
+  const snapshots = (vault.budget.snapshots ??= [])
+  for (const [month, closed] of Object.entries(vault.months ?? {})) {
+    if (snapshots.some(s => s.month === month)) continue
+    snapshots.push({
+      id: crypto.randomUUID(),
+      createdAt: closed.closedAt,
+      month,
+      // Receipts are only ever counted against expense entries.
+      lines: closed.lines.map(l => ({ ...l, type: 'expense' as const })),
+      forBelegeOnly: true,
+    })
+  }
+  delete vault.months
+}
+
+/**
+ * Snapshots taken by hand, from before the app kept a copy of every month.
+ * Retired before the beta: every month has its copy now, and two kinds of copy
+ * for one idea was what made the Archive confusing. Dropped, not converted — a
+ * copy taken on the 15th is not the plan a month ended with.
+ */
+function dropHandMadeSnapshots(vault: { budget?: { snapshots?: { month?: string }[] } }): void {
+  if (vault.budget?.snapshots) vault.budget.snapshots = vault.budget.snapshots.filter(s => s.month !== undefined)
+}
+
+/**
+ * v10 -> v11: Belege. Nothing spent yet, no month closed, nobody owing
+ * anybody, and the split even — the default a household would pick anyway.
+ */
+function migrateV10ToV11(vault: V10Shape): VaultData {
   const migrated = vault as unknown as VaultData
   migrated.version = VAULT_VERSION
-  migrated.trust = { pins: {}, epochs: {} }
+  migrated.belege = migrated.belege ?? []
+  dropHandMadeSnapshots(migrated)
+  // Months are kept from now on, not from before: no history is invented.
+  migrated.budget.openMonth ??= thisMonth()
+  migrated.settlements = migrated.settlements ?? []
+  migrated.split = migrated.split ?? { mode: 'equal' }
   return migrated
 }
 
@@ -909,13 +1121,41 @@ export function createEmptyVault(mainAccountName = 'Main'): VaultData {
       entries: [],
       plan: [],
       snapshots: [],
+      // A new plan's months start now: none is copied from before it existed.
+      openMonth: thisMonth(),
     },
     // Invariant: a vault always holds at least one account, so every category
     // can be routed from the moment it is created.
     accounts: [createMainAccount(mainAccountName)],
     trust: { pins: {}, epochs: {} },
     tour: { completedAt: null, dismissedAt: null },
+    people: {},
+    belege: [],
+    settlements: [],
+    split: { mode: 'equal' },
   }
+}
+
+/**
+ * Everything the vault holds about money, gone: the budget and its history,
+ * records, balances, accounts. What is left is the vault a new sign-up gets —
+ * one empty account — so nothing outlives it to be found later as a history
+ * of a budget that no longer exists.
+ *
+ * Kept: whose keys this account has already checked (`trust` — clearing it
+ * would quietly undo a verification), and whether the tour was taken, which
+ * is about the person, not their money.
+ *
+ * In place, through the sync source, so it replays like any other change onto
+ * a vault saved elsewhere meanwhile — and wipes what was added there too.
+ */
+export function deleteAllData(vault: VaultData, mainAccountName: string): void {
+  const fresh = createEmptyVault(mainAccountName)
+  fresh.accounts[0].id = newId('account')
+  fresh.accounts[0].lastCorrectedAt = todayISO()
+  const { trust, tour } = vault
+  for (const key of Object.keys(vault)) delete (vault as unknown as Record<string, unknown>)[key]
+  Object.assign(vault, fresh, { trust, tour })
 }
 
 function createMainAccount(name: string): VaultAccount {
@@ -925,10 +1165,6 @@ function createMainAccount(name: string): VaultAccount {
     kind: 'transactional',
     currency: 'CHF',
     currentAmount: '0.00',
-    lastCorrectedAt: todayISO(),
+    lastCorrectedAt: today(),
   }
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
 }

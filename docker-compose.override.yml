@@ -1,0 +1,21 @@
+# Development ports. Compose loads this file by itself when no -f is given,
+# so `docker compose up -d --build` is the development stack. Production names
+# its files with -f, which leaves this one out — see docker-compose.yml.
+
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  mailpit:
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+  api:
+    ports:
+      - "8081:8080"
+
+  frontend:
+    ports:
+      - "3000:3000"

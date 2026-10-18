@@ -1,5 +1,6 @@
 import { t } from '../i18n/index.svelte'
 import type { Screen } from './router.svelte'
+import { getInvitationState } from '../household/invitations.svelte'
 
 /**
  * The places the app has, as data.
@@ -14,7 +15,7 @@ import type { Screen } from './router.svelte'
  * password with other people's accounts and bury an audit log that wants a
  * screen of its own.
  */
-export type IconName = 'budget' | 'accounts' | 'knowledge' | 'profile' | 'users' | 'audit' | 'upkeep'
+export type IconName = 'budget' | 'spending' | 'accounts' | 'knowledge' | 'profile' | 'users' | 'audit' | 'upkeep'
 
 export interface Destination {
   screen: Screen
@@ -25,7 +26,11 @@ export interface Destination {
    * label captured once would keep the language it was built in.
    */
   label: () => string
+  /** Whether something there is waiting on the user: a dot on the tab. */
+  attention?: () => boolean
 }
+
+const invitations = getInvitationState()
 
 /**
  * Profile is last in both lists, and at the foot of the rail. It is the only
@@ -33,17 +38,27 @@ export interface Destination {
  */
 const FOR_USER: Destination[] = [
   { screen: 'budget', path: '/budget', icon: 'budget', label: () => t('nav.budget') },
+  // Beside the budget it is read against: the plan, then what was spent.
+  { screen: 'spending', path: '/spending', icon: 'spending', label: () => t('nav.spending') },
   { screen: 'accounts', path: '/accounts', icon: 'accounts', label: () => t('nav.accounts') },
   { screen: 'knowledge', path: '/knowledge', icon: 'knowledge', label: () => t('nav.knowledge') },
-  { screen: 'profile', path: '/profile', icon: 'profile', label: () => t('nav.profile') },
+  {
+    screen: 'profile',
+    path: '/profile',
+    icon: 'profile',
+    label: () => t('nav.profile'),
+    // Somebody accepted an invitation and waits to be confirmed, which is done
+    // on Profile — on whatever screen the owner happens to be.
+    attention: () => invitations.anyWaiting,
+  },
 ]
 
 /*
- * Four fits at 320px. Five does not — which is the constraint the shell was
- * drawn against, and it has not moved. Savings and a dashboard are both owed a
- * slot, so whoever adds the fifth destination has to decide what stops being
- * one; Knowledge is the likeliest candidate, since a library is a place you go
- * deliberately rather than one you switch to while working.
+ * Five fit at 320px. This said four did not, reckoning labels at 64px each —
+ * but other apps carry five, and so does this one, once every locale's labels
+ * fit: Belege and Konten, Spese and Conti, at the bar's font size, checked at
+ * 320px in all five languages. Shrink the label font before dropping a tab.
+ * A sixth (Savings, a dashboard) reopens the question.
  */
 
 /*

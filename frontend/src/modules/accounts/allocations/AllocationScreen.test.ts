@@ -8,13 +8,13 @@ import type { VaultEntry, VaultData } from '../../../lib/crypto/vault'
 // crypto, network, or a login.
 let testVault: VaultData | null = null
 
-vi.mock('../../../lib/crypto/vaultStore.svelte', () => ({
+vi.mock('../../../lib/crypto/vaultStore.svelte', async () => ({
   getVaultState: () => ({
     get vault() {
       return testVault
     },
   }),
-  markDirty: vi.fn(),
+  commit: (await import('../../../lib/sync/testing')).committerFor(() => testVault),
 }))
 
 import { clearEditing, toggleEditing } from '../../../lib/util/editMode.svelte'
@@ -39,9 +39,13 @@ function entry(overrides: Partial<VaultEntry> & { id: string; name: string }): V
 
 function makeVault(): VaultData {
   return {
-    version: 9,
+    version: 11,
     tour: { completedAt: null, dismissedAt: null },
     trust: { pins: {}, epochs: {} },
+    people: {},
+    belege: [],
+    settlements: [],
+    split: { mode: 'equal' as const },
     accounts: [
       {
         id: 'main',

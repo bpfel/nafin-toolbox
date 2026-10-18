@@ -25,6 +25,13 @@
    * it can never resolve. A tutorial QR code that a camera happily opened would
    * be the one thing here with consequences.
    */
+  /**
+   * Two moments of the same invitation, for two steps: just sent, with the code
+   * to hand over, and accepted, with the Confirm button. The dot that tells an
+   * owner somebody is waiting is left out: it explains itself in the app.
+   */
+  let { stage = 'pending' }: { stage?: 'pending' | 'accepted' } = $props()
+
   const EMAIL = 'max.musterfrau@blub.ch'
   const LINK = 'https://example.invalid/join#this-is-an-example'
   const NAME = 'Zuhause'
@@ -34,7 +41,7 @@
   Labelled rather than silent: to a screen reader this is one described thing,
   not a list of controls that have mysteriously stopped working.
 -->
-<div class="example" inert aria-label={t('invite.codeFor').replace('{name}', EMAIL)}>
+<div class="example" inert aria-label={t('invite.codeFor', { name: EMAIL })}>
   <div class="row household">
     <HouseMark initials={initialsOf(NAME)} />
     <span class="name">{NAME}</span>
@@ -45,11 +52,18 @@
   <ul class="list">
     <li class="row invite">
       <span class="who">{EMAIL}</span>
-      <span class="tag">{t('invite.pending')}</span>
-      <span class="tag">{t('role.writer')}</span>
+      {#if stage === 'accepted'}
+        <span class="tag ready">{t('invite.accepted')}</span>
+        <span class="tag">{t('role.writer')}</span>
+        <span class="confirm">{t('invite.confirm')}</span>
+      {:else}
+        <span class="tag">{t('invite.pending')}</span>
+        <span class="tag">{t('role.writer')}</span>
+      {/if}
     </li>
   </ul>
 
+  {#if stage === 'pending'}
   <!--
     The code inline, where the real card puts it behind a dialog. Not a
     shortcut: the tour dims the page from z-index 90 and a dialog is drawn at
@@ -61,6 +75,7 @@
     <p class="why">{t('invite.linkWhy')}</p>
     <span class="copy">{t('invite.copy')}</span>
   </div>
+  {/if}
 </div>
 
 <style>
@@ -122,6 +137,20 @@
     font-size: 0.75rem;
     color: var(--ink-faint);
     white-space: nowrap;
+  }
+
+  .tag.ready {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* The real panel's green button, drawn — for the reason given at .copy. */
+  .confirm {
+    padding: 0.35rem 0.9rem;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.875rem;
   }
 
   .code {

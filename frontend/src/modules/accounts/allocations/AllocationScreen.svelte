@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../../../lib/i18n/index.svelte'
-  import { getVaultState, markDirty } from '../../../lib/crypto/vaultStore.svelte'
+  import { getVaultState, commit } from '../../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../../lib/budget/budgetEngine'
   import {
     sideOf,
@@ -15,8 +15,9 @@
     projectedBalance,
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
-  import { fromCents, monthsBetween, nextDue, toCents } from '../../../lib/accounts/reserveMath'
-  import { formatAmount } from '../../../lib/util/money'
+  import { nextDue } from '../../../lib/accounts/reserveMath'
+  import { monthsBetween, thisMonth } from '../../../lib/util/calendar'
+  import { formatAmount, fromCents, toCents } from '../../../lib/util/money'
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import AllocationRow from './AllocationRow.svelte'
@@ -55,11 +56,6 @@
   interface Props {
     /** 'YYYY-MM' the reserve and account figures are computed for. Defaults to now. */
     currentMonth?: string
-  }
-
-  function thisMonth(): string {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   }
 
   let { currentMonth = thisMonth() }: Props = $props()
@@ -130,9 +126,6 @@
     return new Map(engine.listCategories(vault).map(g => [g.id, g]))
   })
 
-  function categoryOrder(categoryId: string): number {
-    return categoriesById.get(categoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
-  }
 
   // An entry whose category was deleted still has to show up, so an unknown
   // category id collapses into the unnamed "Other" bucket that sorts last.
@@ -149,8 +142,10 @@
       bucket.rows.push(row)
       bucket.cents += cents(row.plannedAmount)
     }
+    if (!vaultState.vault) return []
+    const rank = engine.categoryRank(vaultState.vault)
     return Array.from(map.values())
-      .sort((a, b) => categoryOrder(a.categoryId) - categoryOrder(b.categoryId))
+      .sort((a, b) => rank(a.categoryId) - rank(b.categoryId))
       .map(b => ({
         categoryId: b.categoryId,
         categoryName: b.categoryName,
@@ -273,13 +268,8 @@
     }
 
     error = null
-    entry.sourceAccountId = routing.sourceAccountId
-    entry.sinkAccountId = routing.sinkAccountId
-    // A reserve has to accumulate somewhere. Routing back to spending removes
-    // the sink, so the reserve goes with it rather than lingering illegally.
-    if (entry.sinkAccountId === null) delete entry.reserve
-
-    markDirty()
+    // Routing back to spending drops the reserve with the sink; see `setRouting`.
+    commit('setRouting', entryId, routing.sourceAccountId, routing.sinkAccountId)
     version++
   }
 
@@ -478,8 +468,8 @@
     margin: 0 0 1rem;
     padding: 0.6rem 0.9rem;
     font-size: 0.85rem;
-    color: #c0392b;
-    background: #fdecea;
+    color: var(--alarm);
+    background: var(--alarm-soft);
     border-radius: 6px;
   }
 

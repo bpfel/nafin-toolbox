@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDateTime } from '../util/calendar'
   import { fetchAuditLogs, listUsers, type AuditLogEntry, type User } from './authStore.svelte'
 
   const PAGE_SIZE = 50
@@ -14,7 +15,7 @@
   let expandedId = $state<number | null>(null)
 
   const eventTypes = [
-    'login_success', 'login_failed', 'logout',
+    'login_success', 'login_failed', 'logout', 'logout_everywhere',
     'password_changed', '2fa_enabled', '2fa_disabled',
     '2fa_verified', '2fa_failed', 'recovery_code_used',
     'user_invited', 'email_verified', 'user_deleted',
@@ -24,6 +25,7 @@
     login_success: '#155724',
     login_failed: '#721c24',
     logout: '#666',
+    logout_everywhere: '#666',
     password_changed: '#856404',
     '2fa_enabled': '#155724',
     '2fa_disabled': '#856404',
@@ -39,6 +41,7 @@
     login_success: '#d4edda',
     login_failed: '#f8d7da',
     logout: '#e9ecef',
+    logout_everywhere: '#e9ecef',
     password_changed: '#fff3cd',
     '2fa_enabled': '#d4edda',
     '2fa_disabled': '#fff3cd',
@@ -101,14 +104,6 @@
     expandedId = expandedId === id ? null : id
   }
 
-  function formatDate(iso: string): string {
-    const d = new Date(iso)
-    return d.toLocaleString('de-CH', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    })
-  }
-
   // Load on mount
   load()
   loadUsers()
@@ -163,7 +158,7 @@
         <tbody>
           {#each entries as entry (entry.id)}
             <tr>
-              <td class="nowrap">{formatDate(entry.created_at)}</td>
+              <td class="nowrap">{formatDateTime(entry.created_at, { seconds: true })}</td>
               <td>
                 <span
                   class="badge"

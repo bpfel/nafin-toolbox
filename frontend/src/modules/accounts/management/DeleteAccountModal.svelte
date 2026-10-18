@@ -1,9 +1,8 @@
 <script lang="ts">
+  import Sheet from '../../../lib/nav/Sheet.svelte'
   import { t, tn, tAround } from '../../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import type { VaultAccount, VaultEntry } from '../../../lib/crypto/vault'
-  import { focusTrap } from '../../../lib/util/focusTrap'
-  import { closeOnBack } from '../../../lib/nav/closeOnBack'
 
   interface Props {
     account: VaultAccount
@@ -50,19 +49,12 @@
     ondelete(reassignToId)
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose()
-  }
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) onclose()
-  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={t('accountDelete.title')} use:focusTrap use:closeOnBack={onclose}>
+<Sheet label={t('accountDelete.title')} {onclose}>
+  <!-- One block, so the dialog keeps its own spacing rather than the sheet's. -->
+  <div>
     <h3>{t('accountDelete.title')}</h3>
 
     <p>
@@ -106,29 +98,9 @@
       </button>
     </div>
   </div>
-</div>
+</Sheet>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 1rem;
-  }
-  .modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 440px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: var(--shadow-modal);
-  }
   h3 {
     margin: 0 0 0.75rem;
     font-size: 1.1rem;
@@ -182,43 +154,5 @@
     display: flex;
     gap: 0.75rem;
     justify-content: flex-end;
-  }
-  .btn {
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .cancel {
-    background: #f1f3f5;
-    border: 1px solid #dee2e6;
-    color: #333;
-  }
-  .cancel:hover:not(:disabled) {
-    background: #e9ecef;
-  }
-  .delete {
-    background: #c0392b;
-    border: none;
-    color: white;
-  }
-  .delete:hover:not(:disabled) {
-    background: #a93226;
-  }
-
-  @media (max-width: 480px) {
-    .backdrop {
-      align-items: flex-end;
-      padding: 0;
-    }
-    .modal {
-      max-width: 100%;
-      border-radius: 16px 16px 0 0;
-      padding: 1.5rem 1.25rem 2rem;
-    }
   }
 </style>

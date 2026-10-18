@@ -1,6 +1,8 @@
+import { buildMonthSnapshot, closeMonth } from '../belege/belegeEngine'
 import { describe, test, expect, beforeEach } from 'vitest'
 import {
   listCategories,
+  categoryRank,
   createCategory,
   updateCategory,
   mergeCategory,
@@ -15,16 +17,27 @@ import {
   plannedFor,
   setPlanned,
   getPlanSummary,
-  listSnapshots,
-  takeSnapshot,
-  renameSnapshot,
   resetBudget,
-  deleteSnapshot,
   seedDefaults,
   seedSharedDefaults,
 } from './budgetEngine'
 import { createEmptyVault, holdsMoney, savesTowardsTarget, type VaultData } from '../crypto/vault'
 import { isLegalEntryRouting, isLegalRouting, primaryAccountId } from '../accounts/routing'
+
+// The table, the allocations and a month's copy used to decide this each for
+// themselves, and a month's copy put a vanished category first.
+describe('categoryRank', () => {
+  test('by sortOrder, and a category that no longer exists last', () => {
+    const vault = createEmptyVault('Main')
+    createCategory(vault, 'Housing', 'expense', 20)
+    createCategory(vault, 'Food', 'expense', 10)
+    const rank = categoryRank(vault)
+    const ids = [...vault.budget.categories.map(c => c.id), 'gone']
+
+    expect([...ids].sort((a, b) => rank(a) - rank(b)).at(-1)).toBe('gone')
+    expect(rank(vault.budget.categories[1].id)).toBeLessThan(rank(vault.budget.categories[0].id))
+  })
+})
 
 describe('listCategories', () => {
   test('returns empty array for empty vault', () => {
@@ -845,214 +858,6 @@ describe('getPlanSummary', () => {
   })
 })
 
-describe('takeSnapshot', () => {
-  function planned(vault: VaultData) {
-    const salary = createEntry(vault, { name: 'Salary', type: 'income', categoryName: 'Employment' })
-    const rent = createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
-    setPlanned(vault, salary.id, '6000.00')
-    setPlanned(vault, rent.id, '1350.00')
-    return { salary, rent }
-  }
-
-  test('snapshots the plan as names and amounts', () => {
-    const vault = createEmptyVault()
-    planned(vault)
-
-    const snapshot = takeSnapshot(vault, '2026 baseline')
-
-    expect(snapshot.name).toBe('2026 baseline')
-    expect(snapshot.id).toBeTruthy()
-    expect(snapshot.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-    expect(snapshot.lines).toEqual([
-      { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
-      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
-    ])
-    expect(vault.budget.snapshots).toContain(snapshot)
-  })
-
-  test('includes entries left at 0.00, so the snapshot reads like the plan did', () => {
-    const vault = createEmptyVault()
-    createEntry(vault, { name: 'Holidays', type: 'expense', categoryName: 'Lifestyle' })
-
-    const snapshot = takeSnapshot(vault, 'Empty start')
-
-    expect(snapshot.lines).toHaveLength(1)
-    expect(snapshot.lines[0].plannedAmount).toBe('0.00')
-  })
-
-  test('does not snapshot archived entries', () => {
-    const vault = createEmptyVault()
-    const { rent } = planned(vault)
-    updateEntry(vault, rent.id, { archived: true })
-
-    const snapshot = takeSnapshot(vault, 'After archiving Rent')
-
-    expect(snapshot.lines.map(l => l.entryName)).toEqual(['Salary'])
-  })
-
-  test('rejects an empty or whitespace-only name', () => {
-    const vault = createEmptyVault()
-    planned(vault)
-
-    expect(() => takeSnapshot(vault, '')).toThrow(/name/)
-    expect(() => takeSnapshot(vault, '   ')).toThrow(/name/)
-    expect(() => takeSnapshot(vault, '\t\n')).toThrow(/name/)
-    // A rejected snapshot must not be half-stored.
-    expect(vault.budget.snapshots).toHaveLength(0)
-  })
-
-  test('trims the name', () => {
-    const vault = createEmptyVault()
-
-    expect(takeSnapshot(vault, '  March review  ').name).toBe('March review')
-  })
-
-  test('renaming an entry afterwards does not rewrite the snapshot', () => {
-    const vault = createEmptyVault()
-    const { rent } = planned(vault)
-    const snapshot = takeSnapshot(vault, 'Before the rename')
-
-    updateEntry(vault, rent.id, { name: 'Rent (new flat)', categoryName: 'Accommodation' })
-
-    // The snapshot records what the plan said at the time. A later rename is a
-    // fact about today's budget, not about the snapshot.
-    expect(snapshot.lines[1].entryName).toBe('Rent')
-    expect(snapshot.lines[1].categoryName).toBe('Housing')
-    expect(listSnapshots(vault)[0].lines[1].entryName).toBe('Rent')
-  })
-
-  test('deleting an entry afterwards does not remove its archived line', () => {
-    const vault = createEmptyVault()
-    const { rent } = planned(vault)
-    const snapshot = takeSnapshot(vault, 'Before the delete')
-
-    deleteEntry(vault, rent.id)
-
-    expect(vault.budget.entries).toHaveLength(1)
-    expect(vault.budget.plan.some(e => e.entryId === rent.id)).toBe(false)
-    // The snapshot keeps both lines: it holds names, not references.
-    expect(snapshot.lines).toHaveLength(2)
-    expect(snapshot.lines[1].entryName).toBe('Rent')
-    expect(snapshot.lines[1].plannedAmount).toBe('1350.00')
-  })
-
-  test('editing the plan afterwards does not change the snapshot', () => {
-    const vault = createEmptyVault()
-    const { rent } = planned(vault)
-    const snapshot = takeSnapshot(vault, 'Snapshot')
-
-    setPlanned(vault, rent.id, '1500.00')
-
-    expect(snapshot.lines[1].plannedAmount).toBe('1350.00')
-    expect(plannedFor(vault, rent.id)).toBe('1500.00')
-  })
-})
-
-describe('listSnapshots', () => {
-  test('returns an empty array for an empty vault', () => {
-    expect(listSnapshots(createEmptyVault())).toEqual([])
-  })
-
-  test('returns snapshots newest first', () => {
-    const vault = createEmptyVault()
-    const first = takeSnapshot(vault, 'First')
-    const second = takeSnapshot(vault, 'Second')
-    const third = takeSnapshot(vault, 'Third')
-
-    expect(listSnapshots(vault).map(a => a.id)).toEqual([third.id, second.id, first.id])
-  })
-
-  test('orders by createdAt, not by insertion', () => {
-    const vault = createEmptyVault()
-    const older = takeSnapshot(vault, 'Older')
-    const newer = takeSnapshot(vault, 'Newer')
-    older.createdAt = '2020-01-01T00:00:00.000Z'
-    newer.createdAt = '2030-01-01T00:00:00.000Z'
-
-    expect(listSnapshots(vault).map(a => a.name)).toEqual(['Newer', 'Older'])
-  })
-
-  test('does not mutate the stored array', () => {
-    const vault = createEmptyVault()
-    takeSnapshot(vault, 'First')
-    takeSnapshot(vault, 'Second')
-    const original = [...vault.budget.snapshots]
-
-    listSnapshots(vault)
-
-    expect(vault.budget.snapshots).toEqual(original)
-  })
-})
-
-describe('renameSnapshot', () => {
-  test('renames the snapshot', () => {
-    const vault = createEmptyVault()
-    const snapshot = takeSnapshot(vault, 'Old name')
-
-    renameSnapshot(vault, snapshot.id, 'New name')
-
-    expect(snapshot.name).toBe('New name')
-  })
-
-  test('trims the new name', () => {
-    const vault = createEmptyVault()
-    const snapshot = takeSnapshot(vault, 'Old name')
-
-    renameSnapshot(vault, snapshot.id, '  Tidy  ')
-
-    expect(snapshot.name).toBe('Tidy')
-  })
-
-  test('rejects an empty name, as creation does', () => {
-    const vault = createEmptyVault()
-    const snapshot = takeSnapshot(vault, 'Keep me')
-
-    expect(() => renameSnapshot(vault, snapshot.id, '   ')).toThrow(/name/)
-    expect(snapshot.name).toBe('Keep me')
-  })
-
-  test('an unknown id is a no-op', () => {
-    const vault = createEmptyVault()
-    const snapshot = takeSnapshot(vault, 'Only one')
-
-    expect(() => renameSnapshot(vault, 'no-such-snapshot', 'Whatever')).not.toThrow()
-    expect(snapshot.name).toBe('Only one')
-  })
-})
-
-describe('deleteSnapshot', () => {
-  test('removes the snapshot', () => {
-    const vault = createEmptyVault()
-    const snapshot = takeSnapshot(vault, 'Doomed')
-
-    deleteSnapshot(vault, snapshot.id)
-
-    expect(vault.budget.snapshots).toHaveLength(0)
-    expect(listSnapshots(vault)).toEqual([])
-  })
-
-  test('leaves the other snapshots and the plan alone', () => {
-    const vault = createEmptyVault()
-    const entry = createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
-    setPlanned(vault, entry.id, '1350.00')
-    const keep = takeSnapshot(vault, 'Keep')
-    const drop = takeSnapshot(vault, 'Drop')
-
-    deleteSnapshot(vault, drop.id)
-
-    expect(listSnapshots(vault).map(a => a.id)).toEqual([keep.id])
-    expect(plannedFor(vault, entry.id)).toBe('1350.00')
-  })
-
-  test('deleting an unknown id is a no-op', () => {
-    const vault = createEmptyVault()
-    takeSnapshot(vault, 'Keep')
-
-    expect(() => deleteSnapshot(vault, 'no-such-snapshot')).not.toThrow()
-    expect(vault.budget.snapshots).toHaveLength(1)
-  })
-})
-
 describe('seedDefaults', () => {
   test('creates default categories and entries', () => {
     const vault = createEmptyVault()
@@ -1178,6 +983,60 @@ describe('seedDefaults', () => {
     const rent = summary.entries.find(e => e.entryName === 'Rent')!
 
     expect(rent.yearlyAmount).toBe('16200.00')
+  })
+
+  /**
+   * Reported from a screenshot: 12'550 typed into the yearly box showed as
+   * 12'549.96 in the table and -0.04 unallocated. The dialog stores a yearly
+   * figure as its monthly to four places — 1045.8333 — and the year of it was
+   * taken from that monthly rounded to the rappen first. Rounded once, at the
+   * end, it is the figure that was typed.
+   */
+  test('a year typed as a year comes back as that year', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const rent = vault.budget.entries.find(e => e.name === 'Rent')!
+    setPlanned(vault, rent.id, (12550 / 12).toFixed(4))
+    const summary = getPlanSummary(vault)
+
+    expect(summary.entries.find(e => e.entryId === rent.id)!.yearlyAmount).toBe('12550.00')
+  })
+
+  test('a year typed as a month is still twelve of that month', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    const rent = vault.budget.entries.find(e => e.name === 'Rent')!
+    setPlanned(vault, rent.id, '1045.83')
+    const summary = getPlanSummary(vault)
+
+    expect(summary.entries.find(e => e.entryId === rent.id)!.yearlyAmount).toBe('12549.96')
+  })
+
+  /**
+   * The screenshot's -0.04: income typed as a year set against a bill, whose
+   * year was already exact. Both have to be rounded the same way, once, or
+   * Unallocated reads zero a month and four rappen short a year.
+   */
+  test('income typed as a year balances a bill of the same year', () => {
+    const vault = createEmptyVault()
+
+    seedDefaults(vault)
+    for (const entry of vault.budget.entries) {
+      setPlanned(vault, entry.id, '0.00')
+      if (entry.type !== 'bill') delete entry.reserve
+    }
+    const bills = vault.budget.entries.filter(e => e.type === 'bill')
+    for (const bill of bills.slice(1)) delete bill.reserve
+    const bill = bills[0]
+    bill.reserve = { ...bill.reserve!, targetAmount: '12550.00', periodMonths: 12 }
+    setPlanned(vault, bill.id, '1045.83')
+    const salary = vault.budget.entries.find(e => e.type === 'income')!
+    setPlanned(vault, salary.id, (12550 / 12).toFixed(4))
+    const summary = getPlanSummary(vault)
+
+    expect(summary.yearlyBalance).toBe('0.00')
   })
 
   /**
@@ -1415,17 +1274,18 @@ describe('resetBudget', () => {
 
   // Snapshots hold names, not references, so they read the same after the
   // entries they describe are gone. Resetting the plan is not erasing history.
-  test('leaves snapshots standing', () => {
+  test('leaves the months’ copies standing: the plan’s history outlives a reset', () => {
     const { vault } = vaultWithPlan()
-    const snapshot = takeSnapshot(vault, 'Before the reset')
+    const snapshot = buildMonthSnapshot(vault, '2026-09')
+    closeMonth(vault, '2026-09', snapshot)
 
     resetBudget(vault)
 
     expect(vault.budget.snapshots).toHaveLength(1)
-    expect(vault.budget.snapshots[0].name).toBe('Before the reset')
+    expect(vault.budget.snapshots[0].month).toBe('2026-09')
     expect(snapshot.lines).toEqual([
-      { entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' },
-      { entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' },
+      expect.objectContaining({ entryName: 'Salary', categoryName: 'Employment', type: 'income', plannedAmount: '6000.00' }),
+      expect.objectContaining({ entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1350.00' }),
     ])
   })
 

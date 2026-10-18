@@ -43,13 +43,16 @@ export type TourStepId =
   | 'typeSavings'
   | 'typeBill'
   | 'typePurchase'
+  | 'spending'
   | 'accounts'
   | 'allocations'
+  | 'install'
   | 'knowledge'
   // The shared-budgets walkthrough.
   | 'sharedWhat'
   | 'sharedStart'
   | 'sharedInvite'
+  | 'sharedConfirm'
   | 'sharedSwitch'
   | 'sharedEntries'
   | 'sharedContributions'
@@ -116,8 +119,11 @@ export interface TourStep {
    * place of the real list. It matters because the step it belongs to explains
    * inviting somebody, and the reader most likely to need that explanation is
    * looking at "You have none yet."
+   *
+   * Which moment of an invitation it shows: sent and `pending`, or `accepted`
+   * and waiting for the owner's Confirm.
    */
-  exampleHousehold?: true
+  exampleHousehold?: 'pending' | 'accepted'
   /**
    * Let the pointer reach the thing being ringed.
    *
@@ -132,6 +138,15 @@ export interface TourStep {
    * be pointed at.
    */
   permeable?: true
+  /**
+   * Leave this step out when the app is already running installed.
+   *
+   * For the one step that explains how to put the app on a home screen: read
+   * inside the installed app it is advice about something already done. Left
+   * out rather than skipped, so the counter never promises a step it will not
+   * show. See `isInstalled`.
+   */
+  browserOnly?: true
 }
 
 export const TOUR_STEPS: TourStep[] = [
@@ -152,11 +167,18 @@ export const TOUR_STEPS: TourStep[] = [
   { id: 'typeBill', path: '/budget', anchor: 'type-bill', sub: true, guideType: 'bill' },
   { id: 'typePurchase', path: '/budget', anchor: 'type-purchase', sub: true, guideType: 'purchase' },
 
+  // After the plan and before the accounts: what a month actually cost is read
+  // against the plan the steps before it described.
+  { id: 'spending', path: '/spending' },
   { id: 'accounts', path: '/accounts' },
   // The second segment is the point: the step describes the allocations view,
   // so it shows it rather than pointing at the tab that would reach it. A
   // sub-tab is the one thing below a screen that is still a place.
   { id: 'allocations', path: '/accounts/allocations', anchor: 'accounts-tabs' },
+  // Nothing to ring: the control is the browser's menu, which the page cannot
+  // point at. On Profile because that is where the iPhone hint lives after
+  // the tour is over.
+  { id: 'install', path: '/profile', browserOnly: true },
   // Ends where it can be started again, which is the one thing a tour must not
   // leave the user unable to find.
   { id: 'knowledge', path: '/knowledge', anchor: 'nav-knowledge' },
@@ -187,7 +209,10 @@ export const TOUR_STEPS: TourStep[] = [
 export const SHARED_STEPS: TourStep[] = [
   { id: 'sharedWhat', path: '/budget' },
   { id: 'sharedStart', path: '/profile', anchor: 'household' },
-  { id: 'sharedInvite', path: '/profile', anchor: 'household', exampleHousehold: true },
+  { id: 'sharedInvite', path: '/profile', anchor: 'household', exampleHousehold: 'pending' },
+  // Admission is a button the owner presses, so the reader has to know it is
+  // coming — otherwise the person they invited waits, and nothing told them why.
+  { id: 'sharedConfirm', path: '/profile', anchor: 'household', exampleHousehold: 'accepted' },
   // Seeds here rather than one step later, at `sharedPlan`: this step is about
   // moving between two budgets, and an empty one behind it is a poor
   // advertisement for having a second.

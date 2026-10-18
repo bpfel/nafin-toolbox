@@ -1,12 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/svelte'
+import { committingTo } from '../../lib/sync/testing'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import type { PlanEntryView } from '../../lib/budget/budgetEngine'
 import type { VaultData } from '../../lib/crypto/vault'
 import { toggleEditing, clearEditing } from '../../lib/util/editMode.svelte'
 
-vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
-  markDirty: vi.fn(),
-}))
+vi.mock('../../lib/crypto/vaultStore.svelte', async () => (await import('../../lib/sync/testing')).storeMock())
 
 import BudgetTable from './BudgetTable.svelte'
 import BudgetEntryRow from './BudgetEntryRow.svelte'
@@ -102,10 +101,18 @@ describe('edit-mode controls are never hidden', () => {
 
 describe('the controls are in the DOM the moment edit mode is on', () => {
   function vault(): VaultData {
+    return committingTo(buildVault())
+  }
+
+  function buildVault(): VaultData {
     return {
-      version: 9,
+      version: 11,
       tour: { completedAt: null, dismissedAt: null },
       trust: { pins: {}, epochs: {} },
+      people: {},
+      belege: [],
+      settlements: [],
+      split: { mode: 'equal' as const },
       accounts: [{
         id: 'main', name: 'Main', kind: 'transactional', currency: 'CHF',
         currentAmount: '0.00', lastCorrectedAt: '2026-01-01',

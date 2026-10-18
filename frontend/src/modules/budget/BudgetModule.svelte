@@ -1,13 +1,15 @@
 <script lang="ts">
   import { t, getLocale } from '../../lib/i18n/index.svelte'
-  import { getVaultState, markDirty } from '../../lib/crypto/vaultStore.svelte'
+  import { getVaultState, commit } from '../../lib/crypto/vaultStore.svelte'
   import * as engine from '../../lib/budget/budgetEngine'
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
-  import SnapshotPanel from './SnapshotPanel.svelte'
-  import ResetBudgetModal from './ResetBudgetModal.svelte'
-  import { isEditing } from '../../lib/util/editMode.svelte'
+  import VersionStepper from './VersionStepper.svelte'
+  import VersionChanges from './VersionChanges.svelte'
+  import { planVersions, changesAfter } from '../../lib/budget/versions'
+  import { monthLabel } from '../../lib/util/months'
+  import { clearEditing } from '../../lib/util/editMode.svelte'
 
   const vaultState = getVaultState()
 
@@ -31,13 +33,12 @@
 
   function handleSave(entryId: string, amount: string) {
     if (!vaultState.vault) return
-    engine.setPlanned(vaultState.vault, entryId, amount)
-    markDirty()
+    commit('setPlanned', entryId, amount)
     version++
   }
 
+  // The change itself was committed where it was made; this only redraws.
   function handleEntryChange() {
-    markDirty()
     version++
   }
 
@@ -50,9 +51,7 @@
 
   function handleSeeded() {
     if (!vaultState.vault) return
-    const seed = household ? engine.seedSharedDefaults : engine.seedDefaults
-    seed(vaultState.vault, getLocale())
-    markDirty()
+    commit(household ? 'seedSharedDefaults' : 'seedDefaults', getLocale())
     version++
   }
 
@@ -64,9 +63,59 @@
   // the action strip, and the summary and the table both answer to it.
   interface Props {
     viewMode?: 'monthly' | 'yearly'
+    /** Showing an earlier version: the screen hides what would change the plan. */
+    past?: boolean
   }
 
-  let { viewMode = $bindable('monthly') }: Props = $props()
+  let { viewMode = $bindable('monthly'), past = $bindable(false) }: Props = $props()
+
+  /**
+   * The plan's versions, newest first — the plan now, then each one before a
+   * change. Stepped through from the stepper above the plan. See `planVersions`.
+   */
+  let versions = $derived(vaultState.vault && version >= 0 ? planVersions(vaultState.vault) : [])
+
+  /**
+   * The version stepped back to, by its first month; `null` for the plan now.
+   * Not by position: a version appearing in front — a month ending, an edit on
+   * another device — would silently swap what is on screen. A first month
+   * never moves (see `PlanVersion`), and if the version it names has since
+   * become the plan now, that is what is shown.
+   */
+  let selected = $state<string | null>(null)
+  let shownAt = $derived(Math.max(0, selected === null ? 0 : versions.findIndex(v => v.from === selected)))
+  let shown = $derived(versions[shownAt])
+
+  // Past is what is on screen, not what was asked for: a version that has
+  // become the plan now is the plan now, pen and all.
+  $effect(() => {
+    past = !!shown?.copy
+    // An earlier version is read, not changed: whatever edit mode was on goes.
+    if (past) clearEditing()
+  })
+
+  function stepTo(at: number) {
+    const target = versions[at]
+    selected = target?.copy ? (target.from ?? null) : null
+  }
+
+  /** What the summary and the table show: the plan now, or the version stepped back to. */
+  let pastSummary = $derived(shown?.copy ? engine.planSummaryOf(shown.lines) : null)
+  let after = $derived(shown?.copy ? changesAfter(versions, shownAt) : null)
+  // Another budget, another history: start again at its plan now.
+  $effect(() => {
+    void vaultState.currentVaultId
+    selected = null
+  })
+
+  function range(from: string | undefined, to: string | null): string {
+    if (!from) return ''
+    if (to === null) return t('budget.since', { month: monthLabel(from) })
+    return from === to ? monthLabel(from) : `${monthLabel(from)} – ${monthLabel(to)}`
+  }
+
+  let stepTitle = $derived(!shown ? '' : shown.to === null ? t('budget.currentPlan') : range(shown.from, shown.to))
+  let stepSub = $derived(!shown || shown.to !== null ? undefined : range(shown.from, null) || undefined)
 
   /**
    * Passed straight through from the screen's "+" to the table that owns the
@@ -78,18 +127,6 @@
 
   export function openAddEntry() {
     table?.openAddEntry()
-  }
-
-  let confirmingReset = $state(false)
-
-  function handleReset() {
-    if (!vaultState.vault) return
-    engine.resetBudget(vaultState.vault)
-    // An empty budget is exactly the state the setup screen exists for, so the
-    // offer of the defaults comes back rather than leaving a blank table.
-    dismissedSetup = false
-    markDirty()
-    version++
   }
 </script>
 
@@ -107,11 +144,31 @@
   {:else if needsSetup}
     <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} {household} />
   {:else if summary}
-    {#if isEditing('budget') && summary.entries.length > 0}
-      <div class="module-actions">
-        <button class="btn-reset" onclick={() => confirmingReset = true}>{t('budget.reset')}</button>
-      </div>
+    {#if versions.length > 1}
+      <VersionStepper
+        title={stepTitle}
+        sub={stepSub}
+        onprevious={shownAt < versions.length - 1 ? () => stepTo(shownAt + 1) : undefined}
+        onnext={shownAt > 0 ? () => stepTo(shownAt - 1) : undefined}
+      />
     {/if}
+    {#if shown && shown.copy && pastSummary}
+      <!-- The same summary and table as the plan now, read-only: edit mode is
+           off while it is on screen, and nothing else in them changes a thing. -->
+      {#if after && after.changes.length > 0 && after.from}
+        <VersionChanges changes={after.changes} from={after.from} />
+      {/if}
+      <BudgetSummary summary={pastSummary} {viewMode} />
+      <BudgetTable
+        bind:viewMode
+        entries={pastSummary.entries}
+        vault={vaultState.vault}
+        onsave={() => {}}
+        onentrycreated={() => {}}
+        onentrydeleted={() => {}}
+        oncategorychanged={() => {}}
+      />
+    {:else}
     {#if summary.entries.length > 0}
       <BudgetSummary {summary} {viewMode} />
     {/if}
@@ -125,15 +182,6 @@
       onentrydeleted={handleEntryChange}
       oncategorychanged={handleEntryChange}
     />
-    <SnapshotPanel vault={vaultState.vault} />
-
-    {#if confirmingReset}
-      <ResetBudgetModal
-        entryCount={vaultState.vault.budget.entries.length}
-        snapshotCount={vaultState.vault.budget.snapshots.length}
-        onreset={handleReset}
-        onclose={() => confirmingReset = false}
-      />
     {/if}
   {/if}
 </div>
@@ -151,25 +199,6 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-  }
-  .module-actions {
-    display: flex;
-    justify-content: flex-end;
-    /* The module already spaces its children generously; the bar belongs to the
-       table below it rather than floating alone. */
-    margin-bottom: -1rem;
-  }
-  .btn-reset {
-    background: white;
-    color: #c0392b;
-    border: 1px solid #c0392b;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.8rem;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .btn-reset:hover {
-    background: #fdecea;
   }
   .loading {
     color: var(--ink-faint);

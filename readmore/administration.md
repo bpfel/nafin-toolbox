@@ -2,8 +2,8 @@
 
 [← Back to README](../README.md)
 
-The commands below assume the production compose files. On a Synology, add
-`-f docker-compose.synology.yml` and run them with `sudo`; see
+The commands below assume the production compose files. On a Synology, run them
+with `sudo`, as the `dc` there does; see
 [Self-hosting on a Synology NAS](synology-selfhosting.md). For brevity, from the
 repository folder:
 

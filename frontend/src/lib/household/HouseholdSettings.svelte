@@ -4,6 +4,8 @@
   import { initialsOf, HOUSEHOLD_NAME_MAX } from '../crypto/household'
   import HouseMark from './HouseMark.svelte'
   import HouseholdPeople from './HouseholdPeople.svelte'
+  import WaitingDot from './WaitingDot.svelte'
+  import { getInvitationState } from './invitations.svelte'
   import ExampleHousehold from './ExampleHousehold.svelte'
   import { getTourState } from '../tour/tourStore.svelte'
   import ActionButton from '../nav/ActionButton.svelte'
@@ -31,6 +33,7 @@
   let { myUserId = null }: Props = $props()
 
   const vaultState = getVaultState()
+  const invitations = getInvitationState()
   const tour = getTourState()
 
   /**
@@ -147,7 +150,7 @@
       step that says "unfold a household to invite somebody" has to be able
       to point at a household, and most readers of that sentence have none.
     -->
-    <ExampleHousehold />
+    <ExampleHousehold stage={tour.exampleHouseholdStage} />
   {:else if vaultState.households.length === 0}
     <p class="none">{t('household.none')}</p>
   {:else}
@@ -172,7 +175,7 @@
             </form>
           {:else if confirmingId === household.id}
             <div class="confirm-box">
-              <p>{t('household.deletePrompt').replace('{name}', household.name)}</p>
+              <p>{t('household.deletePrompt', { name: household.name })}</p>
               <div class="btn-row">
                 <button class="btn-danger" onclick={() => remove(household.id)} disabled={busy}>
                   {busy ? t('household.deleting') : t('household.delete')}
@@ -197,6 +200,9 @@
               >
                 <HouseMark initials={initialsOf(household.name)} />
                 <span class="name">{household.name}</span>
+                {#if invitations.waitingIn(household.id) > 0}
+                  <WaitingDot />
+                {/if}
                 <svg
                   class="chevron"
                   class:down={unfolded === household.id}

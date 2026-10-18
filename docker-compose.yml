@@ -1,3 +1,17 @@
+# The services, with no ports published. Which ports a stack publishes is
+# decided by the file layered on top:
+#
+#   docker compose up -d --build        development: docker-compose.override.yml,
+#                                       which Compose loads on its own
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#                                       production: the frontend only
+#
+# Ports live only in the layers because a layer can add ports but not reliably
+# take them away. Removing them needs `ports: !override`, which Compose before
+# 2.24 ignores, merging the lists instead. Synology DSM ships 2.20, and the
+# production file once relied on it: on an older Compose it published the
+# database and the API to the network after all.
+
 services:
   db:
     image: postgres:17-alpine
@@ -7,19 +21,18 @@ services:
       POSTGRES_PASSWORD: finance
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U finance"]
       interval: 2s
       timeout: 3s
       retries: 10
+      # A first start initialises the data directory before Postgres answers,
+      # which on a NAS-class CPU outlasts ten 2s retries. Failures in this
+      # window do not count; it is healthy as soon as a check passes.
+      start_period: 60s
 
   mailpit:
     image: axllent/mailpit
-    ports:
-      - "8025:8025"
-      - "1025:1025"
 
   api:
     build: ./backend
@@ -32,8 +45,6 @@ services:
       SMTP_FROM: "noreply@nafin.local"
       APP_URL: "http://localhost:3000"
       ENCRYPTION_KEY: "bcbb68dd891f7a97bf3370ff8800ab3eb3cc4226efbb09fcc519791cb8a76174"
-    ports:
-      - "8081:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -44,8 +55,6 @@ services:
       args:
         # Release builds: APP_VERSION="$(git describe --tags)" docker compose build frontend
         APP_VERSION: ${APP_VERSION:-}
-    ports:
-      - "3000:3000"
     depends_on:
       - api
 

@@ -1,13 +1,16 @@
 import { cleanup, render, screen, fireEvent } from '@testing-library/svelte'
+import { committingTo } from '../../lib/sync/testing'
 import { describe, test, expect, vi, afterEach } from 'vitest'
 import { createEmptyVault } from '../../lib/crypto/vault'
 import * as engine from '../../lib/budget/budgetEngine'
 
-vi.mock('../../lib/crypto/vaultStore.svelte', () => ({
-  markDirty: vi.fn(),
+// A spy around the stand-in, so a test can see which changes the dialog sent.
+vi.mock('../../lib/crypto/vaultStore.svelte', async () => ({
+  commit: vi.fn((await import('../../lib/sync/testing')).fakeCommit),
 }))
 
 import AddEntryModal from './AddEntryModal.svelte'
+import { commit } from '../../lib/crypto/vaultStore.svelte'
 
 afterEach(cleanup)
 
@@ -20,7 +23,7 @@ const chf = (n: number) =>
 // A real vault, because Enter runs the whole save path — which writes the name
 // and category through the engine, not just the amount.
 function openOn(plannedAmount: string, onsave = vi.fn(), onclose = vi.fn()) {
-  const vault = createEmptyVault()
+  const vault = committingTo(createEmptyVault())
   const rent = engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
   const housing = engine.listCategories(vault)[0]
 
@@ -56,8 +59,21 @@ describe('AddEntryModal — the only way to change an amount', () => {
 
     await fireEvent.input(monthly, { target: { value: chf(1450) } })
     await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
+  })
+
+  // Exactly, not by floating point: 1.005 × 100 is 100.4999…, which used to
+  // round down to 1.00.
+  test('a third decimal of 5 rounds up, to 1.01', async () => {
+    const { onsave, entryId, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1.005' } })
+    await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onsave).toHaveBeenCalledWith(entryId, '1.01')
   })
 
   test('saves a figure retyped without a separator', async () => {
@@ -65,6 +81,7 @@ describe('AddEntryModal — the only way to change an amount', () => {
 
     await fireEvent.input(monthly, { target: { value: '1450' } })
     await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
   })
@@ -84,8 +101,53 @@ describe('AddEntryModal — the only way to change an amount', () => {
 
     await fireEvent.input(monthly, { target: { value: 'abc' } })
     await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onsave).not.toHaveBeenCalled()
+  })
+
+  // Leaving the field is not saving. Clicking Cancel blurs the field before the
+  // click lands, so an amount written on blur was saved by Cancel.
+  test('Cancel drops a typed amount', async () => {
+    const { onsave, onclose, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.blur(monthly)
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(onsave).not.toHaveBeenCalled()
+    expect(onclose).toHaveBeenCalled()
+  })
+
+  test('clicking outside the dialog drops it too', async () => {
+    const { onsave, onclose, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.blur(monthly)
+    await fireEvent.click(document.querySelector('.backdrop')!)
+
+    expect(onsave).not.toHaveBeenCalled()
+    expect(onclose).toHaveBeenCalled()
+  })
+
+  // Typed in yearly, a monthly figure is stored to four places; the box shows
+  // two. Saving the name alone must not round it to what the box shows.
+  test('an amount left untouched is not rewritten', async () => {
+    const { onsave } = openOn('83.3333')
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onsave).not.toHaveBeenCalled()
+  })
+
+  // Enter in the name field saves the whole dialog, the amount included.
+  test('Enter in the name saves a typed amount', async () => {
+    const { onsave, entryId, monthly } = openOn('1350.00')
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.keyDown(screen.getByDisplayValue('Rent'), { key: 'Enter' })
+
+    expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
   })
 })
 
@@ -133,11 +195,64 @@ describe('Enter in an amount field', () => {
   })
 })
 
+/**
+ * A year typed into a new entry used to be stored as the monthly box showed it,
+ * rounded to the rappen, so 12'550 a year came back as 12'549.96. Editing an
+ * existing entry already kept four places; creating one now does too.
+ */
+describe('a year typed into a new entry stays that year', () => {
+  function openNew() {
+    const vault = committingTo(createEmptyVault())
+    engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+    const housing = engine.listCategories(vault)[0]
+
+    render(AddEntryModal, {
+      props: {
+        type: 'income' as const,
+        categories: [{ name: housing.name, id: housing.id }],
+        vault,
+        oncreated: vi.fn(),
+        onclose: vi.fn(),
+      },
+    })
+    return vault
+  }
+
+  async function add(vault: ReturnType<typeof openNew>, field: string, value: string) {
+    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Bonus' } })
+    await fireEvent.input(screen.getByLabelText(field), { target: { value } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    const bonus = vault.budget.entries.find(e => e.name === 'Bonus')!
+    return {
+      stored: vault.budget.plan.find(p => p.entryId === bonus.id)?.plannedAmount,
+      yearly: engine.getPlanSummary(vault).entries.find(e => e.entryId === bonus.id)?.yearlyAmount,
+    }
+  }
+
+  test('from the yearly box', async () => {
+    const vault = openNew()
+
+    const { stored, yearly } = await add(vault, 'Planned/yr', '12550')
+
+    expect(stored).toBe('1045.8333')
+    expect(yearly).toBe('12550.00')
+  })
+
+  test('from the monthly box, still to the rappen', async () => {
+    const vault = openNew()
+
+    const { stored, yearly } = await add(vault, 'Planned/mo', '1045.83')
+
+    expect(stored).toBe('1045.83')
+    expect(yearly).toBe('12549.96')
+  })
+})
+
 describe('a bill states the bill, not the monthly amount', () => {
   afterEach(cleanup)
 
   function openBill() {
-    const vault = createEmptyVault()
+    const vault = committingTo(createEmptyVault())
     engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
     const housing = engine.listCategories(vault)[0]
     const oncreated = vi.fn()
@@ -199,7 +314,7 @@ describe('a purchase can be described from either end', () => {
   afterEach(cleanup)
 
   function openPurchase() {
-    const vault = createEmptyVault()
+    const vault = committingTo(createEmptyVault())
     engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
     const housing = engine.listCategories(vault)[0]
 
@@ -241,3 +356,82 @@ describe('a purchase can be described from either end', () => {
     expect(laptop.reserve?.periodMonths).toBe(100)
   })
 })
+
+// The budget table opens this dialog as `{#if context}` and passes
+// `context.editEntry`, so once it closes, reading the prop reads through a
+// context that is gone. Chrome then fires blur on the amount field as it leaves
+// the page, and the blur handler read `editEntry` — "Cannot read properties of
+// null (reading 'editEntry')", and the page stopped updating. jsdom does not
+// blur a removed field, so the test fires it.
+describe('AddEntryModal — closing from the amount field', () => {
+  function openInTable(onsave = vi.fn()) {
+    const vault = createEmptyVault()
+    const rent = engine.createEntry(vault, { name: 'Rent', type: 'expense', categoryName: 'Housing' })
+    const housing = engine.listCategories(vault)[0]
+    let context: { editEntry: { id: string; name: string; categoryName: string; plannedAmount: string } } | null = {
+      editEntry: { id: rent.id, name: 'Rent', categoryName: 'Housing', plannedAmount: '1350.00' },
+    }
+    const props = {
+      type: 'expense' as const,
+      categories: [{ name: housing.name, id: housing.id }],
+      get editEntry() {
+        return context!.editEntry
+      },
+      vault,
+      oncreated: vi.fn(),
+      onclose: () => (context = null),
+      onsave,
+    }
+    render(AddEntryModal, { props })
+    return { onsave, entryId: rent.id, monthly: screen.getByLabelText('Planned/mo') as HTMLInputElement }
+  }
+
+  test('Enter saves, closes, and the blur that follows does nothing', async () => {
+    const { onsave, entryId, monthly } = openInTable()
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.keyDown(monthly, { key: 'Enter' })
+    await fireEvent.blur(monthly)
+
+    expect(onsave).toHaveBeenCalledTimes(1)
+    expect(onsave).toHaveBeenCalledWith(entryId, '1450.00')
+  })
+
+  // Escape is cancel. An amount typed and not yet committed stays unwritten.
+  test('Escape closes without writing what was typed', async () => {
+    const { onsave, monthly } = openInTable()
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.keyDown(window, { key: 'Escape' })
+    await fireEvent.blur(monthly)
+
+    expect(onsave).not.toHaveBeenCalled()
+  })
+})
+
+// Save sends only what changed: an amount alone is one change, not a rename
+// that happens to keep the name. Otherwise an entry deleted elsewhere is
+// refused, and reported, twice.
+describe('AddEntryModal — saving only what changed', () => {
+  test('a new amount alone leaves the entry itself untouched', async () => {
+    const { onsave, monthly } = openOn('1350.00')
+    vi.mocked(commit).mockClear()
+
+    await fireEvent.input(monthly, { target: { value: '1450' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onsave).toHaveBeenCalled()
+    expect(vi.mocked(commit).mock.calls.map(c => c[0])).not.toContain('updateEntry')
+  })
+
+  test('a new name is still sent', async () => {
+    openOn('1350.00')
+    vi.mocked(commit).mockClear()
+
+    await fireEvent.input(screen.getByDisplayValue('Rent'), { target: { value: 'Miete' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(vi.mocked(commit).mock.calls.map(c => c[0])).toContain('updateEntry')
+  })
+})
+

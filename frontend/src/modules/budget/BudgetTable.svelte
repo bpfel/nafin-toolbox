@@ -3,6 +3,7 @@
   import Sortable from 'sortablejs'
   import type { PlanEntryView } from '../../lib/budget/budgetEngine'
   import * as engine from '../../lib/budget/budgetEngine'
+  import { commit } from '../../lib/crypto/vaultStore.svelte'
   import { sideOf, type EntryType, type VaultData } from '../../lib/crypto/vault'
   import { isEditing } from '../../lib/util/editMode.svelte'
   import Money from '../../lib/util/Money.svelte'
@@ -113,11 +114,8 @@
     // Order by the category's own sortOrder. This used to be inferred from wherever
     // each category's first entry landed in the entry sort, which meant
     // dragging an entry could silently reshuffle whole categories.
-    return Array.from(map.values()).sort((a, b) => categoryOrder(a.categoryId) - categoryOrder(b.categoryId))
-  }
-
-  function categoryOrder(categoryId: string): number {
-    return vault.budget.categories.find(g => g.id === categoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER
+    const rank = engine.categoryRank(vault)
+    return Array.from(map.values()).sort((a, b) => rank(a.categoryId) - rank(b.categoryId))
   }
 
   let incomeCategories = $derived(categoryEntries(incomeEntries))
@@ -199,7 +197,7 @@
   }
 
   function handleEntryDeleted(entryId: string) {
-    engine.deleteEntry(vault, entryId)
+    commit('deleteEntry', entryId)
     onentrydeleted()
   }
 
@@ -238,7 +236,7 @@
         const rows = node.querySelectorAll('.entry-row')
         const ids = Array.from(rows).map(r => (r as HTMLElement).dataset.entryId!).filter(Boolean)
         if (ids.length > 0) {
-          engine.reorderEntries(vault, ids)
+          commit('reorderEntries', ids)
           onentrycreated()
         }
       },
@@ -260,7 +258,7 @@
           .map(b => (b as HTMLElement).dataset.categoryId)
           .filter((id): id is string => Boolean(id))
         if (ids.length > 0) {
-          engine.reorderCategories(vault, ids)
+          commit('reorderCategories', ids)
           onentrycreated()
         }
       },

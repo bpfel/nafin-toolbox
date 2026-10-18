@@ -1,17 +1,18 @@
 <script lang="ts">
+  import Sheet from '../../lib/nav/Sheet.svelte'
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
+  import { commit } from '../../lib/crypto/vaultStore.svelte'
   import {
     savesTowardsTarget,
     type EntryType,
     type VaultData,
   } from '../../lib/crypto/vault'
-  import { focusTrap } from '../../lib/util/focusTrap'
-  import { closeOnBack } from '../../lib/nav/closeOnBack'
   import { autofocus } from '../../lib/util/autofocus'
-  import { formatAmount, parseAmount } from '../../lib/util/money'
+  import { centsOf, formatAmount, fromCents, parseAmount } from '../../lib/util/money'
   import { monthNames } from '../../lib/util/months'
+  import { thisMonth } from '../../lib/util/calendar'
 
   /**
    * Adding or editing one budget line.
@@ -45,23 +46,27 @@
 
   let { type, categories, editEntry = null, presetCategoryName, vault, oncreated, onclose, onsave, ondelete }: Props = $props()
 
-  let isEdit = $derived(editEntry != null)
+  // Read once, and kept. The parent passes it as `context.editEntry` under an
+  // `{#if context}`, so after closing, the prop reads through a context that is
+  // gone — and Chrome still blurs the amount field as it leaves the page.
+  const editing = untrack(() => editEntry)
+  const isEdit = editing != null
+
   /** Bill and purchase save towards a figure; the other three do not. */
   let targeted = $derived(savesTowardsTarget(type))
 
   // Seeded once: the modal is created fresh each time it opens, so every read of
-  // `editEntry` below is deliberately an initial value rather than a reactive
-  // one. `untrack` says so out loud, to Svelte and to the next reader.
-  let name = $state(untrack(() => editEntry?.name ?? ''))
+  // a prop below is deliberately an initial value rather than a reactive one.
+  // `untrack` says so out loud, to Svelte and to the next reader.
+  let name = $state(editing?.name ?? '')
   let selectedCategory = $state(
-    untrack(() => editEntry?.categoryName ?? presetCategoryName ?? categories[0]?.name ?? ''),
+    untrack(() => editing?.categoryName ?? presetCategoryName ?? categories[0]?.name ?? ''),
   )
   let newCategoryName = $state('')
   let useNewCategory = $state(false)
   let error = $state<string | null>(null)
 
-  const now = new Date()
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const currentMonth = thisMonth()
 
   /**
    * How often a bill comes round, in months.
@@ -79,7 +84,7 @@
 
   /** The reserve as stored: the plan view does not carry one. */
   function storedReserve() {
-    return editEntry ? vault.budget.entries.find(e => e.id === editEntry.id)?.reserve : undefined
+    return editing ? vault.budget.entries.find(e => e.id === editing.id)?.reserve : undefined
   }
 
   let totalValue = $state(
@@ -115,12 +120,28 @@
   let periodRemainderMonths = $derived(periodMonths % 12)
 
   let plannedMoValue = $state(
-    untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount)) : '')),
+    editing?.plannedAmount ? formatAmount(Number(editing.plannedAmount)) : '',
   )
   let plannedYrValue = $state(
-    untrack(() => (editEntry?.plannedAmount ? formatAmount(Number(editEntry.plannedAmount) * 12) : '')),
+    editing?.plannedAmount ? formatAmount(Number(editing.plannedAmount) * 12) : '',
   )
   let valueFocusedField = $state<'planned_mo' | 'planned_yr' | null>(null)
+  /** Which box the amount was last typed into, and so which one is the truth. */
+  let amountTypedIn = $state<'planned_mo' | 'planned_yr'>('planned_mo')
+  /** Whether the amount was typed in at all. Saving an untouched one would round
+   *  a stored figure to what the box shows. */
+  let amountChanged = false
+
+  /**
+   * The monthly to store for a figure typed into one of the boxes.
+   *
+   * A year is kept as its monthly to four places, so twelve of it comes back as
+   * the year that was typed. The monthly box shows that figure rounded to the
+   * rappen, and storing what it shows turned 12'550 into 12'549.96.
+   */
+  function storedMonthly(field: 'planned_mo' | 'planned_yr', val: number): string {
+    return field === 'planned_mo' ? val.toFixed(2) : (val / 12).toFixed(4)
+  }
 
   // --- the three-way relation --------------------------------------------
   //
@@ -132,11 +153,6 @@
   // For a bill only the first form is offered — the period is a fixed set of
   // billing cycles, so deriving it from an amount would produce cycles that do
   // not exist.
-
-  function centsOf(value: string): number {
-    const parsed = parseAmount(value)
-    return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0
-  }
 
   function monthlyFromTotal(): string {
     const total = centsOf(totalValue)
@@ -179,25 +195,23 @@
   }
 
   /**
-   * Normalises the pair of amount fields, and on an existing entry writes the
-   * value through. On a new one there is nothing to write to yet — the amount
-   * travels with `createEntry` instead, so this only keeps the monthly and
-   * yearly boxes agreeing with each other.
+   * Normalises the pair of amount fields so the monthly and yearly boxes agree.
+   * Writes nothing: the amount is saved with the rest of the dialog, by Save or
+   * Enter. It used to be written on blur, and since clicking Cancel blurs the
+   * field before the click lands, Cancel saved the amount it was meant to drop.
    */
   function commitValue(field: 'planned_mo' | 'planned_yr'): boolean {
     const raw = field === 'planned_mo' ? plannedMoValue : plannedYrValue
     const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return false
 
+    amountTypedIn = field
     if (field === 'planned_mo') {
       plannedMoValue = formatAmount(val)
       plannedYrValue = formatAmount(val * 12)
-      if (editEntry && onsave) onsave(editEntry.id, val.toFixed(2))
     } else {
-      const monthly = val / 12
       plannedYrValue = formatAmount(val)
-      plannedMoValue = formatAmount(monthly)
-      if (editEntry && onsave) onsave(editEntry.id, monthly.toFixed(4))
+      plannedMoValue = formatAmount(val / 12)
     }
     return true
   }
@@ -224,6 +238,8 @@
     const val = parseAmount(raw)
     if (isNaN(val) || !isFinite(val)) return
 
+    amountTypedIn = field
+    amountChanged = true
     if (field === 'planned_mo') {
       plannedYrValue = formatAmount(val * 12)
     } else {
@@ -236,11 +252,12 @@
     if (targeted) {
       const total = centsOf(totalValue)
       if (total <= 0 || periodMonths <= 0) return ''
-      return (Math.round(total / periodMonths) / 100).toFixed(2)
+      return fromCents(Math.round(total / periodMonths))
     }
-    const value = parseAmount(plannedMoValue)
-    if (plannedMoValue.trim() === '' || isNaN(value) || !isFinite(value)) return ''
-    return value.toFixed(2)
+    const raw = amountTypedIn === 'planned_mo' ? plannedMoValue : plannedYrValue
+    const value = parseAmount(raw)
+    if (raw.trim() === '' || isNaN(value) || !isFinite(value)) return ''
+    return storedMonthly(amountTypedIn, value)
   }
 
   let anchorMonth = $derived(
@@ -259,33 +276,48 @@
       (!targeted || centsOf(totalValue) > 0),
   )
 
+  // Deleted elsewhere while this form was open: the queue's replay took it out
+  // of the vault under the form. Saving would edit nothing, so the form says so
+  // and offers only Close.
+  let gone = $derived(
+    isEdit && !!editEntry && !vault.budget.entries.some(e => e.id === editEntry.id),
+  )
+
   function save() {
     const trimmed = name.trim()
     if (!canSave) return
     error = null
 
     try {
-      if (isEdit && editEntry) {
-        engine.updateEntry(vault, editEntry.id, {
-          name: trimmed,
-          categoryName: resolvedCategoryName,
-        })
+      if (isEdit && editing) {
+        // Only what changed. An unchanged name sent along with a new amount is
+        // a second change to be refused, and reported, if the entry is gone.
+        if (trimmed !== editing.name || resolvedCategoryName !== editing.categoryName) {
+          commit('updateEntry', editing.id, {
+            name: trimmed,
+            categoryName: resolvedCategoryName,
+          })
+        }
         if (targeted) {
-          engine.setReserve(vault, editEntry.id, {
-            targetAmount: (centsOf(totalValue) / 100).toFixed(2),
+          commit('setReserve', editing.id, {
+            targetAmount: fromCents(centsOf(totalValue)),
             periodMonths,
             anchorMonth,
           })
-          onsave?.(editEntry.id, monthlyAmount())
+          onsave?.(editing.id, monthlyAmount())
+        } else if (amountChanged) {
+          // Cleared or unreadable leaves the stored amount alone, as it always has.
+          const amount = monthlyAmount()
+          if (amount !== '') onsave?.(editing.id, amount)
         }
       } else {
-        engine.createEntry(vault, {
+        commit('createEntry', {
           name: trimmed,
           type,
           categoryName: resolvedCategoryName,
           plannedAmount: monthlyAmount(),
           anchorMonth,
-          targetAmount: targeted ? (centsOf(totalValue) / 100).toFixed(2) : undefined,
+          targetAmount: targeted ? fromCents(centsOf(totalValue)) : undefined,
           periodMonths: targeted ? periodMonths : undefined,
         })
       }
@@ -296,19 +328,12 @@
     }
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose()
-  }
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) onclose()
-  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap use:closeOnBack={onclose}>
+<Sheet label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} {onclose}>
+  <!-- One block, so the dialog keeps its own spacing rather than the sheet's. -->
+  <div>
     <h3>
       {t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', {
         type: t(`entryType.${type}` as 'entryType.expense'),
@@ -483,9 +508,16 @@
       <p class="error">{error}</p>
     {/if}
 
+    {#if gone}
+      <p class="error" role="alert">{t('sync.goneElsewhere')}</p>
+      <div class="actions">
+        <span class="spacer"></span>
+        <button class="btn cancel" onclick={onclose}>{t('action.close')}</button>
+      </div>
+    {:else}
     <div class="actions">
       {#if isEdit && ondelete}
-        <button class="btn delete" onclick={ondelete}>{t('action.delete')}</button>
+        <button class="btn delete-quiet" onclick={ondelete}>{t('action.delete')}</button>
       {/if}
       <span class="spacer"></span>
       <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
@@ -493,8 +525,9 @@
         {isEdit ? t('action.save') : t('entry.add')}
       </button>
     </div>
+    {/if}
   </div>
-</div>
+</Sheet>
 
 <style>
   .split {
@@ -526,30 +559,6 @@
     color: #555;
   }
 
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 1rem;
-  }
-  .modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 400px;
-    /* A dialog taller than the screen is a dialog whose buttons cannot be
-       reached. `dvh` rather than `vh`: on a phone the two disagree by exactly
-       the height of the browser's own chrome, which is the margin that decides
-       whether the last row is on screen. */
-    max-height: 88dvh;
-    overflow-y: auto;
-    box-shadow: var(--shadow-modal);
-  }
   h3 {
     margin: 0 0 0.25rem;
     font-size: 1.1rem;
@@ -608,11 +617,11 @@
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.85rem;
     margin: 0 0 0.75rem;
     padding: 0.5rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 4px;
   }
   .actions {
@@ -625,40 +634,6 @@
      reaching for Cancel. */
   .spacer {
     flex: 1;
-  }
-  .delete {
-    background: white;
-    border: 1px solid #c0392b;
-    color: #c0392b;
-  }
-  .delete:hover {
-    background: #fdecea;
-  }
-  .btn {
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .cancel {
-    background: #f1f3f5;
-    border: 1px solid #dee2e6;
-    color: #333;
-  }
-  .cancel:hover:not(:disabled) {
-    background: #e9ecef;
-  }
-  .save {
-    background: #2d6a4f;
-    border: none;
-    color: white;
-  }
-  .save:hover:not(:disabled) {
-    background: #245a42;
   }
 
   .values-section {
@@ -698,15 +673,4 @@
     color: var(--ink-faint);
   }
 
-  @media (max-width: 480px) {
-    .backdrop {
-      align-items: flex-end;
-      padding: 0;
-    }
-    .modal {
-      max-width: 100%;
-      border-radius: 16px 16px 0 0;
-      padding: 1.5rem 1.25rem 2rem;
-    }
-  }
 </style>

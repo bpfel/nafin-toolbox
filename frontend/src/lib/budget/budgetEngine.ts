@@ -12,12 +12,23 @@ import {
 import { defaultRouting, primaryAccountId } from '../accounts/routing'
 import { seedNamesFor, type SeedKey } from './seedNames'
 import type { Locale } from '../i18n/index.svelte'
-import { fromCents, toCents } from '../accounts/reserveMath'
+import { fromCents, toCents } from '../util/money'
+import { newId, nowISO } from '../sync/source'
 
 // --- Entry Categories ---
 
 export function listCategories(vault: VaultData): VaultCategory[] {
   return [...vault.budget.categories].sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+/**
+ * Where a category sorts, by id. One that no longer exists sorts last — the
+ * budget table, the allocations and a month's copy all used to decide this for
+ * themselves, and a month's copy put it first.
+ */
+export function categoryRank(vault: VaultData): (categoryId: string) => number {
+  const order = new Map(vault.budget.categories.map(c => [c.id, c.sortOrder]))
+  return id => order.get(id) ?? Number.MAX_SAFE_INTEGER
 }
 
 export function createCategory(
@@ -29,7 +40,7 @@ export function createCategory(
   const categories = vault.budget.categories
   const order = sortOrder ?? (categories.length > 0 ? Math.max(...categories.map(g => g.sortOrder)) + 10 : 10)
   const category: VaultCategory = {
-    id: crypto.randomUUID(),
+    id: newId('category'),
     name,
     side,
     sortOrder: order,
@@ -42,7 +53,16 @@ export function getOrCreateCategory(
   vault: VaultData,
   name: string,
   side: 'income' | 'expense',
+  /**
+   * The category meant, by id, if the caller knows it. Preferred over the name
+   * while it still exists on the right side: a change replayed after somebody
+   * renamed the category must still land in it, not in a new one under the old
+   * name.
+   */
+  preferId?: string,
 ): VaultCategory {
+  const preferred = preferId && vault.budget.categories.find(g => g.id === preferId && g.side === side)
+  if (preferred) return preferred
   const existing = vault.budget.categories.find(
     g => g.name === name && g.side === side,
   )
@@ -183,6 +203,8 @@ export function createEntry(
     name: string
     type: EntryType
     categoryName: string
+    /** The category meant, by id, where known. See `getOrCreateCategory`. */
+    categoryId?: string
     sortOrder?: number
     /**
      * What to plan for it, straight away.
@@ -204,14 +226,14 @@ export function createEntry(
     periodMonths?: number
   },
 ): VaultEntry {
-  const category = getOrCreateCategory(vault, opts.categoryName, sideOf(opts.type))
+  const category = getOrCreateCategory(vault, opts.categoryName, sideOf(opts.type), opts.categoryId)
   const cats = vault.budget.entries
   const order = opts.sortOrder ?? (cats.length > 0 ? Math.max(...cats.map(c => c.sortOrder)) + 10 : 10)
   // Entries are born routed: the default is legal for both types, so no
   // entry ever exists unrouted or contradictory.
   const routing = defaultRouting(opts.type, primaryAccountId(vault))
   const cat: VaultEntry = {
-    id: crypto.randomUUID(),
+    id: newId('entry'),
     name: opts.name,
     type: opts.type,
     sortOrder: order,
@@ -269,7 +291,11 @@ export function setReserve(
 export function updateEntry(
   vault: VaultData,
   entryId: string,
-  update: Partial<Pick<VaultEntry, 'name' | 'type' | 'sortOrder' | 'archived'>> & { categoryName?: string },
+  update: Partial<Pick<VaultEntry, 'name' | 'type' | 'sortOrder' | 'archived'>> & {
+    categoryName?: string
+    /** The category meant, by id, where known. See `getOrCreateCategory`. */
+    categoryId?: string
+  },
 ): VaultEntry | null {
   const cat = vault.budget.entries.find(c => c.id === entryId)
   if (!cat) return null
@@ -292,7 +318,7 @@ export function updateEntry(
   if (update.sortOrder !== undefined) cat.sortOrder = update.sortOrder
   if (update.archived !== undefined) cat.archived = update.archived
   if (update.categoryName !== undefined) {
-    const category = getOrCreateCategory(vault, update.categoryName, sideOf(cat.type))
+    const category = getOrCreateCategory(vault, update.categoryName, sideOf(cat.type), update.categoryId)
     cat.categoryId = category.id
     // Moving the last entry out empties the category it came from.
     pruneEmptyCategories(vault)
@@ -308,6 +334,9 @@ export function deleteEntry(vault: VaultData, entryId: string): void {
   // left alone: they hold names, not references, and a record of a past plan
   // must not lose lines because an entry was deleted afterwards.
   vault.budget.plan = vault.budget.plan.filter(e => e.entryId !== entryId)
+  // A record is money somebody spent; it outlives the line it was counted
+  // against, as Unassigned. A finished month keeps the line in its own copy.
+  for (const beleg of vault.belege) if (beleg.entryId === entryId) beleg.entryId = null
   pruneEmptyCategories(vault)
 }
 
@@ -426,7 +455,45 @@ function money(value: number): string {
 
 export function getPlanSummary(vault: VaultData): PlanSummary {
   const categories = vault.budget.categories
+  return summarize(
+    listEntries(vault).map(entry => {
+      const plannedAmount = plannedFor(vault, entry.id)
+      return {
+        entryId: entry.id,
+        entryName: entry.name,
+        entryType: entry.type,
+        categoryId: entry.categoryId,
+        categoryName: categories.find(g => g.id === entry.categoryId)?.name ?? '',
+        plannedAmount,
+        yearlyAmount: yearlyFor(entry, plannedAmount),
+      }
+    }),
+  )
+}
 
+/**
+ * An earlier version of the plan, in the shape the budget's own summary and
+ * table read — so stepping back shows the same screen, not a different one.
+ *
+ * Lines carry no category id; each category is keyed by its name and listed in
+ * the order the copy holds them, which is the budget's order when it was taken.
+ */
+export function planSummaryOf(lines: VaultSnapshotLine[]): PlanSummary {
+  return summarize(
+    lines.map((line, i) => ({
+      entryId: line.entryId ?? `line-${i}`,
+      entryName: line.entryName,
+      entryType: line.type,
+      categoryId: `copy:${line.categoryName}`,
+      categoryName: line.categoryName,
+      plannedAmount: line.plannedAmount,
+      yearlyAmount: yearlyFor({ reserve: line.reserve ? { ...line.reserve, anchorMonth: '' } : undefined }, line.plannedAmount),
+    })),
+  )
+}
+
+/** The totals over a plan's lines, live or copied. */
+function summarize(entries: PlanEntryView[]): PlanSummary {
   let totalPlannedIncome = 0
   let totalPlannedExpenses = 0
   let totalPlannedSavings = 0
@@ -438,29 +505,13 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
   let yearlyExpenses = 0
   let yearlySavings = 0
 
-  const entries: PlanEntryView[] = []
-
-  for (const cat of listEntries(vault)) {
-    const category = categories.find(g => g.id === cat.categoryId)
-    const plannedAmount = plannedFor(vault, cat.id)
-    const planned = Number(plannedAmount)
-    const yearlyAmount = yearlyFor(cat, plannedAmount)
-    const yearly = Number(yearlyAmount)
-
-    entries.push({
-      entryId: cat.id,
-      entryName: cat.name,
-      entryType: cat.type,
-      categoryId: cat.categoryId,
-      categoryName: category?.name ?? '',
-      plannedAmount,
-      yearlyAmount,
-    })
-
-    if (cat.type === 'income') {
+  for (const entry of entries) {
+    const planned = Number(entry.plannedAmount)
+    const yearly = Number(entry.yearlyAmount)
+    if (entry.entryType === 'income') {
       totalPlannedIncome += planned
       yearlyIncome += yearly
-    } else if (holdsMoney(cat.type)) {
+    } else if (holdsMoney(entry.entryType)) {
       totalPlannedSavings += planned
       yearlySavings += yearly
     } else {
@@ -490,79 +541,42 @@ export function getPlanSummary(vault: VaultData): PlanSummary {
  *
  * A bill or a purchase states its real total and the cycle it falls on, so a
  * year of it is `target x 12 / period` — exact, whatever the monthly rounds
- * to. Everything else has no figure truer than twelve of its monthly.
+ * to. Everything else has no figure truer than twelve of its monthly — but
+ * twelve of the monthly as stored, rounded once at the end. A year typed into
+ * the yearly box is kept as its monthly to four places, and rounding that to
+ * the rappen before multiplying turned 12'550 into 12'549.96.
  *
- * In centimes, because the whole point is the rappen.
+ * In centimes, because the whole point is the rappen. A stored monthly has at
+ * most four places, so twelve of it never lands on a half-rappen to break.
  */
-function yearlyFor(entry: VaultEntry, plannedAmount: string): string {
+function yearlyFor(entry: Pick<VaultEntry, 'reserve'>, plannedAmount: string): string {
   const reserve = entry.reserve
   if (reserve && reserve.periodMonths > 0) {
     return fromCents(Math.round((toCents(reserve.targetAmount) * 12) / reserve.periodMonths))
   }
-  return fromCents(toCents(plannedAmount) * 12)
+  return fromCents(Math.round(Number(plannedAmount) * 1200))
 }
 
 // --- Snapshots ---
 
-/** Snapshots, newest first. */
-export function listSnapshots(vault: VaultData): VaultSnapshot[] {
-  // Stable sort over an already newest-first array, so two snapshots created in
-  // the same millisecond keep the order they were made in.
-  return [...vault.budget.snapshots].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-}
 
 /**
- * Snapshots the current plan under a name.
- *
- * The lines are DENORMALISED — entry and category names are copied in, not
- * referenced. An snapshot that pointed at live entries would be rewritten by
- * the next rename and would lose lines to the next delete, which would make it
- * a view of the present rather than a record of the past.
- *
- * The snapshot covers what the plan summary shows: every non-archived entry,
- * including those left at 0.00, so an snapshot reads the same as the plan it was
- * taken from.
+ * One line of a copy of the plan, denormalised: the names as they are now, and
+ * the id kept beside them so a month's records can still find their line.
  */
-export function takeSnapshot(vault: VaultData, name: string): VaultSnapshot {
-  const trimmed = name.trim()
-  if (trimmed === '') {
-    // An unnamed snapshot cannot be told apart from any other, so it could never
-    // be found again — better to refuse than to store something unusable.
-    throw new Error('an snapshot needs a name')
+export function snapshotLine(vault: VaultData, entry: VaultEntry): VaultSnapshotLine {
+  return {
+    entryId: entry.id,
+    entryName: entry.name,
+    categoryName: vault.budget.categories.find(c => c.id === entry.categoryId)?.name ?? '',
+    type: entry.type,
+    plannedAmount: plannedFor(vault, entry.id),
+    ...(entry.automatic ? { automatic: true } : {}),
+    // So a year of a bill or a purchase reads exact, as it does live.
+    ...(entry.reserve ? { reserve: { targetAmount: entry.reserve.targetAmount, periodMonths: entry.reserve.periodMonths } } : {}),
   }
-
-  const categoryNameById = new Map(vault.budget.categories.map(g => [g.id, g.name]))
-
-  const lines: VaultSnapshotLine[] = listEntries(vault).map(cat => ({
-    entryName: cat.name,
-    categoryName: categoryNameById.get(cat.categoryId) ?? '',
-    type: cat.type,
-    plannedAmount: plannedFor(vault, cat.id),
-  }))
-
-  const snapshot: VaultSnapshot = {
-    id: crypto.randomUUID(),
-    name: trimmed,
-    createdAt: new Date().toISOString(),
-    lines,
-  }
-  vault.budget.snapshots.unshift(snapshot)
-  return snapshot
 }
 
-/** Renames an snapshot. An empty name is rejected, as it is on creation. */
-export function renameSnapshot(vault: VaultData, id: string, name: string): void {
-  const trimmed = name.trim()
-  if (trimmed === '') {
-    throw new Error('an snapshot needs a name')
-  }
-  const snapshot = vault.budget.snapshots.find(a => a.id === id)
-  if (snapshot) snapshot.name = trimmed
-}
-
-export function deleteSnapshot(vault: VaultData, id: string): void {
-  vault.budget.snapshots = vault.budget.snapshots.filter(a => a.id !== id)
-}
 
 /**
  * Empties the budget: every entry, every category, and the plan itself.
@@ -573,10 +587,26 @@ export function deleteSnapshot(vault: VaultData, id: string): void {
  * the same bargain deleteEntry already makes. A reset is for starting the
  * plan over, not for erasing what the plan used to say.
  */
+/** Mark a line as paid without a receipt, or take the mark off. */
+export function setAutomatic(vault: VaultData, entryId: string, automatic: boolean): void {
+  const entry = vault.budget.entries.find(e => e.id === entryId)
+  if (!entry) return
+  if (automatic) entry.automatic = true
+  else delete entry.automatic
+}
+
+/**
+ * An empty budget, for the tour's example on a throwaway copy. Not offered to
+ * anyone any more: Delete all data in Profile replaced Reset budget, which
+ * cleared the budget but kept its history (see `deleteAllData`).
+ */
 export function resetBudget(vault: VaultData): void {
   vault.budget.entries = []
   vault.budget.categories = []
   vault.budget.plan = []
+  // Records stay, as Unassigned — a fresh plan is not a reason to forget
+  // what was spent.
+  for (const beleg of vault.belege) beleg.entryId = null
 }
 
 // --- Seed Defaults ---
@@ -596,6 +626,11 @@ interface DefaultEntry {
   /** What a `bill` or `purchase` is saving towards, and over how long. */
   targetAmount?: string
   periodMonths?: number
+  /**
+   * Almost always a standing order or a direct debit in Switzerland, so it
+   * arrives marked as paid automatically and Belege never asks for a receipt.
+   */
+  automatic?: true
 }
 
 function bfsDefaultCategories(): DefaultCategory[] {
@@ -612,11 +647,11 @@ function bfsDefaultCategories(): DefaultCategory[] {
 function bfsDefaults(): DefaultEntry[] {
   return [
     { key: 'salaryNet', type: 'income', sortOrder: 10, categoryKey: 'cat.employment', amount: '6000.00' },
-    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1350.00' },
-    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '150.00' },
-    { key: 'healthInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insuranceTaxes', amount: '391.67' },
-    { key: 'otherInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insuranceTaxes', amount: '166.67' },
-    { key: 'taxes', type: 'expense', sortOrder: 30, categoryKey: 'cat.insuranceTaxes', amount: '833.33' },
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1350.00', automatic: true },
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '150.00', automatic: true },
+    { key: 'healthInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insuranceTaxes', amount: '391.67', automatic: true },
+    { key: 'otherInsurance', type: 'expense', sortOrder: 20, categoryKey: 'cat.insuranceTaxes', amount: '166.67', automatic: true },
+    { key: 'taxes', type: 'expense', sortOrder: 30, categoryKey: 'cat.insuranceTaxes', amount: '833.33', automatic: true },
     { key: 'groceries', type: 'expense', sortOrder: 10, categoryKey: 'cat.living', amount: '500.00' },
     // 67.08, not 400: the GA below takes 332.92 of HABE's transport figure and
     // this is the rest — the occasional taxi, a bike, a car shared for a
@@ -624,7 +659,7 @@ function bfsDefaults(): DefaultEntry[] {
     // exactly the 400.00 the survey reports and the setup screen's claim
     // about where these numbers come from stays true.
     { key: 'transport', type: 'expense', sortOrder: 20, categoryKey: 'cat.living', amount: '67.08' },
-    { key: 'telecoms', type: 'expense', sortOrder: 30, categoryKey: 'cat.living', amount: '80.00' },
+    { key: 'telecoms', type: 'expense', sortOrder: 30, categoryKey: 'cat.living', amount: '80.00', automatic: true },
     { key: 'clothing', type: 'expense', sortOrder: 10, categoryKey: 'cat.lifestyle', amount: '100.00' },
     { key: 'entertainment', type: 'expense', sortOrder: 20, categoryKey: 'cat.lifestyle', amount: '250.00' },
     { key: 'diningOut', type: 'expense', sortOrder: 30, categoryKey: 'cat.lifestyle', amount: '250.00' },
@@ -697,6 +732,7 @@ export function seedDefaults(vault: VaultData, locale: Locale = 'en', anchorMont
       targetAmount: d.targetAmount,
       periodMonths: d.periodMonths,
     })
+    if (d.automatic) entry.automatic = true
     setPlanned(vault, entry.id, d.amount)
   }
 }
@@ -769,6 +805,7 @@ export function seedSharedDefaults(
       targetAmount: d.targetAmount,
       periodMonths: d.periodMonths,
     })
+    if (d.automatic) entry.automatic = true
     setPlanned(vault, entry.id, d.amount)
   }
 }
@@ -794,17 +831,17 @@ function sharedDefaults(): DefaultEntry[] {
     { key: 'contributionSam', type: 'income', sortOrder: 20, categoryKey: 'cat.contributions', amount: '991.04' },
 
     // 5711: net rent or mortgage interest on the main residence.
-    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1238.54' },
+    { key: 'rent', type: 'expense', sortOrder: 10, categoryKey: 'cat.housing', amount: '1238.54', automatic: true },
     // 5712: Nebenkosten — the service charges a Swiss tenant pays beside the
     // rent. Rubbish, water, drainage, and the flat-rate share of the rest.
-    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '145.12' },
+    { key: 'utilities', type: 'expense', sortOrder: 20, categoryKey: 'cat.housing', amount: '145.12', automatic: true },
     // 5713.01. Split out from heating because the survey splits them, and
     // because they arrive on different bills from different suppliers.
-    { key: 'electricity', type: 'expense', sortOrder: 30, categoryKey: 'cat.housing', amount: '70.58' },
+    { key: 'electricity', type: 'expense', sortOrder: 30, categoryKey: 'cat.housing', amount: '70.58', automatic: true },
     // 5713.02 + 5713.03: gas and other fuels, plus central or district
     // heating. The two together with electricity are exactly the survey's
     // 106.59 for energy at the main residence, so the split reconciles.
-    { key: 'heating', type: 'expense', sortOrder: 40, categoryKey: 'cat.housing', amount: '36.02' },
+    { key: 'heating', type: 'expense', sortOrder: 40, categoryKey: 'cat.housing', amount: '36.02', automatic: true },
     // Serafe collects the federal radio and television levy. It is charged per
     // *dwelling*, which is why it belongs in a shared budget at all, and it is
     // the one bill that is the same for every household in the country — an
@@ -821,7 +858,7 @@ function sharedDefaults(): DefaultEntry[] {
     // 4201: contents, liability, fire and building cover. Insurance on the
     // home rather than on a person, and the only premium here for that reason
     // — the survey's 688.67 of health insurance is not seeded. See above.
-    { key: 'householdInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insurance', amount: '41.95' },
+    { key: 'householdInsurance', type: 'expense', sortOrder: 10, categoryKey: 'cat.insurance', amount: '41.95', automatic: true },
 
     // 581 + 582 + 583: furniture and furnishings, household textiles, and
     // kitchen and household appliances. What a home is furnished and equipped
