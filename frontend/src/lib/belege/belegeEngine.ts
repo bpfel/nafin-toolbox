@@ -146,9 +146,12 @@ export function recentEntries(vault: VaultData, userId: string, count = 6): stri
 export function closingLines(vault: VaultData, month: string): ClosedMonthLine[] {
   const pointedAt = new Set(belegeIn(vault, month).map(b => b.entryId).filter((id): id is string => id !== null))
   const categoryName = new Map(vault.budget.categories.map(c => [c.id, c.name]))
+  const categoryOrder = new Map(vault.budget.categories.map(c => [c.id, c.sortOrder]))
+  // In the budget's order — category, then entry — so Review can put them
+  // under the same headings in the same sequence.
   return vault.budget.entries
     .filter(e => e.type === 'expense' || pointedAt.has(e.id))
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .sort((a, b) => (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0) || a.sortOrder - b.sortOrder)
     .map(e => ({
       entryId: e.id,
       entryName: e.name,
