@@ -32,7 +32,7 @@ export const it: PartialContent = {
     },
     budget: {
       title: 'Un piano permanente',
-      body: 'Non un registro mensile. Descrivi un mese tipico una volta sola e scatti un’istantanea con un nome quando qualcosa cambia abbastanza da valerne la pena.',
+      body: 'Non un registro mensile. Descrivi un mese tipico una volta sola; l’app ne conserva una copia per ogni mese, e le frecce sopra il budget tornano alle versioni precedenti.',
       note: 'A titolo di esempio usiamo alcuni valori svizzeri predefiniti.',
     },
     controls: {
@@ -117,7 +117,7 @@ export const it: PartialContent = {
       body: [
         'Il budget descrive un mese tipico: ciò che entra, ciò che esce e ciò che viene tenuto da parte. Lo aggiorni tu, non è un registro dei movimenti — l’app non vede mai la tua banca.',
         'Le voci stanno sotto intestazioni che scegli tu. Ogni voce ha un tipo, ed è quello che conta: entrate e uscite sono denaro che arriva e che se n’è andato, mentre risparmi, fatture e acquisti lasciano il tuo conto senza lasciare il tuo patrimonio.',
-        'C’è un solo piano, non uno al mese. Quando qualcosa cambia abbastanza da valere la pena di ricordarlo — un aumento, un trasloco, una nuova assicurazione — scatta un’istantanea con un nome: continua a vivere accanto a essa.',
+        'C’è un solo piano, non uno al mese. L’app ne conserva una copia per ogni mese concluso. Quando qualcosa cambia — un aumento, un trasloco, una nuova assicurazione — la versione precedente resta un passo indietro, sopra il budget, e può ricevere un nome.',
       ],
     },
 

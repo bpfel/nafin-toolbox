@@ -33,7 +33,7 @@ export const fr: PartialContent = {
     },
     budget: {
       title: 'Un plan permanent',
-      body: 'Pas un journal mensuel. Tu décris un mois type une seule fois, et tu prends un instantané nommé quand quelque chose change assez pour mériter d’être gardé.',
+      body: 'Pas un journal mensuel. Tu décris un mois type une seule fois ; l’app en garde une copie pour chaque mois, et les flèches au-dessus du budget remontent aux versions précédentes.',
       note: 'Nous utilisons des valeurs suisses par défaut à titre d’illustration.',
     },
     controls: {
@@ -118,7 +118,7 @@ export const fr: PartialContent = {
       body: [
         'Le budget décrit un mois ordinaire : ce qui entre, ce qui sort et ce qui est mis de côté. Tu le tiens à jour ; ce n’est pas un relevé d’opérations — l’application ne voit jamais ta banque.',
         'Les entrées sont regroupées sous des titres que tu choisis. Chaque entrée a un type, et c’est lui qui importe : revenus et dépenses sont de l’argent qui arrive et qui repart, tandis que l’épargne, les factures et les achats quittent ton compte sans quitter ton patrimoine.',
-        'Il y a un seul plan, pas un par mois. Quand quelque chose change assez pour mériter d’être retenu — une augmentation, un déménagement, une nouvelle assurance —, prends un instantané nommé : il continue de vivre en parallèle.',
+        'Il y a un seul plan, pas un par mois. L’app en garde une copie pour chaque mois terminé. Quand quelque chose change — une augmentation, un déménagement, une nouvelle assurance —, la version d’avant reste à un pas en arrière, au-dessus du budget, et peut recevoir un nom.',
       ],
     },
 
