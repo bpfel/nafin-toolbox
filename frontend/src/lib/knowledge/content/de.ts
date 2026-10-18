@@ -106,6 +106,7 @@ export const de: PartialContent = {
       body: [
         'Die Belege sind die andere Hälfte des Budgets: Der Plan sagt, was ein Monat kosten soll, die Belege halten fest, was er gekostet hat. Jeder Beleg ist ein Betrag, ein Tag und die Budgetzeile, auf die er zählt – oder keine, als «nicht zugeordnet».',
         'Die Übersicht vergleicht einen Monat Zeile für Zeile mit seinem Plan. Eine Zeile, die per Dauerauftrag oder Lastschrift bezahlt wird, etwa die Miete, kannst du als automatisch bezahlt markieren: Sie wird nicht für Belege angeboten und zählt mit ihrem Planbetrag als bezahlt, damit das Total den ganzen Monat zeigt.',
+        'Das Journal listet jeden Beleg bis zum ersten und findet einen über das, was du noch weisst: eine Notiz, eine Zeile, einen Betrag.',
         'Ist ein Monat vorbei, behält er das Budget, mit dem er geendet hat. Spätere Änderungen am Plan schreiben einen vergangenen Monat nicht um.',
         'Im Haushalt sagt jeder Beleg, wer bezahlt hat – ein Mitglied oder das gemeinsame Konto. Die Übersicht zeigt, wer wem was schuldet, über die Monate weitergeführt, und die wenigsten Zahlungen zum Ausgleich. Die Aufteilung, gleichmässig oder nach Anteil, gilt für Belege, die ab dann erfasst werden.',
       ],

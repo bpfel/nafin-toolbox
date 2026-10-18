@@ -7,26 +7,34 @@
   import ActionButton from '../lib/nav/ActionButton.svelte'
   import { getVaultState, commit, saveNow, closeEndedMonths, listMembers } from '../lib/crypto/vaultStore.svelte'
   import type { Beleg } from '../lib/crypto/vault'
-  import { belegeIn, reviewMonth, reviewableMonths, sharesFor, thisMonth } from '../lib/belege/belegeEngine'
-  import SpendingSummary from '../modules/spending/SpendingSummary.svelte'
+  import { reviewableMonths, sharesFor, thisMonth } from '../lib/belege/belegeEngine'
   import type { RecordValues } from '../modules/spending/RecordForm.svelte'
-  import RecordRow from '../modules/spending/RecordRow.svelte'
   import RecordDialog from '../modules/spending/RecordDialog.svelte'
   import ReviewView from '../modules/spending/ReviewView.svelte'
+  import JournalView from '../modules/spending/JournalView.svelte'
+  import { clearEditing, isEditing } from '../lib/util/editMode.svelte'
 
   /**
    * Belege: what was actually spent, against the budget.
    *
-   * Two views, as Accounts has: this month's records, and Review, to read a
-   * month against its plan. A receipt is entered from the "+", on either, in a
-   * dialog — the screen's ordinary action, where Budget and Accounts keep
-   * theirs. The tab is in the address, so the one you were on survives a reload.
+   * Two views, as Accounts has. The Overview first: a month read against its
+   * plan, which is what the screen is for. Then the Journal: every receipt, all
+   * the way back, searched and filtered — where one is looked up, and changed
+   * only once edit mode is on. A receipt is entered from the "+", on either, in
+   * a dialog. The tab is in the address, so the one you were on survives a
+   * reload; an old `/spending/review` lands on the Overview.
    */
   let { userId = null }: { userId?: number | null } = $props()
 
   const vaultState = getVaultState()
   const route = getRoute()
-  let onReview = $derived(route.tab === 'review')
+  let onJournal = $derived(route.tab === 'journal')
+
+  /** Edit mode is the Journal's; leaving the Journal leaves it. */
+  $effect(() => {
+    if (!onJournal && untrack(() => isEditing('spending'))) clearEditing()
+  })
+  let journalEditing = $derived(onJournal && isEditing('spending') && !vaultState.readOnly)
   let me = $derived(String(userId ?? ''))
 
   /**
@@ -86,15 +94,6 @@
     saveNow()
   }
 
-  /** This month's, newest first, so the one just entered is on top. */
-  let thisMonthsRecords = $derived(
-    vaultState.vault
-      ? belegeIn(vaultState.vault, thisMonth()).sort(
-          (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
-        )
-      : [],
-  )
-
   let editing = $state<Beleg | null>(null)
   let adding = $state(false)
 
@@ -108,12 +107,9 @@
   const go = (to: number) => {
     if (months[to]) month = months[to]
   }
-
-  /** This month at a glance, on Records too: the two tabs are one screen. */
-  let thisMonthReview = $derived(vaultState.vault ? reviewMonth(vaultState.vault, thisMonth()) : null)
 </script>
 
-<ScreenChrome title={t('nav.spending')}>
+<ScreenChrome title={t('nav.spending')} editKey={onJournal ? 'spending' : undefined}>
   {#snippet children()}
     {#if !vaultState.readOnly && vaultState.vault}
       <ActionButton pinned label={t('spending.add')} onclick={() => (adding = true)}>
@@ -129,21 +125,21 @@
 <nav class="view-tabs" aria-label={t('spending.viewsLabel')}>
   <a
     class="tab"
-    class:active={!onReview}
+    class:active={!onJournal}
     href="/spending"
-    aria-current={!onReview ? 'page' : undefined}
+    aria-current={!onJournal ? 'page' : undefined}
     onclick={(e) => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); navigate('/spending') } }}
   >
-    {t('spending.tabRecord')}
+    {t('spending.tabOverview')}
   </a>
   <a
     class="tab"
-    class:active={onReview}
-    href="/spending/review"
-    aria-current={onReview ? 'page' : undefined}
-    onclick={(e) => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); navigate('/spending/review') } }}
+    class:active={onJournal}
+    href="/spending/journal"
+    aria-current={onJournal ? 'page' : undefined}
+    onclick={(e) => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); navigate('/spending/journal') } }}
   >
-    {t('spending.tabReview')}
+    {t('spending.tabJournal')}
   </a>
 </nav>
 
@@ -152,38 +148,20 @@
   <div
     class="views"
     use:swipeHorizontal={{
-      onnext: () => navigate('/spending/review'),
+      onnext: () => navigate('/spending/journal'),
       onprevious: () => navigate('/spending'),
     }}
   >
-    <div hidden={onReview}>
+    <div hidden={onJournal}>
       {#if vaultState.readOnly}
         <p class="empty">{t('spending.readOnly')}</p>
-      {/if}
-
-      {#if thisMonthsRecords.length === 0}
+      {:else if vault.belege.length === 0}
         <!-- What it is for, and the one action that starts it. -->
         <div class="start">
           <p class="empty">{t('spending.empty')}</p>
-          {#if !vaultState.readOnly}
-            <button class="add" onclick={() => (adding = true)}>{t('spending.add')}</button>
-          {/if}
-        </div>
-      {:else}
-        {#if thisMonthReview}
-          <SpendingSummary title={t('spending.thisMonth')} planned={thisMonthReview.planned} spent={thisMonthReview.spent} />
-        {/if}
-        <!-- On a card, as Budget's table and Accounts' cards are: the list is
-             the foreground, and the page behind it the ground. -->
-        <div class="card">
-          {#each thisMonthsRecords as beleg (beleg.id)}
-            <RecordRow {beleg} {vault} {names} onopen={vaultState.readOnly ? undefined : () => (editing = beleg)} />
-          {/each}
+          <button class="add" onclick={() => (adding = true)}>{t('spending.add')}</button>
         </div>
       {/if}
-    </div>
-
-    <div hidden={!onReview}>
       <ReviewView
         {vault}
         {month}
@@ -195,6 +173,10 @@
         readOnly={vaultState.readOnly}
         onopen={vaultState.readOnly ? undefined : b => (editing = b)}
       />
+    </div>
+
+    <div hidden={!onJournal}>
+      <JournalView {vault} {names} onopen={journalEditing ? b => (editing = b) : undefined} />
     </div>
   </div>
 
@@ -246,12 +228,6 @@
   }
 
 
-  .card {
-    background: var(--surface);
-    border-radius: 8px;
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
-  }
 
   .start {
     display: flex;

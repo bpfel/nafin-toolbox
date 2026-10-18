@@ -43,7 +43,7 @@ export const fr: PartialContent = {
     },
     spending: {
       title: 'Ce que tu dépenses vraiment',
-      body: 'Dans Tickets, tu saisis tes dépenses au fil de l’eau : le montant et la ligne de budget concernée. Le bilan compare un mois au plan ; les lignes payées par ordre permanent comptent d’elles-mêmes comme payées. Dans un ménage, il montre aussi qui doit quoi.',
+      body: 'Dans Tickets, tu saisis tes dépenses au fil de l’eau : le montant et la ligne de budget concernée. L’aperçu compare un mois au plan ; les lignes payées par ordre permanent comptent d’elles-mêmes comme payées. Dans un ménage, il montre aussi qui doit quoi.',
     },
     accounts: {
       title: 'Comptes',
@@ -106,9 +106,10 @@ export const fr: PartialContent = {
       title: 'Saisir ce que tu dépenses',
       body: [
         'Tickets est l’autre moitié du budget : le plan dit ce qu’un mois devrait coûter, Tickets note ce qu’il a coûté. Chaque ticket est un montant, un jour et la ligne de budget concernée – ou aucune, comme « non attribué ».',
-        'Le bilan compare un mois à son plan, ligne par ligne. Une ligne payée par ordre permanent ou prélèvement, comme le loyer, peut être marquée payée automatiquement : elle n’est plus proposée pour les tickets et compte comme payée à son montant prévu, pour que le total montre tout le mois.',
+        'L’aperçu compare un mois à son plan, ligne par ligne. Une ligne payée par ordre permanent ou prélèvement, comme le loyer, peut être marquée payée automatiquement : elle n’est plus proposée pour les tickets et compte comme payée à son montant prévu, pour que le total montre tout le mois.',
+        'Le journal liste chaque ticket, jusqu’au premier, et en retrouve un par ce dont tu te souviens : une note, une ligne, un montant.',
         'Une fois terminé, un mois garde le budget avec lequel il s’est achevé. Modifier le plan ensuite ne réécrit pas un mois passé.',
-        'Dans un ménage, chaque ticket dit qui a payé – un membre ou le compte commun. Le bilan montre qui doit quoi, reporté d’un mois à l’autre, et le moins de paiements pour équilibrer. La répartition, à parts égales ou par part, vaut pour les tickets saisis à partir de là.',
+        'Dans un ménage, chaque ticket dit qui a payé – un membre ou le compte commun. L’aperçu montre qui doit quoi, reporté d’un mois à l’autre, et le moins de paiements pour équilibrer. La répartition, à parts égales ou par part, vaut pour les tickets saisis à partir de là.',
       ],
     },
 

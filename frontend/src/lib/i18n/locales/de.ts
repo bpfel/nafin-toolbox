@@ -613,10 +613,15 @@ export const de: Messages = {
   'tour.offerDecline': 'Später',
 
   // --- Belege ---
-  'spending.tabRecord': 'Einträge',
+  'spending.tabJournal': 'Journal',
+  'spending.search': 'Suchen…',
+  'spending.category': 'Kategorie',
+  'spending.allCategories': 'Alle Kategorien',
+  'spending.results.one': '1 Beleg',
+  'spending.results.other': '{count} Belege',
+  'spending.noResults': 'Nichts gefunden.',
   'spending.add': 'Beleg erfassen',
-  'spending.thisMonth': 'Diesen Monat',
-  'spending.tabReview': 'Übersicht',
+  'spending.tabOverview': 'Übersicht',
   'spending.viewsLabel': 'Ansichten der Belege',
   'spending.empty': 'Erfasse, was du ausgibst, und sieh es neben deinem Budget.',
   'spending.amount': 'Betrag',

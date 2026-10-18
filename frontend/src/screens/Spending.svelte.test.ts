@@ -55,12 +55,12 @@ describe('adding a record', () => {
   test('an empty month says what Belege is for, and offers the one thing to do', () => {
     render(SpendingScreen, { userId: 1 })
 
-    expect(screen.getByText(/Record what you spend/)).toBeTruthy()
+    expect(screen.getAllByText(/Record what you spend/).length).toBeGreaterThan(0)
     expect(screen.queryByLabelText('Amount')).toBeNull()
     expect(screen.getAllByRole('button', { name: 'Add record' }).length).toBeGreaterThan(0)
   })
 
-  test('the dialog saves it at once, closes, and the month lists it', async () => {
+  test('the dialog saves it at once, closes, and the overview counts it', async () => {
     render(SpendingScreen, { userId: 1 })
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Add record' })[0])
@@ -74,7 +74,8 @@ describe('adding a record', () => {
     expect(saveNow).toHaveBeenCalled()
     expect(store.vault!.belege).toHaveLength(1)
     expect(store.vault!.belege[0]).toMatchObject({ amount: '12.50', createdBy: '1', entryId: null })
-    expect(screen.getByText('This month')).toBeTruthy()
+    // Saved with no line chosen: the overview's Unassigned row has it.
+    expect(screen.getAllByText('Unassigned').length).toBeGreaterThan(0)
   })
 
   test('a reader is offered no way to add one', () => {
