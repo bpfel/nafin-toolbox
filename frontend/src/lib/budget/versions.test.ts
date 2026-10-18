@@ -79,3 +79,23 @@ describe('the plan’s versions', () => {
     ])
   })
 })
+
+/**
+ * An earlier version is shown with the budget's own summary and table, so its
+ * figures have to come out exactly as the live plan's would.
+ */
+describe('a version read as the budget reads the plan', () => {
+  test('a copy of an unchanged plan adds up exactly as the plan does, years included', () => {
+    const v = plan()
+    const live = budget.getPlanSummary(v)
+    const copied = budget.planSummaryOf(buildMonthSnapshot(v, '2026-09').lines)
+
+    for (const key of ['totalPlannedIncome', 'totalPlannedExpenses', 'totalPlannedSavings', 'plannedBalance', 'yearlyIncome', 'yearlyExpenses', 'yearlySavings', 'yearlyBalance'] as const) {
+      expect(copied[key], key).toBe(live[key])
+    }
+    // Line by line; a copy lists them in the budget's order, category first.
+    const yearOf = (entries: { entryId: string; yearlyAmount: string }[]) =>
+      Object.fromEntries(entries.map(e => [e.entryId, e.yearlyAmount]))
+    expect(yearOf(copied.entries)).toEqual(yearOf(live.entries))
+  })
+})

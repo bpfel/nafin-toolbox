@@ -209,6 +209,8 @@ export interface VaultSnapshotLine {
   plannedAmount: string
   /** Paid automatically, as it stood: Belege counts it as spent at its plan. */
   automatic?: boolean
+  /** A bill's or a purchase's target and cycle, as they stood: a year of it reads exact. */
+  reserve?: { targetAmount: string; periodMonths: number }
 }
 
 export type AccountKind =

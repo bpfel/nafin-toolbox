@@ -33,6 +33,9 @@ export interface PlanVersion {
 /** What a line says, apart from when it was copied. Order does not count. */
 function signature(lines: VaultSnapshotLine[]): string {
   return lines
+    // The reserve is left out: a new target moves the monthly figure, which is
+    // compared, and copies taken before reserves were kept would otherwise all
+    // look changed.
     .map(l => [l.entryId ?? l.entryName, l.entryName, l.categoryName, l.type, Number(l.plannedAmount).toFixed(4), l.automatic ? 1 : 0].join('\u0001'))
     .sort()
     .join('\u0002')

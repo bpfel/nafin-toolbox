@@ -361,8 +361,6 @@ export const fr: Messages = {
   'category.mergeInto': 'Fusionner avec {name}',
 
   // --- Snapshots ---
-  'snapshot.empty': 'Cet instantané ne contient aucune ligne.',
-  'snapshot.entryColumn': 'Entrée',
 
   // --- Resetting ---
   'reset.title': 'Réinitialiser le budget',

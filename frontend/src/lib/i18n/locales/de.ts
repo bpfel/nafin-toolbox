@@ -333,8 +333,6 @@ export const de: Messages = {
   'category.type': 'Typ',
 
   // --- Snapshots ---
-  'snapshot.empty': 'Diese Momentaufnahme hat keine Zeilen.',
-  'snapshot.entryColumn': 'Eintrag',
 
   'field.name': 'Name',
 

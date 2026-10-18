@@ -6,11 +6,11 @@
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
   import VersionStepper from './VersionStepper.svelte'
-  import PastVersion from './PastVersion.svelte'
+  import VersionChanges from './VersionChanges.svelte'
   import { planVersions } from '../../lib/budget/versions'
   import { monthLabel } from '../../lib/util/months'
   import ResetBudgetModal from './ResetBudgetModal.svelte'
-  import { isEditing } from '../../lib/util/editMode.svelte'
+  import { isEditing, clearEditing } from '../../lib/util/editMode.svelte'
 
   const vaultState = getVaultState()
 
@@ -79,7 +79,12 @@
   let shown = $derived(versions[Math.min(index, versions.length - 1)])
   $effect(() => {
     past = index > 0
+    // An earlier version is read, not changed: whatever edit mode was on goes.
+    if (past) clearEditing()
   })
+
+  /** What the summary and the table show: the plan now, or the version stepped back to. */
+  let pastSummary = $derived(shown?.copy ? engine.planSummaryOf(shown.copy.lines) : null)
   // Another budget, another history: start again at its plan now.
   $effect(() => {
     void vaultState.currentVaultId
@@ -141,8 +146,22 @@
         onnext={index > 0 ? () => index-- : undefined}
       />
     {/if}
-    {#if shown && shown.copy}
-      <PastVersion copy={shown.copy} changes={shown.changes} changedFrom={shown.changedFrom} />
+    {#if shown && shown.copy && pastSummary}
+      <!-- The same summary and table as the plan now, read-only: edit mode is
+           off while it is on screen, and nothing else in them changes a thing. -->
+      {#if shown.changes.length > 0 && shown.changedFrom}
+        <VersionChanges changes={shown.changes} from={shown.changedFrom} />
+      {/if}
+      <BudgetSummary summary={pastSummary} {viewMode} />
+      <BudgetTable
+        bind:viewMode
+        entries={pastSummary.entries}
+        vault={vaultState.vault}
+        onsave={() => {}}
+        onentrycreated={() => {}}
+        onentrydeleted={() => {}}
+        oncategorychanged={() => {}}
+      />
     {:else}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">

@@ -361,8 +361,6 @@ export const en = {
   'category.type': 'Type',
 
   // --- Snapshots ---
-  'snapshot.empty': 'This snapshot has no lines.',
-  'snapshot.entryColumn': 'Entry',
 
   'field.name': 'Name',
 
