@@ -61,9 +61,9 @@ function signatureOf(copy: VaultSnapshot): string {
 
 export function planVersions(vault: VaultData): PlanVersion[] {
   const copies = vault.budget.snapshots
-    // A backdated copy is today's budget filed under an old month, and a month
-    // with no budget in it is not a version of one.
-    .filter(s => s.month && !s.backdated && budgetLines(s).length > 0)
+    // A copy kept only as Belege's yardstick, and a month with no budget in
+    // it, are not versions of the budget.
+    .filter(s => s.month && !s.forBelegeOnly && budgetLines(s).length > 0)
     .sort((a, b) => a.month.localeCompare(b.month))
   const versions: (PlanVersion & { sig: string })[] = []
 

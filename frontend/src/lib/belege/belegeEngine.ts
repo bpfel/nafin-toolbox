@@ -165,7 +165,7 @@ export function buildMonthSnapshot(vault: VaultData, month: string): VaultSnapsh
     createdAt: nowISO(),
     month,
     lines: monthLines(vault, month),
-    ...(open && month < open ? { backdated: true as const } : {}),
+    ...(open && month < open ? { forBelegeOnly: true as const } : {}),
   }
 }
 

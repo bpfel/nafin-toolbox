@@ -202,11 +202,11 @@ describe('closing a month', () => {
 
   // Today's budget filed under an old month: Belege needs it, but it is not
   // what the budget was then.
-  test('a month before the history starts is copied as backdated', () => {
+  test('a month before the history starts is copied for Belege only', () => {
     const v = vault()
     v.budget.openMonth = '2026-10'
-    expect(buildMonthSnapshot(v, '2025-03').backdated).toBe(true)
-    expect(buildMonthSnapshot(v, '2026-10').backdated).toBeUndefined()
+    expect(buildMonthSnapshot(v, '2025-03').forBelegeOnly).toBe(true)
+    expect(buildMonthSnapshot(v, '2026-10').forBelegeOnly).toBeUndefined()
   })
 
   test('an archived line kept for its records is marked as such', () => {

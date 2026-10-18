@@ -1325,6 +1325,23 @@ describe('migrateVault — legacy versions forward', () => {
     expect(migrateVault(old).budget.snapshots.map(s => s.id)).toEqual(['m9'])
   })
 
+  // Belege's months were a map of their own on develop; a vault from then
+  // folds into snapshots that Belege reads and Budget's history skips.
+  test('a develop v11 vault folds its months into copies for Belege only', () => {
+    const v = createEmptyVault('Main')
+    const old = {
+      ...v,
+      months: { '2026-09': { closedAt: '2026-10-01T08:00:00Z', lines: [{ entryId: 'e1', entryName: 'Rent', categoryName: 'Housing', plannedAmount: '1500.00', automatic: true }] } },
+    }
+
+    const migrated = migrateVault(old)
+
+    expect((migrated as unknown as { months?: unknown }).months).toBeUndefined()
+    const copy = migrated.budget.snapshots.find(s => s.month === '2026-09')!
+    expect(copy).toMatchObject({ createdAt: '2026-10-01T08:00:00Z', forBelegeOnly: true })
+    expect(copy.lines[0]).toMatchObject({ entryId: 'e1', type: 'expense', automatic: true })
+  })
+
   test('a vault from a newer build is refused, not emptied', () => {
     expect(() => migrateVault({ version: 12, budget: { entries: [] } })).toThrow(VaultVersionAheadError)
     expect(() => migrateVault({ version: 99, budget: { entries: [] } })).toThrow(/newer version/)

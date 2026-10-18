@@ -87,7 +87,7 @@ describe('the plan’s versions', () => {
     budget.setPlanned(v, salary(v).id, '6400.00')
     close(v, '2026-09')
     close(v, '2025-03')
-    expect(v.budget.snapshots.find(s => s.month === '2025-03')?.backdated).toBe(true)
+    expect(v.budget.snapshots.find(s => s.month === '2025-03')?.forBelegeOnly).toBe(true)
 
     const versions = planVersions(v)
 
@@ -109,6 +109,16 @@ describe('the plan’s versions', () => {
     expect(versions.map(x => [x.from, x.to])).toEqual([['2026-10', null], ['2026-09', '2026-09']])
     expect(versions[0].lines.some(l => l.entryId === gym.id)).toBe(false)
     expect(changesAfter(versions, 1).changes).toEqual([expect.objectContaining({ kind: 'removed', name: gym.name })])
+  })
+
+  // A develop build kept only the expense lines; against a whole budget that
+  // would read as every income and saving line removed.
+  test('a copy kept for Belege only is no version', () => {
+    const v = plan()
+    close(v, '2026-09')
+    v.budget.snapshots.push({ id: 'old', createdAt: 'z', month: '2026-08', lines: [{ entryId: 'r', entryName: 'Rent', categoryName: 'Housing', type: 'expense', plannedAmount: '1.00' }], forBelegeOnly: true })
+
+    expect(planVersions(v)).toHaveLength(1)
   })
 
   test('a month with no budget in it is no version', () => {
