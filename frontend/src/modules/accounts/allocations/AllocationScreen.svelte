@@ -468,8 +468,8 @@
     margin: 0 0 1rem;
     padding: 0.6rem 0.9rem;
     font-size: 0.85rem;
-    color: #c0392b;
-    background: #fdecea;
+    color: var(--alarm);
+    background: var(--alarm-soft);
     border-radius: 6px;
   }
 

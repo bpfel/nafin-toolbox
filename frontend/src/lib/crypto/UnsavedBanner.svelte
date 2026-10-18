@@ -43,8 +43,8 @@
     gap: 1rem;
     padding: 0.85rem calc(1.25rem + env(safe-area-inset-right, 0px)) 0.85rem
       calc(1.25rem + env(safe-area-inset-left, 0px));
-    background: #fdecea;
-    border-top: 2px solid #c0392b;
+    background: var(--alarm-soft);
+    border-top: 2px solid var(--alarm);
     color: #7d2820;
     font-size: 0.875rem;
     line-height: 1.45;
@@ -57,7 +57,7 @@
   }
   button {
     flex: none;
-    background: #c0392b;
+    background: var(--alarm);
     color: white;
     border: none;
     border-radius: 6px;
@@ -66,7 +66,7 @@
     cursor: pointer;
   }
   button:hover {
-    background: #a93226;
+    background: var(--alarm-strong);
   }
 
   @media (max-width: 560px) {

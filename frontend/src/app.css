@@ -110,6 +110,7 @@
   /* The exceptions, which is why these are the loud ones. */
   --alarm: #c0392b;       /*  5.4:1 — overspent, under-funded, errors, delete */
   --alarm-soft: #fdecea;
+  --alarm-strong: #a93226; /* a delete button under the pointer */
   --warn: #8f4f13;        /*  6.4:1 — unsaved, provisional, a date that will not settle */
   --warn-soft: #fdf3e0;
 
@@ -265,6 +266,66 @@ button {
 
 button:hover {
   background: #1b4332;
+}
+
+/*
+ * A dialog's buttons, by what they do: `.btn` plus one of `cancel`, `save`,
+ * `delete` or `delete-quiet`. They were written out again in every dialog —
+ * eight identical copies of `.btn`, nine of `.cancel` — and the reds had
+ * drifted apart: half the app deleted in the alarm red, the security settings
+ * in a different one.
+ */
+.btn {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.cancel {
+  background: #f1f3f5;
+  border-color: #dee2e6;
+  color: #333;
+}
+
+.btn.cancel:hover:not(:disabled) {
+  background: #e9ecef;
+}
+
+.btn.save {
+  background: var(--accent);
+  color: white;
+}
+
+.btn.save:hover:not(:disabled) {
+  background: var(--accent-dark);
+}
+
+.btn.delete {
+  background: var(--alarm);
+  color: white;
+}
+
+.btn.delete:hover:not(:disabled) {
+  background: var(--alarm-strong);
+}
+
+/* Delete offered beside something else, not as the point of the dialog. */
+.btn.delete-quiet {
+  background: white;
+  border-color: var(--alarm);
+  color: var(--alarm);
+}
+
+.btn.delete-quiet:hover:not(:disabled) {
+  background: var(--alarm-soft);
 }
 
 @media (max-width: 768px) {

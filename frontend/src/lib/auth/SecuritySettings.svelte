@@ -283,10 +283,10 @@
   }
 
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.85rem;
     padding: 0.4rem 0.6rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 6px;
   }
 
@@ -325,21 +325,21 @@
   .btn-secondary:hover { background: #ccc; }
 
   .btn-danger {
-    background: #dc3545;
+    background: var(--alarm);
     color: white;
     padding: 0.35rem 1rem;
     font-size: 0.85rem;
   }
-  .btn-danger:hover { background: #c82333; }
+  .btn-danger:hover { background: var(--alarm-strong); }
 
   .btn-danger-outline {
     background: white;
-    color: #dc3545;
-    border: 1px solid #dc3545;
+    color: var(--alarm);
+    border: 1px solid var(--alarm);
     padding: 0.35rem 1rem;
     font-size: 0.85rem;
   }
-  .btn-danger-outline:hover { background: #fdecea; }
+  .btn-danger-outline:hover { background: var(--alarm-soft); }
 
   .codes-grid {
     display: grid;
@@ -367,7 +367,7 @@
   }
 
   .copy-status.failed {
-    color: #c0392b;
+    color: var(--alarm);
   }
 
   button:disabled {

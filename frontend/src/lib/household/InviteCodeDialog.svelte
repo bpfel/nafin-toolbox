@@ -1,7 +1,6 @@
 <script lang="ts">
+  import Sheet from '../nav/Sheet.svelte'
   import { t } from '../i18n/index.svelte'
-  import { focusTrap } from '../util/focusTrap'
-  import { closeOnBack } from '../nav/closeOnBack'
   import InviteQR from './InviteQR.svelte'
   import { createCopier } from '../util/copier.svelte'
 
@@ -29,39 +28,33 @@
   // The shared copier, not the clipboard directly: the browser can refuse the
   // clipboard, and this button used to fail then without a word.
   const copier = createCopier()
-
-  function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose()
-  }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<Sheet label={t('invite.codeFor', { name: email })} {onclose}>
+  <div class="code">
+    <h3>{t('invite.codeFor', { name: email })}</h3>
+    <p class="why">{t('invite.linkWhy')}</p>
 
-<div class="backdrop" role="presentation" onclick={onclose}></div>
+    <InviteQR {link} />
 
-<div class="modal" role="dialog" aria-label={t('invite.codeFor').replace('{name}', email)} use:focusTrap use:closeOnBack={onclose}>
-  <h3>{t('invite.codeFor').replace('{name}', email)}</h3>
-  <p class="why">{t('invite.linkWhy')}</p>
-
-  <InviteQR {link} />
-
-  <div class="btn-row">
-    <!--
-      The one control here that keeps its words. Every other action in this
-      feature is a verb with an obvious mark; the clipboard has none that anybody
-      reads at a glance — and this is the route for somebody who cannot scan.
-    -->
-    <button class="btn-secondary" onclick={() => copier.copy(link)}>
-      {copier.copied ? t('invite.copied') : t('invite.copy')}
-    </button>
-    <button class="btn-primary" onclick={onclose}>{t('invite.doneAction')}</button>
+    <div class="actions">
+      <!--
+        The one control here that keeps its words. Every other action in this
+        feature is a verb with an obvious mark; the clipboard has none that anybody
+        reads at a glance — and this is the route for somebody who cannot scan.
+      -->
+      <button class="btn cancel" onclick={() => copier.copy(link)}>
+        {copier.copied ? t('invite.copied') : t('invite.copy')}
+      </button>
+      <button class="btn save" onclick={onclose}>{t('invite.doneAction')}</button>
+    </div>
+    <!-- Nothing reached the clipboard: the link itself, to copy by hand. -->
+    {#if copier.failed}
+      <p class="copy-failed" role="alert">{t('invite.copyFailed')}</p>
+      <input class="link" readonly value={link} aria-label={t('invite.copy')} onfocus={e => e.currentTarget.select()} />
+    {/if}
   </div>
-  <!-- Nothing reached the clipboard: the link itself, to copy by hand. -->
-  {#if copier.failed}
-    <p class="copy-failed" role="alert">{t('invite.copyFailed')}</p>
-    <input class="link" readonly value={link} aria-label={t('invite.copy')} onfocus={e => e.currentTarget.select()} />
-  {/if}
-</div>
+</Sheet>
 
 <style>
   .copy-failed {
@@ -78,33 +71,19 @@
     font-size: 0.8rem;
   }
 
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 80;
-    background: rgba(26, 26, 46, 0.35);
-  }
-
-  .modal {
-    position: fixed;
-    z-index: 81;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(22rem, calc(100vw - 2 * var(--app-gutter)));
-    /* dvh rather than vh: on a phone the address bar comes and goes, and a
-       dialog sized to the larger viewport puts its own buttons under it. */
-    max-height: calc(100dvh - 2rem);
-    overflow-y: auto;
-    padding: 1.25rem;
+  /* Centred, and big: a code held up to another phone's camera wants the rest
+     of the page out of the way. */
+  .code {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.75rem;
-    background: var(--surface);
-    border-radius: 10px;
-    box-shadow: var(--shadow-modal);
     text-align: center;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
   }
 
   h3 {

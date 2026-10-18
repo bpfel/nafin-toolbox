@@ -36,6 +36,9 @@ function open(parts: AllocationPart[], total: string) {
   })
 }
 
+// A sheet moves itself to <body>, out of the render container.
+const dialog = () => screen.getByRole('dialog')
+
 describe('AllocatedDialog', () => {
   test('names the account it is explaining', () => {
     open([part()], '1000.00')
@@ -59,8 +62,8 @@ describe('AllocatedDialog', () => {
   })
 
   test('shows each part against the target it is saving towards', () => {
-    const { container } = open([part()], '1000.00')
-    const amounts = [...container.querySelectorAll('.money')].map(n => digitsOf(n.textContent))
+    open([part()], '1000.00')
+    const amounts = [...dialog().querySelectorAll('.money')].map(n => digitsOf(n.textContent))
 
     // 1000.00 saved, 6000.00 to reach, 1000.00 total.
     expect(amounts).toContain('1000.00')
@@ -89,7 +92,7 @@ describe('AllocatedDialog', () => {
   })
 
   test('the total it prints is the one it was handed', () => {
-    const { container } = open(
+    open(
       [
         part({ required: '1000.00' }),
         part({ entryId: 'e2', entryName: 'New car', required: '500.00' }),
@@ -97,41 +100,41 @@ describe('AllocatedDialog', () => {
       '1500.00',
     )
 
-    const total = container.querySelector('.total-figure .money')
+    const total = dialog().querySelector('.total-figure .money')
     expect(digitsOf(total?.textContent)).toBe('1500.00')
   })
 
   test('an account nothing saves into says so instead of showing an empty list', () => {
-    const { container } = open([], '0.00')
+    open([], '0.00')
 
     expect(screen.getByText(/Nothing saves into this account/)).toBeTruthy()
     // No list, and no total either — a total of a list that is not there reads
     // as a figure that failed to load.
-    expect(container.querySelector('.parts')).toBeNull()
-    expect(container.querySelector('.total')).toBeNull()
+    expect(dialog().querySelector('.parts')).toBeNull()
+    expect(dialog().querySelector('.total')).toBeNull()
   })
 
   test('closes on Escape and on the backdrop', async () => {
     let closed = 0
-    const { container } = render(AllocatedDialog, {
+    render(AllocatedDialog, {
       props: { accountName: 'Reserves', parts: [part()], total: '1000.00', onclose: () => closed++ },
     })
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(closed).toBe(1)
 
-    const backdrop = container.querySelector('.backdrop') as HTMLElement
+    const backdrop = document.querySelector('.backdrop') as HTMLElement
     backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(closed).toBe(2)
   })
 
   test('a click inside the dialog does not close it', () => {
     let closed = 0
-    const { container } = render(AllocatedDialog, {
+    render(AllocatedDialog, {
       props: { accountName: 'Reserves', parts: [part()], total: '1000.00', onclose: () => closed++ },
     })
 
-    const modal = container.querySelector('.modal') as HTMLElement
+    const modal = dialog()
     modal.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(closed).toBe(0)
   })

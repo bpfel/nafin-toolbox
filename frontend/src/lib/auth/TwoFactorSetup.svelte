@@ -159,10 +159,10 @@
   }
 
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.85rem;
     padding: 0.4rem 0.6rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 6px;
     margin-bottom: 0.75rem;
   }
@@ -240,7 +240,7 @@
   }
 
   .copy-status.failed {
-    color: #c0392b;
+    color: var(--alarm);
   }
 
   .btn-secondary {

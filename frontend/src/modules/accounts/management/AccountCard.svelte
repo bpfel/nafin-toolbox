@@ -411,7 +411,7 @@
     color: #666;
   }
   .amount.negative {
-    color: #c0392b;
+    color: var(--alarm);
   }
   .anchor {
     margin: 0;
@@ -465,7 +465,7 @@
   }
   .error {
     margin: 0;
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.8rem;
   }
   /* The correction form's own Cancel/Save keep their words — they are a

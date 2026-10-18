@@ -119,13 +119,13 @@ describe('reading what Allocated is made of', () => {
 
   test("the dialog's total is the figure on the card behind it", async () => {
     store.vault = vaultWithReserves()
-    const { container } = render(AccountManagement, { props: { currentMonth: '2026-08' } })
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
 
     screen.getByRole('button', { name: 'What is allocated on Reserves' }).click()
     await tick()
 
     // Both bills are due this month, so the whole of each target is required.
-    const total = container.querySelector('.total-figure .money')
+    const total = screen.getByRole('dialog').querySelector('.total-figure .money')
     expect((total?.textContent ?? '').replace(/[^\d.-]/g, '')).toBe('3360.00')
   })
 
