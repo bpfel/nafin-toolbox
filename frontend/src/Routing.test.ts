@@ -72,6 +72,12 @@ vi.mock('./lib/crypto/vaultStore.svelte', () => ({
   createHousehold: vi.fn(),
   renameHousehold: vi.fn(),
   deleteHousehold: vi.fn(),
+  // Belege is mounted with the shell, and closes finished months on the way in.
+  closeEndedMonths: vi.fn(),
+  listMembers: vi.fn(async () => []),
+  commit: vi.fn(),
+  saveNow: vi.fn(),
+  belegUnsaved: () => false,
 }))
 
 vi.mock('./lib/util/buildVersion.svelte', () => ({
