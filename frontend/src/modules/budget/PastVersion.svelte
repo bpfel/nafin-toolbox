@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { t } from '../../lib/i18n/index.svelte'
   import type { VaultSnapshot } from '../../lib/crypto/vault'
   import SnapshotEditor from './SnapshotEditor.svelte'
   import VersionChanges from './VersionChanges.svelte'
@@ -13,8 +12,6 @@
   let { copy, changes = [], changedFrom }: { copy: VaultSnapshot; changes?: PlanChange[]; changedFrom?: string } = $props()
 </script>
 
-<p class="hint">{t('budget.pastVersionHint')}</p>
-
 {#if changes.length > 0 && changedFrom}
   <VersionChanges {changes} from={changedFrom} />
 {/if}
@@ -26,12 +23,6 @@
 </div>
 
 <style>
-  .hint {
-    margin: 0 0 0.75rem;
-    font-size: 0.85rem;
-    color: var(--ink-faint);
-    text-align: center;
-  }
 
   .card {
     background: var(--surface);
