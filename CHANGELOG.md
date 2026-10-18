@@ -53,8 +53,14 @@ release may change things without a deprecation period. Each release is a tag on
   categories; the *Journal* lists every receipt, all the way back, with a
   search and a category filter, and changes one only in edit mode. A finished month keeps the budget it
   ended with, so changing Rent today does not rewrite October. That copy is the
-  whole plan, and it lands in the Archive as the month's own snapshot, under
-  the ones you take by hand — so every month now has one, Belege or not. A record whose
+  whole plan, and every month gets one, Belege or not.
+- **Budget steps back through earlier versions of the plan.** Arrows above the
+  plan go from the plan now to the plan before each change — months that
+  changed nothing are one step, such as *July – August 2026*. An earlier
+  version is shown whole and read-only, and can be given a name. This replaces
+  the Archive: snapshots are no longer taken by hand, since every month keeps
+  one; snapshots taken before are kept, listed with the version that was the
+  plan when they were taken. A record whose
   budget line is deleted is kept as Unassigned, never lost.
   In a household, each record says who paid — a member or the joint
   account — and Review shows who owes whom, running on from month to month,

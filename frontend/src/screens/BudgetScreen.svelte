@@ -17,6 +17,8 @@
    * question does not arise and the control would toggle nothing visible.
    */
   let viewMode = $state<'monthly' | 'yearly'>('monthly')
+  /** An earlier version of the plan is on screen. */
+  let past = $state(false)
 
   /**
    * The budget module, so the strip's "+" can start a new line.
@@ -30,10 +32,11 @@
   let budget = $state<{ openAddEntry: () => void } | null>(null)
 </script>
 
-<ScreenChrome title={t('nav.budget')} editKey="budget">
+<!-- An earlier version of the plan is read, not changed: no pen, no "+". -->
+<ScreenChrome title={t('nav.budget')} editKey={past ? undefined : 'budget'}>
   {#snippet children()}
     <!-- Not for a reader: an entry they add is one the server refuses. -->
-    {#if !vaultState.readOnly}
+    {#if !vaultState.readOnly && !past}
     <ActionButton label={t('entry.addOne')} onclick={() => budget?.openAddEntry()}>
       <svg
         viewBox="0 0 24 24"
@@ -72,7 +75,7 @@
   {/snippet}
 </ScreenChrome>
 
-<BudgetModule bind:this={budget} bind:viewMode />
+<BudgetModule bind:this={budget} bind:viewMode bind:past />
 
 <style>
   .period {

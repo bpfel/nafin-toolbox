@@ -32,7 +32,7 @@ export const de: PartialContent = {
     },
     budget: {
       title: 'Ein stehender Plan',
-      body: 'Kein monatliches Journal. Du beschreibst einen typischen Monat einmal und erstellst eine benannte Momentaufnahme, wenn sich etwas ändert, das festgehalten werden soll.',
+      body: 'Kein monatliches Journal. Du beschreibst einen typischen Monat einmal; die App behält für jeden Monat eine Kopie, und die Pfeile über dem Budget führen zu früheren Versionen.',
       note: 'Zur Veranschaulichung verwenden wir Schweizer Standardwerte.',
     },
     controls: {
@@ -117,7 +117,7 @@ export const de: PartialContent = {
       body: [
         'Das Budget beschreibt einen typischen Monat: was hereinkommt, was hinausgeht und was zurückgehalten wird. Es ist etwas, das du pflegst, und keine Aufzeichnung von Transaktionen — die App sieht deine Bank nie.',
         'Einträge stehen unter Überschriften, die du selbst wählst. Jeder Eintrag hat eine Art, und die ist entscheidend: Einnahmen und Ausgaben meinen eingehendes und verbrauchtes Geld, während Sparen, Rechnungen und Anschaffungen zwar dein Konto verlassen, nicht aber dein Vermögen.',
-        'Es gibt einen Plan, nicht einen pro Monat. Ändert sich etwas, das es zu behalten lohnt — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, erstellst du eine benannte Momentaufnahme, und er läuft daneben weiter.',
+        'Es gibt einen Plan, nicht einen pro Monat. Die App behält für jeden abgeschlossenen Monat eine Kopie davon. Ändert sich etwas — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, bleibt die Version davor einen Schritt zurück über dem Budget erreichbar und lässt sich benennen.',
       ],
     },
 

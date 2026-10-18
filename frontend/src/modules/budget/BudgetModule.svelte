@@ -5,7 +5,10 @@
   import BudgetSummary from './BudgetSummary.svelte'
   import BudgetTable from './BudgetTable.svelte'
   import BudgetSetup from './BudgetSetup.svelte'
-  import SnapshotPanel from './SnapshotPanel.svelte'
+  import VersionStepper from './VersionStepper.svelte'
+  import PastVersion from './PastVersion.svelte'
+  import { planVersions } from '../../lib/budget/versions'
+  import { monthLabel } from '../../lib/util/months'
   import ResetBudgetModal from './ResetBudgetModal.svelte'
   import { isEditing } from '../../lib/util/editMode.svelte'
 
@@ -61,9 +64,40 @@
   // the action strip, and the summary and the table both answer to it.
   interface Props {
     viewMode?: 'monthly' | 'yearly'
+    /** Showing an earlier version: the screen hides what would change the plan. */
+    past?: boolean
   }
 
-  let { viewMode = $bindable('monthly') }: Props = $props()
+  let { viewMode = $bindable('monthly'), past = $bindable(false) }: Props = $props()
+
+  /**
+   * The plan's versions, newest first — the plan now, then each one before a
+   * change. Stepped through from the stepper above the plan. See `planVersions`.
+   */
+  let versions = $derived(vaultState.vault && version >= 0 ? planVersions(vaultState.vault) : [])
+  let index = $state(0)
+  let shown = $derived(versions[Math.min(index, versions.length - 1)])
+  $effect(() => {
+    past = index > 0
+  })
+  // Another budget, another history: start again at its plan now.
+  $effect(() => {
+    void vaultState.currentVaultId
+    index = 0
+  })
+
+  function range(from: string | undefined, to: string | null): string {
+    if (!from) return ''
+    if (to === null) return t('budget.since', { month: monthLabel(from) })
+    return from === to ? monthLabel(from) : `${monthLabel(from)} – ${monthLabel(to)}`
+  }
+
+  let stepTitle = $derived(
+    !shown ? '' : shown.to === null ? t('budget.currentPlan') : shown.name || range(shown.from, shown.to),
+  )
+  let stepSub = $derived(
+    !shown ? undefined : shown.to === null ? range(shown.from, null) || undefined : shown.name ? range(shown.from, shown.to) : undefined,
+  )
 
   /**
    * Passed straight through from the screen's "+" to the table that owns the
@@ -103,6 +137,17 @@
   {:else if needsSetup}
     <BudgetSetup onseeded={handleSeeded} onstartblank={handleStartBlank} {household} />
   {:else if summary}
+    {#if versions.length > 1}
+      <VersionStepper
+        title={stepTitle}
+        sub={stepSub}
+        onprevious={index < versions.length - 1 ? () => index++ : undefined}
+        onnext={index > 0 ? () => index-- : undefined}
+      />
+    {/if}
+    {#if shown && shown.copy}
+      <PastVersion version={shown} readOnly={vaultState.readOnly} onchange={() => version++} />
+    {:else}
     {#if isEditing('budget') && summary.entries.length > 0}
       <div class="module-actions">
         <button class="btn-reset" onclick={() => confirmingReset = true}>{t('budget.reset')}</button>
@@ -121,7 +166,10 @@
       onentrydeleted={handleEntryChange}
       oncategorychanged={handleEntryChange}
     />
-    <SnapshotPanel vault={vaultState.vault} />
+    {#if shown && shown.saved.length > 0}
+      <PastVersion version={shown} readOnly={vaultState.readOnly} onchange={() => version++} savedOnly />
+    {/if}
+    {/if}
 
     {#if confirmingReset}
       <ResetBudgetModal

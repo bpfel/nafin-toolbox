@@ -114,7 +114,6 @@ export const rm: Partial<Messages> = {
   'section.expense': 'Expensas',
   'section.savings': 'Spargn',
   'entry.add': 'Agiuntar',
-  'snapshot.panelTitle': 'Archiv',
 
   // --- Accounts ---
   'accounts.add': 'Agiuntar',

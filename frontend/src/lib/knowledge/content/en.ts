@@ -30,7 +30,7 @@ export const en: Content = {
     },
     budget: {
       title: 'One standing plan',
-      body: 'Not a record of every month. You describe a typical one once, and take a named snapshot when something changes enough to be worth keeping.',
+      body: 'Not a record of every month. You describe a typical one once; the app keeps a copy of it for every month, and the arrows above the plan step back to earlier versions.',
       note: 'We’ll use some Swiss defaults for illustration.',
     },
     controls: {
@@ -122,7 +122,7 @@ export const en: Content = {
       body: [
         'The budget is a description of a typical month: what comes in, what goes out, and what is held back. You maintain it yourself, and it is not a log of transactions — the app never sees your bank.',
         'Entries are grouped under headings you choose. Each entry has a type, and the type is what matters most: income and expense are money arriving and money gone, while savings, bills and purchases all leave your account without leaving your net worth.',
-        'There is one standing plan, not one per month. When something changes enough to record — a raise, a move, a new insurance — take a named snapshot, and it carries on live beside that copy.',
+        'There is one standing plan, not one per month. The app keeps a copy of it for every month that ends. When something changes — a raise, a move, a new insurance — the version before stays one step back, above the plan, and can be given a name.',
       ],
     },
 
