@@ -70,7 +70,7 @@ describe('earlier versions of the plan', () => {
     let past = false
     render(BudgetModule, { get past() { return past }, set past(v) { past = v } })
 
-    expect(screen.getByRole('heading', { name: 'Current plan' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Current budget' })).toBeTruthy()
     expect(screen.getByText('since September 2026')).toBeTruthy()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Earlier version' }))

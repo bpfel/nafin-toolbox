@@ -29,8 +29,8 @@ export const en: Content = {
       body: 'There are several types of entry, each presented in turn.',
     },
     budget: {
-      title: 'One standing plan',
-      body: 'Not a record of every month. You describe a typical one once; the app keeps a copy of it for every month, and the arrows above the plan step back to earlier versions.',
+      title: 'One standing budget',
+      body: 'Not a record of every month. You describe a typical one once; the app keeps a copy of it for every month, and the arrows above it step back to earlier versions.',
       note: 'We’ll use some Swiss defaults for illustration.',
     },
     controls: {
@@ -40,7 +40,7 @@ export const en: Content = {
     },
     spending: {
       title: 'What you actually spent',
-      body: 'Spending records receipts as you go: the amount, and the budget line it counts against. The overview reads a month against the plan; lines paid by standing order count as paid by themselves. In a household it also shows who owes whom.',
+      body: 'Spending records receipts as you go: the amount, and the budget line it counts against. The overview reads a month against the budget; lines paid by standing order count as paid by themselves. In a household it also shows who owes whom.',
     },
     accounts: {
       title: 'Accounts',
@@ -109,10 +109,10 @@ export const en: Content = {
     'about-belege': {
       title: 'Recording what you spend',
       body: [
-        'Spending is the other half of the budget: the plan says what a month should cost, and Spending records what it did. Each receipt is an amount, a day and the budget line it counts against — or none, as Unassigned.',
-        'The overview reads a month against its plan, line by line. A line paid by standing order or direct debit, such as rent, can be marked paid automatically: it is not offered for receipts and counts as paid at its plan, so the month’s total is the whole month.',
+        'Spending is the other half of the budget: the budget says what a month should cost, and Spending records what it did. Each receipt is an amount, a day and the budget line it counts against — or none, as Unassigned.',
+        'The overview reads a month against its budget, line by line. A line paid by standing order or direct debit, such as rent, can be marked paid automatically: it is not offered for receipts and counts as paid at its planned amount, so the month’s total is the whole month.',
         'The journal lists every receipt, all the way back, and finds one by what you remember of it: a note, a line, an amount.',
-        'When a month is over it keeps the budget it ended with. Changing the plan afterwards does not rewrite a month already past.',
+        'When a month is over it keeps the budget it ended with. Changing the budget afterwards does not rewrite a month already past.',
         'In a household, each receipt says who paid — a member, or the joint account. The overview shows who owes whom, carried on from month to month, and the fewest payments that settle it. The split, equal or by share, applies to receipts entered from then on.',
       ],
     },
@@ -122,7 +122,7 @@ export const en: Content = {
       body: [
         'The budget is a description of a typical month: what comes in, what goes out, and what is held back. You maintain it yourself, and it is not a log of transactions — the app never sees your bank.',
         'Entries are grouped under headings you choose. Each entry has a type, and the type is what matters most: income and expense are money arriving and money gone, while savings, bills and purchases all leave your account without leaving your net worth.',
-        'There is one standing plan, not one per month. The app keeps a copy of it for every month that ends. When something changes — a raise, a move, a new insurance — the version before stays one step back, above the plan, and can be given a name.',
+        'There is one standing budget, not one per month. The app keeps a copy of it for every month that ends. When something changes — a raise, a move, a new insurance — the version before stays one step back, with what changed listed on it.',
       ],
     },
 
