@@ -52,7 +52,9 @@ release may change things without a deprecation period. Each release is a tag on
   *Overview* shows a month against its plan, line by line under the budget's
   categories; the *Journal* lists every receipt, all the way back, with a
   search and a category filter, and changes one only in edit mode. A finished month keeps the budget it
-  ended with, so changing Rent today does not rewrite October. A record whose
+  ended with, so changing Rent today does not rewrite October. That copy is the
+  whole plan, and it lands in the Archive as the month's own snapshot, under
+  the ones you take by hand — so every month now has one, Belege or not. A record whose
   budget line is deleted is kept as Unassigned, never lost.
   In a household, each record says who paid — a member or the joint
   account — and Review shows who owes whom, running on from month to month,

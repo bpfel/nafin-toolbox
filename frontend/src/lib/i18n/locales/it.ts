@@ -350,6 +350,8 @@ export const it: Messages = {
   'snapshot.newNamePlaceholder': 'p. es. prima dell’aumento',
   'snapshot.create': 'Scatta un’istantanea',
   'snapshot.none': 'Nessuna istantanea.',
+  'snapshot.months': 'Mesi',
+  'snapshot.monthsHint': 'Ogni mese concluso conserva il budget con cui è finito; Spese confronta il mese con quello.',
   'snapshot.empty': 'Questa istantanea non contiene righe.',
   'snapshot.entryColumn': 'Voce',
   'snapshot.deleteOne': 'Elimina l’istantanea {name}',

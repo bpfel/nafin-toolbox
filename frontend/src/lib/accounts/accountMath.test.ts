@@ -62,7 +62,6 @@ function vaultWith(
     trust: { pins: {}, epochs: {} },
     people: {},
     belege: [],
-    months: {},
     settlements: [],
     split: { mode: 'equal' as const },
     budget: { categories: [], entries, plan, snapshots: [] },
@@ -147,7 +146,6 @@ describe('allocationBreakdown', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       budget: {

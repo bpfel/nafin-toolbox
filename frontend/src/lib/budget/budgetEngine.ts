@@ -569,14 +569,7 @@ export function buildSnapshot(vault: VaultData, name: string): VaultSnapshot {
     throw new Error('an snapshot needs a name')
   }
 
-  const categoryNameById = new Map(vault.budget.categories.map(g => [g.id, g.name]))
-
-  const lines: VaultSnapshotLine[] = listEntries(vault).map(cat => ({
-    entryName: cat.name,
-    categoryName: categoryNameById.get(cat.categoryId) ?? '',
-    type: cat.type,
-    plannedAmount: plannedFor(vault, cat.id),
-  }))
+  const lines: VaultSnapshotLine[] = listEntries(vault).map(entry => snapshotLine(vault, entry))
 
   const snapshot: VaultSnapshot = {
     id: newId('snapshot'),
@@ -587,24 +580,46 @@ export function buildSnapshot(vault: VaultData, name: string): VaultSnapshot {
   return snapshot
 }
 
+/**
+ * One line of a copy of the plan, denormalised: the names as they are now, and
+ * the id kept beside them so a month's records can still find their line.
+ */
+export function snapshotLine(vault: VaultData, entry: VaultEntry): VaultSnapshotLine {
+  return {
+    entryId: entry.id,
+    entryName: entry.name,
+    categoryName: vault.budget.categories.find(c => c.id === entry.categoryId)?.name ?? '',
+    type: entry.type,
+    plannedAmount: plannedFor(vault, entry.id),
+    ...(entry.automatic ? { automatic: true } : {}),
+  }
+}
+
 /** Stores a built snapshot, newest first. Storing one already there does nothing. */
 export function insertSnapshot(vault: VaultData, snapshot: VaultSnapshot): void {
   if (vault.budget.snapshots.some(a => a.id === snapshot.id)) return
   vault.budget.snapshots.unshift(snapshot)
 }
 
-/** Renames an snapshot. An empty name is rejected, as it is on creation. */
+/**
+ * Renames a snapshot. An empty name is rejected, as it is on creation — except
+ * on a month's copy, which is called by its month and goes back to that.
+ */
 export function renameSnapshot(vault: VaultData, id: string, name: string): void {
   const trimmed = name.trim()
-  if (trimmed === '') {
+  const snapshot = vault.budget.snapshots.find(a => a.id === id)
+  if (trimmed === '' && !snapshot?.month) {
     throw new Error('an snapshot needs a name')
   }
-  const snapshot = vault.budget.snapshots.find(a => a.id === id)
   if (snapshot) snapshot.name = trimmed
 }
 
+/**
+ * Deletes a snapshot taken by hand. A month's copy stays: Belege reads that
+ * month against it, and a month without one would be read against today's plan.
+ */
 export function deleteSnapshot(vault: VaultData, id: string): void {
-  vault.budget.snapshots = vault.budget.snapshots.filter(a => a.id !== id)
+  vault.budget.snapshots = vault.budget.snapshots.filter(a => a.id !== id || a.month !== undefined)
 }
 
 /**

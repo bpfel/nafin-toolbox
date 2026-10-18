@@ -48,7 +48,6 @@ function emptyVault(): VaultData {
     trust: { pins: {}, epochs: {} },
     people: {},
     belege: [],
-    months: {},
     settlements: [],
     split: { mode: 'equal' as const },
     budget: { categories: [], entries: [], plan: [], snapshots: [] },

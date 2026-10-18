@@ -874,12 +874,12 @@ describe('Belege', () => {
     commit('addBeleg', record('2026-10-05', '12.00'))
     await saveVault()
     itIs(2026, 11, 1)
-    await elsewhere(v => belege.closeMonth(v, '2026-10', { closedAt: 'theirs', lines: [] }))
+    await elsewhere(v => belege.closeMonth(v, '2026-10', { id: 'theirs', name: '', createdAt: 'theirs', lines: [] }))
 
     commit('addBeleg', record('2026-11-01', '5.00'))
     await saveVault()
 
-    expect((await onServer()).months['2026-10'].closedAt).toBe('theirs')
+    expect((await onServer()).budget.snapshots.filter(c => c.month === '2026-10').map(c => c.createdAt)).toEqual(['theirs'])
   })
 
   test('B5. Rent changed on the 1st, before anything else: October keeps the old Rent', async () => {
@@ -892,7 +892,7 @@ describe('Belege', () => {
     commit('setPlanned', rent.id, '1800.00')
     await saveVault()
 
-    const october = (await onServer()).months['2026-10']
+    const october = (await onServer()).budget.snapshots.find(c => c.month === '2026-10')!
     expect(october.lines.find(l => l.entryId === rent.id)?.plannedAmount).toBe('1500.00')
   })
 
@@ -903,8 +903,8 @@ describe('Belege', () => {
     await saveVault()
 
     const saved = await onServer()
-    expect(saved.months['2026-09']).toBeTruthy()
-    expect(saved.months['2026-11']).toBeUndefined()
+    expect(saved.budget.snapshots.some(c => c.month === '2026-09')).toBe(true)
+    expect(saved.budget.snapshots.some(c => c.month === '2026-11')).toBe(false)
   })
 
   test('B7. the split changed elsewhere while a record was entered here: the record keeps its own', async () => {
@@ -928,6 +928,24 @@ describe('Belege', () => {
     expect((await onServer()).settlements).toHaveLength(2)
   })
 
+  // A plan's history for everybody: every month gets its copy, Belege or not —
+  // and months nobody wrote in had the same plan as the one before them.
+  test('B9. back after three months away: each month ended gets its copy of the plan', async () => {
+    const rent = expense(state.vault!)
+    commit('setPlanned', rent.id, '1500.00')
+    await saveVault()
+    itIs(2027, 1, 5)
+
+    commit('setPlanned', rent.id, '1600.00')
+    await saveVault()
+
+    const copies = (await onServer()).budget.snapshots.filter(c => c.month).map(c => c.month).sort()
+    expect(copies).toEqual(['2026-10', '2026-11', '2026-12'])
+    const december = (await onServer()).budget.snapshots.find(c => c.month === '2026-12')!
+    expect(december.lines.find(l => l.entryId === rent.id)?.plannedAmount).toBe('1500.00')
+    expect(new Set(december.lines.map(l => l.type)).size).toBe(5)
+  })
+
   // On load, for a writer: Belege calls this when it opens, so a month is
   // closed even if nobody writes anything in November.
   test('opening the app in November closes October, without anything else written', async () => {
@@ -938,6 +956,6 @@ describe('Belege', () => {
     closeEndedMonths()
     await saveVault()
 
-    expect((await onServer()).months['2026-10']).toBeTruthy()
+    expect((await onServer()).budget.snapshots.some(c => c.month === '2026-10')).toBe(true)
   })
 })

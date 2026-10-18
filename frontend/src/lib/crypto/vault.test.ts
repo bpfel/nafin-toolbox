@@ -42,6 +42,7 @@ describe('createEmptyVault', () => {
       entries: [],
       plan: [],
       snapshots: [],
+      openMonth: expect.stringMatching(/^\d{4}-\d{2}$/),
     })
     expect(vault.accounts.length).toBe(1)
   })
@@ -217,7 +218,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -371,7 +371,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -426,7 +425,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -458,7 +456,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -497,7 +494,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -537,7 +533,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -578,7 +573,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: Array.from({ length: 5 }, (_, i) => ({
@@ -643,7 +637,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -680,7 +673,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [
@@ -719,7 +711,6 @@ describe('encryptVault and decryptVault', () => {
       trust: { pins: {}, epochs: {} },
       people: {},
       belege: [],
-      months: {},
       settlements: [],
       split: { mode: 'equal' as const },
       accounts: [],
@@ -1259,7 +1250,7 @@ describe('migrateVault — legacy versions forward', () => {
   // And the shape check refuses to write one, which is what stops a bad
   // migration outliving the tab that made it.
   test('a vault without a trust record cannot be saved', () => {
-    const missing = { ...v8Vault(), version: 11, people: {}, belege: [], months: {}, settlements: [], split: { mode: 'equal' } } as unknown as VaultData
+    const missing = { ...v8Vault(), version: 11, people: {}, belege: [], settlements: [], split: { mode: 'equal' } } as unknown as VaultData
 
     expect(() => assertVaultShape(missing)).toThrow(/trust is missing/)
   })
@@ -1292,7 +1283,7 @@ describe('migrateVault — legacy versions forward', () => {
   })
 
   test('a vault without names cannot be saved', () => {
-    const missing = { ...v9Vault(), version: 11, belege: [], months: {}, settlements: [], split: { mode: 'equal' } } as unknown as VaultData
+    const missing = { ...v9Vault(), version: 11, belege: [], settlements: [], split: { mode: 'equal' } } as unknown as VaultData
 
     expect(() => assertVaultShape(missing)).toThrow(/people is missing/)
   })
@@ -1306,7 +1297,6 @@ describe('migrateVault — legacy versions forward', () => {
 
     expect(migrated.version).toBe(VAULT_VERSION)
     expect(migrated.belege).toEqual([])
-    expect(migrated.months).toEqual({})
     expect(migrated.settlements).toEqual([])
     expect(migrated.split).toEqual({ mode: 'equal' })
     expect(migrated.people).toEqual({ '7': { name: 'Ben' } })
@@ -1320,6 +1310,23 @@ describe('migrateVault — legacy versions forward', () => {
     const missing = { ...v9Vault(), version: 11, people: {} } as unknown as VaultData
 
     expect(() => assertVaultShape(missing)).toThrow(/belege is missing/)
+  })
+
+  // Belege's months were a map of their own in builds never released; a test
+  // vault from then folds into snapshots rather than failing to open.
+  test('a pre-release v11 vault folds its months into snapshots', () => {
+    const v = createEmptyVault('Main')
+    const old = {
+      ...v,
+      months: { '2026-09': { closedAt: '2026-10-01T08:00:00Z', lines: [{ entryId: 'e1', entryName: 'Rent', categoryName: 'Housing', plannedAmount: '1500.00', automatic: true }] } },
+    }
+
+    const migrated = migrateVault(old)
+
+    expect((migrated as unknown as { months?: unknown }).months).toBeUndefined()
+    const copy = migrated.budget.snapshots.find(s => s.month === '2026-09')!
+    expect(copy).toMatchObject({ name: '', createdAt: '2026-10-01T08:00:00Z' })
+    expect(copy.lines[0]).toMatchObject({ entryId: 'e1', type: 'expense', automatic: true })
   })
 
   test('a vault from a newer build is refused, not emptied', () => {

@@ -1,5 +1,5 @@
-import type { Beleg, ClosedMonth, ClosedMonthLine, Settlement, Split, VaultData, VaultEntry } from '../crypto/vault'
-import { plannedFor } from '../budget/budgetEngine'
+import type { Beleg, Settlement, Split, VaultData, VaultEntry, VaultSnapshot, VaultSnapshotLine } from '../crypto/vault'
+import { snapshotLine } from '../budget/budgetEngine'
 import { newId, nowISO } from '../sync/source'
 import { normalizeAmount } from '../util/money'
 
@@ -138,50 +138,72 @@ export function recentEntries(vault: VaultData, userId: string, count = 6): stri
 }
 
 // --- closing a month ---------------------------------------------------------
+//
+// A finished month keeps a copy of the plan it ended with: a snapshot carrying
+// its month, of the whole plan, every type. It is the plan's history for
+// everybody, and the yardstick a month of Belege is read against — a past
+// month read against today's plan would change its verdict every time the plan
+// did. Taken by hand, a snapshot has no month; taken as a month ends, it does.
+
+/** The month after `month`, `'YYYY-MM'`. */
+export function nextMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+}
+
+/** A month's copy of the plan, if it has one. */
+export function monthCopy(vault: VaultData, month: string): VaultSnapshot | undefined {
+  return vault.budget.snapshots.find(s => s.month === month)
+}
 
 /**
- * The budget a month is read against, as it stands now: every expense entry,
- * archived or not, and any other entry the month's records point at.
+ * The plan as a month's lines: every entry in use, in the budget's order —
+ * category, then entry — and any archived one the month's records point at.
  */
-export function closingLines(vault: VaultData, month: string): ClosedMonthLine[] {
+function monthLines(vault: VaultData, month: string): VaultSnapshotLine[] {
   const pointedAt = new Set(belegeIn(vault, month).map(b => b.entryId).filter((id): id is string => id !== null))
-  const categoryName = new Map(vault.budget.categories.map(c => [c.id, c.name]))
   const categoryOrder = new Map(vault.budget.categories.map(c => [c.id, c.sortOrder]))
-  // In the budget's order — category, then entry — so Review can put them
-  // under the same headings in the same sequence.
   return vault.budget.entries
-    .filter(e => e.type === 'expense' || pointedAt.has(e.id))
+    .filter(e => !e.archived || pointedAt.has(e.id))
     .sort((a, b) => (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0) || a.sortOrder - b.sortOrder)
-    .map(e => ({
-      entryId: e.id,
-      entryName: e.name,
-      categoryName: categoryName.get(e.categoryId) ?? '',
-      plannedAmount: plannedFor(vault, e.id),
-      ...(e.automatic ? { automatic: true } : {}),
-    }))
+    .map(e => snapshotLine(vault, e))
 }
 
-export function buildClosedMonth(vault: VaultData, month: string): ClosedMonth {
-  return { closedAt: nowISO(), lines: closingLines(vault, month) }
-}
-
-/** Keep a month's copy. The first one kept stays: two devices closing October leave one. */
-export function closeMonth(vault: VaultData, month: string, closed: ClosedMonth): void {
-  if (vault.months[month]) return
-  vault.months[month] = closed
+/** The copy a month ends with, unnamed: it is called by its month. */
+export function buildMonthSnapshot(vault: VaultData, month: string): VaultSnapshot {
+  return { id: newId('snapshot'), name: '', createdAt: nowISO(), month, lines: monthLines(vault, month) }
 }
 
 /**
- * Finished months with records that have no copy yet, oldest first.
+ * Keep a month's copy, and move on to the month after it. The first copy kept
+ * stays: two devices closing October leave one.
+ */
+export function closeMonth(vault: VaultData, month: string, copy: VaultSnapshot): void {
+  if (!monthCopy(vault, month)) vault.budget.snapshots.unshift({ ...copy, month })
+  if (!vault.budget.openMonth || vault.budget.openMonth <= month) vault.budget.openMonth = nextMonth(month)
+}
+
+/** Start recording months from `month`, on the plan's first write. Never moved back. */
+export function startMonths(vault: VaultData, month: string): void {
+  vault.budget.openMonth ??= month
+}
+
+/**
+ * Finished months without a copy yet, oldest first: every month from the one
+ * being recorded up to the current one, and any earlier month a record has been
+ * backdated into.
  *
  * Closing happens on the first write after a month ends — there is no server
  * job, and the server could not read the plan anyway. The plan can only change
  * through the app, so a copy taken by that first write is the plan as it stood
- * when the month ended, however late the write comes.
+ * when the month ended, however late the write comes — and a month nobody wrote
+ * in had the same plan as the one before it.
  */
 export function monthsToClose(vault: VaultData, current: string): string[] {
-  const months = new Set(vault.belege.map(b => monthOf(b.date)))
-  return [...months].filter(m => m < current && !vault.months[m]).sort()
+  const months = new Set(vault.belege.map(b => monthOf(b.date)).filter(m => m < current))
+  const open = vault.budget.openMonth
+  if (open) for (let m = open; m < current; m = nextMonth(m)) months.add(m)
+  return [...months].filter(m => !monthCopy(vault, m)).sort()
 }
 
 // --- settlements and the split -------------------------------------------------
@@ -364,13 +386,16 @@ export interface MonthReview {
  */
 export function reviewMonth(vault: VaultData, month: string): MonthReview {
   const records = belegeIn(vault, month).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
-  const closed = vault.months[month]
-  const lines = closed ? closed.lines : closingLines(vault, month).filter(l => liveLineShows(vault, l.entryId, records))
+  // What Belege reads: the expense lines, and any other a record points at.
+  const pointedAt = new Set(records.map(b => b.entryId).filter((id): id is string => id !== null))
+  const counts = (l: VaultSnapshotLine) => l.type === 'expense' || (l.entryId !== undefined && pointedAt.has(l.entryId))
+  const closed = monthCopy(vault, month)
+  const lines = (closed ? closed.lines : monthLines(vault, month)).filter(counts)
 
   // A line paid automatically starts out spent at its plan: the month's total
   // is then the whole month, not only the part that came with receipts.
   const rows: ReviewRow[] = lines.map(l => ({
-    entryId: l.entryId,
+    entryId: l.entryId ?? null,
     entryName: l.entryName,
     categoryName: l.categoryName,
     planned: rappen(l.plannedAmount),
@@ -378,7 +403,7 @@ export function reviewMonth(vault: VaultData, month: string): MonthReview {
     belege: [],
     automatic: l.automatic === true,
   }))
-  const byEntry = new Map(rows.map(r => [r.entryId, r]))
+  const byEntry = new Map(rows.filter(r => r.entryId !== null).map(r => [r.entryId, r]))
   const unassigned: ReviewRow = { entryId: null, entryName: '', categoryName: '', planned: null, spent: 0, belege: [], automatic: false }
 
   for (const beleg of records) {
@@ -400,18 +425,12 @@ export function reviewMonth(vault: VaultData, month: string): MonthReview {
   const all = [...shown, unassigned]
   return {
     month,
-    closedAt: closed?.closedAt ?? null,
+    closedAt: closed?.createdAt ?? null,
     rows: shown,
     unassigned,
     planned: shown.reduce((sum, r) => sum + (r.planned ?? 0), 0),
     spent: all.reduce((sum, r) => sum + r.spent, 0),
   }
-}
-
-/** Live, an archived entry only shows if something was spent on it this month. */
-function liveLineShows(vault: VaultData, entryId: string, records: Beleg[]): boolean {
-  const entry = vault.budget.entries.find(e => e.id === entryId)
-  return !!entry && (!entry.archived || records.some(b => b.entryId === entryId))
 }
 
 /** Months that have records, newest first, with the current month always there. */

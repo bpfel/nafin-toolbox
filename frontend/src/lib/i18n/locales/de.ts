@@ -322,6 +322,8 @@ export const de: Messages = {
   'snapshot.newNamePlaceholder': 'z. B. Vor der Lohnerhöhung',
   'snapshot.create': 'Momentaufnahme erstellen',
   'snapshot.none': 'Noch keine Momentaufnahmen.',
+  'snapshot.months': 'Monate',
+  'snapshot.monthsHint': 'Jeder abgeschlossene Monat behält das Budget, mit dem er geendet hat; die Belege lesen den Monat daran.',
   'snapshot.empty': 'Diese Momentaufnahme hat keine Zeilen.',
   'snapshot.entryColumn': 'Eintrag',
   'snapshot.deleteOne': 'Momentaufnahme {name} löschen',

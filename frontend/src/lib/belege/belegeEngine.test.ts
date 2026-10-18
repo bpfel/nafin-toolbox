@@ -2,8 +2,9 @@ import { describe, test, expect } from 'vitest'
 import { createEmptyVault, type VaultData } from '../crypto/vault'
 import * as budget from '../budget/budgetEngine'
 import {
-  addBeleg, addSettlement, balances, belegeIn, buildClosedMonth, closeMonth, closingLines, editBeleg,
-  monthsToClose, recentEntries, reviewMonth, reviewableMonths, settleUp, sharesFor, splitRappen,
+  addBeleg, addSettlement, balances, belegeIn, buildMonthSnapshot, closeMonth, editBeleg, monthCopy,
+  monthsToClose, nextMonth, recentEntries, reviewMonth, reviewableMonths, settleUp, sharesFor, splitRappen,
+  startMonths,
   spendableEntries, thisMonth, today, JOINT,
 } from './belegeEngine'
 
@@ -75,31 +76,68 @@ describe('the entry a record is counted against', () => {
 })
 
 describe('closing a month', () => {
-  test('only finished months with records, oldest first, and not twice', () => {
-    const v = vault()
-    for (const date of ['2026-08-10', '2026-10-02', '2026-09-30', '2026-11-01']) {
-      addBeleg(v, { date, amount: '1', entryId: null, createdBy: '1' })
-    }
-    expect(monthsToClose(v, '2026-11')).toEqual(['2026-08', '2026-09', '2026-10'])
+  const copy = (name = '') => ({ id: name || 'x', name, createdAt: name || 'now', lines: [] })
 
-    closeMonth(v, '2026-09', buildClosedMonth(v, '2026-09'))
-    expect(monthsToClose(v, '2026-11')).toEqual(['2026-08', '2026-10'])
+  test('from the month being recorded up to this one, and any earlier month a record was backdated into', () => {
+    const v = vault()
+    v.budget.openMonth = '2026-09'
+    addBeleg(v, { date: '2026-07-10', amount: '1', entryId: null, createdBy: '1' })
+
+    expect(monthsToClose(v, '2026-11')).toEqual(['2026-07', '2026-09', '2026-10'])
+
+    closeMonth(v, '2026-09', buildMonthSnapshot(v, '2026-09'))
+    expect(monthsToClose(v, '2026-11')).toEqual(['2026-07', '2026-10'])
   })
 
-  test('the first copy kept stays', () => {
+  // No history is invented: a new plan starts recording the month it is made.
+  test('a plan records months from when it was made, not before', () => {
     const v = vault()
-    closeMonth(v, '2026-09', { closedAt: 'first', lines: [] })
-    closeMonth(v, '2026-09', { closedAt: 'second', lines: [] })
-    expect(v.months['2026-09'].closedAt).toBe('first')
+    expect(v.budget.openMonth).toBe(thisMonth())
+    expect(monthsToClose(v, thisMonth())).toEqual([])
   })
 
-  test('copies every expense line, archived too, and anything the month’s records point at', () => {
+  test('a plan without a month being recorded starts from the one it is told, once', () => {
+    const v = vault()
+    delete v.budget.openMonth
+    expect(monthsToClose(v, '2026-11')).toEqual([])
+    startMonths(v, '2026-11')
+    startMonths(v, '2026-08')
+    expect(v.budget.openMonth).toBe('2026-11')
+  })
+
+  test('the first copy kept stays, and the month after it becomes the one recorded', () => {
+    const v = vault()
+    v.budget.openMonth = '2026-09'
+    closeMonth(v, '2026-09', copy('first'))
+    closeMonth(v, '2026-09', copy('second'))
+
+    expect(monthCopy(v, '2026-09')!.createdAt).toBe('first')
+    expect(v.budget.snapshots.filter(s => s.month === '2026-09')).toHaveLength(1)
+    expect(v.budget.openMonth).toBe('2026-10')
+  })
+
+  test('a month backdated into does not move the month being recorded back', () => {
+    const v = vault()
+    v.budget.openMonth = '2026-10'
+    closeMonth(v, '2026-07', copy())
+    expect(v.budget.openMonth).toBe('2026-10')
+  })
+
+  test('a month’s copy is the whole plan, every type, by id', () => {
+    const v = vault()
+    const lines = buildMonthSnapshot(v, '2026-10').lines
+    expect(new Set(lines.map(l => l.type))).toEqual(new Set(['income', 'expense', 'savings', 'bill', 'purchase']))
+    expect(lines.every(l => l.entryId !== undefined)).toBe(true)
+  })
+
+  test('it carries an archived line only if the month’s records point at it', () => {
     const v = vault()
     const archived = anyExpense(v, 1)
     archived.archived = true
-    const lines = closingLines(v, '2026-10')
-    expect(lines.map(l => l.entryId)).toContain(archived.id)
-    expect(lines.every(l => v.budget.entries.find(e => e.id === l.entryId)!.type === 'expense')).toBe(true)
+    expect(buildMonthSnapshot(v, '2026-10').lines.some(l => l.entryId === archived.id)).toBe(false)
+
+    v.belege.push({ id: 'b', date: '2026-10-02', amount: '1.00', entryId: archived.id, createdBy: '1', createdAt: 'z' })
+    expect(buildMonthSnapshot(v, '2026-10').lines.some(l => l.entryId === archived.id)).toBe(true)
   })
 
   test('a closed month reads against its copy, whatever the budget does after', () => {
@@ -108,7 +146,7 @@ describe('closing a month', () => {
     const nameThen = rent.name
     budget.setPlanned(v, rent.id, '1500.00')
     addBeleg(v, { date: '2026-10-01', amount: '1500', entryId: rent.id, createdBy: '1' })
-    closeMonth(v, '2026-10', buildClosedMonth(v, '2026-10'))
+    closeMonth(v, '2026-10', buildMonthSnapshot(v, '2026-10'))
 
     budget.setPlanned(v, rent.id, '1800.00')
     budget.updateEntry(v, rent.id, { name: 'Miete' })
@@ -118,15 +156,52 @@ describe('closing a month', () => {
     expect(row.entryName).toBe(nameThen)
   })
 
+  test('Belege reads only the expense lines of a month’s copy', () => {
+    const v = vault()
+    closeMonth(v, '2026-09', buildMonthSnapshot(v, '2026-09'))
+    const salary = v.budget.entries.find(e => e.type === 'income')!
+    expect(reviewMonth(v, '2026-09').rows.some(r => r.entryId === salary.id)).toBe(false)
+  })
+
   test('a record backdated against an entry made after the month closed gets a row of its own, unplanned', () => {
     const v = vault()
-    closeMonth(v, '2026-09', { closedAt: 'x', lines: [] })
+    closeMonth(v, '2026-09', copy())
     const later = budget.createEntry(v, { name: 'Dentist', type: 'expense', categoryName: 'Health' })
     addBeleg(v, { date: '2026-09-15', amount: '200', entryId: later.id, createdBy: '1' })
 
     const row = reviewMonth(v, '2026-09').rows.find(r => r.entryId === later.id)!
     expect(row.planned).toBeNull()
     expect(row.spent).toBe(20000)
+  })
+
+  test('the month after December is January', () => {
+    expect(nextMonth('2026-12')).toBe('2027-01')
+    expect(nextMonth('2026-09')).toBe('2026-10')
+  })
+})
+
+describe('the copies the archive keeps', () => {
+  test('a month’s copy cannot be deleted; a snapshot taken by hand can', () => {
+    const v = vault()
+    closeMonth(v, '2026-09', buildMonthSnapshot(v, '2026-09'))
+    budget.insertSnapshot(v, budget.buildSnapshot(v, 'Before the move'))
+    const [month, named] = [monthCopy(v, '2026-09')!, v.budget.snapshots.find(s => s.name === 'Before the move')!]
+
+    budget.deleteSnapshot(v, month.id)
+    budget.deleteSnapshot(v, named.id)
+
+    expect(v.budget.snapshots.map(s => s.id)).toEqual([month.id])
+  })
+
+  test('a month’s copy can be named, and the name cleared back to its month', () => {
+    const v = vault()
+    closeMonth(v, '2026-09', buildMonthSnapshot(v, '2026-09'))
+    const month = monthCopy(v, '2026-09')!
+
+    budget.renameSnapshot(v, month.id, 'Moving month')
+    expect(month.name).toBe('Moving month')
+    budget.renameSnapshot(v, month.id, '')
+    expect(month.name).toBe('')
   })
 })
 
@@ -284,7 +359,7 @@ describe('lines paid automatically', () => {
     const v = vault()
     const rent = v.budget.entries.find(e => e.name === 'Rent')!
     addBeleg(v, { date: '2026-09-01', amount: '1', entryId: null, createdBy: '1' })
-    closeMonth(v, '2026-09', buildClosedMonth(v, '2026-09'))
+    closeMonth(v, '2026-09', buildMonthSnapshot(v, '2026-09'))
 
     budget.setAutomatic(v, rent.id, false)
 

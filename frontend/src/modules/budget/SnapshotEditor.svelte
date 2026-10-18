@@ -3,6 +3,7 @@
   import { untrack } from 'svelte'
   import type { VaultSnapshot, VaultSnapshotLine } from '../../lib/crypto/vault'
   import Money from '../../lib/util/Money.svelte'
+  import { monthLabel } from '../../lib/util/months'
 
   interface Props {
     snapshot: VaultSnapshot
@@ -11,9 +12,14 @@
      * message is caught here so it lands next to the field the user typed in.
      */
     onrename: (name: string) => void
+    /**
+     * A month's copy with receipts: what each line's receipts came to, in
+     * rappen, by entry id — a Spent column beside the plan, as Belege shows it.
+     */
+    spent?: Map<string, number>
   }
 
-  let { snapshot, onrename }: Props = $props()
+  let { snapshot, onrename, spent }: Props = $props()
 
   // Seeded once: the editor is mounted fresh per snapshot, and the draft must not
   // be yanked out from under a half-typed rename.
@@ -87,6 +93,7 @@
     <input
       type="text"
       class="rename-input"
+      placeholder={snapshot.month ? monthLabel(snapshot.month) : undefined}
       bind:value={nameDraft}
       onblur={commitName}
       onkeydown={handleNameKeydown}
@@ -104,17 +111,24 @@
         <tr>
           <th class="col-name">{t('snapshot.entryColumn')}</th>
           <th class="right col-amount">{t('budget.plannedMo')}</th>
+          {#if spent}<th class="right col-amount">{t('spending.spent')}</th>{/if}
         </tr>
       </thead>
       {#each [...incomeCategories, ...expenseCategories] as category (category.categoryName + ':' + category.rows[0].line.type)}
         <tbody>
           <tr class="line-category">
-            <td colspan="2">{category.categoryName || t('budget.uncategorised')}</td>
+            <td colspan={spent ? 3 : 2}>{category.categoryName || t('budget.uncategorised')}</td>
           </tr>
           {#each category.rows as row (row.index)}
             <tr class="line-row" class:income={row.line.type === 'income'}>
               <td class="line-name">{row.line.entryName}</td>
               <td class="line-amount"><Money value={row.line.plannedAmount} /></td>
+              {#if spent}
+                {@const out = row.line.entryId ? spent.get(row.line.entryId) : undefined}
+                <td class="line-amount" class:over={out !== undefined && out > Math.round(Number(row.line.plannedAmount) * 100)}>
+                  {#if out !== undefined}<Money value={out} cents />{/if}
+                </td>
+              {/if}
             </tr>
           {/each}
         </tbody>
@@ -243,5 +257,6 @@
     font-variant-numeric: tabular-nums;
   }
   .income-total { color: #2d6a4f; }
+  .line-amount.over { color: var(--alarm); }
   .expense-total { color: #c0392b; }
 </style>
