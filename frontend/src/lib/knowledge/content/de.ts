@@ -31,7 +31,7 @@ export const de: PartialContent = {
       body: 'Es gibt mehrere Arten von Einträgen, die nacheinander vorgestellt werden.',
     },
     budget: {
-      title: 'Ein stehender Plan',
+      title: 'Ein stehendes Budget',
       body: 'Kein monatliches Journal. Du beschreibst einen typischen Monat einmal; die App behält für jeden Monat eine Kopie, und die Pfeile über dem Budget führen zu früheren Versionen.',
       note: 'Zur Veranschaulichung verwenden wir Schweizer Standardwerte.',
     },
@@ -42,7 +42,7 @@ export const de: PartialContent = {
     },
     spending: {
       title: 'Was du wirklich ausgibst',
-      body: 'In den Belegen erfasst du Quittungen laufend: den Betrag und die Budgetzeile, auf die er zählt. Die Übersicht vergleicht einen Monat mit dem Plan; Zeilen per Dauerauftrag gelten von selbst als bezahlt. Im Haushalt zeigt sie auch, wer wem was schuldet.',
+      body: 'In den Belegen erfasst du Quittungen laufend: den Betrag und die Budgetzeile, auf die er zählt. Die Übersicht vergleicht einen Monat mit dem Budget; Zeilen per Dauerauftrag gelten von selbst als bezahlt. Im Haushalt zeigt sie auch, wer wem was schuldet.',
     },
     accounts: {
       title: 'Konten',
@@ -104,10 +104,10 @@ export const de: PartialContent = {
     'about-belege': {
       title: 'Erfassen, was du ausgibst',
       body: [
-        'Die Belege sind die andere Hälfte des Budgets: Der Plan sagt, was ein Monat kosten soll, die Belege halten fest, was er gekostet hat. Jeder Beleg ist ein Betrag, ein Tag und die Budgetzeile, auf die er zählt – oder keine, als «nicht zugeordnet».',
-        'Die Übersicht vergleicht einen Monat Zeile für Zeile mit seinem Plan. Eine Zeile, die per Dauerauftrag oder Lastschrift bezahlt wird, etwa die Miete, kannst du als automatisch bezahlt markieren: Sie wird nicht für Belege angeboten und zählt mit ihrem Planbetrag als bezahlt, damit das Total den ganzen Monat zeigt.',
+        'Die Belege sind die andere Hälfte des Budgets: Das Budget sagt, was ein Monat kosten soll, die Belege halten fest, was er gekostet hat. Jeder Beleg ist ein Betrag, ein Tag und die Budgetzeile, auf die er zählt – oder keine, als «nicht zugeordnet».',
+        'Die Übersicht vergleicht einen Monat Zeile für Zeile mit seinem Budget. Eine Zeile, die per Dauerauftrag oder Lastschrift bezahlt wird, etwa die Miete, kannst du als automatisch bezahlt markieren: Sie wird nicht für Belege angeboten und zählt mit ihrem Planbetrag als bezahlt, damit das Total den ganzen Monat zeigt.',
         'Das Journal listet jeden Beleg bis zum ersten und findet einen über das, was du noch weisst: eine Notiz, eine Zeile, einen Betrag.',
-        'Ist ein Monat vorbei, behält er das Budget, mit dem er geendet hat. Spätere Änderungen am Plan schreiben einen vergangenen Monat nicht um.',
+        'Ist ein Monat vorbei, behält er das Budget, mit dem er geendet hat. Spätere Änderungen am Budget schreiben einen vergangenen Monat nicht um.',
         'Im Haushalt sagt jeder Beleg, wer bezahlt hat – ein Mitglied oder das gemeinsame Konto. Die Übersicht zeigt, wer wem was schuldet, über die Monate weitergeführt, und die wenigsten Zahlungen zum Ausgleich. Die Aufteilung, gleichmässig oder nach Anteil, gilt für Belege, die ab dann erfasst werden.',
       ],
     },
@@ -117,7 +117,7 @@ export const de: PartialContent = {
       body: [
         'Das Budget beschreibt einen typischen Monat: was hereinkommt, was hinausgeht und was zurückgehalten wird. Es ist etwas, das du pflegst, und keine Aufzeichnung von Transaktionen — die App sieht deine Bank nie.',
         'Einträge stehen unter Überschriften, die du selbst wählst. Jeder Eintrag hat eine Art, und die ist entscheidend: Einnahmen und Ausgaben meinen eingehendes und verbrauchtes Geld, während Sparen, Rechnungen und Anschaffungen zwar dein Konto verlassen, nicht aber dein Vermögen.',
-        'Es gibt einen Plan, nicht einen pro Monat. Die App behält für jeden abgeschlossenen Monat eine Kopie davon. Ändert sich etwas — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, bleibt die Version davor einen Schritt zurück über dem Budget erreichbar und lässt sich benennen.',
+        'Es gibt ein Budget, nicht eines pro Monat. Die App behält für jeden abgeschlossenen Monat eine Kopie davon. Ändert sich etwas — eine Lohnerhöhung, ein Umzug, eine neue Versicherung —, bleibt die Version davor einen Schritt zurück erreichbar, mit dem, was sich geändert hat.',
       ],
     },
 

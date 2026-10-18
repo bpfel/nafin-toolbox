@@ -32,7 +32,7 @@ export const fr: PartialContent = {
       body: 'Il en existe plusieurs types, présentés l’un après l’autre.',
     },
     budget: {
-      title: 'Un plan permanent',
+      title: 'Un budget permanent',
       body: 'Pas un journal mensuel. Tu décris un mois type une seule fois ; l’app en garde une copie pour chaque mois, et les flèches au-dessus du budget remontent aux versions précédentes.',
       note: 'Nous utilisons des valeurs suisses par défaut à titre d’illustration.',
     },
@@ -43,7 +43,7 @@ export const fr: PartialContent = {
     },
     spending: {
       title: 'Ce que tu dépenses vraiment',
-      body: 'Dans Tickets, tu saisis tes dépenses au fil de l’eau : le montant et la ligne de budget concernée. L’aperçu compare un mois au plan ; les lignes payées par ordre permanent comptent d’elles-mêmes comme payées. Dans un ménage, il montre aussi qui doit quoi.',
+      body: 'Dans Tickets, tu saisis tes dépenses au fil de l’eau : le montant et la ligne de budget concernée. L’aperçu compare un mois au budget ; les lignes payées par ordre permanent comptent d’elles-mêmes comme payées. Dans un ménage, il montre aussi qui doit quoi.',
     },
     accounts: {
       title: 'Comptes',
@@ -105,10 +105,10 @@ export const fr: PartialContent = {
     'about-belege': {
       title: 'Saisir ce que tu dépenses',
       body: [
-        'Tickets est l’autre moitié du budget : le plan dit ce qu’un mois devrait coûter, Tickets note ce qu’il a coûté. Chaque ticket est un montant, un jour et la ligne de budget concernée – ou aucune, comme « non attribué ».',
-        'L’aperçu compare un mois à son plan, ligne par ligne. Une ligne payée par ordre permanent ou prélèvement, comme le loyer, peut être marquée payée automatiquement : elle n’est plus proposée pour les tickets et compte comme payée à son montant prévu, pour que le total montre tout le mois.',
+        'Tickets est l’autre moitié du budget : le budget dit ce qu’un mois devrait coûter, Tickets note ce qu’il a coûté. Chaque ticket est un montant, un jour et la ligne de budget concernée – ou aucune, comme « non attribué ».',
+        'L’aperçu compare un mois à son budget, ligne par ligne. Une ligne payée par ordre permanent ou prélèvement, comme le loyer, peut être marquée payée automatiquement : elle n’est plus proposée pour les tickets et compte comme payée à son montant prévu, pour que le total montre tout le mois.',
         'Le journal liste chaque ticket, jusqu’au premier, et en retrouve un par ce dont tu te souviens : une note, une ligne, un montant.',
-        'Une fois terminé, un mois garde le budget avec lequel il s’est achevé. Modifier le plan ensuite ne réécrit pas un mois passé.',
+        'Une fois terminé, un mois garde le budget avec lequel il s’est achevé. Modifier le budget ensuite ne réécrit pas un mois passé.',
         'Dans un ménage, chaque ticket dit qui a payé – un membre ou le compte commun. L’aperçu montre qui doit quoi, reporté d’un mois à l’autre, et le moins de paiements pour équilibrer. La répartition, à parts égales ou par part, vaut pour les tickets saisis à partir de là.',
       ],
     },
@@ -118,7 +118,7 @@ export const fr: PartialContent = {
       body: [
         'Le budget décrit un mois ordinaire : ce qui entre, ce qui sort et ce qui est mis de côté. Tu le tiens à jour ; ce n’est pas un relevé d’opérations — l’application ne voit jamais ta banque.',
         'Les entrées sont regroupées sous des titres que tu choisis. Chaque entrée a un type, et c’est lui qui importe : revenus et dépenses sont de l’argent qui arrive et qui repart, tandis que l’épargne, les factures et les achats quittent ton compte sans quitter ton patrimoine.',
-        'Il y a un seul plan, pas un par mois. L’app en garde une copie pour chaque mois terminé. Quand quelque chose change — une augmentation, un déménagement, une nouvelle assurance —, la version d’avant reste à un pas en arrière, au-dessus du budget, et peut recevoir un nom.',
+        'Il y a un seul budget, pas un par mois. L’app en garde une copie pour chaque mois terminé. Quand quelque chose change — une augmentation, un déménagement, une nouvelle assurance —, la version d’avant reste à un pas en arrière, avec ce qui a changé.',
       ],
     },
 

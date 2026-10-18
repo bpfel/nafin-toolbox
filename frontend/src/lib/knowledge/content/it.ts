@@ -31,7 +31,7 @@ export const it: PartialContent = {
       body: 'Ne esistono vari tipi, presentati uno dopo l’altro.',
     },
     budget: {
-      title: 'Un piano permanente',
+      title: 'Un budget permanente',
       body: 'Non un registro mensile. Descrivi un mese tipico una volta sola; l’app ne conserva una copia per ogni mese, e le frecce sopra il budget tornano alle versioni precedenti.',
       note: 'A titolo di esempio usiamo alcuni valori svizzeri predefiniti.',
     },
@@ -42,7 +42,7 @@ export const it: PartialContent = {
     },
     spending: {
       title: 'Quello che spendi davvero',
-      body: 'In Spese registri le uscite man mano: l’importo e la voce di budget a cui contano. La panoramica confronta un mese con il piano; le voci pagate con ordine permanente contano da sole come pagate. In un’economia domestica mostra anche chi deve cosa a chi.',
+      body: 'In Spese registri le uscite man mano: l’importo e la voce di budget a cui contano. La panoramica confronta un mese con il budget; le voci pagate con ordine permanente contano da sole come pagate. In un’economia domestica mostra anche chi deve cosa a chi.',
     },
     accounts: {
       title: 'Conti',
@@ -104,10 +104,10 @@ export const it: PartialContent = {
     'about-belege': {
       title: 'Registrare quello che spendi',
       body: [
-        'Spese è l’altra metà del budget: il piano dice quanto dovrebbe costare un mese, Spese registra quanto è costato. Ogni spesa è un importo, un giorno e la voce di budget a cui conta – o nessuna, come «non assegnata».',
-        'La panoramica confronta un mese con il suo piano, voce per voce. Una voce pagata con ordine permanente o addebito diretto, come l’affitto, può essere segnata come pagata automaticamente: non viene più proposta per le spese e conta come pagata al suo importo previsto, così il totale mostra tutto il mese.',
+        'Spese è l’altra metà del budget: il budget dice quanto dovrebbe costare un mese, Spese registra quanto è costato. Ogni spesa è un importo, un giorno e la voce di budget a cui conta – o nessuna, come «non assegnata».',
+        'La panoramica confronta un mese con il suo budget, voce per voce. Una voce pagata con ordine permanente o addebito diretto, come l’affitto, può essere segnata come pagata automaticamente: non viene più proposta per le spese e conta come pagata al suo importo previsto, così il totale mostra tutto il mese.',
         'Il journal elenca ogni spesa, fino alla prima, e ne ritrova una da ciò che ricordi: una nota, una voce, un importo.',
-        'Finito un mese, conserva il budget con cui si è chiuso. Cambiare il piano dopo non riscrive un mese passato.',
+        'Finito un mese, conserva il budget con cui si è chiuso. Cambiare il budget dopo non riscrive un mese passato.',
         'In un’economia domestica, ogni spesa dice chi ha pagato – un membro o il conto comune. La panoramica mostra chi deve cosa a chi, riportato di mese in mese, e i pagamenti minimi per pareggiare. La ripartizione, in parti uguali o per quota, vale per le spese registrate da quel momento.',
       ],
     },
@@ -117,7 +117,7 @@ export const it: PartialContent = {
       body: [
         'Il budget descrive un mese tipico: ciò che entra, ciò che esce e ciò che viene tenuto da parte. Lo aggiorni tu, non è un registro dei movimenti — l’app non vede mai la tua banca.',
         'Le voci stanno sotto intestazioni che scegli tu. Ogni voce ha un tipo, ed è quello che conta: entrate e uscite sono denaro che arriva e che se n’è andato, mentre risparmi, fatture e acquisti lasciano il tuo conto senza lasciare il tuo patrimonio.',
-        'C’è un solo piano, non uno al mese. L’app ne conserva una copia per ogni mese concluso. Quando qualcosa cambia — un aumento, un trasloco, una nuova assicurazione — la versione precedente resta un passo indietro, sopra il budget, e può ricevere un nome.',
+        'C’è un solo budget, non uno al mese. L’app ne conserva una copia per ogni mese concluso. Quando qualcosa cambia — un aumento, un trasloco, una nuova assicurazione — la versione precedente resta un passo indietro, con ciò che è cambiato.',
       ],
     },
 

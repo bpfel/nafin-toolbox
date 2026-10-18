@@ -282,7 +282,7 @@ export const en = {
   'budget.expenses': 'Expenses',
   'budget.savings': 'Savings',
   'budget.unallocated': 'Unallocated',
-  'budget.currentPlan': 'Current plan',
+  'budget.currentPlan': 'Current budget',
   'budget.since': 'since {month}',
   'budget.previousVersion': 'Earlier version',
   'budget.nextVersion': 'Later version',
@@ -296,7 +296,7 @@ export const en = {
   'change.automaticOff': 'no longer paid automatically',
   'change.showAll': 'Show all {count} changes',
   'change.showFewer': 'Show fewer',
-  'reset.versionsKept': 'Earlier versions of the plan are kept.',
+  'reset.versionsKept': 'Earlier versions of the budget are kept.',
   'budget.perYear': '/yr',
   'budget.plannedMo': 'Planned/mo',
   'budget.plannedYr': 'Planned/yr',
@@ -371,9 +371,9 @@ export const en = {
   'reset.title': 'Reset budget',
   'reset.explain.one': 'This removes all {count} entry, its category and every planned amount. You start again from an empty budget.',
   'reset.explain.other': 'This removes all {count} entries, their categories and every planned amount. You start again from an empty budget.',
-  'reset.noSnapshots': 'No month has ended since this plan was made, so no record of it will remain.',
+  'reset.noSnapshots': 'No month has ended since this budget was made, so no record of it will remain.',
 
-  'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Earlier versions of the plan keep their copy of it.',
+  'entry.deleteExplain': 'Remove {name} from your budget? Its planned amount goes with it. Earlier versions of the budget keep their copy of it.',
 
 
   // --- Accounts ---
@@ -392,7 +392,7 @@ export const en = {
   'allocated.due': 'due {month}',
   'allocated.ofTarget': 'of',
   'accounts.guide.title': 'What this screen shows',
-  'accounts.guide.body': "The balance is what the account holds once this month's plan has run — carried forward from the last time you corrected it, not accumulated from transactions. Allocated is the part already spoken for by bills and purchases saving up in it. Free is what is left over: money in the account with no job yet.",
+  'accounts.guide.body': "The balance is what the account holds once this month's budget has run — carried forward from the last time you corrected it, not accumulated from transactions. Allocated is the part already spoken for by bills and purchases saving up in it. Free is what is left over: money in the account with no job yet.",
   'accounts.guide.controls': 'Every card carries the same controls. The magnifier opens what that account’s allocated figure is made of. The sliders correct its balance — the amount and the date it is true as of, which are set together. The QR code makes a bill for paying into the account, and appears only once the account has an IBAN. Turning on editing adds a pencil and a bin.',
   'accountForm.typeGuide.title': "What an account's type is for",
   'accountForm.typeGuide.body': 'It changes nothing about the arithmetic. It is how an account is recognised at a glance when several have similar names, and it is what a future net-worth view will group by — a savings account and a pillar 3a are both yours, but only one of them can be spent this month.',
@@ -633,7 +633,7 @@ export const en = {
   // The second walkthrough. Its own title and body; the buttons are shared
   // with the first, because "Start" says all a button needs to.
   'knowledge.sharedTourTitle': 'Set up shared budgets',
-  'knowledge.sharedTourBody': 'How two people keep a household plan beside their own, and who may change it.',
+  'knowledge.sharedTourBody': 'How two people keep a household budget beside their own, and who may change it.',
   'knowledge.about': 'About this app',
   'knowledge.swiss': 'Swiss basics',
   'knowledge.sources': 'Official sources',
