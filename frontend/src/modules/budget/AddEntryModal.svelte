@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Sheet from '../../lib/nav/Sheet.svelte'
   import { t } from '../../lib/i18n/index.svelte'
   import { untrack } from 'svelte'
   import * as engine from '../../lib/budget/budgetEngine'
@@ -8,8 +9,6 @@
     type EntryType,
     type VaultData,
   } from '../../lib/crypto/vault'
-  import { focusTrap } from '../../lib/util/focusTrap'
-  import { closeOnBack } from '../../lib/nav/closeOnBack'
   import { autofocus } from '../../lib/util/autofocus'
   import { centsOf, formatAmount, fromCents, parseAmount } from '../../lib/util/money'
   import { monthNames } from '../../lib/util/months'
@@ -329,19 +328,12 @@
     }
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose()
-  }
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) onclose()
-  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<div class="backdrop" role="presentation" onclick={handleBackdrop}>
-  <div class="modal" role="dialog" aria-label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} use:focusTrap use:closeOnBack={onclose}>
+<Sheet label={isEdit ? t('entry.editTitle') : t('entry.addTitle')} {onclose}>
+  <!-- One block, so the dialog keeps its own spacing rather than the sheet's. -->
+  <div>
     <h3>
       {t(isEdit ? 'entry.editTypeTitle' : 'entry.addTypeTitle', {
         type: t(`entryType.${type}` as 'entryType.expense'),
@@ -525,7 +517,7 @@
     {:else}
     <div class="actions">
       {#if isEdit && ondelete}
-        <button class="btn delete" onclick={ondelete}>{t('action.delete')}</button>
+        <button class="btn delete-quiet" onclick={ondelete}>{t('action.delete')}</button>
       {/if}
       <span class="spacer"></span>
       <button class="btn cancel" onclick={onclose}>{t('action.cancel')}</button>
@@ -535,7 +527,7 @@
     </div>
     {/if}
   </div>
-</div>
+</Sheet>
 
 <style>
   .split {
@@ -567,30 +559,6 @@
     color: #555;
   }
 
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 1rem;
-  }
-  .modal {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 400px;
-    /* A dialog taller than the screen is a dialog whose buttons cannot be
-       reached. `dvh` rather than `vh`: on a phone the two disagree by exactly
-       the height of the browser's own chrome, which is the margin that decides
-       whether the last row is on screen. */
-    max-height: 88dvh;
-    overflow-y: auto;
-    box-shadow: var(--shadow-modal);
-  }
   h3 {
     margin: 0 0 0.25rem;
     font-size: 1.1rem;
@@ -649,11 +617,11 @@
     box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
   }
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.85rem;
     margin: 0 0 0.75rem;
     padding: 0.5rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 4px;
   }
   .actions {
@@ -666,40 +634,6 @@
      reaching for Cancel. */
   .spacer {
     flex: 1;
-  }
-  .delete {
-    background: white;
-    border: 1px solid #c0392b;
-    color: #c0392b;
-  }
-  .delete:hover {
-    background: #fdecea;
-  }
-  .btn {
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .cancel {
-    background: #f1f3f5;
-    border: 1px solid #dee2e6;
-    color: #333;
-  }
-  .cancel:hover:not(:disabled) {
-    background: #e9ecef;
-  }
-  .save {
-    background: #2d6a4f;
-    border: none;
-    color: white;
-  }
-  .save:hover:not(:disabled) {
-    background: #245a42;
   }
 
   .values-section {
@@ -739,15 +673,4 @@
     color: var(--ink-faint);
   }
 
-  @media (max-width: 480px) {
-    .backdrop {
-      align-items: flex-end;
-      padding: 0;
-    }
-    .modal {
-      max-width: 100%;
-      border-radius: 16px 16px 0 0;
-      padding: 1.5rem 1.25rem 2rem;
-    }
-  }
 </style>

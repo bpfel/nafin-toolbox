@@ -447,14 +447,14 @@
     color: #666;
   }
   .amount.negative {
-    color: #c0392b;
+    color: var(--alarm);
   }
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.85rem;
     margin: 0;
     padding: 0.6rem 0.75rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 4px;
   }
   .loading {

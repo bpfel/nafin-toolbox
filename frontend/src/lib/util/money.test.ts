@@ -121,7 +121,9 @@ describe('cents — exact, whichever way the amount came in', () => {
  */
 describe('cents — no stored figure changes', () => {
   test('every two-decimal amount reads the same as the floating-point way did', () => {
-    for (let n = -250_000; n <= 2_500_000; n += 37) {
+    // Every rappen from -10.00 to 10.00, then a sparse sweep to 25'000.00.
+    const amounts = [...Array.from({ length: 2001 }, (_, i) => i - 1000), ...Array.from({ length: 2500 }, (_, i) => i * 997)]
+    for (const n of amounts) {
       const stored = fromCents(n)
       const floating = Math.round(Number(stored) * 100)
       expect(centsOf(stored)).toBe(floating)

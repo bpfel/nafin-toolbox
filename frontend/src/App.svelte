@@ -440,10 +440,10 @@
   .link-btn:hover { color: #245a42; }
 
   .error {
-    color: #c0392b;
+    color: var(--alarm);
     font-size: 0.9rem;
     padding: 0.5rem 0.75rem;
-    background: #fdecea;
+    background: var(--alarm-soft);
     border-radius: 6px;
     margin-top: 1rem;
   }

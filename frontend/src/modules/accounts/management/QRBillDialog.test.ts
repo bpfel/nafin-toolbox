@@ -181,7 +181,7 @@ const HOLDER = {
 
 describe('QRBillDialog generation', () => {
   test('validates before encoding and reports the offending field', async () => {
-    const { container } = render(QRBillDialog, {
+    render(QRBillDialog, {
       props: {
         account: account({
           iban: 'CH4431999123000889012',
@@ -199,11 +199,11 @@ describe('QRBillDialog generation', () => {
     await waitFor(() => {
       expect(screen.getByText(/must be exactly 27 digits/)).toBeTruthy()
     })
-    expect(container.querySelector('svg')).toBeNull()
+    expect(screen.getByRole('dialog').querySelector('svg')).toBeNull()
   })
 
   test('a valid bill runs the payload -> encode -> svg pipeline', async () => {
-    const { container } = render(QRBillDialog, {
+    render(QRBillDialog, {
       props: {
         account: account({
           iban: 'CH4431999123000889012',
@@ -221,7 +221,7 @@ describe('QRBillDialog generation', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
 
     await waitFor(() => {
-      expect(container.querySelector('svg')).toBeTruthy()
+      expect(screen.getByRole('dialog').querySelector('svg')).toBeTruthy()
     })
   })
 })

@@ -153,7 +153,7 @@
     margin: 0 0 1.25rem;
   }
   .stakes {
-    background: #fdecea;
+    background: var(--alarm-soft);
     border: 1px solid #f5c6c2;
     border-radius: 8px;
     padding: 0.9rem 1rem;
@@ -216,7 +216,7 @@
     margin: 0.4rem 0 0.9rem;
   }
   .status.failed {
-    color: #c0392b;
+    color: var(--alarm);
   }
   .actions {
     display: flex;

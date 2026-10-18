@@ -156,8 +156,8 @@
   }
 
   .action.danger:hover:not(:disabled) {
-    background: #fdecea;
-    color: #c0392b;
+    background: var(--alarm-soft);
+    color: var(--alarm);
   }
 
   .action:focus-visible {
