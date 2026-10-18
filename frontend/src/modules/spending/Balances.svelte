@@ -23,9 +23,11 @@
     members: { id: string; name: string }[]
     me: string
     readOnly: boolean
+    /** Edit mode: a payment can be deleted, the split changed. Recording one is not behind it. */
+    editing?: boolean
   }
 
-  let { vault, month, members, me, readOnly }: Props = $props()
+  let { vault, month, members, me, readOnly, editing = false }: Props = $props()
 
   /** A name for anybody a record mentions, including somebody who has left. */
   function nameOf(id: string): string {
@@ -118,7 +120,7 @@
             {t('spending.transfer', { from: nameOf(payment.from), to: nameOf(payment.to) })}
             <strong><Money value={payment.amount} /></strong>
           </span>
-          {#if !readOnly}
+          {#if !readOnly && editing}
             <button class="remove" aria-label={t('spending.deletePayment')} title={t('spending.deletePayment')} onclick={() => remove(payment.id)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polyline points="3 6 5 6 21 6" />
@@ -131,7 +133,7 @@
     </ul>
   {/if}
 
-  <SplitSetting {vault} {members} {readOnly} />
+  <SplitSetting {vault} {members} readOnly={readOnly || !editing} />
 </section>
 
 <style>

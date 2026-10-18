@@ -30,12 +30,14 @@
     members?: { id: string; name: string }[]
     me?: string
     readOnly?: boolean
+    /** Edit mode is on: payments can be deleted and the split changed. */
+    editing?: boolean
     /** Stepping months; absent at the newest or the oldest. */
     onprevious?: () => void
     onnext?: () => void
   }
 
-  let { vault, month, names, onopen, members = [], me = '', readOnly = false, onprevious, onnext }: Props = $props()
+  let { vault, month, names, onopen, members = [], me = '', readOnly = false, editing = false, onprevious, onnext }: Props = $props()
 
   /** Only where there is somebody to owe: two members, or records that say who paid. */
   let shared = $derived(members.length > 1 || vault.belege.some(b => b.paidBy !== undefined))
@@ -203,7 +205,7 @@
   </div>
 
   {#if shared}
-    <Balances {vault} {month} {members} {me} {readOnly} />
+    <Balances {vault} {month} {members} {me} {readOnly} {editing} />
   {/if}
 </div>
 

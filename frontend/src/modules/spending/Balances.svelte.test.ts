@@ -26,8 +26,8 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-const show = (readOnly = false) =>
-  render(Balances, { vault: store.vault!, month: '2026-10', members, me: '1', readOnly })
+const show = (readOnly = false, editing = true) =>
+  render(Balances, { vault: store.vault!, month: '2026-10', members, me: '1', readOnly, editing })
 
 describe('who owes whom', () => {
   test('proposes the one payment that evens two people out, and recording it does', async () => {
@@ -54,6 +54,17 @@ describe('who owes whom', () => {
     expect(screen.queryByRole('button', { name: 'Change split' })).toBeNull()
   })
 
+  // Recording a payment adds one, and is always there; changing what was
+  // recorded — deleting a payment, the split — waits for the pen.
+  test('without edit mode, payments are recorded but not deleted, and the split is not changed', async () => {
+    show(false, false)
+    await userEvent.click(screen.getByRole('button', { name: 'Record payment' }))
+
+    expect(store.vault!.settlements).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Delete payment' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Change split' })).toBeNull()
+  })
+
   // Two people: typing one share sets the other.
   test('typing one share of two sets the other, so it always adds up to 100', async () => {
     show()
@@ -70,7 +81,7 @@ describe('who owes whom', () => {
   // Three: whoever has not been typed in gives way, so what you typed stays.
   test('with three, the one not typed in takes the rest', async () => {
     const three = [...members, { id: '3', name: 'Cleo' }]
-    render(Balances, { vault: store.vault!, month: '2026-10', members: three, me: '1', readOnly: false })
+    render(Balances, { vault: store.vault!, month: '2026-10', members: three, me: '1', readOnly: false, editing: true })
     await userEvent.click(screen.getByRole('button', { name: 'Change split' }))
     await userEvent.click(screen.getByLabelText('By share'))
 
