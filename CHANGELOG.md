@@ -50,6 +50,12 @@ release may change things without a deprecation period. Each release is a tag on
   taken before are removed when a budget is next opened. (Pre-beta: no
   migration to month copies, since a copy taken mid-month is not the plan a
   month ended with.)
+- **Reset budget is gone; Delete all data replaces it, in Profile.** Reset
+  cleared the budget but kept its history, receipts and accounts, so a fresh
+  budget arrived with the old one's past attached. Delete all data, beside
+  Delete account and confirmed with your password, deletes your budget, its
+  history, your receipts and your accounts. Your login and your households
+  stay. A household's budget is not touched.
 
 ### New
 

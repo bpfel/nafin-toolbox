@@ -232,6 +232,11 @@ export const fr: Messages = {
   'security.deletePrompt': 'Saisis ton mot de passe pour confirmer la suppression du compte:',
   'security.deleteMyAccount': 'Supprimer mon compte',
   'security.deleting': 'Suppression...',
+  'security.deleteDataTitle': 'Supprimer toutes les données',
+  'security.deleteDataHint': 'Ton budget et ses versions précédentes, tes tickets et tes comptes sont supprimés. Tu gardes ton identifiant et tes ménages. Cette action est irréversible.',
+  'security.deleteDataPrompt': 'Saisis ton mot de passe pour supprimer toutes tes données:',
+  'security.deleteMyData': 'Supprimer toutes mes données',
+  'security.wrongPassword': 'Ce mot de passe n’est pas correct.',
 
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Activer l’authentification à deux facteurs',
@@ -284,7 +289,6 @@ export const fr: Messages = {
   'change.automaticOff': 'plus payé automatiquement',
   'change.showAll': 'Afficher les {count} changements',
   'change.showFewer': 'Afficher moins',
-  'reset.versionsKept': 'Les versions précédentes du budget sont conservées.',
   'budget.perYear': '/an',
   'budget.plannedMo': 'Prévu/mois',
   'budget.plannedYr': 'Prévu/an',
@@ -300,7 +304,6 @@ export const fr: Messages = {
   'budget.editCategoryOf': 'Modifier la catégorie {category}',
   'budget.addEntryTo': 'Ajouter une entrée à {category}',
   'budget.uncategorised': 'Autres',
-  'budget.reset': 'Réinitialiser le budget',
   'budget.setupTitle': 'Configurer ton budget',
   'budget.setupHint': 'Commence avec des entrées suisses par défaut, fondées sur l’enquête sur le budget des ménages de l’OFS (HABE 2023, personne seule). Tu pourras tout adapter par la suite.',
   'budget.setupHintHousehold': 'Commence avec des entrées suisses par défaut pour un ménage de deux personnes, fondées sur l’enquête sur le budget des ménages de l’OFS (HABE 2020–2021, couples de moins de 65 ans sans enfants). Tu pourras tout adapter par la suite.',
@@ -363,10 +366,6 @@ export const fr: Messages = {
   // --- Snapshots ---
 
   // --- Resetting ---
-  'reset.title': 'Réinitialiser le budget',
-  'reset.explain.one': 'Cela supprime l’unique entrée, sa catégorie et tous les montants prévus. Tu repars d’un budget vide.',
-  'reset.explain.other': 'Cela supprime les {count} entrées, leurs catégories et tous les montants prévus. Tu repars d’un budget vide.',
-  'reset.noSnapshots': 'Aucun mois ne s’est terminé depuis la création de ce budget : il n’en restera aucune trace.',
 
   // --- Accounts ---
   'accounts.add': 'Ajouter',

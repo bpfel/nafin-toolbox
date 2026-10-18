@@ -1,4 +1,5 @@
 import { thisMonth, today } from '../util/calendar'
+import { newId, todayISO } from '../sync/source'
 
 const NONCE_LENGTH = 12
 
@@ -1117,6 +1118,28 @@ export function createEmptyVault(mainAccountName = 'Main'): VaultData {
     settlements: [],
     split: { mode: 'equal' },
   }
+}
+
+/**
+ * Everything the vault holds about money, gone: the budget and its history,
+ * records, balances, accounts. What is left is the vault a new sign-up gets —
+ * one empty account — so nothing outlives it to be found later as a history
+ * of a budget that no longer exists.
+ *
+ * Kept: whose keys this account has already checked (`trust` — clearing it
+ * would quietly undo a verification), and whether the tour was taken, which
+ * is about the person, not their money.
+ *
+ * In place, through the sync source, so it replays like any other change onto
+ * a vault saved elsewhere meanwhile — and wipes what was added there too.
+ */
+export function deleteAllData(vault: VaultData, mainAccountName: string): void {
+  const fresh = createEmptyVault(mainAccountName)
+  fresh.accounts[0].id = newId('account')
+  fresh.accounts[0].lastCorrectedAt = todayISO()
+  const { trust, tour } = vault
+  for (const key of Object.keys(vault)) delete (vault as unknown as Record<string, unknown>)[key]
+  Object.assign(vault, fresh, { trust, tour })
 }
 
 function createMainAccount(name: string): VaultAccount {

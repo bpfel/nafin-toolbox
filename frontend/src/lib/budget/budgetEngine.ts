@@ -585,6 +585,11 @@ export function setAutomatic(vault: VaultData, entryId: string, automatic: boole
   else delete entry.automatic
 }
 
+/**
+ * An empty budget, for the tour's example on a throwaway copy. Not offered to
+ * anyone any more: Delete all data in Profile replaced Reset budget, which
+ * cleared the budget but kept its history (see `deleteAllData`).
+ */
 export function resetBudget(vault: VaultData): void {
   vault.budget.entries = []
   vault.budget.categories = []

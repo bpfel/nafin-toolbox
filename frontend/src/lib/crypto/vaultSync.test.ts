@@ -366,13 +366,16 @@ describe('order and bulk', () => {
     expect([...saved.budget.entries].sort((a, b) => a.sortOrder - b.sortOrder).map(e => e.id)).toEqual(mine)
   })
 
-  test('18. a reset here wipes what was added elsewhere — that is what reset means', async () => {
-    commit('resetBudget')
+  test('18. deleting all data here wipes what was added elsewhere — that is what it means', async () => {
+    commit('deleteAllData', 'Main')
     await elsewhere(v => budget.createEntry(v, { name: 'Gym', type: 'expense', categoryName: 'Health' }))
 
     await saveVault()
 
-    expect((await onServer()).budget.entries).toEqual([])
+    const saved = await onServer()
+    expect(saved.budget.entries).toEqual([])
+    expect(saved.budget.snapshots).toEqual([])
+    expect(saved.accounts).toHaveLength(1)
   })
 
   test('19. seeding a budget seeded elsewhere first does nothing, silently', async () => {

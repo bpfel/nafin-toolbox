@@ -9,8 +9,7 @@
   import VersionChanges from './VersionChanges.svelte'
   import { planVersions, changesAfter } from '../../lib/budget/versions'
   import { monthLabel } from '../../lib/util/months'
-  import ResetBudgetModal from './ResetBudgetModal.svelte'
-  import { isEditing, clearEditing } from '../../lib/util/editMode.svelte'
+  import { clearEditing } from '../../lib/util/editMode.svelte'
 
   const vaultState = getVaultState()
 
@@ -129,17 +128,6 @@
   export function openAddEntry() {
     table?.openAddEntry()
   }
-
-  let confirmingReset = $state(false)
-
-  function handleReset() {
-    if (!vaultState.vault) return
-    commit('resetBudget')
-    // An empty budget is exactly the state the setup screen exists for, so the
-    // offer of the defaults comes back rather than leaving a blank table.
-    dismissedSetup = false
-    version++
-  }
 </script>
 
 <div class="budget-module">
@@ -181,11 +169,6 @@
         oncategorychanged={() => {}}
       />
     {:else}
-    {#if isEditing('budget') && summary.entries.length > 0}
-      <div class="module-actions">
-        <button class="btn-reset" onclick={() => confirmingReset = true}>{t('budget.reset')}</button>
-      </div>
-    {/if}
     {#if summary.entries.length > 0}
       <BudgetSummary {summary} {viewMode} />
     {/if}
@@ -199,15 +182,6 @@
       onentrydeleted={handleEntryChange}
       oncategorychanged={handleEntryChange}
     />
-    {/if}
-
-    {#if confirmingReset}
-      <ResetBudgetModal
-        entryCount={vaultState.vault.budget.entries.length}
-        snapshotCount={vaultState.vault.budget.snapshots.length}
-        onreset={handleReset}
-        onclose={() => confirmingReset = false}
-      />
     {/if}
   {/if}
 </div>
@@ -225,25 +199,6 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-  }
-  .module-actions {
-    display: flex;
-    justify-content: flex-end;
-    /* The module already spaces its children generously; the bar belongs to the
-       table below it rather than floating alone. */
-    margin-bottom: -1rem;
-  }
-  .btn-reset {
-    background: white;
-    color: #c0392b;
-    border: 1px solid #c0392b;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.8rem;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .btn-reset:hover {
-    background: #fdecea;
   }
   .loading {
     color: var(--ink-faint);

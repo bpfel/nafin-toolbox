@@ -1,4 +1,4 @@
-import { savesTowardsTarget, sideOf, type EntryType, type VaultData } from '../crypto/vault'
+import { deleteAllData, savesTowardsTarget, sideOf, type EntryType, type VaultData } from '../crypto/vault'
 import * as budget from '../budget/budgetEngine'
 import * as accounts from '../accounts/accountsEngine'
 import * as belege from '../belege/belegeEngine'
@@ -190,7 +190,6 @@ export const ACTIONS = {
   reorderCategories: def({ apply: budget.reorderCategories }),
 
   // --- the whole budget ---
-  resetBudget: def({ apply: budget.resetBudget }),
   // Seeding is for an empty budget. If somebody else filled it first, what was
   // asked for has happened, and doing it twice would double every line.
   seedDefaults: def({
@@ -201,6 +200,10 @@ export const ACTIONS = {
     apply: budget.seedSharedDefaults,
     check: v => (v.budget.entries.length > 0 ? 'done' : 'go'),
   }),
+
+  // --- everything ---
+  // Wipes what was added elsewhere meanwhile too: that is what it means.
+  deleteAllData: def({ apply: deleteAllData }),
 
   // --- accounts ---
   createAccount: def({

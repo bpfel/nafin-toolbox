@@ -778,6 +778,30 @@ export async function setupKeys(password: string, email: string, userId: number)
 }
 
 /**
+ * Delete everything in this account's own vault, after the password — the
+ * same proof Delete account asks for, checked here by unwrapping the vault key
+ * with it rather than by the server, which could not tell a budget from noise.
+ *
+ * Always the personal vault, whichever is on screen: a household's budget is
+ * the household's, and goes with the household. Saved at once, not after the
+ * usual pause — this is not a change anyone should be able to close the tab on
+ * half-way.
+ */
+export async function deleteAllMyData(password: string, email: string): Promise<'ok' | 'wrong-password'> {
+  const keys = await fetchVaultKeys()
+  if (!keys) return 'wrong-password'
+  try {
+    await unwrapMEK(keys.encrypted_mek, await deriveKEK(password, email, keys.iterations))
+  } catch {
+    return 'wrong-password'
+  }
+  await switchTo('personal')
+  commit('deleteAllData', mainAccountName())
+  saveNow()
+  return 'ok'
+}
+
+/**
  * What a new vault's first account is called, in the language in use when the
  * vault is made. It was always "Main" — English written into a French user's
  * vault as data, where no catalogue could reach it.
