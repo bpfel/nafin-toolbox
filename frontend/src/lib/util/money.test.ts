@@ -113,3 +113,20 @@ describe('cents — exact, whichever way the amount came in', () => {
     expect(fromCents(-5)).toBe('-0.05')
   })
 })
+
+/**
+ * Moving Belege, the entry dialog and the balances from floating point to the
+ * exact conversion must not move any figure already stored: every stored
+ * amount has two decimals, and for those the two always agreed.
+ */
+describe('cents — no stored figure changes', () => {
+  test('every two-decimal amount reads the same as the floating-point way did', () => {
+    for (let n = -250_000; n <= 2_500_000; n += 37) {
+      const stored = fromCents(n)
+      const floating = Math.round(Number(stored) * 100)
+      expect(centsOf(stored)).toBe(floating)
+      expect(toCents(stored)).toBe(floating)
+      expect(normalizeAmount(stored.replace('-', ''))).toBe((Math.abs(floating) / 100).toFixed(2))
+    }
+  })
+})
