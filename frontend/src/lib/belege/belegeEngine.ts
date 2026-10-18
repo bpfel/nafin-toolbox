@@ -1,7 +1,7 @@
 import type { Beleg, Settlement, Split, VaultData, VaultEntry, VaultSnapshot, VaultSnapshotLine } from '../crypto/vault'
-import { snapshotLine } from '../budget/budgetEngine'
+import { categoryRank, snapshotLine } from '../budget/budgetEngine'
 import { newId, nowISO } from '../sync/source'
-import { normalizeAmount } from '../util/money'
+import { centsOf, normalizeAmount } from '../util/money'
 import { nextMonth } from '../util/calendar'
 
 /**
@@ -147,10 +147,10 @@ export function monthCopy(vault: VaultData, month: string): VaultSnapshot | unde
  */
 function monthLines(vault: VaultData, month: string): VaultSnapshotLine[] {
   const pointedAt = new Set(belegeIn(vault, month).map(b => b.entryId).filter((id): id is string => id !== null))
-  const categoryOrder = new Map(vault.budget.categories.map(c => [c.id, c.sortOrder]))
+  const rank = categoryRank(vault)
   return vault.budget.entries
     .filter(e => !e.archived || pointedAt.has(e.id))
-    .sort((a, b) => (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0) || a.sortOrder - b.sortOrder)
+    .sort((a, b) => rank(a.categoryId) - rank(b.categoryId) || a.sortOrder - b.sortOrder)
     .map(e => (e.archived ? { ...snapshotLine(vault, e), archived: true as const } : snapshotLine(vault, e)))
 }
 
@@ -252,8 +252,7 @@ export function sharesFor(split: Split, members: string[]): Record<string, numbe
 // --- money in rappen -----------------------------------------------------------
 
 export function rappen(amount: string): number {
-  const value = Number(normalizeAmount(amount))
-  return Number.isFinite(value) ? Math.round(value * 100) : 0
+  return centsOf(amount)
 }
 
 /**

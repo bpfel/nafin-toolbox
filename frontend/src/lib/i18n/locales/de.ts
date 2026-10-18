@@ -166,6 +166,7 @@ export const de: Messages = {
   'invite.linkWhy': 'Nur wenn du ihn selbst schickst, kann die App den Schlüssel für dich prüfen. Am sichersten ist der Code zum Scannen.',
   'invite.copy': 'Link kopieren',
   'invite.copied': 'Kopiert',
+  'invite.copyFailed': 'Die Zwischenablage ist nicht erreichbar. Kopiere den Link hier:',
   'invite.done': 'Fertig',
   'invite.pending': 'Eingeladen',
   'invite.accepted': 'Angenommen',

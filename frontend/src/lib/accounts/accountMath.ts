@@ -5,8 +5,9 @@ import {
   type VaultEntry,
   type VaultData,
 } from '../crypto/vault'
-import { fromCents, monthlyForItem, nextDue, requiredForItem, toCents } from './reserveMath'
+import { monthlyForItem, nextDue, requiredForItem } from './reserveMath'
 import { monthsBetween } from '../util/calendar'
+import { fromCents, toCents } from '../util/money'
 
 // Per-account figures, derived on every read. Nothing here writes to the vault:
 // the account holds an anchor pair (`currentAmount` as at `lastCorrectedAt`) and

@@ -9,7 +9,7 @@
     projectedBalance,
     requiredForAccount,
   } from '../../../lib/accounts/accountMath'
-  import { toCents } from '../../../lib/accounts/reserveMath'
+  import { toCents } from '../../../lib/util/money'
   import type { VaultAccount } from '../../../lib/crypto/vault'
   import { isEditing } from '../../../lib/util/editMode.svelte'
   import Money from '../../../lib/util/Money.svelte'

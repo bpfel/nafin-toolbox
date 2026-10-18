@@ -2,6 +2,7 @@ import { buildMonthSnapshot, closeMonth } from '../belege/belegeEngine'
 import { describe, test, expect, beforeEach } from 'vitest'
 import {
   listCategories,
+  categoryRank,
   createCategory,
   updateCategory,
   mergeCategory,
@@ -22,6 +23,21 @@ import {
 } from './budgetEngine'
 import { createEmptyVault, holdsMoney, savesTowardsTarget, type VaultData } from '../crypto/vault'
 import { isLegalEntryRouting, isLegalRouting, primaryAccountId } from '../accounts/routing'
+
+// The table, the allocations and a month's copy used to decide this each for
+// themselves, and a month's copy put a vanished category first.
+describe('categoryRank', () => {
+  test('by sortOrder, and a category that no longer exists last', () => {
+    const vault = createEmptyVault('Main')
+    createCategory(vault, 'Housing', 'expense', 20)
+    createCategory(vault, 'Food', 'expense', 10)
+    const rank = categoryRank(vault)
+    const ids = [...vault.budget.categories.map(c => c.id), 'gone']
+
+    expect([...ids].sort((a, b) => rank(a) - rank(b)).at(-1)).toBe('gone')
+    expect(rank(vault.budget.categories[1].id)).toBeLessThan(rank(vault.budget.categories[0].id))
+  })
+})
 
 describe('listCategories', () => {
   test('returns empty array for empty vault', () => {

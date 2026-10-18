@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tick } from 'svelte'
 import Sortable from 'sortablejs'
@@ -260,6 +260,20 @@ describe('AccountManagement edit mode', () => {
 
     render(AccountManagement, { props: { currentMonth: '2026-08' } })
     expect(screen.getAllByRole('button', { name: 'Correct the balance of Main' })).toHaveLength(1)
+  })
+
+  // Enter submits before the field tidies itself on blur, so the correction
+  // reads the amount exactly as typed — with the ’ an iPhone puts in.
+  test('a correction typed with the iPhone’s apostrophe and sent with Enter is taken', async () => {
+    store.vault = vault(account('a', 'Main'))
+    render(AccountManagement, { props: { currentMonth: '2026-08' } })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Correct the balance of Main' }))
+    const amount = document.querySelector('.correction input[inputmode="decimal"]') as HTMLInputElement
+    await fireEvent.input(amount, { target: { value: '1’234.50' } })
+    await fireEvent.keyDown(amount, { key: 'Enter' })
+
+    expect(store.vault!.accounts[0].currentAmount).toBe('1234.50')
   })
 
   test('toggling edit mode after render takes effect without a remount', async () => {

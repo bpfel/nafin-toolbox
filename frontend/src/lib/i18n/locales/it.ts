@@ -177,6 +177,7 @@ export const it: Messages = {
   'invite.linkWhy': 'Solo mandandolo tu l’app può verificare la sua chiave. Il codice da scansionare è il più sicuro.',
   'invite.copy': 'Copia il link',
   'invite.copied': 'Copiato',
+  'invite.copyFailed': 'Gli appunti non sono raggiungibili. Copia il link qui:',
   'invite.done': 'Fatto',
   'invite.pending': 'Invitato',
   'invite.accepted': 'Accettato',

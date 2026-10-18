@@ -11,7 +11,7 @@
   import { focusTrap } from '../../lib/util/focusTrap'
   import { closeOnBack } from '../../lib/nav/closeOnBack'
   import { autofocus } from '../../lib/util/autofocus'
-  import { formatAmount, parseAmount } from '../../lib/util/money'
+  import { centsOf, formatAmount, fromCents, parseAmount } from '../../lib/util/money'
   import { monthNames } from '../../lib/util/months'
   import { thisMonth } from '../../lib/util/calendar'
 
@@ -155,11 +155,6 @@
   // billing cycles, so deriving it from an amount would produce cycles that do
   // not exist.
 
-  function centsOf(value: string): number {
-    const parsed = parseAmount(value)
-    return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0
-  }
-
   function monthlyFromTotal(): string {
     const total = centsOf(totalValue)
     if (total <= 0 || periodMonths <= 0) return ''
@@ -258,7 +253,7 @@
     if (targeted) {
       const total = centsOf(totalValue)
       if (total <= 0 || periodMonths <= 0) return ''
-      return (Math.round(total / periodMonths) / 100).toFixed(2)
+      return fromCents(Math.round(total / periodMonths))
     }
     const raw = amountTypedIn === 'planned_mo' ? plannedMoValue : plannedYrValue
     const value = parseAmount(raw)
@@ -306,7 +301,7 @@
         }
         if (targeted) {
           commit('setReserve', editing.id, {
-            targetAmount: (centsOf(totalValue) / 100).toFixed(2),
+            targetAmount: fromCents(centsOf(totalValue)),
             periodMonths,
             anchorMonth,
           })
@@ -323,7 +318,7 @@
           categoryName: resolvedCategoryName,
           plannedAmount: monthlyAmount(),
           anchorMonth,
-          targetAmount: targeted ? (centsOf(totalValue) / 100).toFixed(2) : undefined,
+          targetAmount: targeted ? fromCents(centsOf(totalValue)) : undefined,
           periodMonths: targeted ? periodMonths : undefined,
         })
       }

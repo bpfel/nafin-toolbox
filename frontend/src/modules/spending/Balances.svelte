@@ -5,6 +5,7 @@
   import { balances, balancesIn, monthOf, settleUp } from '../../lib/belege/belegeEngine'
   import { today } from '../../lib/util/calendar'
   import Money from '../../lib/util/Money.svelte'
+  import { fromCents } from '../../lib/util/money'
   import SplitSetting from './SplitSetting.svelte'
 
   /**
@@ -54,7 +55,7 @@
   )
 
   function record(from: string, to: string, rappen: number) {
-    commit('addSettlement', { date: today(), from, to, amount: (rappen / 100).toFixed(2), createdBy: me })
+    commit('addSettlement', { date: today(), from, to, amount: fromCents(rappen), createdBy: me })
     saveNow()
   }
 

@@ -2,7 +2,7 @@
   import { accountKindLabel } from '../../../lib/accounts/labels'
   import { t } from '../../../lib/i18n/index.svelte'
   import type { VaultAccount } from '../../../lib/crypto/vault'
-  import { formatAmount, moneyInput } from '../../../lib/util/money'
+  import { cleanAmount, formatAmount, moneyInput } from '../../../lib/util/money'
   import { amountsHidden } from '../../../lib/util/privacy.svelte'
   import Money from '../../../lib/util/Money.svelte'
   import { isEditing } from '../../../lib/util/editMode.svelte'
@@ -56,9 +56,14 @@
     return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  /** Accepts 1234.5, 1'234.50 and 1234,50; returns a 2-decimal string. */
-  function normalizeAmount(raw: string): string | null {
-    const cleaned = raw.replace(/['\s]/g, '').replace(',', '.')
+  /**
+   * Accepts 1234.5, 1’234.50 and 1234,50, and a minus — an overdrawn account
+   * is corrected like any other; returns a 2-decimal string. The noise is the
+   * shared set: a private copy that knew only `'` turned away the `’` an
+   * iPhone types, whenever Enter was pressed before the field had tidied it.
+   */
+  function correctedAmount(raw: string): string | null {
+    const cleaned = cleanAmount(raw)
     if (!/^-?\d+(\.\d{1,2})?$/.test(cleaned)) return null
     return Number(cleaned).toFixed(2)
   }
@@ -76,7 +81,7 @@
   }
 
   function submitCorrection() {
-    const amount = normalizeAmount(amountInput)
+    const amount = correctedAmount(amountInput)
     if (amount === null) {
       correctionError = t('accounts.errorAmount')
       return

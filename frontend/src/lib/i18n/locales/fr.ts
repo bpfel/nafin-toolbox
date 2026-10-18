@@ -177,6 +177,7 @@ export const fr: Messages = {
   'invite.linkWhy': 'C’est en l’envoyant toi-même que l’app peut vérifier sa clé. Le code à scanner est le plus sûr.',
   'invite.copy': 'Copier le lien',
   'invite.copied': 'Copié',
+  'invite.copyFailed': 'Le presse-papiers est inaccessible. Copie le lien ici:',
   'invite.done': 'Terminé',
   'invite.pending': 'Invité',
   'invite.accepted': 'Accepté',
