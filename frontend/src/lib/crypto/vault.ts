@@ -202,12 +202,13 @@ export interface VaultSnapshot {
    */
   month: string
   /**
-   * Taken late, for a month before the budget's history starts: a receipt was
-   * backdated into it. A copy of the budget as it is now, not as it was then —
-   * Belege needs some yardstick for the month, but Budget's history must not
-   * present it as a version the budget once had.
+   * A yardstick for Belege, not a version of the budget, so Budget's history
+   * skips it. Two kinds: a month before the history starts that a receipt was
+   * backdated into, copied late from the budget as it is now rather than as it
+   * was then; and a month closed by a develop build before months became
+   * snapshots, which kept only the expense lines.
    */
-  backdated?: true
+  forBelegeOnly?: true
 }
 
 export interface VaultSnapshotLine {
@@ -589,6 +590,11 @@ export function migrateVault(parsed: unknown): VaultData {
   const wearingV10Keys =
     vault.version === VAULT_VERSION && (vault as { belege?: unknown }).belege === undefined
 
+  // Belege's months were a map of their own on develop before they became
+  // snapshots. Folded in, so a vault from then reads as one from now.
+  if (vault.version === VAULT_VERSION && (vault as { months?: unknown }).months !== undefined) {
+    foldMonthsIntoSnapshots(vault as unknown as DevelopV11)
+  }
   if (vault.version === VAULT_VERSION) dropHandMadeSnapshots(vault as unknown as { budget?: { snapshots?: { month?: string }[] } })
 
   if (
@@ -1062,6 +1068,33 @@ function migrateV9ToV10(vault: V9Shape): V10Shape {
 
 interface V10Shape extends V9Shape {
   people: Record<string, VaultPerson>
+}
+
+interface DevelopV11 {
+  budget: { snapshots?: VaultSnapshot[] }
+  months?: Record<string, { closedAt: string; lines: { entryId: string; entryName: string; categoryName: string; plannedAmount: string; automatic?: boolean }[] }>
+}
+
+/**
+ * A develop build kept a closed month's expense lines in `months`, apart from
+ * the snapshots. They become that month's copy, for Belege only: a copy of the
+ * expense side alone, compared with a whole budget, would read as every income
+ * and saving line removed.
+ */
+function foldMonthsIntoSnapshots(vault: DevelopV11): void {
+  const snapshots = (vault.budget.snapshots ??= [])
+  for (const [month, closed] of Object.entries(vault.months ?? {})) {
+    if (snapshots.some(s => s.month === month)) continue
+    snapshots.push({
+      id: crypto.randomUUID(),
+      createdAt: closed.closedAt,
+      month,
+      // Receipts are only ever counted against expense entries.
+      lines: closed.lines.map(l => ({ ...l, type: 'expense' as const })),
+      forBelegeOnly: true,
+    })
+  }
+  delete vault.months
 }
 
 /**
