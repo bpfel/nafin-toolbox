@@ -12,7 +12,7 @@
   import RecordDialog from '../modules/spending/RecordDialog.svelte'
   import ReviewView from '../modules/spending/ReviewView.svelte'
   import JournalView from '../modules/spending/JournalView.svelte'
-  import { clearEditing, isEditing } from '../lib/util/editMode.svelte'
+  import { isEditing } from '../lib/util/editMode.svelte'
 
   /**
    * Belege: what was actually spent, against the budget.
@@ -30,11 +30,13 @@
   const route = getRoute()
   let onJournal = $derived(route.tab === 'journal')
 
-  /** Edit mode is the Journal's; leaving the Journal leaves it. */
-  $effect(() => {
-    if (!onJournal && untrack(() => isEditing('spending'))) clearEditing()
-  })
-  let journalEditing = $derived(onJournal && isEditing('spending') && !vaultState.readOnly)
+  /**
+   * Changing what was recorded — a receipt, a payment, the split — waits for
+   * the pen, on both tabs: the screen is read far more often than corrected,
+   * and a tap that opened a dialog was a correction nobody asked for. Adding
+   * is not behind it; the "+" is the screen's ordinary action.
+   */
+  let editingOn = $derived(isEditing('spending') && !vaultState.readOnly)
   let me = $derived(String(userId ?? ''))
 
   /**
@@ -109,7 +111,7 @@
   }
 </script>
 
-<ScreenChrome title={t('nav.spending')} editKey={onJournal ? 'spending' : undefined}>
+<ScreenChrome title={t('nav.spending')} editKey="spending">
   {#snippet children()}
     {#if !vaultState.readOnly && vaultState.vault}
       <ActionButton pinned label={t('spending.add')} onclick={() => (adding = true)}>
@@ -171,12 +173,13 @@
         {members}
         {me}
         readOnly={vaultState.readOnly}
-        onopen={vaultState.readOnly ? undefined : b => (editing = b)}
+        editing={editingOn}
+        onopen={editingOn ? b => (editing = b) : undefined}
       />
     </div>
 
     <div hidden={!onJournal}>
-      <JournalView {vault} {names} onopen={journalEditing ? b => (editing = b) : undefined} />
+      <JournalView {vault} {names} onopen={editingOn ? b => (editing = b) : undefined} />
     </div>
   </div>
 
