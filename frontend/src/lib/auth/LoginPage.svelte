@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { login, setup, verify2FA, getAuthState, signInWithPasskey } from './authStore.svelte'
+  import { login, setup, verify2FA, getAuthState, signInWithPasskey, refreshSignInOptions } from './authStore.svelte'
   import TOTPInput from './TOTPInput.svelte'
   import PasskeyChoice from './PasskeyChoice.svelte'
   import { autofillSupported, passkeysSupported } from './passkey'
@@ -30,6 +30,11 @@
   let autofill: AbortController | null = null
   // A token list, not text: "webauthn" lets the field's autofill list passkeys.
   let emailAutocomplete = $derived<AutoFill>(offerPasskey ? 'email webauthn' : 'email')
+
+  // Asked each time the screen appears, not only when the page loaded.
+  $effect(() => {
+    if (!authState.needsSetup) refreshSignInOptions()
+  })
 
   // Also waits in the email field's autofill, where the browser lists any
   // passkey it has for this site. Picking one there signs in like the button.

@@ -4,12 +4,14 @@ import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest'
 // Read at call time by the mock, so each test sets what the server said.
 let passkeysOffered = false
 const signInWithPasskey = vi.fn()
+const refreshSignInOptions = vi.fn(async () => {})
 
 vi.mock('./authStore.svelte', () => ({
   login: vi.fn(),
   setup: vi.fn(),
   verify2FA: vi.fn(),
   signInWithPasskey: (...a: unknown[]) => signInWithPasskey(...a),
+  refreshSignInOptions: () => refreshSignInOptions(),
   getAuthState: () => ({ needsSetup: false, passkeysOffered }),
 }))
 
@@ -29,6 +31,12 @@ describe('the sign-in screen and passkeys', () => {
     passkeysOffered = false
     render(LoginPage, { props: { onSuccess: () => {} } })
     expect(screen.queryByRole('button', { name: 'Sign in with a passkey' })).toBeNull()
+  })
+
+  test('asks the server again each time it appears', () => {
+    refreshSignInOptions.mockClear()
+    render(LoginPage, { props: { onSuccess: () => {} } })
+    expect(refreshSignInOptions).toHaveBeenCalledOnce()
   })
 
   test('once allowed, offers one to everyone beside the password', () => {

@@ -74,6 +74,20 @@ export function getAuthState() {
   }
 }
 
+/**
+ * Ask again whether the sign-in screen should offer a passkey. Read once on
+ * page load, it went stale: an admin who allowed passkeys and signed out saw a
+ * sign-in screen without them until the page was reloaded.
+ */
+export async function refreshSignInOptions(): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/needs-setup`, { credentials: 'include' })
+    if (res.ok) passkeysOffered = (await res.json()).passkeys === true
+  } catch {
+    // Offline: keep what is known; the form works either way.
+  }
+}
+
 export function clearRecoveryKey() {
   recoveryKeyToShow = null
 }
