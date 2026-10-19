@@ -10,6 +10,16 @@ release may change things without a deprecation period. Each release is a tag on
 
 ## [Unreleased]
 
+### Security
+
+- The server is built with Go 1.27. It was built with Go 1.23, which stopped
+  receiving security fixes in August 2025.
+- Updated the libraries the server uses for the database (pgx), routing (chi) and
+  email (go-mail), and Go's text and crypto packages. The versions before had
+  known flaws on paths the server uses, among them an SQL injection in pgx's
+  placeholder handling and an open redirect in chi. None is known to have been
+  used against an instance.
+
 ## [0.5.0] — 2026-10-19
 
 Belege: what was actually spent, read against the budget, month by month — and
