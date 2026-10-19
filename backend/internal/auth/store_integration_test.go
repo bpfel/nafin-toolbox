@@ -49,6 +49,7 @@ func TestMain(m *testing.M) {
 func truncateTables(t *testing.T) {
 	t.Helper()
 	tables := []string{
+		"passkey_challenges", "passkeys",
 		"audit_log", "recovery_codes", "totp_secrets", "mfa_challenges",
 		"verification_tokens", "app_settings", "sessions", "users",
 	}

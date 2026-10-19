@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/bpfel/nafin-toolbox/internal/apierror"
@@ -86,6 +87,11 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		EncryptionKey:       encryptionKey,
 		AppURL:              appURL,
 	}
+	if wa, err := auth.NewWebAuthn(appURL); err != nil {
+		log.Printf("passkeys unavailable at %s: %v", appURL, err)
+	} else {
+		deps.WebAuthn = wa
+	}
 
 	s.router.Route("/api", func(r chi.Router) {
 		r.Use(maxBodySize(1 << 20)) // 1 MB
@@ -97,6 +103,8 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		r.Post("/auth/setup", auth.HandleSetup(deps))
 		r.Post("/auth/verify-email", auth.HandleVerifyEmail(deps))
 		r.Post("/auth/verify-2fa", auth.HandleVerify2FA(deps))
+		r.With(auth.RequirePasskeys(deps)).Post("/auth/passkeys/login/begin", auth.HandlePasskeyLoginBegin(deps))
+		r.With(auth.RequirePasskeys(deps)).Post("/auth/passkeys/login/finish", auth.HandlePasskeyLoginFinish(deps))
 
 		// Protected routes (require auth)
 		r.Group(func(r chi.Router) {
@@ -113,6 +121,20 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Delete("/auth/2fa", auth.HandleDisable2FA(deps))
 			r.Post("/auth/2fa/recovery-codes", auth.HandleRegenerateRecoveryCodes(deps))
 
+			// Passkeys, once an admin has allowed them. Removing one is
+			// always possible, so nobody is stuck with a passkey they no
+			// longer want because the switch went off.
+			r.Delete("/auth/passkeys/{id}", auth.HandleDeletePasskey(deps))
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequirePasskeys(deps))
+				r.Get("/auth/passkeys", auth.HandleListPasskeys(deps))
+				r.Post("/auth/passkeys/register/begin", auth.HandlePasskeyRegisterBegin(deps))
+				r.Post("/auth/passkeys/register/finish", auth.HandlePasskeyRegisterFinish(deps))
+				r.Post("/auth/passkeys/unlock/begin", auth.HandlePasskeyUnlockBegin(deps))
+				r.Post("/auth/passkeys/unlock/finish", auth.HandlePasskeyUnlockFinish(deps))
+				r.Put("/auth/passkeys/{id}/vault-key", auth.HandlePasskeyVaultKey(deps))
+			})
+
 			// Account management
 			r.Delete("/auth/account", auth.HandleDeleteAccount(deps))
 
@@ -123,6 +145,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Post("/auth/users/{id}/reset-password", auth.HandleAdminResetPassword(deps))
 			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
+			r.Post("/auth/settings/allow-passkeys", auth.HandleAdminAllowPasskeys(deps))
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))
 
 			r.Post("/upkeep/remind", upkeep.Handle(deps, remindLimiter))

@@ -267,6 +267,10 @@ func hashToken(raw string) string {
 }
 
 func (s *Store) CreateSession(ctx context.Context, userID int) (*Session, error) {
+	return s.createSession(ctx, userID, nil)
+}
+
+func (s *Store) createSession(ctx context.Context, userID int, passkeyID *int) (*Session, error) {
 	token, err := generateToken()
 	if err != nil {
 		return nil, fmt.Errorf("generating session token: %w", err)
@@ -276,13 +280,14 @@ func (s *Store) CreateSession(ctx context.Context, userID int) (*Session, error)
 		Token:     token,
 		TokenHash: hashToken(token),
 		UserID:    userID,
+		PasskeyID: passkeyID,
 		ExpiresAt: time.Now().Add(sessionDuration),
 	}
 
 	err = s.db.QueryRowContext(ctx,
-		`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)
+		`INSERT INTO sessions (token_hash, user_id, expires_at, passkey_id) VALUES ($1, $2, $3, $4)
 		 RETURNING created_at`,
-		sess.TokenHash, sess.UserID, sess.ExpiresAt,
+		sess.TokenHash, sess.UserID, sess.ExpiresAt, passkeyID,
 	).Scan(&sess.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("creating session: %w", err)
@@ -294,10 +299,10 @@ func (s *Store) GetSession(ctx context.Context, token string) (*Session, error) 
 	var sess Session
 	h := hashToken(token)
 	err := s.db.QueryRowContext(ctx,
-		`SELECT token_hash, user_id, expires_at, created_at FROM sessions
+		`SELECT token_hash, user_id, expires_at, created_at, passkey_id FROM sessions
 		 WHERE token_hash = $1 AND expires_at > NOW()`,
 		h,
-	).Scan(&sess.TokenHash, &sess.UserID, &sess.ExpiresAt, &sess.CreatedAt)
+	).Scan(&sess.TokenHash, &sess.UserID, &sess.ExpiresAt, &sess.CreatedAt, &sess.PasskeyID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

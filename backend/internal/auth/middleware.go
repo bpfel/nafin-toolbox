@@ -9,7 +9,10 @@ import (
 
 type contextKey string
 
-const userContextKey contextKey = "user"
+const (
+	userContextKey    contextKey = "user"
+	sessionContextKey contextKey = "session"
+)
 
 func RequireAuth(store *Store) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -33,6 +36,7 @@ func RequireAuth(store *Store) func(http.Handler) http.Handler {
 			}
 
 			ctx := context.WithValue(r.Context(), userContextKey, user)
+			ctx = context.WithValue(ctx, sessionContextKey, sess)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -41,6 +45,12 @@ func RequireAuth(store *Store) func(http.Handler) http.Handler {
 func UserFromContext(ctx context.Context) *User {
 	u, _ := ctx.Value(userContextKey).(*User)
 	return u
+}
+
+// SessionFromContext is the session the request was made with.
+func SessionFromContext(ctx context.Context) *Session {
+	s, _ := ctx.Value(sessionContextKey).(*Session)
+	return s
 }
 
 // ContextWithUser returns a context with the given user set. Useful for tests.

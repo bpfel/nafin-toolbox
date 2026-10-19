@@ -84,6 +84,14 @@ var codes = map[string]string{
 	Auth + "|cannot reset your own password via admin endpoint": "AUTH-041",
 	Auth + "|cannot delete the last administrator":              "AUTH-042",
 
+	// --- Passkeys ---
+	Auth + "|passkeys are not enabled":             "AUTH-060",
+	Auth + "|invalid or expired passkey challenge": "AUTH-061",
+	Auth + "|passkey not recognised":               "AUTH-062",
+	Auth + "|passkey not found":                    "AUTH-063",
+	Auth + "|too many passkeys":                    "AUTH-064",
+	Auth + "|vault key required":                   "AUTH-065",
+
 	// --- Validation of what was typed ---
 	// AUTH-050 is retired. It stood for every rule at once, so a user reading
 	// it out could not say which one their input broke; each rule has its own

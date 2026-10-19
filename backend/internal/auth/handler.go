@@ -18,6 +18,7 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/email"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -37,6 +38,9 @@ type HandlerDeps struct {
 	EmailSender         email.Sender
 	EncryptionKey       []byte // 32-byte AES key, nil if 2FA not available
 	AppURL              string
+	// Passkeys for the app's address; nil where the address cannot carry them
+	// (an IP rather than a name). See NewWebAuthn.
+	WebAuthn *webauthn.WebAuthn
 }
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
@@ -98,7 +102,7 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		// No 2FA — create session directly. See startSession.
-		sess, err := startSession(r.Context(), deps, user)
+		sess, err := startSession(r.Context(), deps, user, nil)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
@@ -122,13 +126,15 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 // accounts and read the audit log, and a second one left open on some other
 // machine is a risk with nothing to show for it — so signing in as an admin
 // ends any other admin session first, as every sign-in used to.
-func startSession(ctx context.Context, deps *HandlerDeps, user *User) (*Session, error) {
+//
+// passkeyID is the passkey the sign-in used, or nil for a password.
+func startSession(ctx context.Context, deps *HandlerDeps, user *User, passkeyID *int) (*Session, error) {
 	if user.IsAdmin() {
 		if err := deps.Store.DeleteUserSessions(ctx, user.ID); err != nil {
 			return nil, err
 		}
 	}
-	return deps.Store.CreateSession(ctx, user.ID)
+	return deps.Store.createSession(ctx, user.ID, passkeyID)
 }
 
 // HandleLogoutEverywhere ends every session of the signed-in account, this one
@@ -189,8 +195,8 @@ func HandleMe(w http.ResponseWriter, r *http.Request) {
 		apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	sess := SessionFromContext(r.Context())
+	writeJSON(w, meResponse{User: user, PasskeySession: sess != nil && sess.PasskeyID != nil})
 }
 
 // HandleInvite creates a new user. Requires admin role.
@@ -471,7 +477,11 @@ func HandleNeedsSetup(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]bool{"needs_setup": count == 0})
+		json.NewEncoder(w).Encode(map[string]bool{
+			"needs_setup": count == 0,
+			// The sign-in screen offers a passkey only when this is true.
+			"passkeys": count > 0 && passkeysOn(r.Context(), deps),
+		})
 	}
 }
 
@@ -610,7 +620,7 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		sess, err := startSession(r.Context(), deps, user)
+		sess, err := startSession(r.Context(), deps, user, nil)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
@@ -1067,6 +1077,9 @@ func HandleAdminRequire2FA(deps *HandlerDeps) http.HandlerFunc {
 			}
 		}
 
+		deps.Store.LogAudit(r.Context(), &caller.ID, AuditSettingChanged, r, map[string]any{
+			"setting": "require_2fa", "value": req.Require,
+		})
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"require_2fa": req.Require})
 	}
@@ -1083,7 +1096,11 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 			// The invite form asks for a first password when this is false,
 			// because HandleInvite then requires one. Until it said so, the
 			// form could not invite anybody on an instance without SMTP.
-			"email_enabled": emailEnabled(deps),
+			"email_enabled":  emailEnabled(deps),
+			"allow_passkeys": passkeysOn(r.Context(), deps),
+			// False when the app's address is an IP rather than a name, where
+			// no browser will make a passkey. The admin switch says so.
+			"passkeys_possible": deps.WebAuthn != nil,
 		})
 	}
 }

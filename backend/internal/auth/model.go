@@ -26,6 +26,8 @@ type Session struct {
 	Token     string // raw token (only in memory / cookie, never stored)
 	TokenHash string // SHA-256 hex hash (stored in DB)
 	UserID    int
+	// The passkey the session was started with; nil for a password sign-in.
+	PasskeyID *int
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }

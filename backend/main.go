@@ -88,6 +88,9 @@ func main() {
 			if err := authStore.DeleteExpiredMFAChallenges(ctx); err != nil {
 				log.Printf("MFA challenge cleanup error: %v", err)
 			}
+			if err := authStore.DeleteExpiredPasskeyChallenges(ctx); err != nil {
+				log.Printf("passkey challenge cleanup error: %v", err)
+			}
 			log.Println("expired tokens cleaned up")
 		}
 	}()
