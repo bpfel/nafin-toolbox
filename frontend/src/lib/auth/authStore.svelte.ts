@@ -760,8 +760,11 @@ export async function addPasskey(password: string, name: string): Promise<Passke
 
   if (currentUser?.role === 'admin') return passkey
 
+  // A passkey that said outright it has no PRF will not grow one on a second
+  // prompt; asking would only mean a second fingerprint for nothing.
+  const refused = made.credential.clientExtensionResults?.prf?.enabled === false
   let secret = made.secret
-  if (!secret) {
+  if (!secret && !refused) {
     const asked = await askPasskey(passkey.id)
     if (typeof asked !== 'string') secret = asked.secret
   }

@@ -25,6 +25,9 @@
   let busy = $state(false)
   let error = $state<string | null>(null)
   let note = $state<string | null>(null)
+  // Said under the list as long as one of them cannot open the budget: a lock
+  // screen that keeps asking for the password looks like a fault otherwise.
+  let someSignInOnly = $derived(!isAdmin && passkeys.some(p => !p.unlocks))
   let confirmingRemove = $state<number | null>(null)
 
   $effect(() => {
@@ -120,6 +123,8 @@
 
     {#if note}
       <p class="info" role="status">{note}</p>
+    {:else if someSignInOnly}
+      <p class="info">{t('passkey.whySignInOnly')}</p>
     {/if}
 
     {#if !supported}

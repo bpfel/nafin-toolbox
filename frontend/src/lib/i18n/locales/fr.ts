@@ -258,7 +258,8 @@ export const fr: Messages = {
   'passkey.notUsed': 'pas encore utilisée',
   'passkey.opensBudget': 'Connecte et ouvre ton budget',
   'passkey.signsInOnly': 'Connecte; le budget demande toujours le mot de passe',
-  'passkey.addedSignInOnly': 'Ajoutée. Elle te connecte, mais cet appareil ne peut pas ouvrir ton budget avec elle: le budget demande toujours ton mot de passe.',
+  'passkey.addedSignInOnly': 'Ajoutée. Elle te connecte, mais le navigateur ou le gestionnaire de mots de passe où elle est enregistrée ne peut pas ouvrir ton budget: le budget demande toujours ton mot de passe.',
+  'passkey.whySignInOnly': 'Une clé d’accès n’ouvre ton budget que si l’endroit où elle est enregistrée le permet. Chrome avec le Gestionnaire de mots de passe de Google et Safari avec le trousseau iCloud le peuvent; Firefox sur Android et certains gestionnaires, comme Bitwarden, souvent pas.',
   'passkey.remove': 'Supprimer',
   'passkey.unsupported': 'Ce navigateur ne prend pas en charge les clés d’accès.',
 

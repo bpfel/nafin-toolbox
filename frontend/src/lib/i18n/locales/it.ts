@@ -258,7 +258,8 @@ export const it: Messages = {
   'passkey.notUsed': 'non ancora usata',
   'passkey.opensBudget': 'Accede e apre il tuo budget',
   'passkey.signsInOnly': 'Accede; il budget chiede ancora la password',
-  'passkey.addedSignInOnly': 'Aggiunta. Ti fa accedere, ma questo dispositivo non può aprire il tuo budget con essa: il budget chiede ancora la password.',
+  'passkey.addedSignInOnly': 'Aggiunta. Ti fa accedere, ma il browser o il gestore di password in cui è salvata non può aprire il tuo budget: il budget chiede ancora la password.',
+  'passkey.whySignInOnly': 'Se una passkey apre anche il tuo budget dipende da dove è salvata. Chrome con Gestore delle password di Google e Safari con il Portachiavi iCloud possono; Firefox su Android e alcuni gestori di password, come Bitwarden, spesso no.',
   'passkey.remove': 'Rimuovi',
   'passkey.unsupported': 'Questo browser non supporta le passkey.',
 

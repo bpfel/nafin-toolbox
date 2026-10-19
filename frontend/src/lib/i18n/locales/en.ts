@@ -272,7 +272,8 @@ export const en = {
   'passkey.notUsed': 'not used yet',
   'passkey.opensBudget': 'Signs in and opens your budget',
   'passkey.signsInOnly': 'Signs in; your budget still asks for the password',
-  'passkey.addedSignInOnly': 'Added. It signs you in, but this device cannot open your budget with it, so the budget still asks for your password.',
+  'passkey.addedSignInOnly': 'Added. It signs you in, but the browser or password manager it is stored in cannot open your budget, so the budget still asks for your password.',
+  'passkey.whySignInOnly': 'Whether a passkey also opens your budget depends on where it is stored. Chrome with Google Password Manager and Safari with iCloud Keychain can; Firefox on Android and some password managers, such as Bitwarden, often cannot.',
   'passkey.remove': 'Remove',
   'passkey.unsupported': 'This browser cannot use passkeys.',
 

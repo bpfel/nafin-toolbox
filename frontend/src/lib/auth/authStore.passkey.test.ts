@@ -150,6 +150,19 @@ describe('adding a passkey', () => {
     expect(result).toMatchObject({ unlocks: true })
   })
 
+  test('one that says it has no PRF is not asked a second time', async () => {
+    server({
+      '/auth/passkeys/register/begin': ceremony,
+      '/auth/passkeys/register/finish': added,
+    })
+    createPasskey.mockResolvedValue({ credential: { id: 'x', clientExtensionResults: { prf: { enabled: false } } }, secret: null })
+
+    const result = await addPasskey('pw', 'Android')
+
+    expect(usePasskey).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ unlocks: false })
+  })
+
   test('a passkey with no PRF at all is kept, as one that only signs in', async () => {
     const fetchMock = server({
       '/auth/passkeys/register/begin': ceremony,

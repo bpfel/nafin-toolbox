@@ -247,7 +247,8 @@ export const de: Messages = {
   'passkey.notUsed': 'noch nicht benutzt',
   'passkey.opensBudget': 'Meldet an und öffnet dein Budget',
   'passkey.signsInOnly': 'Meldet an; das Budget fragt weiter nach dem Passwort',
-  'passkey.addedSignInOnly': 'Hinzugefügt. Er meldet dich an, aber dieses Gerät kann damit dein Budget nicht öffnen – dafür fragt es weiter nach dem Passwort.',
+  'passkey.addedSignInOnly': 'Hinzugefügt. Er meldet dich an, aber der Browser oder Passwortmanager, in dem er gespeichert ist, kann dein Budget damit nicht öffnen – dafür fragt es weiter nach dem Passwort.',
+  'passkey.whySignInOnly': 'Ob ein Passkey auch dein Budget öffnet, hängt davon ab, wo er gespeichert ist. Chrome mit dem Google Passwortmanager und Safari mit dem iCloud-Schlüsselbund können es; Firefox auf Android und manche Passwortmanager wie Bitwarden oft nicht.',
   'passkey.remove': 'Entfernen',
   'passkey.unsupported': 'Dieser Browser kann keine Passkeys verwenden.',
 
