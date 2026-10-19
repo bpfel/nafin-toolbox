@@ -255,6 +255,27 @@ export const en = {
   'security.deleteMyData': 'Delete all my data',
   'security.wrongPassword': 'That password is not right.',
 
+  // --- Passkeys ---
+  'auth.or': 'or',
+  'passkey.signIn': 'Sign in with a passkey',
+  'passkey.what': 'Fingerprint, face or device PIN',
+  'passkey.waiting': 'Waiting for your device…',
+  'passkey.noneHere': 'No passkey here yet. Sign in with your password, then add one in Profile.',
+  'passkey.unlock': 'Unlock with a passkey',
+  'passkey.title': 'Passkeys',
+  'passkey.intro': 'Sign in with your fingerprint, face or device PIN. Your password keeps working.',
+  'passkey.add': 'Add a passkey',
+  'passkey.name': 'Name',
+  'passkey.passwordPrompt': 'Your password, to confirm',
+  'passkey.addedOn': 'Added {date}',
+  'passkey.lastUsed': 'last used {date}',
+  'passkey.notUsed': 'not used yet',
+  'passkey.opensBudget': 'Signs in and opens your budget',
+  'passkey.signsInOnly': 'Signs in; your budget still asks for the password',
+  'passkey.addedSignInOnly': 'Added. It signs you in, but this device cannot open your budget with it, so the budget still asks for your password.',
+  'passkey.remove': 'Remove',
+  'passkey.unsupported': 'This browser cannot use passkeys.',
+
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Enable Two-Factor Authentication',
   'twofa.setupHint': 'Add an extra layer of security to your account using a TOTP authenticator app.',

@@ -27,6 +27,20 @@ export function fromBase64(value: string): Uint8Array<ArrayBuffer> {
 }
 
 /**
+ * Base64url without padding, the encoding WebAuthn speaks: every challenge,
+ * credential id and signature crosses to the server in it.
+ */
+export function toBase64Url(bytes: Uint8Array | ArrayBuffer): string {
+  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  return toBase64(view).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
+  const plain = value.replace(/-/g, '+').replace(/_/g, '/')
+  return fromBase64(plain + '='.repeat((4 - (plain.length % 4)) % 4))
+}
+
+/**
  * WebCrypto asks for a `BufferSource` whose buffer is definitely not shared,
  * and a `Uint8Array` sliced out of another one carries `ArrayBufferLike` — which
  * could be a `SharedArrayBuffer` as far as the types know. Copying out is a few

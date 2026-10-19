@@ -1,4 +1,4 @@
-import { splitNonce, withNonce } from './bytes'
+import { ownBuffer, splitNonce, withNonce } from './bytes'
 
 const PBKDF2_HASH = 'SHA-256'
 const AES_ALGO = 'AES-GCM'
@@ -141,4 +141,43 @@ export async function wrapMEKWithRecovery(mek: CryptoKey, recoveryKey: string): 
  */
 export async function unwrapMEKWithRecovery(encryptedMEK: string, recoveryKey: string): Promise<CryptoKey> {
   return unwrapMEK(encryptedMEK, await recoveryKEK(recoveryKey, 'unwrapKey'))
+}
+
+/**
+ * The key a passkey's PRF secret stands for.
+ *
+ * The secret is already 32 uniformly random bytes the authenticator alone can
+ * produce, so HKDF rather than PBKDF2: there is nothing to slow an attacker
+ * down from, only a key to derive. The info string ties the key to this one
+ * purpose, should the same secret ever be put to a second use.
+ */
+async function passkeyKEK(secret: Uint8Array, usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey('raw', ownBuffer(secret), 'HKDF', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new Uint8Array(32),
+      info: new TextEncoder().encode('nafin passkey vault key'),
+    },
+    material,
+    { name: AES_ALGO, length: KEK_KEY_LENGTH },
+    false,
+    [usage],
+  )
+}
+
+/**
+ * Wrap MEK under a passkey's PRF secret: a third copy of the vault key, beside
+ * the password's and the recovery key's.
+ */
+export async function wrapMEKWithPasskey(mek: CryptoKey, secret: Uint8Array): Promise<string> {
+  return wrapMEK(mek, await passkeyKEK(secret, 'wrapKey'))
+}
+
+/**
+ * Unwrap MEK with a passkey's PRF secret.
+ */
+export async function unwrapMEKWithPasskey(encryptedMEK: string, secret: Uint8Array): Promise<CryptoKey> {
+  return unwrapMEK(encryptedMEK, await passkeyKEK(secret, 'unwrapKey'))
 }

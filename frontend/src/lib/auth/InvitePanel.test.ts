@@ -33,6 +33,7 @@ vi.mock('./authStore.svelte', () => ({
   deleteUser: (id: number) => deleteUser(id),
   resendVerification: vi.fn(),
   adminResetPassword: vi.fn(),
+  setAllowPasskeys: vi.fn(async () => null),
   getAuthState: () => ({ currentUser: { id: 1, email: 'admin@example.ch', role: 'admin' } }),
 }))
 

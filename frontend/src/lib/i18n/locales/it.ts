@@ -241,6 +241,27 @@ export const it: Messages = {
   'security.deleteMyData': 'Elimina tutti i miei dati',
   'security.wrongPassword': 'La password non è corretta.',
 
+  // --- Passkeys ---
+  'auth.or': 'oppure',
+  'passkey.signIn': 'Accedi con una passkey',
+  'passkey.what': 'Impronta, volto o PIN del dispositivo',
+  'passkey.waiting': 'In attesa del dispositivo…',
+  'passkey.noneHere': 'Ancora nessuna passkey qui. Accedi con la password, poi aggiungine una nel profilo.',
+  'passkey.unlock': 'Sblocca con una passkey',
+  'passkey.title': 'Passkey',
+  'passkey.intro': 'Accedi con impronta, volto o PIN del dispositivo. La password continua a funzionare.',
+  'passkey.add': 'Aggiungi una passkey',
+  'passkey.name': 'Nome',
+  'passkey.passwordPrompt': 'La tua password, per conferma',
+  'passkey.addedOn': 'Aggiunta il {date}',
+  'passkey.lastUsed': 'usata il {date}',
+  'passkey.notUsed': 'non ancora usata',
+  'passkey.opensBudget': 'Accede e apre il tuo budget',
+  'passkey.signsInOnly': 'Accede; il budget chiede ancora la password',
+  'passkey.addedSignInOnly': 'Aggiunta. Ti fa accedere, ma questo dispositivo non può aprire il tuo budget con essa: il budget chiede ancora la password.',
+  'passkey.remove': 'Rimuovi',
+  'passkey.unsupported': 'Questo browser non supporta le passkey.',
+
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Attiva l’autenticazione a due fattori',
   'twofa.setupHint': 'Proteggi ulteriormente il tuo account con un’app di autenticazione TOTP.',

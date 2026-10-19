@@ -241,6 +241,27 @@ export const fr: Messages = {
   'security.deleteMyData': 'Supprimer toutes mes données',
   'security.wrongPassword': 'Ce mot de passe n’est pas correct.',
 
+  // --- Passkeys ---
+  'auth.or': 'ou',
+  'passkey.signIn': 'Se connecter avec une clé d’accès',
+  'passkey.what': 'Empreinte, visage ou code de l’appareil',
+  'passkey.waiting': 'En attente de ton appareil…',
+  'passkey.noneHere': 'Pas encore de clé d’accès ici. Connecte-toi avec ton mot de passe, puis ajoutes-en une dans le profil.',
+  'passkey.unlock': 'Déverrouiller avec une clé d’accès',
+  'passkey.title': 'Clés d’accès',
+  'passkey.intro': 'Connecte-toi avec ton empreinte, ton visage ou le code de ton appareil. Ton mot de passe reste valable.',
+  'passkey.add': 'Ajouter une clé d’accès',
+  'passkey.name': 'Nom',
+  'passkey.passwordPrompt': 'Ton mot de passe, pour confirmer',
+  'passkey.addedOn': 'Ajoutée le {date}',
+  'passkey.lastUsed': 'utilisée le {date}',
+  'passkey.notUsed': 'pas encore utilisée',
+  'passkey.opensBudget': 'Connecte et ouvre ton budget',
+  'passkey.signsInOnly': 'Connecte; le budget demande toujours le mot de passe',
+  'passkey.addedSignInOnly': 'Ajoutée. Elle te connecte, mais cet appareil ne peut pas ouvrir ton budget avec elle: le budget demande toujours ton mot de passe.',
+  'passkey.remove': 'Supprimer',
+  'passkey.unsupported': 'Ce navigateur ne prend pas en charge les clés d’accès.',
+
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Activer l’authentification à deux facteurs',
   'twofa.setupHint': 'Protège ton compte par une couche supplémentaire à l’aide d’une application d’authentification TOTP.',

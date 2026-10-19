@@ -10,6 +10,22 @@ release may change things without a deprecation period. Each release is a tag on
 
 ## [Unreleased]
 
+### New
+
+- **Passkeys.** Sign in with a fingerprint, face or device PIN instead of typing
+  the password, and — where the device supports it — open the budget in the same
+  prompt. Off until an administrator allows it under Users → Sign-in; then each
+  person adds their own in Profile → Passkeys, and nobody has to. The password and
+  the recovery key keep working as before. A passkey sign-in counts as two
+  factors, so it skips the authenticator code.
+
+### Upgrading
+
+- Migration 014 adds the passkey tables and runs on start. Nothing changes for
+  anyone until an administrator allows passkeys.
+- A passkey is bound to the domain in `APP_URL`. If your instance may still move
+  to another domain, leave passkeys off until it has.
+
 ### Security
 
 - The server is built with Go 1.27. It was built with Go 1.23, which stopped

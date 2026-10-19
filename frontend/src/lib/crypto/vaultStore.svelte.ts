@@ -1,4 +1,4 @@
-import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
+import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery, wrapMEKWithPasskey, unwrapMEKWithPasskey } from './keys'
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData, type VaultPerson } from './vault'
 import {
   fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
@@ -667,11 +667,43 @@ export async function initializeVault(
 ): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead'> {
   const keys = await fetchVaultKeys()
   if (!keys) return 'no-keys'
+  return openVault(keys, userId, async () => unwrapMEK(keys.encrypted_mek, await deriveKEK(password, email, keys.iterations)))
+}
+
+/**
+ * Open the vault with a passkey's PRF secret and the vault key wrapped under
+ * it, which the server hands back after a passkey sign-in or unlock. The same
+ * result as typing the password, without it.
+ */
+export async function initializeVaultWithPasskey(
+  encryptedMEKPRF: string,
+  secret: Uint8Array,
+  userId: number,
+): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead'> {
+  const keys = await fetchVaultKeys()
+  if (!keys) return 'no-keys'
+  return openVault(keys, userId, () => unwrapMEKWithPasskey(encryptedMEKPRF, secret))
+}
+
+/**
+ * The vault key wrapped under a passkey's PRF secret, for the server to keep
+ * beside the password's copy. null while the vault is locked: there is no key
+ * in memory to wrap.
+ */
+export async function wrapVaultKeyForPasskey(secret: Uint8Array): Promise<string | null> {
+  return mek ? wrapMEKWithPasskey(mek, secret) : null
+}
+
+/** What every way of opening the vault does once it has the key. */
+async function openVault(
+  keys: NonNullable<Awaited<ReturnType<typeof fetchVaultKeys>>>,
+  userId: number,
+  unwrap: () => Promise<CryptoKey>,
+): Promise<'ok' | 'decrypt-failed' | 'version-ahead'> {
   owner = userId
 
   try {
-    const kek = await deriveKEK(password, email, keys.iterations)
-    mek = await unwrapMEK(keys.encrypted_mek, kek)
+    mek = await unwrap()
     current.key = mek
     identity = await ensureIdentity(keys, mek)
 

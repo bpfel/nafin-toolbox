@@ -46,7 +46,7 @@ after 0.4.0 in [CHANGELOG.md](../CHANGELOG.md).
 | Variable | Description |
 |---|---|
 | `POSTGRES_PASSWORD` | Database password. Generate a strong one. |
-| `APP_URL` | Public base URL, used in links in emails — e.g. `https://finance.example.ch` |
+| `APP_URL` | Public base URL, used in links in emails — e.g. `https://finance.example.ch`. Passkeys, if allowed, are bound to its domain |
 | `CORS_ORIGINS` | Allowed origins for CORS and CSRF checks; usually the same as `APP_URL` |
 | `NAFIN_LISTEN` | Where the frontend is published: `4000` (default, every interface) or `127.0.0.1:4000` (loopback only) |
 | `ENCRYPTION_KEY` | 64 hex characters encrypting TOTP secrets. `openssl rand -hex 32`. Back it up: losing it makes every enrolled 2FA secret unusable. |

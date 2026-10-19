@@ -4,6 +4,9 @@ import { vi, describe, test, expect, afterEach } from 'vitest'
 const auth = vi.hoisted(() => ({ result: true }))
 
 vi.mock('../lib/auth/authStore.svelte', () => ({
+  // Profile's passkeys card asks; an instance without them shows none.
+  getSettings: vi.fn(async () => ({ require_2fa: false })),
+  listPasskeys: vi.fn(async () => []),
   getAuthState: () => ({
     get currentUser() {
       return { id: 2, email: 'anna@example.ch', role: 'user', totp_enabled: false }

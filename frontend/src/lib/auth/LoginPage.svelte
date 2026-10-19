@@ -1,7 +1,9 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { login, setup, verify2FA, getAuthState } from './authStore.svelte'
+  import { login, setup, verify2FA, getAuthState, signInWithPasskey } from './authStore.svelte'
   import TOTPInput from './TOTPInput.svelte'
+  import PasskeyChoice from './PasskeyChoice.svelte'
+  import { autofillSupported, passkeysSupported } from './passkey'
   import { autofocus } from '../util/autofocus'
 
   let { onSuccess }: { onSuccess: () => void } = $props()
@@ -18,6 +20,51 @@
   let totpCode = $state('')
   let useRecoveryCode = $state(false)
   let recoveryCode = $state('')
+
+  // Passkeys, once an administrator has allowed them: offered to everyone as an
+  // equal choice beside the password. Only someone who added one in Profile
+  // can use it; anyone else is told so in one line and carries on as before.
+  let offerPasskey = $derived(!authState.needsSetup && authState.passkeysOffered && passkeysSupported())
+  let passkeyBusy = $state(false)
+  let passkeyNote = $state<string | null>(null)
+  let autofill: AbortController | null = null
+  // A token list, not text: "webauthn" lets the field's autofill list passkeys.
+  let emailAutocomplete = $derived<AutoFill>(offerPasskey ? 'email webauthn' : 'email')
+
+  // Also waits in the email field's autofill, where the browser lists any
+  // passkey it has for this site. Picking one there signs in like the button.
+  $effect(() => {
+    if (!offerPasskey) return
+    let stopped = false
+    autofillSupported().then(ok => {
+      if (ok && !stopped) waitInAutofill()
+    })
+    return () => {
+      stopped = true
+      autofill?.abort()
+    }
+  })
+
+  async function waitInAutofill() {
+    autofill = new AbortController()
+    const result = await signInWithPasskey(autofill.signal)
+    if (result === null) onSuccess()
+    else if (result !== 'cancelled') error = result
+  }
+
+  async function handlePasskey() {
+    // One passkey request at a time: the autofill one stands down for the button.
+    autofill?.abort()
+    autofill = null
+    error = null
+    passkeyNote = null
+    passkeyBusy = true
+    const result = await signInWithPasskey()
+    passkeyBusy = false
+    if (result === null) onSuccess()
+    else if (result === 'cancelled') passkeyNote = t('passkey.noneHere')
+    else error = result
+  }
 
   async function handleSubmit(e: Event) {
     e.preventDefault()
@@ -137,7 +184,7 @@
             type="email"
             bind:value={email}
             required
-            autocomplete="email"
+            autocomplete={emailAutocomplete}
             disabled={submitting}
           />
         </label>
@@ -161,6 +208,10 @@
           {submitting ? t('auth.pleaseWait') : authState.needsSetup ? t('auth.createAccount') : t('auth.signIn')}
         </button>
       </form>
+
+      {#if offerPasskey}
+        <PasskeyChoice label={t('passkey.signIn')} busy={passkeyBusy} note={passkeyNote} onclick={handlePasskey} />
+      {/if}
 
       {#if !authState.needsSetup}
         <p class="forgot-hint">{t('auth.forgotHint')}</p>

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { setOnUnauthorized } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
+  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault, listPasskeys, unlockWithPasskey } from './lib/auth/authStore.svelte'
+  import PasskeyChoice from './lib/auth/PasskeyChoice.svelte'
+  import { passkeysSupported } from './lib/auth/passkey'
   import { getVaultState, sessionEndedElsewhere } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
@@ -45,6 +47,11 @@
   let unlocking = $state(false)
   let unlockError = $state<string | null>(null)
 
+  // Unlocking with a passkey instead, offered when one of this account's
+  // passkeys can open the vault.
+  let passkeyUnlocks = $state(false)
+  let passkeyUnlocking = $state(false)
+
   // Recovery state
   let recoveryKey = $state('')
   let recovering = $state(false)
@@ -84,7 +91,10 @@
   async function checkRequire2FA() {
     const settings = await getSettings()
     require2FA = settings.require_2fa
-    if (require2FA && authState.currentUser && !authState.currentUser.totp_enabled) {
+    // A passkey session already has two factors — the device and the
+    // fingerprint or PIN — so it is not stopped to set up an authenticator app.
+    const user = authState.currentUser
+    if (require2FA && user && !user.totp_enabled && !user.passkey_session) {
       show2FAEnforcement = true
     }
   }
@@ -136,6 +146,14 @@
     }
   }
 
+  async function handlePasskeyUnlock() {
+    passkeyUnlocking = true
+    unlockError = null
+    const result = await unlockWithPasskey()
+    passkeyUnlocking = false
+    if (result && result !== 'cancelled') unlockError = result
+  }
+
   async function handleRecovery() {
     if (!recoveryKey.trim()) return
     recovering = true
@@ -183,6 +201,14 @@
    * statement of it now, and this reads it.
    */
   let chromeless = $derived(gate !== null)
+
+  $effect(() => {
+    if (gate !== 'vaultLocked' || !passkeysSupported()) return
+    // An empty list when passkeys are off: the server answers 404.
+    listPasskeys().then(list => {
+      passkeyUnlocks = list.some(p => p.unlocks)
+    })
+  })
 </script>
 
 {#if chromeless}
@@ -330,6 +356,10 @@
             {unlocking ? t('vault.unlockBusy') : t('vault.unlockAction')}
           </button>
         </form>
+
+        {#if passkeyUnlocks}
+          <PasskeyChoice label={t('passkey.unlock')} busy={passkeyUnlocking} onclick={handlePasskeyUnlock} />
+        {/if}
 
         <button class="link-btn" onclick={() => handleLogout()}>{t('menu.logout')}</button>
       </div>

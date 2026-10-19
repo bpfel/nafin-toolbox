@@ -4,6 +4,9 @@ import { vi, describe, test, expect, afterEach } from 'vitest'
 const deleteAllMyData = vi.fn()
 vi.mock('../crypto/vaultStore.svelte', () => ({ deleteAllMyData: (...a: unknown[]) => deleteAllMyData(...a) }))
 vi.mock('./authStore.svelte', () => ({
+  // Profile's passkeys card asks; an instance without them shows none.
+  getSettings: vi.fn(async () => ({ require_2fa: false })),
+  listPasskeys: vi.fn(async () => []),
   getAuthState: () => ({ currentUser: { id: 1, email: 'anna@nafin.test', totp_enabled: false } }),
   disable2FA: vi.fn(),
   regenerateRecoveryCodes: vi.fn(),

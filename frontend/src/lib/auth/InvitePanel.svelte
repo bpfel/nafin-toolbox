@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatDate } from '../util/calendar'
-  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, getSettings, type User, getAuthState } from './authStore.svelte'
+  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, getSettings, setAllowPasskeys, type User, getAuthState } from './authStore.svelte'
   import DeleteUserModal from './DeleteUserModal.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
@@ -47,6 +47,26 @@
   let resettingPassword = $state<number | null>(null)
   let tempPassword = $state<{ email: string; password: string } | null>(null)
 
+  /**
+   * Passkeys for the whole instance, off until turned on here. Each person
+   * still adds their own in Profile; this only lets them. Off again keeps the
+   * passkeys people added and stops them working until it is back on.
+   */
+  let allowPasskeys = $state(false)
+  let passkeysPossible = $state(true)
+  let savingPasskeys = $state(false)
+  let passkeysError = $state<string | null>(null)
+
+  async function togglePasskeys() {
+    savingPasskeys = true
+    passkeysError = null
+    const want = !allowPasskeys
+    const result = await setAllowPasskeys(want)
+    savingPasskeys = false
+    if (result) passkeysError = result
+    else allowPasskeys = want
+  }
+
   async function loadUsers() {
     users = await listUsers()
   }
@@ -55,6 +75,8 @@
     loadUsers()
     getSettings().then((s) => {
       emailEnabled = s.email_enabled ?? true
+      allowPasskeys = s.allow_passkeys === true
+      passkeysPossible = s.passkeys_possible ?? true
     })
   })
 
@@ -239,6 +261,9 @@
       <p><strong>Temporary password for {tempPassword.email}:</strong></p>
       <code class="temp-password">{tempPassword.password}</code>
       <p class="temp-password-hint">Share this with the user securely. They will be asked to set a new password on next login.</p>
+      {#if allowPasskeys}
+        <p class="temp-password-hint">A passkey of theirs that opens their budget keeps doing so, and spares them the recovery key.</p>
+      {/if}
       <button class="btn-small" onclick={() => tempPassword = null}>Dismiss</button>
     </div>
   {/if}
@@ -291,6 +316,36 @@
       {submitting ? 'Inviting...' : emailEnabled ? 'Invite User' : 'Create User'}
     </button>
   </form>
+
+  <h3>Sign-in</h3>
+  <label class="switch">
+    <input
+      type="checkbox"
+      checked={allowPasskeys}
+      onchange={togglePasskeys}
+      disabled={savingPasskeys || (!passkeysPossible && !allowPasskeys)}
+    />
+    Allow passkeys
+  </label>
+  <p class="hint">
+    Lets people sign in with a fingerprint, face or device PIN, and open their
+    budget with it. Each person adds their own in Profile; nobody has to. The
+    sign-in screen then offers a passkey beside the password.
+  </p>
+  <p class="hint">
+    A passkey only works at the address it was made at. If this instance moves
+    to another domain, everyone's passkeys stop working and have to be added
+    again; passwords are unaffected.
+  </p>
+  {#if !passkeysPossible}
+    <p class="hint">
+      Not available here: APP_URL is an IP address, and browsers make passkeys
+      only for a domain name.
+    </p>
+  {/if}
+  {#if passkeysError}
+    <p class="error">{passkeysError}</p>
+  {/if}
 </div>
 
 <style>
@@ -487,6 +542,14 @@
      shrink the other two. */
   .first-password {
     margin-top: 0.75rem;
+  }
+
+  .switch {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
   .hint {

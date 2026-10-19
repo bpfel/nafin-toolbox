@@ -16,6 +16,12 @@ them; neither can its administrator.
 - **Vault** — one JSON document holding your data, encrypted with the MEK
   (AES-256-GCM).
 
+**Passkey.** Optional, once an administrator allows passkeys. A passkey that
+supports the WebAuthn PRF extension yields a secret only the authenticator can
+produce; the browser derives a key from it with HKDF and wraps the MEK a third
+time. The server stores that wrap and never sees the secret. A passkey without
+PRF signs in but cannot open the vault.
+
 **Recovery key.** Shown once when the vault is created. It wraps the MEK
 independently of your password, and is the only way back in after a forgotten
 password or an admin reset.
@@ -28,7 +34,7 @@ There is no inactivity lock yet: the vault stays open for the life of the tab.
 - Losing both password and recovery key means the data is gone. There is no
   backdoor.
 - An admin password reset leaves the vault locked until the user enters their
-  recovery key.
+  recovery key, or uses a passkey that opens it.
 
 ## Shared households
 
@@ -50,6 +56,18 @@ member holds the same key. The design is in `plans/shared-vault-plan.md`.
   `HttpOnly`, `SameSite=Lax` cookie, `Secure` in production.
 - Expired sessions, verification tokens and two-factor challenges are purged hourly.
 - An email address is one account however it is capitalised.
+
+## Passkeys
+
+- Off until an administrator allows them; then optional per user, from Profile.
+  Always in addition to the password, never instead of it.
+- Discoverable credentials with user verification required, so a passkey
+  sign-in is two factors on its own and skips TOTP.
+- The credential record is kept server-side; challenges are server-held,
+  single-use and expire after five minutes.
+- A passkey is bound to the domain in `APP_URL`. Moving the instance to another
+  domain makes every passkey stop working; passwords are unaffected.
+- Removing a passkey ends every session it started.
 
 ## Two-factor authentication (TOTP)
 

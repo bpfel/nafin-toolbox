@@ -2,6 +2,7 @@
   import { t } from '../i18n/index.svelte'
   import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount } from './authStore.svelte'
   import TwoFactorSetup from './TwoFactorSetup.svelte'
+  import PasskeySettings from './PasskeySettings.svelte'
   import Sheet from '../nav/Sheet.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
   import { createCopier } from '../util/copier.svelte'
@@ -172,6 +173,9 @@
       <button onclick={() => showSetup2FA = true}>{t('security.enable2fa')}</button>
     {/if}
   </div>
+
+  <!-- Passkeys, once an administrator allows them; nothing at all until then. -->
+  <PasskeySettings />
 
   <!-- Password Section -->
   <div class="settings-card">

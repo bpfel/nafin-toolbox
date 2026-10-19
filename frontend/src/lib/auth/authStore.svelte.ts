@@ -1,6 +1,7 @@
 import { withCode } from '../api/client'
 import { passwordChangeProblem } from './rules'
-import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault, saveVault, getVaultState } from '../crypto/vaultStore.svelte'
+import { initializeVault, initializeVaultWithPasskey, wrapVaultKeyForPasskey, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault, saveVault, getVaultState } from '../crypto/vaultStore.svelte'
+import { createPasskey, usePasskey, type PasskeyAnswer } from './passkey'
 
 export interface User {
   id: number
@@ -10,6 +11,12 @@ export interface User {
   email_verified: boolean
   totp_enabled: boolean
   created_at: string
+  /**
+   * This session was started with a passkey, which is two factors already, so
+   * an instance that requires 2FA does not stop it for an authenticator app.
+   * Optional: only /auth/me and a passkey sign-in report it.
+   */
+  passkey_session?: boolean
 }
 
 export interface AppSettings {
@@ -20,6 +27,20 @@ export interface AppSettings {
    * server from before it was reported does not send it.
    */
   email_enabled?: boolean
+  /** An administrator has allowed passkeys on this instance. */
+  allow_passkeys?: boolean
+  /** The app's address can carry passkeys at all: a name, not an IP. */
+  passkeys_possible?: boolean
+}
+
+/** One of the signed-in account's passkeys. */
+export interface Passkey {
+  id: number
+  name: string
+  created_at: string
+  last_used_at: string | null
+  /** Opens the vault as well as signing in. */
+  unlocks: boolean
 }
 
 const API_BASE = '/api'
@@ -27,6 +48,8 @@ const API_BASE = '/api'
 let currentUser = $state<User | null>(null)
 let loading = $state(true)
 let needsSetup = $state(false)
+// An administrator has allowed passkeys, so the sign-in screen offers one.
+let passkeysOffered = $state(false)
 
 // Held credentials for vault initialization (cleared after use)
 let heldPassword = $state<string | null>(null)
@@ -43,6 +66,7 @@ export function getAuthState() {
     get currentUser() { return currentUser },
     get loading() { return loading },
     get needsSetup() { return needsSetup },
+    get passkeysOffered() { return passkeysOffered },
     get vaultNeedsSetup() { return vaultNeedsSetup },
     get vaultDecryptFailed() { return vaultDecryptFailed },
     get vaultLocked() { return vaultLocked },
@@ -61,6 +85,7 @@ export async function checkAuth() {
     if (setupRes.ok) {
       const data = await setupRes.json()
       needsSetup = data.needs_setup
+      passkeysOffered = data.passkeys === true
       if (needsSetup) {
         currentUser = null
         return
@@ -581,4 +606,174 @@ export async function setRequire2FA(require: boolean): Promise<string | null> {
 
   const data = await res.json().catch(() => ({ error: 'Failed to update setting' }))
   return withCode(data) || 'Failed to update setting'
+}
+
+// ---- Passkeys ----
+
+async function post(path: string, body?: unknown): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+
+async function failure(res: Response, fallback: string): Promise<string> {
+  const data = await res.json().catch(() => ({ error: fallback }))
+  return withCode(data) || fallback
+}
+
+/**
+ * Sign in with a passkey: one prompt, no email, no TOTP.
+ *
+ * If the passkey can open the vault, it is opened with the secret from the
+ * same prompt; otherwise the lock screen asks for the password, as after a
+ * reload. A passkey that fails to open the vault does the same rather than
+ * reporting the vault broken — the password still opens it.
+ *
+ * With `signal`, it waits in the email field's autofill rather than opening
+ * a prompt. Returns null on success, 'cancelled' if nobody chose a passkey,
+ * or an error to show.
+ */
+export async function signInWithPasskey(signal?: AbortSignal): Promise<string | 'cancelled' | null> {
+  const begin = await post('/auth/passkeys/login/begin')
+  if (!begin.ok) return failure(begin, 'Passkey sign-in failed')
+  const { token, options } = await begin.json()
+
+  let used: PasskeyAnswer | null
+  try {
+    used = await usePasskey(options, { signal, conditional: !!signal })
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Passkey sign-in failed'
+  }
+  if (!used) return 'cancelled'
+
+  const res = await post('/auth/passkeys/login/finish', { token, credential: used.credential })
+  if (!res.ok) return failure(res, 'Passkey sign-in failed')
+  const data: { user: User; encrypted_mek_prf: string | null } = await res.json()
+
+  currentUser = data.user
+  heldPassword = null
+  heldEmail = null
+  vaultNeedsSetup = false
+  vaultDecryptFailed = false
+  vaultLocked = false
+
+  if (data.user.role !== 'admin') {
+    const opened = data.encrypted_mek_prf && used.secret
+      ? await initializeVaultWithPasskey(data.encrypted_mek_prf, used.secret, data.user.id)
+      : 'locked'
+    if (opened !== 'ok') vaultLocked = opened !== 'version-ahead'
+  }
+  return null
+}
+
+/**
+ * Open a locked vault with a passkey, for someone already signed in. Returns
+ * null once it is open, 'cancelled', or an error to show.
+ */
+export async function unlockWithPasskey(): Promise<string | 'cancelled' | null> {
+  if (!currentUser) return 'Not logged in'
+  const result = await askPasskey()
+  if (typeof result === 'string') return result
+  if (!result.wrap || !result.secret) return 'cancelled'
+
+  const opened = await initializeVaultWithPasskey(result.wrap, result.secret, currentUser.id)
+  if (opened === 'ok') {
+    vaultLocked = false
+    return null
+  }
+  return opened === 'version-ahead' ? null : 'Passkey unlock failed'
+}
+
+/**
+ * A fingerprint prompt for the signed-in account: any passkey that opens the
+ * vault, or the one given. Returns its wrap of the vault key and its PRF
+ * secret, either of which may be missing.
+ */
+async function askPasskey(passkeyId?: number): Promise<{ id: number; wrap: string | null; secret: Uint8Array | null } | string> {
+  const begin = await post('/auth/passkeys/unlock/begin', passkeyId ? { passkey_id: passkeyId } : undefined)
+  if (!begin.ok) return failure(begin, 'Passkey unlock failed')
+  const { token, options } = await begin.json()
+
+  let used: PasskeyAnswer | null
+  try {
+    used = await usePasskey(options)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Passkey unlock failed'
+  }
+  if (!used) return 'cancelled'
+
+  const res = await post('/auth/passkeys/unlock/finish', { token, credential: used.credential })
+  if (!res.ok) return failure(res, 'Passkey unlock failed')
+  const data: { passkey_id: number; encrypted_mek_prf: string | null } = await res.json()
+  return { id: data.passkey_id, wrap: data.encrypted_mek_prf, secret: used.secret }
+}
+
+export async function listPasskeys(): Promise<Passkey[]> {
+  const res = await fetch(`${API_BASE}/auth/passkeys`, { credentials: 'include' })
+  return res.ok ? res.json() : []
+}
+
+/**
+ * Add a passkey to this account, after the password.
+ *
+ * Then, if the account has a vault, make the passkey able to open it: wrap the
+ * vault key under its PRF secret and store the wrap. Some authenticators give
+ * the secret when the passkey is made; others only when it is first used, so
+ * a second prompt follows if the first brought none. A passkey that gives no
+ * secret at all still signs in, and the list says it does not open the budget.
+ *
+ * Returns the passkey, 'cancelled', or an error to show.
+ */
+export async function addPasskey(password: string, name: string): Promise<Passkey | 'cancelled' | string> {
+  const begin = await post('/auth/passkeys/register/begin', { password })
+  if (!begin.ok) return failure(begin, 'Could not add a passkey')
+  const { token, options } = await begin.json()
+
+  let made: PasskeyAnswer | null
+  try {
+    made = await createPasskey(options)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Could not add a passkey'
+  }
+  if (!made) return 'cancelled'
+
+  const res = await post('/auth/passkeys/register/finish', { token, name, credential: made.credential })
+  if (!res.ok) return failure(res, 'Could not add a passkey')
+  const passkey: Passkey = await res.json()
+
+  if (currentUser?.role === 'admin') return passkey
+
+  let secret = made.secret
+  if (!secret) {
+    const asked = await askPasskey(passkey.id)
+    if (typeof asked !== 'string') secret = asked.secret
+  }
+  const wrap = secret ? await wrapVaultKeyForPasskey(secret) : null
+  if (wrap) {
+    const put = await fetch(`${API_BASE}/auth/passkeys/${passkey.id}/vault-key`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ encrypted_mek_prf: wrap }),
+    })
+    if (put.ok) passkey.unlocks = true
+  }
+  return passkey
+}
+
+/**
+ * Remove one of this account's passkeys. Any session it started ends with it;
+ * if that was this one, the next request signs this tab out.
+ */
+export async function removePasskey(id: number): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/auth/passkeys/${id}`, { method: 'DELETE', credentials: 'include' })
+  return res.ok ? null : failure(res, 'Could not remove the passkey')
+}
+
+export async function setAllowPasskeys(allow: boolean): Promise<string | null> {
+  const res = await post('/auth/settings/allow-passkeys', { allow })
+  return res.ok ? null : failure(res, 'Failed to update setting')
 }

@@ -138,6 +138,8 @@ the server for something the vault cannot do.
 - `sessions` — hashed session tokens, expiry, user association
 - `audit_log` — security event log (user_id nullable for anonymization)
 - `user_vaults` — encrypted vault blobs (opaque to server)
+- `passkeys` — WebAuthn credentials, each with an optional PRF wrap of the MEK
+  (opaque to server); off until an admin sets `allow_passkeys` in `app_settings`
 
 ### Encrypted Vault (frontend, inside `VaultData`, currently v11)
 

@@ -18,7 +18,8 @@
     'login_success', 'login_failed', 'logout', 'logout_everywhere',
     'password_changed', '2fa_enabled', '2fa_disabled',
     '2fa_verified', '2fa_failed', 'recovery_code_used',
-    'user_invited', 'email_verified', 'user_deleted',
+    'user_invited', 'email_verified', 'user_deleted', 'password_reset',
+    'passkey_added', 'passkey_removed', 'setting_changed',
   ]
 
   const eventColors: Record<string, string> = {
@@ -35,6 +36,10 @@
     user_invited: '#0c5460',
     email_verified: '#155724',
     user_deleted: '#721c24',
+    password_reset: '#856404',
+    passkey_added: '#155724',
+    passkey_removed: '#856404',
+    setting_changed: '#0c5460',
   }
 
   const eventBgColors: Record<string, string> = {
@@ -51,6 +56,10 @@
     user_invited: '#d1ecf1',
     email_verified: '#d4edda',
     user_deleted: '#f8d7da',
+    password_reset: '#fff3cd',
+    passkey_added: '#d4edda',
+    passkey_removed: '#fff3cd',
+    setting_changed: '#d1ecf1',
   }
 
   let currentPage = $derived(Math.floor(offset / PAGE_SIZE) + 1)

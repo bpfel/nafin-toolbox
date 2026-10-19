@@ -317,6 +317,18 @@ button:hover {
   background: var(--alarm-strong);
 }
 
+/* An equal alternative to the main action, not a lesser one: a second way
+   to do the same thing, such as signing in with a passkey. */
+.btn.outline {
+  background: white;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn.outline:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
 /* Delete offered beside something else, not as the point of the dialog. */
 .btn.delete-quiet {
   background: white;

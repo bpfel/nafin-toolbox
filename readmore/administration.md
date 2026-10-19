@@ -50,7 +50,8 @@ Escape each `$` in the hash as `\$` on the command line.
 2. Pass the temporary password on securely. The user must change it at the next
    sign-in.
 3. The vault no longer opens with the new password; the user enters their recovery
-   key and everything is there.
+   key and everything is there. A passkey that opens their budget works too, and
+   spares them the recovery key.
 
 ### A user who has lost password and recovery key
 
@@ -62,6 +63,8 @@ dc exec db psql -U finance -d finance -c "
   DELETE FROM user_vaults WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.ch');
   UPDATE users SET encrypted_mek = NULL, recovery_key_hash = NULL, encrypted_mek_recovery = NULL
     WHERE email = 'user@example.ch';
+  UPDATE passkeys SET encrypted_mek_prf = NULL
+    WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.ch');
 "
 ```
 
@@ -85,6 +88,21 @@ curl -b cookies.txt -X POST https://finance.example.ch/api/auth/settings/require
 ```
 
 Users without two-factor then see a mandatory setup screen at their next sign-in.
+
+## Passkeys
+
+Off by default. **Users** → **Sign-in** → **Allow passkeys** turns them on: the
+sign-in screen then offers a passkey beside the password, and each person can add
+their own in Profile. Nobody has to.
+
+- A passkey is bound to the domain in `APP_URL`. If the instance may still move to
+  another domain, leave passkeys off until it has: a move makes every passkey
+  stop working, and everyone has to add theirs again. Passwords are unaffected.
+- An `APP_URL` that is an IP address cannot carry passkeys at all; the switch
+  says so.
+- Turning passkeys off keeps the ones people added and stops them working;
+  turning them back on restores them. People can still remove theirs while it
+  is off.
 
 ## Audit log
 

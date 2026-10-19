@@ -230,6 +230,27 @@ export const de: Messages = {
   'security.deleteMyData': 'Alle meine Daten löschen',
   'security.wrongPassword': 'Das Passwort stimmt nicht.',
 
+  // --- Passkeys ---
+  'auth.or': 'oder',
+  'passkey.signIn': 'Mit Passkey anmelden',
+  'passkey.what': 'Fingerabdruck, Gesicht oder Geräte-PIN',
+  'passkey.waiting': 'Warte auf dein Gerät…',
+  'passkey.noneHere': 'Hier noch kein Passkey. Melde dich mit dem Passwort an und füge im Profil einen hinzu.',
+  'passkey.unlock': 'Mit Passkey entsperren',
+  'passkey.title': 'Passkeys',
+  'passkey.intro': 'Melde dich mit Fingerabdruck, Gesicht oder Geräte-PIN an. Dein Passwort funktioniert weiterhin.',
+  'passkey.add': 'Passkey hinzufügen',
+  'passkey.name': 'Name',
+  'passkey.passwordPrompt': 'Dein Passwort zur Bestätigung',
+  'passkey.addedOn': 'Hinzugefügt am {date}',
+  'passkey.lastUsed': 'zuletzt am {date}',
+  'passkey.notUsed': 'noch nicht benutzt',
+  'passkey.opensBudget': 'Meldet an und öffnet dein Budget',
+  'passkey.signsInOnly': 'Meldet an; das Budget fragt weiter nach dem Passwort',
+  'passkey.addedSignInOnly': 'Hinzugefügt. Er meldet dich an, aber dieses Gerät kann damit dein Budget nicht öffnen – dafür fragt es weiter nach dem Passwort.',
+  'passkey.remove': 'Entfernen',
+  'passkey.unsupported': 'Dieser Browser kann keine Passkeys verwenden.',
+
   // --- Setting up two-factor ---
   'twofa.setupTitle': 'Zwei-Faktor-Authentifizierung aktivieren',
   'twofa.setupHint': 'Schütz dein Konto zusätzlich mit einer TOTP-Authenticator-App.',
