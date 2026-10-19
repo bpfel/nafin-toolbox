@@ -43,7 +43,7 @@ Go and Node do not need to be installed — everything builds and runs in Docker
 ```sh
 # Backend unit tests — in the Go image the API is built with; the api image itself
 # carries only the compiled binary
-docker run --rm -v "$PWD/backend":/src -w /src golang:1.23-alpine go test ./...
+docker run --rm -v "$PWD/backend":/src -w /src golang:1.27-alpine go test ./...
 
 # Frontend tests and type check
 docker run --rm -v "$PWD/frontend":/app -w /app node:22-alpine sh -c "npm ci && npm test && npm run check"
