@@ -10,6 +10,39 @@ release may change things without a deprecation period. Each release is a tag on
 
 ## [Unreleased]
 
+### Upgrading
+
+- **One migration** (`014`) adds two empty columns; it cannot fail on existing
+  data. Temporary passwords handed out before the upgrade get no deadline —
+  reset them again if you want them to expire.
+- **An address can now be locked out of signing in for up to an hour** by
+  thirty wrong passwords, from anywhere. That is the cost of stopping guesses
+  spread across many machines, and anyone who knows the address can trigger it.
+  Sessions already open are not affected.
+
+### Security
+
+- Sign-in limits held only one request at a time. Every attempt that arrived
+  while the first wrong password was still being checked got through, so fifty
+  guesses sent at once were fifty guesses, not five. An attempt is now counted
+  before it is checked. The same applies to two-factor codes and to the link in
+  an invitation.
+- Wrong passwords for one address are also counted across every machine they
+  come from — thirty an hour — and wrong two-factor codes per account, wherever
+  they come from.
+- Asking for the password again — to change it, turn off two-factor sign-in,
+  get new recovery codes or delete the account — is limited to five tries in a
+  quarter of an hour. A stolen session could ask as often as it liked before.
+- A two-factor code or recovery code works once. A code used to stay good for
+  its whole minute and a half, so one read over a shoulder could be used again.
+- A temporary password from an admin reset stops working after three days. The
+  admin sees when, and resets again if it was not used in time.
+- While an instance requires two-factor sign-in, nobody can turn theirs off,
+  and Profile no longer offers to. Only the browser enforced the rule before.
+- Signing in with an address that has no account takes as long as a wrong
+  password. It answered faster, which told anyone timing it which addresses
+  exist.
+
 ## [0.5.1] — 2026-10-24
 
 A security patch: the server's toolchain, libraries and base image, which had

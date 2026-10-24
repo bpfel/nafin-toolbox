@@ -498,6 +498,7 @@ export const de: Messages = {
   'error.createEntry': 'Eintrag konnte nicht erstellt werden',
 
   'security.twofaEnabled': '2FA ist aktiviert',
+  'security.twofaRequired': 'Hier vorgeschrieben – sie lässt sich nicht ausschalten.',
   'security.twofaNotEnabled': '2FA ist nicht aktiviert',
   'twofa.enterCode.label': 'Code eingeben',
   'accountForm.qrIbanNote': 'eine QR-IBAN — Rechnungen verwenden eine QR-Referenz (QRR)',

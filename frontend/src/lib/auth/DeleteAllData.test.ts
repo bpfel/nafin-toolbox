@@ -8,6 +8,7 @@ vi.mock('./authStore.svelte', () => ({
   disable2FA: vi.fn(),
   regenerateRecoveryCodes: vi.fn(),
   deleteAccount: vi.fn(),
+  getSettings: vi.fn(async () => ({ require_2fa: false })),
 }))
 
 import SecuritySettings from './SecuritySettings.svelte'

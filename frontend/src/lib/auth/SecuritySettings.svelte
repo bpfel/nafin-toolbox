@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount } from './authStore.svelte'
+  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount, getSettings } from './authStore.svelte'
   import TwoFactorSetup from './TwoFactorSetup.svelte'
   import Sheet from '../nav/Sheet.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
@@ -21,6 +21,12 @@
   let error = $state<string | null>(null)
   let loading = $state(false)
   let recoveryCodes = $state<string[] | null>(null)
+
+  // While the instance requires 2FA the server refuses to turn it off, so the
+  // button that would ask is not offered. Read once: an admin changing the
+  // policy meanwhile only means the server's answer is the one that shows.
+  let twofaRequired = $state(false)
+  getSettings().then((s) => { twofaRequired = s.require_2fa })
 
   async function handleDisable2FA() {
     if (!password) return
@@ -164,8 +170,13 @@
       {:else}
         <div class="btn-row">
           <button class="btn-secondary" onclick={() => showRegenCodes = true}>{t('security.regenerateCodes')}</button>
-          <button class="btn-danger-outline" onclick={() => showDisable = true}>{t('security.disable2fa')}</button>
+          {#if !twofaRequired}
+            <button class="btn-danger-outline" onclick={() => showDisable = true}>{t('security.disable2fa')}</button>
+          {/if}
         </div>
+        {#if twofaRequired}
+          <p class="status">{t('security.twofaRequired')}</p>
+        {/if}
       {/if}
     {:else}
       <p class="status">{t('security.twofaNotEnabled')}</p>

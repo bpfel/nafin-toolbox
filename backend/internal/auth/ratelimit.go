@@ -48,34 +48,6 @@ func (rl *LoginRateLimiter) Allow(r *http.Request) bool {
 	return true
 }
 
-// Check returns true if under the limit without recording an attempt.
-func (rl *LoginRateLimiter) Check(r *http.Request) bool {
-	return rl.CheckKey(rl.ClientIP(r))
-}
-
-// RecordFailure records a failed attempt for the request's client IP.
-func (rl *LoginRateLimiter) RecordFailure(r *http.Request) {
-	rl.RecordFailureKey(rl.ClientIP(r))
-}
-
-// CheckKey is Check for a key the caller builds — a client and an account
-// together, for one.
-func (rl *LoginRateLimiter) CheckKey(key string) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	return len(rl.recent(key, time.Now())) < rl.max
-}
-
-// RecordFailureKey is RecordFailure for a key the caller builds.
-func (rl *LoginRateLimiter) RecordFailureKey(key string) {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	now := time.Now()
-	rl.attempts[key] = append(rl.recent(key, now), now)
-}
-
 // Forget clears a key's attempts: the right password ends the run of wrong
 // ones before it, rather than leaving them to count against the next typo.
 func (rl *LoginRateLimiter) Forget(key string) {
@@ -83,6 +55,90 @@ func (rl *LoginRateLimiter) Forget(key string) {
 	defer rl.mu.Unlock()
 
 	delete(rl.attempts, key)
+}
+
+// Reservation is one attempt counted against a key before it was made.
+type Reservation struct {
+	rl  *LoginRateLimiter
+	key string
+	at  time.Time
+}
+
+// Reserve counts an attempt for key before the work it guards is done, and
+// refuses when the window is already full.
+//
+// Check-then-RecordFailure, which the sign-in handlers used before, counted a
+// failure only once a bcrypt comparison had finished, a quarter of a second
+// later. Every request that arrived in that quarter second had passed the
+// check: five hundred parallel guesses at one password all got through a
+// limit of five. A reservation is taken under the same lock as the check, so
+// the sixth request is refused however close behind the fifth it comes.
+//
+// An attempt that turns out not to be a failure — the right password — is
+// given back with Release.
+func (rl *LoginRateLimiter) Reserve(key string) (Reservation, bool) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	pruned := rl.recent(key, now)
+	if len(pruned) >= rl.max {
+		rl.attempts[key] = pruned
+		return Reservation{}, false
+	}
+	rl.attempts[key] = append(pruned, now)
+	return Reservation{rl: rl, key: key, at: now}, true
+}
+
+// Release gives back an attempt that did not fail. It removes this attempt
+// only: failures recorded beside it, by this client or another, still count.
+// Releasing the zero Reservation, or one already released, does nothing.
+func (r Reservation) Release() {
+	if r.rl == nil {
+		return
+	}
+	r.rl.mu.Lock()
+	defer r.rl.mu.Unlock()
+
+	existing := r.rl.attempts[r.key]
+	for i, t := range existing {
+		if t.Equal(r.at) {
+			r.rl.attempts[r.key] = append(existing[:i], existing[i+1:]...)
+			return
+		}
+	}
+}
+
+// Reservations are attempts taken together, against several limiters.
+type Reservations []Reservation
+
+// Release gives every one of them back.
+func (rs Reservations) Release() {
+	for _, r := range rs {
+		r.Release()
+	}
+}
+
+// Slot names one key in one limiter, for ReserveAll.
+type Slot struct {
+	Limiter *LoginRateLimiter
+	Key     string
+}
+
+// ReserveAll reserves an attempt in every slot, or in none: when one is full,
+// those already taken are given back, so a refused request does not count
+// against the limits it was never measured by.
+func ReserveAll(slots ...Slot) (Reservations, bool) {
+	taken := make(Reservations, 0, len(slots))
+	for _, s := range slots {
+		r, ok := s.Limiter.Reserve(s.Key)
+		if !ok {
+			taken.Release()
+			return nil, false
+		}
+		taken = append(taken, r)
+	}
+	return taken, true
 }
 
 // recent prunes a key's attempts to those inside the window. Callers hold mu.

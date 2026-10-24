@@ -12,10 +12,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/pquerna/otp/totp"
 
 	"github.com/bpfel/nafin-toolbox/internal/database"
 	"github.com/bpfel/nafin-toolbox/internal/email"
@@ -712,9 +714,12 @@ func TestRecoveryCodeLifecycle(t *testing.T) {
 		}
 	}
 
-	// Mark one as used
-	if err := store.MarkRecoveryCodeUsed(ctx, codes[0].ID); err != nil {
-		t.Fatalf("MarkRecoveryCodeUsed: %v", err)
+	// Spend one, then try to spend it again
+	if claimed, err := store.ClaimRecoveryCode(ctx, codes[0].ID); err != nil || !claimed {
+		t.Fatalf("ClaimRecoveryCode: claimed=%v err=%v, want true, nil", claimed, err)
+	}
+	if claimed, err := store.ClaimRecoveryCode(ctx, codes[0].ID); err != nil || claimed {
+		t.Fatalf("ClaimRecoveryCode again: claimed=%v err=%v, want false, nil", claimed, err)
 	}
 
 	updatedCodes, _ := store.GetRecoveryCodes(ctx, user.ID)
@@ -1305,5 +1310,254 @@ func TestAdminResetPassword_SignsTheUserOutEverywhere(t *testing.T) {
 	}
 	if stillSignedIn(t, store, laptop) || stillSignedIn(t, store, phone) {
 		t.Error("a device stayed signed in after an admin reset the password")
+	}
+}
+
+// --- Limits that hold under a burst, and codes that are spent ---
+
+func TestLogin_AParallelBurstGetsOnlyTheLimit(t *testing.T) {
+	// The audit: every request that arrived before the first bcrypt finished
+	// had passed the check, so fifty at once were fifty guesses, not five.
+	deps := loginDeps(t)
+
+	codes := make(chan int, 50)
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			codes <- loginFrom(t, deps, "203.0.113.7", "father@example.ch", "wrong-pass")
+		}()
+	}
+	wg.Wait()
+	close(codes)
+
+	guessed := 0
+	for code := range codes {
+		if code != http.StatusTooManyRequests {
+			guessed++
+		}
+	}
+	if guessed != 5 {
+		t.Errorf("%d of 50 parallel guesses were checked, want 5", guessed)
+	}
+}
+
+func TestLogin_GuessesFromManyAddressesAreLimitedPerEmail(t *testing.T) {
+	deps := loginDeps(t)
+	deps.LoginEmailLimiter = NewLoginRateLimiter(3, time.Minute)
+
+	for i := 0; i < 3; i++ {
+		loginFrom(t, deps, "198.51.100."+strconv.Itoa(i+1), "father@example.ch", "wrong-pass")
+	}
+	if got := loginFrom(t, deps, "198.51.100.200", "father@example.ch", "right-pass-1"); got != http.StatusTooManyRequests {
+		t.Errorf("after three misses from three addresses, a fourth address = %d, want 429", got)
+	}
+	if got := loginFrom(t, deps, "198.51.100.200", "admin@example.ch", "right-pass-1"); got != http.StatusOK {
+		t.Errorf("another email from that address = %d, want 200", got)
+	}
+}
+
+func TestLogin_TheRightPasswordDoesNotClearOtherAddressesMisses(t *testing.T) {
+	// Otherwise the real user signing in would hand a distributed guesser a
+	// fresh allowance every time.
+	deps := loginDeps(t)
+	deps.LoginEmailLimiter = NewLoginRateLimiter(3, time.Minute)
+
+	loginFrom(t, deps, "198.51.100.1", "father@example.ch", "wrong-pass")
+	loginFrom(t, deps, "198.51.100.2", "father@example.ch", "wrong-pass")
+	if got := loginFrom(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"); got != http.StatusOK {
+		t.Fatalf("the real user = %d, want 200", got)
+	}
+	loginFrom(t, deps, "198.51.100.3", "father@example.ch", "wrong-pass")
+	if got := loginFrom(t, deps, "198.51.100.4", "father@example.ch", "wrong-pass"); got != http.StatusTooManyRequests {
+		t.Errorf("the fourth miss overall = %d, want 429", got)
+	}
+}
+
+// resetPassword resets email's password as an admin would and returns the
+// temporary one.
+func resetPassword(t *testing.T, deps *HandlerDeps, email string) string {
+	t.Helper()
+	target, _ := deps.Store.GetUserByEmail(context.Background(), email)
+	admin := &User{ID: 999, Email: "root@example.ch", Role: RoleAdmin, EmailVerified: true}
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", strconv.Itoa(target.ID))
+	ctx := context.WithValue(context.WithValue(context.Background(), userContextKey, admin), chi.RouteCtxKey, rctx)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/users/"+strconv.Itoa(target.ID)+"/reset-password", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+	HandleAdminResetPassword(deps).ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("reset = %d: %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		TempPassword  string `json:"temp_password"`
+		TempExpiresAt string `json:"temp_expires_at"`
+	}
+	json.NewDecoder(w.Body).Decode(&body)
+	expires, err := time.Parse(time.RFC3339, body.TempExpiresAt)
+	if err != nil || time.Until(expires) < TempPasswordLifetime-time.Minute {
+		t.Fatalf("temp_expires_at = %q, want about %v from now", body.TempExpiresAt, TempPasswordLifetime)
+	}
+	return body.TempPassword
+}
+
+func TestAdminResetPassword_TheTemporaryPasswordExpires(t *testing.T) {
+	deps := loginDeps(t)
+	temp := resetPassword(t, deps, "father@example.ch")
+
+	if got := loginFrom(t, deps, "203.0.113.7", "father@example.ch", temp); got != http.StatusOK {
+		t.Fatalf("temporary password in time = %d, want 200", got)
+	}
+
+	testDB.Exec(`UPDATE users SET temp_password_expires_at = NOW() - INTERVAL '1 minute' WHERE email = 'father@example.ch'`)
+	body := strings.NewReader(`{"email":"father@example.ch","password":"` + temp + `"}`)
+	w := httptest.NewRecorder()
+	HandleLogin(deps).ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/auth/login", body))
+	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "AUTH-037") {
+		t.Errorf("temporary password past its time = %d %s, want 401 AUTH-037", w.Code, w.Body.String())
+	}
+}
+
+func TestChangePassword_EndsTheTemporaryPasswordsDeadline(t *testing.T) {
+	deps := loginDeps(t)
+	temp := resetPassword(t, deps, "father@example.ch")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password",
+		strings.NewReader(`{"current_password":"`+temp+`","new_password":"chosen-pass-1"}`))
+	req = req.WithContext(asUser(t, deps.Store, "father@example.ch"))
+	w := httptest.NewRecorder()
+	HandleChangePassword(deps).ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("change = %d: %s", w.Code, w.Body.String())
+	}
+
+	user, _ := deps.Store.GetUserByEmail(context.Background(), "father@example.ch")
+	if user.MustChangePassword || user.TempPasswordExpiresAt != nil {
+		t.Errorf("after the change: must=%v expires=%v, want false and none", user.MustChangePassword, user.TempPasswordExpiresAt)
+	}
+}
+
+// with2FA turns on TOTP for email and returns its secret.
+func with2FA(t *testing.T, deps *HandlerDeps, email string) (int, string) {
+	t.Helper()
+	user, _ := deps.Store.GetUserByEmail(context.Background(), email)
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "test", AccountName: email})
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := Encrypt([]byte(key.Secret()), deps.EncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := deps.Store.SaveTOTPSecret(context.Background(), user.ID, enc); err != nil {
+		t.Fatal(err)
+	}
+	if err := deps.Store.SetTOTPEnabled(context.Background(), user.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	return user.ID, key.Secret()
+}
+
+// verify2FAFrom answers a fresh challenge for userID with code.
+func verify2FAFrom(t *testing.T, deps *HandlerDeps, client string, userID int, code string) *httptest.ResponseRecorder {
+	t.Helper()
+	token, err := deps.Store.CreateMFAChallenge(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify-2fa",
+		strings.NewReader(`{"mfa_token":"`+token+`","code":"`+code+`"}`))
+	req.RemoteAddr = client + ":40000"
+	w := httptest.NewRecorder()
+	HandleVerify2FA(deps).ServeHTTP(w, req)
+	return w
+}
+
+func TestVerify2FA_ACodeWorksOnce(t *testing.T) {
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	userID, secret := with2FA(t, deps, "father@example.ch")
+	code, _ := totp.GenerateCode(secret, time.Now())
+
+	if w := verify2FAFrom(t, deps, "203.0.113.7", userID, code); w.Code != http.StatusOK {
+		t.Fatalf("first use = %d: %s", w.Code, w.Body.String())
+	}
+	if w := verify2FAFrom(t, deps, "198.51.100.9", userID, code); w.Code != http.StatusUnauthorized {
+		t.Errorf("the same code again = %d, want 401", w.Code)
+	}
+}
+
+func TestVerify2FA_WrongCodesAreLimitedPerAccount(t *testing.T) {
+	// A correct password is never counted, so an attacker who has it can
+	// fetch a challenge per guess, each from a different address.
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	deps.Verify2FAUserLimiter = NewLoginRateLimiter(2, time.Minute)
+	userID, secret := with2FA(t, deps, "father@example.ch")
+
+	verify2FAFrom(t, deps, "198.51.100.1", userID, "000000")
+	verify2FAFrom(t, deps, "198.51.100.2", userID, "000000")
+	code, _ := totp.GenerateCode(secret, time.Now())
+	if w := verify2FAFrom(t, deps, "198.51.100.3", userID, code); w.Code != http.StatusTooManyRequests {
+		t.Errorf("third try from a third address = %d, want 429", w.Code)
+	}
+}
+
+func TestVerify2FA_ARecoveryCodeWorksOnce(t *testing.T) {
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	userID, _ := with2FA(t, deps, "father@example.ch")
+	codes, hashes, err := generateRecoveryCodes(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps.Store.SaveRecoveryCodes(context.Background(), userID, hashes)
+
+	if w := verify2FAFrom(t, deps, "203.0.113.7", userID, codes[0]); w.Code != http.StatusOK {
+		t.Fatalf("recovery code = %d: %s", w.Code, w.Body.String())
+	}
+	if w := verify2FAFrom(t, deps, "203.0.113.7", userID, codes[0]); w.Code != http.StatusUnauthorized {
+		t.Errorf("the same recovery code again = %d, want 401", w.Code)
+	}
+}
+
+func TestClaimTOTPStep_OnlyALaterStep(t *testing.T) {
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	userID, _ := with2FA(t, deps, "father@example.ch")
+	store, ctx := deps.Store, context.Background()
+
+	for _, tc := range []struct {
+		step int64
+		want bool
+	}{{10, true}, {10, false}, {9, false}, {11, true}} {
+		if got, err := store.ClaimTOTPStep(ctx, userID, tc.step); err != nil || got != tc.want {
+			t.Errorf("claim %d = %v, %v; want %v", tc.step, got, err, tc.want)
+		}
+	}
+	// A new secret starts over.
+	store.SaveTOTPSecret(ctx, userID, "replaced")
+	if got, _ := store.ClaimTOTPStep(ctx, userID, 5); !got {
+		t.Error("a new secret did not start its steps over")
+	}
+}
+
+func TestDisable2FA_RefusedWhileTheInstanceRequiresIt(t *testing.T) {
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	with2FA(t, deps, "father@example.ch")
+	deps.Store.SetSetting(context.Background(), "require_2fa", "true")
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/auth/2fa", strings.NewReader(`{"password":"right-pass-1"}`))
+	req = req.WithContext(asUser(t, deps.Store, "father@example.ch"))
+	w := httptest.NewRecorder()
+	HandleDisable2FA(deps).ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "AUTH-038") {
+		t.Errorf("disable under the policy = %d %s, want 409 AUTH-038", w.Code, w.Body.String())
+	}
+	if user, _ := deps.Store.GetUserByEmail(context.Background(), "father@example.ch"); !user.TOTPEnabled {
+		t.Error("2FA was turned off anyway")
 	}
 }

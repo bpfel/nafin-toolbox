@@ -16,10 +16,19 @@ type User struct {
 	EmailVerified      bool      `json:"email_verified"`
 	TOTPEnabled        bool      `json:"totp_enabled"`
 	CreatedAt          time.Time `json:"created_at"`
+	// Set while the password is one an admin handed out. See
+	// SetTemporaryPassword.
+	TempPasswordExpiresAt *time.Time `json:"-"`
 }
 
 func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
+}
+
+// TempPasswordExpired reports whether the user's password is a temporary one
+// whose time is up.
+func (u *User) TempPasswordExpired(now time.Time) bool {
+	return u.MustChangePassword && u.TempPasswordExpiresAt != nil && !now.Before(*u.TempPasswordExpiresAt)
 }
 
 type Session struct {

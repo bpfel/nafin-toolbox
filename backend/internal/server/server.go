@@ -56,6 +56,11 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	setupLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verifyEmailLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verify2FALimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
+	// Keyed by address or by account rather than by client, so none of these
+	// three reads a forwarding header or needs the trusted proxies below.
+	loginEmailLimiter := auth.NewLoginRateLimiter(30, time.Hour)
+	verify2FAUserLimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
+	passwordCheckLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	// Four figures change about four times a year between them; six sends an
 	// hour is room to retry a bounced one without leaving a mail button open.
 	remindLimiter := auth.NewLoginRateLimiter(6, time.Hour)
@@ -76,15 +81,18 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	}
 
 	deps := &auth.HandlerDeps{
-		Store:               authStore,
-		LoginLimiter:        loginLimiter,
-		LoginAccountLimiter: loginAccountLimiter,
-		SetupLimiter:        setupLimiter,
-		VerifyEmailLimiter:  verifyEmailLimiter,
-		Verify2FALimiter:    verify2FALimiter,
-		EmailSender:         emailSender,
-		EncryptionKey:       encryptionKey,
-		AppURL:              appURL,
+		Store:                authStore,
+		LoginLimiter:         loginLimiter,
+		LoginAccountLimiter:  loginAccountLimiter,
+		SetupLimiter:         setupLimiter,
+		VerifyEmailLimiter:   verifyEmailLimiter,
+		Verify2FALimiter:     verify2FALimiter,
+		LoginEmailLimiter:    loginEmailLimiter,
+		Verify2FAUserLimiter: verify2FAUserLimiter,
+		PasswordCheckLimiter: passwordCheckLimiter,
+		EmailSender:          emailSender,
+		EncryptionKey:        encryptionKey,
+		AppURL:               appURL,
 	}
 
 	s.router.Route("/api", func(r chi.Router) {

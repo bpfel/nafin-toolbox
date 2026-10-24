@@ -506,14 +506,14 @@ export async function deleteUser(id: number): Promise<string | null> {
   return withCode(data) || 'Failed to delete user'
 }
 
-export async function adminResetPassword(id: number): Promise<{ temp_password: string } | { error: string }> {
+export async function adminResetPassword(id: number): Promise<{ temp_password: string; temp_expires_at: string } | { error: string }> {
   const res = await fetch(`${API_BASE}/auth/users/${id}/reset-password`, {
     method: 'POST',
     credentials: 'include',
   })
 
   const data = await res.json().catch(() => ({ error: 'Failed to reset password' }))
-  if (res.ok) return { temp_password: data.temp_password }
+  if (res.ok) return { temp_password: data.temp_password, temp_expires_at: data.temp_expires_at }
   return { error: withCode(data) || 'Failed to reset password' }
 }
 

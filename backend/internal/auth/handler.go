@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/email"
@@ -31,12 +33,28 @@ type HandlerDeps struct {
 	// behind one router, the usual case for an app like this.
 	LoginLimiter        *LoginRateLimiter
 	LoginAccountLimiter *LoginRateLimiter
-	SetupLimiter        *LoginRateLimiter
-	VerifyEmailLimiter  *LoginRateLimiter
-	Verify2FALimiter    *LoginRateLimiter
-	EmailSender         email.Sender
-	EncryptionKey       []byte // 32-byte AES key, nil if 2FA not available
-	AppURL              string
+	// Failures per address, from anywhere. The two above are keyed by client,
+	// so guesses spread over many addresses never filled either; this one is
+	// what they fill instead. Generous, because anybody who knows an address
+	// can fill it on purpose: it shuts that address out of signing in for up
+	// to its window, and touches no session already open.
+	LoginEmailLimiter  *LoginRateLimiter
+	SetupLimiter       *LoginRateLimiter
+	VerifyEmailLimiter *LoginRateLimiter
+	Verify2FALimiter   *LoginRateLimiter
+	// Wrong codes per account, wherever they come from. The password has
+	// already been given by then, and a correct password is never counted
+	// anywhere, so without this one an attacker who has it could fetch a fresh
+	// challenge for every guess from a fresh address.
+	Verify2FAUserLimiter *LoginRateLimiter
+	// Wrong passwords per account behind a session: changing it, turning off
+	// 2FA, new recovery codes, deleting the account. Each of those answers
+	// "is this the password?", and a stolen session cookie must not be a way
+	// to ask it as often as one likes — the password unlocks the vault too.
+	PasswordCheckLimiter *LoginRateLimiter
+	EmailSender          email.Sender
+	EncryptionKey        []byte // 32-byte AES key, nil if 2FA not available
+	AppURL               string
 }
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
@@ -53,8 +71,14 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		client := deps.LoginLimiter.ClientIP(r)
-		account := client + "|" + strings.ToLower(strings.TrimSpace(req.Email))
-		if !deps.LoginLimiter.CheckKey(client) || !deps.LoginAccountLimiter.CheckKey(account) {
+		address := strings.ToLower(strings.TrimSpace(req.Email))
+		account := client + "|" + address
+		attempt, ok := ReserveAll(
+			Slot{deps.LoginLimiter, client},
+			Slot{deps.LoginAccountLimiter, account},
+			Slot{deps.LoginEmailLimiter, address},
+		)
+		if !ok {
 			w.Header().Set("Retry-After", "900")
 			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
 			return
@@ -62,19 +86,31 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 
 		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
+			attempt.Release()
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
-		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
-			deps.LoginLimiter.RecordFailureKey(client)
-			deps.LoginAccountLimiter.RecordFailureKey(account)
+		if !passwordMatches(user, req.Password) {
 			uid := userIDPtr(user)
 			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
 
+		// The right password is not a failure. The client-and-account run is
+		// cleared outright, as a typo before it should not count against the
+		// next; the others give back only this attempt, because the failures
+		// in them may be somebody else's.
+		attempt.Release()
 		deps.LoginAccountLimiter.Forget(account)
+
+		// A temporary password an admin handed out works for a while, not for
+		// ever. See SetMustChangePassword.
+		if user.TempPasswordExpired(time.Now()) {
+			deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginFailed, r, map[string]any{"email": req.Email, "reason": "temporary password expired"})
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "temporary password expired")
+			return
+		}
 
 		// Reject unverified email users
 		if !user.EmailVerified {
@@ -365,8 +401,7 @@ func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.CurrentPassword) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "current password is incorrect")
+		if !confirmPassword(w, deps, user, req.CurrentPassword, "current password is incorrect") {
 			return
 		}
 
@@ -478,11 +513,22 @@ func HandleNeedsSetup(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerifyEmail accepts a verification token + password, verifies email, sets password, auto-logs in.
 func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.VerifyEmailLimiter.Check(r) {
+		attempt, ok := deps.VerifyEmailLimiter.Reserve(deps.VerifyEmailLimiter.ClientIP(r))
+		if !ok {
 			w.Header().Set("Retry-After", "900")
 			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
+		// Only a token that does not exist is a guess. Everything else this
+		// handler refuses — a malformed body, a short password — gives the
+		// attempt back, as the check that came before the reservation did not
+		// count them either.
+		guessed := false
+		defer func() {
+			if !guessed {
+				attempt.Release()
+			}
+		}()
 
 		var req VerifyEmailRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -506,7 +552,7 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 		if userID == 0 {
-			deps.VerifyEmailLimiter.RecordFailure(r)
+			guessed = true
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid or expired token")
 			return
 		}
@@ -553,11 +599,21 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerify2FA validates a TOTP code or recovery code after password authentication.
 func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.Verify2FALimiter.Check(r) {
+		var attempt Reservations
+		clientAttempt, ok := deps.Verify2FALimiter.Reserve(deps.Verify2FALimiter.ClientIP(r))
+		if !ok {
 			w.Header().Set("Retry-After", "900")
 			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
+		attempt = append(attempt, clientAttempt)
+		// Only a wrong code is a guess; see HandleVerifyEmail.
+		guessed := false
+		defer func() {
+			if !guessed {
+				attempt.Release()
+			}
+		}()
 
 		var req Verify2FARequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -580,6 +636,14 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
+		userAttempt, ok := deps.Verify2FAUserLimiter.Reserve(strconv.Itoa(userID))
+		if !ok {
+			w.Header().Set("Retry-After", "900")
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
+			return
+		}
+		attempt = append(attempt, userAttempt)
+
 		// Try TOTP code first
 		valid, err := validateTOTPCode(r.Context(), deps, userID, req.Code)
 		if err != nil {
@@ -597,7 +661,7 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if !valid {
-			deps.Verify2FALimiter.RecordFailure(r)
+			guessed = true
 			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, nil)
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid code")
 			return
@@ -751,8 +815,22 @@ func HandleDisable2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.Password) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
+		if !confirmPassword(w, deps, user, req.Password, "incorrect password") {
+			return
+		}
+
+		// While the instance requires a second factor, nobody may drop theirs.
+		// The screen that enforces it is the browser's, and the browser is not
+		// where a rule can be kept: anyone holding a session and the password
+		// could otherwise take the second factor away, and from then on the
+		// password alone would let them in.
+		require2fa, err := deps.Store.GetSetting(r.Context(), "require_2fa")
+		if err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if require2fa == "true" {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is required on this instance")
 			return
 		}
 
@@ -795,8 +873,7 @@ func HandleRegenerateRecoveryCodes(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.Password) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
+		if !confirmPassword(w, deps, user, req.Password, "incorrect password") {
 			return
 		}
 
@@ -836,8 +913,7 @@ func HandleDeleteAccount(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.Password) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
+		if !confirmPassword(w, deps, user, req.Password, "incorrect password") {
 			return
 		}
 
@@ -916,8 +992,15 @@ func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 	}
 }
 
+// TempPasswordLifetime is how long a password from an admin reset works. Three
+// days covers a weekend between the admin sending it and the person reading
+// it; past that, the admin is asked for another rather than the first one
+// lying in a chat history for good.
+const TempPasswordLifetime = 72 * time.Hour
+
 // HandleAdminResetPassword lets an admin reset another user's password.
-// Generates a random temporary password, sets must_change_password = true.
+// Generates a random temporary password, which the user must change at their
+// next sign-in and which stops working after TempPasswordLifetime.
 func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
@@ -958,7 +1041,8 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if err := deps.Store.UpdatePassword(r.Context(), targetID, hash); err != nil {
+		expiresAt := time.Now().Add(TempPasswordLifetime)
+		if err := deps.Store.SetTemporaryPassword(r.Context(), targetID, hash, expiresAt); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -971,10 +1055,6 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if err := deps.Store.SetMustChangePassword(r.Context(), targetID); err != nil {
-			log.Printf("setting must_change_password: %v", err)
-		}
-
 		deps.Store.LogAudit(r.Context(), &caller.ID, AuditPasswordReset, r, map[string]any{
 			"target_user_id": targetID,
 			"target_email":   target.Email,
@@ -982,8 +1062,9 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
-			"status":        "ok",
-			"temp_password": tempPassword,
+			"status":          "ok",
+			"temp_password":   tempPassword,
+			"temp_expires_at": expiresAt.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -1185,7 +1266,62 @@ func userIDPtr(u *User) *int {
 	return &u.ID
 }
 
-// validateTOTPCode decrypts the stored secret and validates a TOTP code.
+// dummyHash is compared against when nobody has the address that was typed,
+// so that answering "no such account" takes as long as "wrong password".
+// Skipping bcrypt made the first a quarter of a second faster, which told
+// anyone timing the answer which addresses have accounts.
+var dummyHash = sync.OnceValue(func() string {
+	h, err := HashPassword("no account has this password")
+	if err != nil {
+		panic(err)
+	}
+	return h
+})
+
+// passwordMatches reports whether user exists and has this password, taking
+// the same time either way.
+func passwordMatches(user *User, password string) bool {
+	if user == nil {
+		CheckPassword(dummyHash(), password)
+		return false
+	}
+	return CheckPassword(user.PasswordHash, password)
+}
+
+// confirmPassword asks the signed-in user for their password again, before
+// something that should not rest on a session alone. It writes the refusal
+// itself — failMessage for a wrong password, a 429 when there have been too
+// many — and reports whether to go on.
+func confirmPassword(w http.ResponseWriter, deps *HandlerDeps, user *User, password, failMessage string) bool {
+	attempt, ok := deps.PasswordCheckLimiter.Reserve(strconv.Itoa(user.ID))
+	if !ok {
+		w.Header().Set("Retry-After", "900")
+		apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
+		return false
+	}
+	if !CheckPassword(user.PasswordHash, password) {
+		apierror.Write(w, apierror.Auth, http.StatusUnauthorized, failMessage)
+		return false
+	}
+	attempt.Release()
+	return true
+}
+
+// The TOTP parameters every authenticator app assumes, and totp.Validate
+// uses: six digits, SHA-1, thirty seconds, one step of drift either way.
+const (
+	totpPeriod = 30
+	totpSkew   = 1
+)
+
+// validateTOTPCode decrypts the stored secret, checks a TOTP code against it,
+// and spends the code: a code that worked once is refused after.
+//
+// Without that, a code read over a shoulder or relayed by a phishing page
+// went on working for the minute and a half the drift window keeps it valid.
+// The step each accepted code belongs to is recorded, and only a later step
+// is accepted next — claimed in one statement, so two requests racing with
+// the same code cannot both have it.
 func validateTOTPCode(ctx context.Context, deps *HandlerDeps, userID int, code string) (bool, error) {
 	if deps.EncryptionKey == nil {
 		return false, nil
@@ -1204,11 +1340,54 @@ func validateTOTPCode(ctx context.Context, deps *HandlerDeps, userID int, code s
 		return false, fmt.Errorf("decrypting TOTP secret: %w", err)
 	}
 
-	return totp.Validate(code, string(secret)), nil
+	step, ok := totpStep(string(secret), code, time.Now())
+	if !ok {
+		return false, nil
+	}
+	return deps.Store.ClaimTOTPStep(ctx, userID, step)
+}
+
+// totpStep finds the time step, inside the drift window around now, whose
+// code is code — what totp.Validate checks, with the step it matched.
+func totpStep(secret, code string, now time.Time) (int64, bool) {
+	if len(code) != 6 {
+		return 0, false
+	}
+	current := now.Unix() / totpPeriod
+	for step := current - totpSkew; step <= current+totpSkew; step++ {
+		want, err := totp.GenerateCode(secret, time.Unix(step*totpPeriod, 0))
+		if err != nil {
+			return 0, false
+		}
+		if subtle.ConstantTimeCompare([]byte(want), []byte(code)) == 1 {
+			return step, true
+		}
+	}
+	return 0, false
+}
+
+// looksLikeRecoveryCode is the shape generateRecoveryCodes makes: eight
+// lower-case hex digits. Anything else cannot match one, and is turned away
+// before ten bcrypt comparisons — two and a half seconds of CPU a wrong
+// six-digit code used to cost on every attempt.
+func looksLikeRecoveryCode(code string) bool {
+	if len(code) != 8 {
+		return false
+	}
+	for _, c := range code {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // tryRecoveryCode checks if the code matches any unused recovery code.
 func tryRecoveryCode(ctx context.Context, deps *HandlerDeps, userID int, code string) (bool, error) {
+	if !looksLikeRecoveryCode(code) {
+		return false, nil
+	}
+
 	codes, err := deps.Store.GetRecoveryCodes(ctx, userID)
 	if err != nil {
 		return false, err
@@ -1219,7 +1398,10 @@ func tryRecoveryCode(ctx context.Context, deps *HandlerDeps, userID int, code st
 			continue
 		}
 		if CheckPassword(rc.CodeHash, code) {
-			if err := deps.Store.MarkRecoveryCodeUsed(ctx, rc.ID); err != nil {
+			// Claimed, not just marked: two requests with the same code both
+			// found it unused above, and only one of them may sign in.
+			claimed, err := deps.Store.ClaimRecoveryCode(ctx, rc.ID)
+			if err != nil || !claimed {
 				return false, err
 			}
 			deps.Store.LogAudit(ctx, &userID, AuditRecoveryCodeUsed, nil, nil)

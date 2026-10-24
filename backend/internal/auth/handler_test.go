@@ -11,19 +11,23 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/apierror"
 	"github.com/bpfel/nafin-toolbox/internal/email"
+	"github.com/pquerna/otp/totp"
 )
 
 func testDeps() *HandlerDeps {
 	limiter := NewLoginRateLimiter(100, time.Minute)
 	return &HandlerDeps{
-		Store:               &Store{db: nil},
-		LoginLimiter:        limiter,
-		LoginAccountLimiter: limiter,
-		SetupLimiter:        limiter,
-		VerifyEmailLimiter:  limiter,
-		Verify2FALimiter:    limiter,
-		EmailSender:         &email.LogSender{},
-		AppURL:              "http://localhost:3000",
+		Store:                &Store{db: nil},
+		LoginLimiter:         limiter,
+		LoginAccountLimiter:  limiter,
+		SetupLimiter:         limiter,
+		VerifyEmailLimiter:   limiter,
+		Verify2FALimiter:     limiter,
+		LoginEmailLimiter:    limiter,
+		Verify2FAUserLimiter: limiter,
+		PasswordCheckLimiter: limiter,
+		EmailSender:          &email.LogSender{},
+		AppURL:               "http://localhost:3000",
 	}
 }
 
@@ -1375,5 +1379,123 @@ func TestSessionCookie_Properties(t *testing.T) {
 	}
 	if c.SameSite != http.SameSiteLaxMode {
 		t.Errorf("SameSite = %d, want SameSiteLaxMode", c.SameSite)
+	}
+}
+
+// --- Spent codes, temporary passwords and password re-checks ---
+
+func TestTOTPStep_MatchesTheDriftWindowAndNothingElse(t *testing.T) {
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "test", AccountName: "a@b.ch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_000, 0)
+	current := now.Unix() / totpPeriod
+
+	for _, offset := range []int64{-1, 0, 1} {
+		code, _ := totp.GenerateCode(key.Secret(), time.Unix((current+offset)*totpPeriod, 0))
+		step, ok := totpStep(key.Secret(), code, now)
+		if !ok || step != current+offset {
+			t.Errorf("offset %d: step=%d ok=%v, want %d true", offset, step, ok, current+offset)
+		}
+	}
+	// Two steps out is outside the window totp.Validate allows.
+	stale, _ := totp.GenerateCode(key.Secret(), time.Unix((current-2)*totpPeriod, 0))
+	if _, ok := totpStep(key.Secret(), stale, now); ok {
+		t.Error("a code two steps old was accepted")
+	}
+	for _, bad := range []string{"", "12345", "1234567", "abcdef"} {
+		if _, ok := totpStep(key.Secret(), bad, now); ok {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+}
+
+func TestLooksLikeRecoveryCode(t *testing.T) {
+	for code, want := range map[string]bool{
+		"0a1b2c3d": true,
+		"123456":   false, // a TOTP code: never costs a bcrypt
+		"0A1B2C3D": false, // generateRecoveryCodes writes lower case only
+		"0a1b2c3":  false,
+		"0a1b2c3g": false,
+		"":         false,
+	} {
+		if got := looksLikeRecoveryCode(code); got != want {
+			t.Errorf("looksLikeRecoveryCode(%q) = %v, want %v", code, got, want)
+		}
+	}
+}
+
+func TestTempPasswordExpired(t *testing.T) {
+	now := time.Now()
+	past, future := now.Add(-time.Minute), now.Add(time.Minute)
+	for _, tc := range []struct {
+		name    string
+		must    bool
+		expires *time.Time
+		want    bool
+	}{
+		{"a password the user chose", false, nil, false},
+		{"handed out before expiry existed", true, nil, false},
+		{"still in time", true, &future, false},
+		{"past its time", true, &past, true},
+		{"changed, with a stale deadline", false, &past, false},
+	} {
+		u := &User{MustChangePassword: tc.must, TempPasswordExpiresAt: tc.expires}
+		if got := u.TempPasswordExpired(now); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestPasswordMatches_NoAccountTakesAsLongAsAWrongPassword(t *testing.T) {
+	user := &User{PasswordHash: mustHash("right-pass-1")}
+	dummyHash() // computed once, up front, as the first real request would
+
+	start := time.Now()
+	if passwordMatches(user, "wrong-pass") {
+		t.Fatal("a wrong password matched")
+	}
+	wrong := time.Since(start)
+
+	start = time.Now()
+	if passwordMatches(nil, "wrong-pass") {
+		t.Fatal("no account matched")
+	}
+	missing := time.Since(start)
+
+	// Both are one bcrypt comparison at the same cost. Skipping it made the
+	// second a hundred times faster; half is far outside that and well
+	// inside scheduling noise.
+	if missing < wrong/2 {
+		t.Errorf("no account took %v, a wrong password %v: the difference tells which addresses exist", missing, wrong)
+	}
+}
+
+func TestConfirmPassword_IsLimitedPerAccount(t *testing.T) {
+	deps := testDeps()
+	deps.PasswordCheckLimiter = NewLoginRateLimiter(2, time.Minute)
+
+	deleteWith := func(password string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodDelete, "/api/auth/account",
+			strings.NewReader(`{"password":"`+password+`"}`))
+		req = req.WithContext(userCtx())
+		w := httptest.NewRecorder()
+		HandleDeleteAccount(deps).ServeHTTP(w, req)
+		return w
+	}
+
+	for i := 0; i < 2; i++ {
+		if w := deleteWith("wrong-pass"); w.Code != http.StatusUnauthorized {
+			t.Fatalf("guess %d = %d, want 401", i+1, w.Code)
+		}
+	}
+	// Refused before the password is looked at, the right one included.
+	w := deleteWith("user1234")
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("third try = %d, want 429 (body: %s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "AUTH-013") {
+		t.Errorf("body %q does not carry AUTH-013", w.Body.String())
 	}
 }
