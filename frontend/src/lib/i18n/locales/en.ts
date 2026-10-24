@@ -537,6 +537,7 @@ export const en = {
   'error.createEntry': 'Failed to create entry',
 
   'security.twofaEnabled': '2FA is enabled',
+  'security.twofaRequired': 'Required here, so it cannot be turned off.',
   'security.twofaNotEnabled': '2FA is not enabled',
   'twofa.enterCode.label': 'Enter code',
   'accountForm.qrIbanNote': 'a QR-IBAN — bills will use a QR reference (QRR)',

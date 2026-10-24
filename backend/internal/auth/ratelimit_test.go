@@ -2,6 +2,8 @@ package auth
 
 import (
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -135,21 +137,6 @@ func TestClientIP_TrustedAllTheWay_IsTheLeftmost(t *testing.T) {
 	}
 }
 
-func TestForget_ClearsOneKeyOnly(t *testing.T) {
-	rl := NewLoginRateLimiter(1, time.Minute)
-	rl.RecordFailureKey("a")
-	rl.RecordFailureKey("b")
-
-	rl.Forget("a")
-
-	if !rl.CheckKey("a") {
-		t.Error("a should be clear after Forget")
-	}
-	if rl.CheckKey("b") {
-		t.Error("b should still be at its limit")
-	}
-}
-
 func TestClientIP_TrustedProxy_XForwardedFor(t *testing.T) {
 	rl := NewLoginRateLimiter(10, time.Minute)
 	rl.SetTrustedProxies([]string{"172.16.0.0/12"})
@@ -207,296 +194,143 @@ func newRequestWithRemote(addr string) *http.Request {
 	return r
 }
 
-// --- Check() and RecordFailure() tests ---
+// --- Reserve and Release ---
 
-// TestCheck_ReturnsTrueWhenUnderLimit tests that Check() returns true when under the limit
-// and does NOT record an attempt
-func TestCheck_ReturnsTrueWhenUnderLimit(t *testing.T) {
+func TestReserve_RefusesOnceTheWindowIsFull(t *testing.T) {
 	rl := NewLoginRateLimiter(3, time.Minute)
 
-	r := newRequestWithRemote("10.0.0.1:12345")
-
-	// First check should return true
-	if !rl.Check(r) {
-		t.Fatal("Check() should return true when no attempts recorded")
-	}
-
-	// Verify Check() didn't consume the limit by checking again
-	if !rl.Check(r) {
-		t.Fatal("Check() should not record an attempt")
-	}
-
-	// Verify we can still make 3 actual attempts via Allow()
 	for i := 0; i < 3; i++ {
-		if !rl.Allow(r) {
-			t.Fatalf("Allow() attempt %d should succeed (Check didn't consume limit)", i+1)
+		if _, ok := rl.Reserve("k"); !ok {
+			t.Fatalf("attempt %d should be reserved", i+1)
 		}
 	}
-
-	// Now 4th should fail
-	if rl.Allow(r) {
-		t.Fatal("Allow() attempt 4 should fail (limit=3)")
+	if _, ok := rl.Reserve("k"); ok {
+		t.Fatal("attempt 4 should be refused (limit=3)")
 	}
 }
 
-// TestCheck_ReturnsFalseWhenAtLimit tests that Check() returns false when at the limit
-func TestCheck_ReturnsFalseWhenAtLimit(t *testing.T) {
+// The reason Reserve exists. Check-then-RecordFailure let every request that
+// arrived before the first failure was recorded through; here five hundred
+// arrive together and exactly the limit get past.
+func TestReserve_ParallelBurstGetsOnlyTheLimit(t *testing.T) {
+	rl := NewLoginRateLimiter(5, time.Minute)
+
+	var wg sync.WaitGroup
+	var granted atomic.Int32
+	start := make(chan struct{})
+	for i := 0; i < 500; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if _, ok := rl.Reserve("victim@example.com"); ok {
+				granted.Add(1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	if got := granted.Load(); got != 5 {
+		t.Fatalf("granted %d of 500 parallel attempts, want 5", got)
+	}
+}
+
+func TestRelease_GivesBackThisAttemptOnly(t *testing.T) {
 	rl := NewLoginRateLimiter(2, time.Minute)
 
-	r := newRequestWithRemote("10.0.0.2:12345")
+	failed, _ := rl.Reserve("k")
+	_ = failed // a wrong password: kept
+	right, _ := rl.Reserve("k")
+	right.Release()
 
-	// Record 2 attempts (reaching limit)
-	rl.Allow(r)
-	rl.Allow(r)
-
-	// Check should now return false
-	if rl.Check(r) {
-		t.Fatal("Check() should return false when at limit")
+	if _, ok := rl.Reserve("k"); !ok {
+		t.Fatal("the released attempt should have freed a place")
 	}
-
-	// Verify we can't make another attempt
-	if rl.Allow(r) {
-		t.Fatal("Allow() should fail when at limit")
+	if _, ok := rl.Reserve("k"); ok {
+		t.Fatal("the failure beside it should still count")
 	}
 }
 
-// TestCheck_ReturnsFalseWhenOverLimit tests that Check() returns false when already over limit
-func TestCheck_ReturnsFalseWhenOverLimit(t *testing.T) {
-	rl := NewLoginRateLimiter(1, time.Minute)
-
-	r := newRequestWithRemote("10.0.0.3:12345")
-
-	// Record attempt (at limit)
-	rl.Allow(r)
-
-	// Check should return false
-	if rl.Check(r) {
-		t.Fatal("Check() should return false when at limit")
-	}
-
-	// Record another failure via RecordFailure (now over limit conceptually)
-	rl.RecordFailure(r)
-
-	// Check should still return false
-	if rl.Check(r) {
-		t.Fatal("Check() should return false when over limit")
-	}
-}
-
-// TestRecordFailure_RecordsAttempt tests that RecordFailure() records a failed attempt
-func TestRecordFailure_RecordsAttempt(t *testing.T) {
+func TestRelease_TwiceOrZeroDoesNothing(t *testing.T) {
 	rl := NewLoginRateLimiter(2, time.Minute)
 
-	r := newRequestWithRemote("10.0.0.4:12345")
+	a, _ := rl.Reserve("k")
+	rl.Reserve("k")
+	a.Release()
+	a.Release()
+	Reservation{}.Release()
 
-	// Before recording, should be under limit
-	if !rl.Check(r) {
-		t.Fatal("Check() should return true initially")
-	}
-
-	// Record a failure
-	rl.RecordFailure(r)
-
-	// Still under limit (1 of 2)
-	if !rl.Check(r) {
-		t.Fatal("Check() should return true after 1 failure (limit=2)")
-	}
-
-	// Record another failure
-	rl.RecordFailure(r)
-
-	// Now at limit (2 of 2)
-	if rl.Check(r) {
-		t.Fatal("Check() should return false after 2 failures (limit=2)")
+	rl.Reserve("k")
+	if _, ok := rl.Reserve("k"); ok {
+		t.Fatal("a second Release must not give back an attempt it did not take")
 	}
 }
 
-// TestRecordFailure_DoesNotAllowMoreAttempts tests that RecordFailure prevents future Allow()
-func TestRecordFailure_DoesNotAllowMoreAttempts(t *testing.T) {
-	rl := NewLoginRateLimiter(1, time.Minute)
+func TestReserveAll_TakesNoneWhenOneIsFull(t *testing.T) {
+	roomy := NewLoginRateLimiter(5, time.Minute)
+	full := NewLoginRateLimiter(1, time.Minute)
+	full.Reserve("k")
 
-	r := newRequestWithRemote("10.0.0.5:12345")
-
-	// Record failure
-	rl.RecordFailure(r)
-
-	// Should be at limit
-	if rl.Allow(r) {
-		t.Fatal("Allow() should fail after RecordFailure() reaches limit")
+	if _, ok := ReserveAll(Slot{roomy, "k"}, Slot{full, "k"}); ok {
+		t.Fatal("should be refused: the second slot is full")
 	}
-}
-
-// TestCheckAndRecordFailure_Interaction tests the interaction between Check() and RecordFailure()
-func TestCheckAndRecordFailure_Interaction(t *testing.T) {
-	rl := NewLoginRateLimiter(3, time.Minute)
-
-	r := newRequestWithRemote("10.0.0.6:12345")
-
-	// Scenario: Check before each login attempt, RecordFailure on failure
-
-	// Attempt 1
-	if !rl.Check(r) {
-		t.Fatal("Check() should pass for attempt 1")
-	}
-	rl.RecordFailure(r) // Login failed
-
-	// Attempt 2
-	if !rl.Check(r) {
-		t.Fatal("Check() should pass for attempt 2 (1 failure recorded)")
-	}
-	rl.RecordFailure(r) // Login failed
-
-	// Attempt 3
-	if !rl.Check(r) {
-		t.Fatal("Check() should pass for attempt 3 (2 failures recorded)")
-	}
-	rl.RecordFailure(r) // Login failed
-
-	// Attempt 4 - should be blocked
-	if rl.Check(r) {
-		t.Fatal("Check() should fail for attempt 4 (3 failures recorded, limit=3)")
-	}
-	// RecordFailure not called because Check() returned false (pre-check pattern)
-}
-
-// TestCheckAndAllow_Difference tests that Check() doesn't consume but Allow() does
-func TestCheckAndAllow_Difference(t *testing.T) {
-	rl := NewLoginRateLimiter(2, time.Minute)
-
-	r := newRequestWithRemote("10.0.0.7:12345")
-
-	// Multiple Check() calls don't consume limit
-	for i := 0; i < 10; i++ {
-		if !rl.Check(r) {
-			t.Fatalf("Check() call %d should not consume limit", i+1)
+	for i := 0; i < 5; i++ {
+		if _, ok := roomy.Reserve("k"); !ok {
+			t.Fatalf("the refused request should not count against the first slot (attempt %d)", i+1)
 		}
 	}
+}
 
-	// But Allow() does consume
-	if !rl.Allow(r) {
-		t.Fatal("Allow() attempt 1 should succeed")
-	}
-	if !rl.Allow(r) {
-		t.Fatal("Allow() attempt 2 should succeed")
-	}
-	if rl.Allow(r) {
-		t.Fatal("Allow() attempt 3 should fail (limit=2)")
-	}
+func TestReserveAll_ReleaseGivesBackEvery(t *testing.T) {
+	a := NewLoginRateLimiter(1, time.Minute)
+	b := NewLoginRateLimiter(1, time.Minute)
 
-	// Check() should now return false
-	if rl.Check(r) {
-		t.Fatal("Check() should return false after Allow() consumed limit")
+	taken, ok := ReserveAll(Slot{a, "k"}, Slot{b, "k"})
+	if !ok {
+		t.Fatal("both slots are empty")
+	}
+	taken.Release()
+
+	if _, ok := ReserveAll(Slot{a, "k"}, Slot{b, "k"}); !ok {
+		t.Fatal("both slots should be free again")
 	}
 }
 
-// TestRecordFailure_PrunesExpiredEntries tests that RecordFailure prunes old attempts
-func TestRecordFailure_PrunesExpiredEntries(t *testing.T) {
+func TestReserve_ExpiredAttemptsStopCounting(t *testing.T) {
 	rl := NewLoginRateLimiter(2, 50*time.Millisecond)
+	rl.Reserve("k")
+	rl.Reserve("k")
 
-	r := newRequestWithRemote("10.0.0.8:12345")
-
-	// Record 2 failures
-	rl.RecordFailure(r)
-	rl.RecordFailure(r)
-
-	// Should be at limit
-	if rl.Check(r) {
-		t.Fatal("Check() should return false immediately after 2 failures")
-	}
-
-	// Wait for window to expire
 	time.Sleep(60 * time.Millisecond)
 
-	// Should be allowed again
-	if !rl.Check(r) {
-		t.Fatal("Check() should return true after window expires")
-	}
-
-	// RecordFailure should have pruned old entries
-	rl.RecordFailure(r)
-	if !rl.Check(r) {
-		t.Fatal("Check() should return true after RecordFailure pruned old entries")
+	if _, ok := rl.Reserve("k"); !ok {
+		t.Fatal("should be reserved after the window has passed")
 	}
 }
 
-// TestCheck_ConcurrentSafety tests that Check() is safe to call concurrently
-func TestCheck_ConcurrentSafety(t *testing.T) {
-	rl := NewLoginRateLimiter(100, time.Minute)
+func TestForget_ClearsOneKeyOnly(t *testing.T) {
+	rl := NewLoginRateLimiter(1, time.Minute)
+	rl.Reserve("a")
+	rl.Reserve("b")
 
-	r := newRequestWithRemote("10.0.0.9:12345")
+	rl.Forget("a")
 
-	// Launch multiple goroutines calling Check()
-	done := make(chan bool)
-	for i := 0; i < 10; i++ {
-		go func() {
-			for j := 0; j < 100; j++ {
-				rl.Check(r)
-			}
-			done <- true
-		}()
+	if _, ok := rl.Reserve("a"); !ok {
+		t.Error("a should be clear after Forget")
 	}
-
-	// Wait for all goroutines
-	for i := 0; i < 10; i++ {
-		<-done
-	}
-
-	// Check() calls shouldn't have consumed limit
-	if !rl.Check(r) {
-		t.Fatal("Check() calls should not consume limit even under concurrent access")
+	if _, ok := rl.Reserve("b"); ok {
+		t.Error("b should still be at its limit")
 	}
 }
 
-// TestRecordFailure_ConcurrentSafety tests that RecordFailure() is safe to call concurrently
-func TestRecordFailure_ConcurrentSafety(t *testing.T) {
-	rl := NewLoginRateLimiter(100, time.Minute)
-
-	r := newRequestWithRemote("10.0.0.10:12345")
-
-	// Launch 10 goroutines each calling RecordFailure 10 times = 100 total
-	done := make(chan bool)
-	for i := 0; i < 10; i++ {
-		go func() {
-			for j := 0; j < 10; j++ {
-				rl.RecordFailure(r)
-			}
-			done <- true
-		}()
-	}
-
-	for i := 0; i < 10; i++ {
-		<-done
-	}
-
-	// Should have recorded 100 failures — at the limit, so Check returns false
-	if rl.Check(r) {
-		t.Fatal("RecordFailure() should have recorded all 100 concurrent calls")
-	}
-}
-
-// TestCheck_EmptyKey tests that Check() handles empty client IP gracefully
-func TestCheck_EmptyKey(t *testing.T) {
-	rl := NewLoginRateLimiter(3, time.Minute)
-
-	r := newRequestWithRemote("")
-
-	// Should not panic and should return true initially
-	if !rl.Check(r) {
-		t.Fatal("Check() with empty RemoteAddr should return true initially")
-	}
-}
-
-// TestRecordFailure_EmptyKey tests that RecordFailure() handles empty client IP gracefully
-func TestRecordFailure_EmptyKey(t *testing.T) {
+func TestReserve_EmptyKey(t *testing.T) {
 	rl := NewLoginRateLimiter(1, time.Minute)
 
-	r := newRequestWithRemote("")
-
-	// Should not panic
-	rl.RecordFailure(r)
-
-	// Check should return false after reaching limit
-	if rl.Check(r) {
-		t.Fatal("Check() should return false after RecordFailure() with empty key")
+	if _, ok := rl.Reserve(""); !ok {
+		t.Fatal("an empty key is a key like any other")
+	}
+	if _, ok := rl.Reserve(""); ok {
+		t.Fatal("and is limited like any other")
 	}
 }

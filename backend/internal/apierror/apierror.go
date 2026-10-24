@@ -57,6 +57,8 @@ var codes = map[string]string{
 	Auth + "|password required":                 "AUTH-017",
 	Auth + "|current and new password required": "AUTH-018",
 	Auth + "|email required":                    "AUTH-019",
+	// An admin reset's password, past TempPasswordLifetime: ask for another.
+	Auth + "|temporary password expired": "AUTH-037",
 
 	// --- Invitations and verification ---
 	Auth + "|invalid or expired token":                 "AUTH-020",
@@ -78,6 +80,7 @@ var codes = map[string]string{
 	Auth + "|2FA is already enabled":                            "AUTH-034",
 	Auth + "|2FA is not enabled":                                "AUTH-035",
 	Auth + "|2FA not available (encryption key not configured)": "AUTH-036",
+	Auth + "|2FA is required on this instance":                  "AUTH-038",
 
 	// --- Administering other users ---
 	Auth + "|cannot delete yourself via admin endpoint":         "AUTH-040",

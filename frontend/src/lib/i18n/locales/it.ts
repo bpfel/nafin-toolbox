@@ -491,6 +491,7 @@ export const it: Messages = {
   'error.createEntry': 'Creazione della voce non riuscita',
 
   'security.twofaEnabled': 'La 2FA è attiva',
+  'security.twofaRequired': 'Obbligatoria qui: non può essere disattivata.',
   'security.twofaNotEnabled': 'La 2FA non è attiva',
   'twofa.enterCode.label': 'Inserisci il codice',
   'accountForm.qrIbanNote': 'un QR-IBAN — le fatture useranno un riferimento QR (QRR)',
