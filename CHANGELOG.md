@@ -85,6 +85,13 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### New
 
+- **A device you have signed in on before can always sign in.** Somebody who
+  fills an address's sign-in limit on purpose now locks out only devices that
+  address has never used. The device's own limit is five tries in a quarter of an
+  hour. The signed cookie that marks it grants nothing without the password and
+  the second factor. An administrator reset and **Log out everywhere** make an
+  account forget its devices. Needs `ENCRYPTION_KEY`; migration `015` adds one
+  column.
 - **Audit** lists every sign-in lockout in force, and lets an administrator clear
   one or all of them.
 - [In case of an attack](readmore/under-attack.md): what the app limits on its

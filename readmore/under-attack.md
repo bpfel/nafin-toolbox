@@ -18,16 +18,29 @@ The commands assume the `dc` shorthand from [Administration](administration.md).
 | Per account, from anywhere | 30 failed sign-ins in an hour | Guesses spread across many machines |
 | Per account, two-factor | 10 wrong codes in 15 minutes | Guessing the code once the password is known |
 | Per account, behind a session | 5 wrong passwords in 15 minutes | A stolen session asking "is this the password?" |
+| Per known device | 5 failed sign-ins in 15 minutes | A browser that signed in to the account before is counted on its own instead, so the per-account limit can't keep its owner out |
 | Unknown addresses | Answer as slowly as a wrong password | Finding out which addresses have accounts |
 
 Every attempt is counted before the password is checked, so a burst of parallel
 requests gets no more tries than the same requests one at a time.
 
-**The trade-off:** the per-account limit can be filled on purpose. Anyone who knows
-an address can shut it out of signing in for up to an hour. Sessions that are
-already open keep working; they last 30 days. Only signing in anew is refused, for
-example on a new device or after signing out. The steps below show how to let
-someone back in.
+**The trade-off, and what softens it:** the per-account limit can be filled on
+purpose. Anyone who knows an address can shut it out of signing in for up to an
+hour. Three things keep that from reaching its owner:
+
+- **Known devices.** After a complete sign-in (password, and the second factor
+  where there is one), the browser gets a signed cookie: "this device has signed
+  in as this account before". A sign-in that carries it is counted against that
+  device alone, so the owner on their own phone or laptop signs in as usual while
+  the address is locked out for everyone else. The cookie grants nothing by
+  itself: the password and the second factor are still required. A password reset
+  by an administrator and **Log out everywhere** both make the account forget
+  every device. Needs `ENCRYPTION_KEY`, which signs the cookies.
+- **Open sessions keep working.** They last 30 days.
+- **An administrator can clear the lockout.** See step 3.
+
+So a lockout only reaches someone signing in from a device they have never used
+before, or after an administrator reset their password.
 
 All of these limits are kept in memory. **Restarting the API clears every one of
 them**, for everybody. That is the blunt tool; step 3 has the precise one.
@@ -124,7 +137,9 @@ one by one is a losing game. Options, from least to most effort:
 
 ## 3. Let people back in
 
-A user who can't sign in because their address is being attacked:
+A user who can't sign in because their address is being attacked is almost always
+on a device they haven't signed in on before. Their usual phone or laptop gets
+through on its own. If they need the new device:
 
 1. Open **Audit**, find their address under **Sign-in lockouts**, and press
    **Clear**. Clearing an address also clears it for each device that tried it,

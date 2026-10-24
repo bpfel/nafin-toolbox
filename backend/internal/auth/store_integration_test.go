@@ -1380,7 +1380,7 @@ func TestLogin_TheRightPasswordDoesNotClearOtherAddressesMisses(t *testing.T) {
 func resetPassword(t *testing.T, deps *HandlerDeps, email string) string {
 	t.Helper()
 	target, _ := deps.Store.GetUserByEmail(context.Background(), email)
-	admin := &User{ID: 999, Email: "root@example.ch", Role: RoleAdmin, EmailVerified: true}
+	admin := &User{ID: 999, Email: "root@example.ch", Role: RoleAdmin, EmailVerified: true, TOTPEnabled: true}
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", strconv.Itoa(target.ID))
 	ctx := context.WithValue(context.WithValue(context.Background(), userContextKey, admin), chi.RouteCtxKey, rctx)
@@ -1631,5 +1631,132 @@ func TestDisable2FA_AnAdministratorMayNot(t *testing.T) {
 
 	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "AUTH-044") {
 		t.Errorf("admin disabling 2FA = %d %s, want 409 AUTH-044", w.Code, w.Body.String())
+	}
+}
+
+// --- Trusted devices ---
+
+// loginWith signs in from client carrying cookies, and returns the response.
+func loginWith(t *testing.T, deps *HandlerDeps, client, email, password string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
+	body := strings.NewReader(`{"email":"` + email + `","password":"` + password + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
+	req.RemoteAddr = "172.18.0.3:40000"
+	req.Header.Set("X-Forwarded-For", client+", 172.18.0.1")
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	w := httptest.NewRecorder()
+	HandleLogin(deps).ServeHTTP(w, req)
+	return w
+}
+
+func deviceCookie(w *httptest.ResponseRecorder) *http.Cookie {
+	for _, c := range w.Result().Cookies() {
+		if strings.HasPrefix(c.Name, deviceCookiePrefix) && c.MaxAge > 0 {
+			return c
+		}
+	}
+	return nil
+}
+
+func deviceDeps(t *testing.T) *HandlerDeps {
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	deps.LoginEmailLimiter = NewLoginRateLimiter(3, time.Hour)
+	deps.DeviceLimiter = NewLoginRateLimiter(5, 15*time.Minute)
+	return deps
+}
+
+func TestLogin_AKnownDeviceGetsInWhileTheAddressIsLockedOut(t *testing.T) {
+	// The attack the cookie exists for: somebody fills the address's limit on
+	// purpose, from addresses of their own.
+	deps := deviceDeps(t)
+	w := loginWith(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1")
+	laptop := deviceCookie(w)
+	if w.Code != http.StatusOK || laptop == nil {
+		t.Fatalf("first sign-in = %d, device cookie %v", w.Code, laptop)
+	}
+	if laptop.Path != "/api/auth" || !laptop.HttpOnly {
+		t.Errorf("cookie path %q httpOnly %v, want /api/auth and true", laptop.Path, laptop.HttpOnly)
+	}
+
+	for i := 1; i <= 3; i++ {
+		loginWith(t, deps, "198.51.100."+strconv.Itoa(i), "father@example.ch", "wrong-pass")
+	}
+	if got := loginWith(t, deps, "192.0.2.50", "father@example.ch", "right-pass-1"); got.Code != http.StatusTooManyRequests {
+		t.Fatalf("a new device during the attack = %d, want 429", got.Code)
+	}
+	if got := loginWith(t, deps, "192.0.2.50", "father@example.ch", "right-pass-1", laptop); got.Code != http.StatusOK {
+		t.Errorf("the owner's laptop during the attack = %d, want 200", got.Code)
+	}
+}
+
+func TestLogin_AKnownDeviceHasALimitOfItsOwn(t *testing.T) {
+	// A stolen device cookie is not a free pass to guess.
+	deps := deviceDeps(t)
+	laptop := deviceCookie(loginWith(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"))
+
+	for i := 0; i < 5; i++ {
+		loginWith(t, deps, "203.0.113.7", "father@example.ch", "wrong-pass", laptop)
+	}
+	if got := loginWith(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1", laptop); got.Code != http.StatusTooManyRequests {
+		t.Errorf("sixth try from one device = %d, want 429", got.Code)
+	}
+}
+
+func TestLogin_ADeviceCookieIsForItsOwnAccountOnly(t *testing.T) {
+	deps := deviceDeps(t)
+	fathers := deviceCookie(loginWith(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"))
+	// Presented under the name another account's cookie would have.
+	fathers.Name = deviceCookiePrefix + "2"
+	for i := 1; i <= 3; i++ {
+		loginWith(t, deps, "198.51.100."+strconv.Itoa(i), "admin@example.ch", "wrong-pass")
+	}
+	if got := loginWith(t, deps, "192.0.2.50", "admin@example.ch", "right-pass-1", fathers); got.Code != http.StatusTooManyRequests {
+		t.Errorf("another account's cookie = %d, want 429", got.Code)
+	}
+}
+
+func TestAdminReset_RetiresTheAccountsDevices(t *testing.T) {
+	deps := deviceDeps(t)
+	laptop := deviceCookie(loginWith(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"))
+	temp := resetPassword(t, deps, "father@example.ch")
+
+	for i := 1; i <= 3; i++ {
+		loginWith(t, deps, "198.51.100."+strconv.Itoa(i), "father@example.ch", "wrong-pass")
+	}
+	if got := loginWith(t, deps, "192.0.2.50", "father@example.ch", temp, laptop); got.Code != http.StatusTooManyRequests {
+		t.Errorf("a device from before the reset = %d, want 429: it should no longer be trusted", got.Code)
+	}
+}
+
+func TestLogoutEverywhere_RetiresTheAccountsDevices(t *testing.T) {
+	deps := deviceDeps(t)
+	laptop := deviceCookie(loginWith(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1"))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout-everywhere", nil)
+	req = req.WithContext(asUser(t, deps.Store, "father@example.ch"))
+	HandleLogoutEverywhere(deps).ServeHTTP(httptest.NewRecorder(), req)
+
+	for i := 1; i <= 3; i++ {
+		loginWith(t, deps, "198.51.100."+strconv.Itoa(i), "father@example.ch", "wrong-pass")
+	}
+	if got := loginWith(t, deps, "192.0.2.50", "father@example.ch", "right-pass-1", laptop); got.Code != http.StatusTooManyRequests {
+		t.Errorf("a device from before signing out everywhere = %d, want 429", got.Code)
+	}
+}
+
+func TestVerify2FA_TheDeviceIsRememberedOnlyAfterTheSecondFactor(t *testing.T) {
+	deps := deviceDeps(t)
+	userID, secret := with2FA(t, deps, "father@example.ch")
+
+	w := loginWith(t, deps, "203.0.113.7", "father@example.ch", "right-pass-1")
+	if w.Code != http.StatusOK || deviceCookie(w) != nil {
+		t.Fatalf("password step = %d, device cookie %v: want 200 and none yet", w.Code, deviceCookie(w))
+	}
+	code, _ := totp.GenerateCode(secret, time.Now())
+	if v := verify2FAFrom(t, deps, "203.0.113.7", userID, code); v.Code != http.StatusOK || deviceCookie(v) == nil {
+		t.Errorf("second factor = %d, device cookie %v: want 200 and one", v.Code, deviceCookie(v))
 	}
 }

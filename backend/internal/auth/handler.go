@@ -52,9 +52,12 @@ type HandlerDeps struct {
 	// "is this the password?", and a stolen session cookie must not be a way
 	// to ask it as often as one likes — the password unlocks the vault too.
 	PasswordCheckLimiter *LoginRateLimiter
-	EmailSender          email.Sender
-	EncryptionKey        []byte // 32-byte AES key, nil if 2FA not available
-	AppURL               string
+	// Failures from one trusted device, which are counted here instead of
+	// against the address and the client. See device.go.
+	DeviceLimiter *LoginRateLimiter
+	EmailSender   email.Sender
+	EncryptionKey []byte // 32-byte AES key, nil if 2FA not available
+	AppURL        string
 }
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
@@ -70,29 +73,38 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
+		// Looked up first, because which limits apply depends on it: a device
+		// this account has signed in on before is counted on its own, and not
+		// against the address and the client — see device.go. The lookup is
+		// one indexed query; the bcrypt it guards is what the limits protect.
+		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
+		if err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		device := deps.trustedDevice(r, user)
+
 		client := deps.LoginLimiter.ClientIP(r)
 		address := strings.ToLower(strings.TrimSpace(req.Email))
 		account := client + "|" + address
-		attempt, ok := ReserveAll(
-			Slot{deps.LoginLimiter, client},
-			Slot{deps.LoginAccountLimiter, account},
-			Slot{deps.LoginEmailLimiter, address},
-		)
+		slots := []Slot{
+			{deps.LoginLimiter, client},
+			{deps.LoginAccountLimiter, account},
+			{deps.LoginEmailLimiter, address},
+		}
+		if device != nil {
+			slots = []Slot{{deps.DeviceLimiter, device.Nonce}}
+		}
+		attempt, ok := ReserveAll(slots...)
 		if !ok {
 			w.Header().Set("Retry-After", "900")
 			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
 			return
 		}
 
-		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
-		if err != nil {
-			attempt.Release()
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
 		if !passwordMatches(user, req.Password) {
 			uid := userIDPtr(user)
-			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
+			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, deviceAudit(device, map[string]any{"email": req.Email}))
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
@@ -140,8 +152,9 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginSuccess, r, nil)
+		deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginSuccess, r, deviceAudit(device, nil))
 		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
+		deps.rememberDevice(w, r, user)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
 	}
@@ -173,6 +186,11 @@ func HandleLogoutEverywhere(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		// A lost phone should not stay a trusted device either.
+		if err := deps.Store.ForgetDevices(r.Context(), user.ID); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -634,7 +652,20 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		userAttempt, ok := deps.Verify2FAUserLimiter.Reserve(strconv.Itoa(userID))
+		// A device this account has signed in on before is counted on its own
+		// here too: an attacker who has the password could otherwise fill the
+		// account's code limit and keep its owner out at the second step.
+		user, err := deps.Store.GetUserByID(r.Context(), userID)
+		if err != nil || user == nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		device := deps.trustedDevice(r, user)
+		codeLimiter, codeKey := deps.Verify2FAUserLimiter, strconv.Itoa(userID)
+		if device != nil {
+			codeLimiter, codeKey = deps.DeviceLimiter, device.Nonce
+		}
+		userAttempt, ok := codeLimiter.Reserve(codeKey)
 		if !ok {
 			w.Header().Set("Retry-After", "900")
 			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
@@ -660,26 +691,24 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 
 		if !valid {
 			guessed = true
-			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, nil)
+			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, deviceAudit(device, nil))
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid code")
 			return
 		}
 
-		// Loaded before the session, which depends on the role. See startSession.
-		user, err := deps.Store.GetUserByID(r.Context(), userID)
-		if err != nil || user == nil {
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
-
+		// The user loaded above decides the session, which depends on the
+		// role. See startSession.
 		sess, err := startSession(r.Context(), deps, user)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
-		deps.Store.LogAudit(r.Context(), &userID, AuditLoginSuccess, r, map[string]any{"method": "2fa"})
+		deps.Store.LogAudit(r.Context(), &userID, AuditLoginSuccess, r, deviceAudit(device, map[string]any{"method": "2fa"}))
 		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
+		// Only now, with both factors given, does this browser become one of
+		// the account's devices.
+		deps.rememberDevice(w, r, user)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
 	}

@@ -1,7 +1,8 @@
 # Attack response — plan
 
 Written 2026-10-24. **Status: in progress.** Baseline built in PRs #50 and #51; §1
-(trusted-device cookies) is being built; §2 (Switzerland only) is backlog, issue #52.
+(trusted-device cookies) built on `feature/device-cookies`; §2 (Switzerland only) is
+backlog, issue #52; §3 not started.
 
 What an administrator can do while somebody is attacking a public instance, and
 what the app should do on its own. Written after the security audit of 0.5.0,
@@ -85,8 +86,9 @@ attempt is counted against. The password (and 2FA) are still required.
   devices.
 - *An admin*: same mechanism. An admin locked out by an attack can still sign in
   from their usual machine, which matters more for them than for anyone.
-- *Several accounts on one browser*: one cookie per account (`nafin_device_<uid>`),
-  capped at five per browser, oldest dropped.
+- *Several accounts on one browser*: one cookie per account (`nafin_device_<uid>`).
+  As built, there's no cap per browser. A browser holds a cookie only for accounts
+  that completed a sign-in on it, which is a handful at most.
 
 **Audit.** `login_success` and `login_failed` record `device: known|unknown` and the
 nonce's first 8 hex characters, so a pattern like "failures only from unknown

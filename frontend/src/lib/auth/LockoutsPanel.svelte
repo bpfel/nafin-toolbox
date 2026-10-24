@@ -12,6 +12,7 @@
     two_factor_client: '2FA codes from this client',
     password_check: 'Password re-checks behind a session',
     verification: 'Invitation links from this client',
+    device: 'Sign-in from one known device',
   }
 
   let lockouts = $state<Lockout[]>([])

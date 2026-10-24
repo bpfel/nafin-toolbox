@@ -71,7 +71,10 @@ member holds the same key. The design is in `plans/shared-vault-plan.md`.
   router. Each account also allows thirty failures an hour from anywhere, against
   guesses spread over many machines. Two-factor codes are limited per client and
   per account. An attempt is counted before it is checked, so parallel requests
-  get no more tries than sequential ones. The limits and how to lift them are in
+  get no more tries than sequential ones. A browser that has signed in to an
+  account before carries a signed device cookie and is counted on its own, so a
+  per-account limit filled on purpose doesn't keep the owner out on their own
+  devices. The limits and how to lift them are in
   [In case of an attack](under-attack.md).
 - **Password re-checks** behind a session — changing it, turning off 2FA, new
   recovery codes, deleting the account — allow five failures in 15 minutes, so a
