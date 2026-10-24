@@ -38,6 +38,18 @@ builds.
 
 Go and Node do not need to be installed — everything builds and runs in Docker.
 
+**The 2FA encryption key is this machine's own.** On the first start, the
+`devkey` service writes a random `ENCRYPTION_KEY` to a Docker volume, and the API
+reads it from there. It survives restarts and rebuilds; `docker compose down -v`
+deletes it along with the database. A database from before 2026-10-24 was
+encrypted under the fixed key the repository used to publish, so its 2FA secrets
+no longer decrypt. Remove them, and set 2FA up again on those test accounts:
+
+```sh
+docker compose exec db psql -U finance -d finance -c \
+  "DELETE FROM totp_secrets; DELETE FROM recovery_codes; UPDATE users SET totp_enabled = FALSE;"
+```
+
 ## Tests
 
 ```sh
