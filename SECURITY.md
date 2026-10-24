@@ -70,6 +70,11 @@ moves to [Security fixes](#security-fixes).
 - **A fresh instance belongs to whoever reaches it first.** The first account
   created becomes the administrator. Set it up before the instance is reachable
   from the internet.
+- **Anyone who knows an address can keep its owner from signing in.** Thirty
+  wrong passwords an hour, from anywhere, lock that address out of signing in
+  for up to an hour. That limit is what stops guessing spread across many
+  machines, and it can be filled on purpose. Sessions already open are not
+  affected.
 - **The development database password is public.** `docker-compose.yml` sets
   `finance` / `finance` for local development. Production takes
   `POSTGRES_PASSWORD` from `.env`, and the database is never published to the
@@ -104,6 +109,25 @@ What has been fixed, newest first. The upgrade notes for each are in
 
 ### Unreleased
 
+- **Sign-in limits hold under parallel requests.** An attempt was counted only
+  after its password check finished, so every request that arrived meanwhile got
+  through: fifty guesses sent at once were fifty guesses, not five. Attempts are
+  now counted before they are checked, for sign-in, two-factor codes and
+  invitation links.
+- **Guessing spread across many machines is limited**: thirty failed sign-ins an
+  hour per address from anywhere, and wrong two-factor codes per account, wherever
+  they come from. This introduced the lockout listed under
+  [Known limitations](#known-limitations).
+- **A stolen session can't be used to guess the password.** Changing it, turning
+  off 2FA, new recovery codes and deleting the account allow five wrong passwords
+  in fifteen minutes.
+- **A two-factor code or recovery code works once**, instead of for its whole
+  ninety-second window.
+- **Temporary passwords from an admin reset expire** after three days.
+- **2FA can't be turned off while the instance requires it.** Only the browser
+  enforced this before.
+- **Signing in with an unknown address takes as long as a wrong password**, so
+  timing no longer tells which addresses have accounts.
 - **No published encryption key.** `docker-compose.yml` no longer carries a
   development `ENCRYPTION_KEY`. Development generates one per machine instead,
   and the API refuses to start with the formerly published one, however it got
