@@ -1,5 +1,8 @@
 # Attack response — plan
 
+Written 2026-10-24. **Status: in progress.** Baseline built in PRs #50 and #51; §1
+(trusted-device cookies) is being built; §2 (Switzerland only) is backlog, issue #52.
+
 What an administrator can do while somebody is attacking a public instance, and
 what the app should do on its own. Written after the security audit of 0.5.0,
 for an instance on a public VPS with its own domain.
