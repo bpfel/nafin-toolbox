@@ -1,6 +1,7 @@
-# Development ports. Compose loads this file by itself when no -f is given,
-# so `docker compose up -d --build` is the development stack. Production names
-# its files with -f, which leaves this one out — see docker-compose.yml.
+# The development layer: ports, and a 2FA encryption key of this machine's own.
+# Compose loads this file by itself when no -f is given, so
+# `docker compose up -d --build` is the development stack. Production names its
+# files with -f, which leaves this one out — see docker-compose.yml.
 
 services:
   db:
@@ -12,10 +13,40 @@ services:
       - "8025:8025"
       - "1025:1025"
 
+  # Writes a random key to the devkey volume the first time the stack starts,
+  # and leaves it alone after, so 2FA set up on this machine keeps working
+  # across restarts and rebuilds. `docker compose down -v` deletes it along
+  # with the database, which is right: the 2FA secrets it protected go too.
+  devkey:
+    image: alpine:3.24
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        f=/keys/encryption_key
+        if [ ! -s "$$f" ]; then
+          od -An -tx1 -N32 /dev/urandom | tr -d ' \n' > "$$f.tmp"
+          mv "$$f.tmp" "$$f"
+          echo "generated a development encryption key for this machine"
+        fi
+    volumes:
+      - devkey:/keys
+
   api:
     ports:
       - "8081:8080"
+    environment:
+      ENCRYPTION_KEY_FILE: /run/nafin/encryption_key
+    volumes:
+      - devkey:/run/nafin:ro
+    depends_on:
+      devkey:
+        condition: service_completed_successfully
 
   frontend:
     ports:
       - "3000:3000"
+
+volumes:
+  devkey:

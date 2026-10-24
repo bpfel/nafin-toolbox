@@ -27,7 +27,7 @@ owner knows too.
 
 | Finding | Where | Verdict |
 |---|---|---|
-| `ENCRYPTION_KEY` value | `docker-compose.yml` (base file) | **Development key**, used only by `docker compose up` locally; production takes it from `.env`. Harmless while nobody runs production on the base file. Item 4 makes that impossible to miss. |
+| `ENCRYPTION_KEY` value | `docker-compose.yml` (base file), until 2026-10-24 | **Development key.** Production took its own from `.env`. Now **removed**: development generates a key per machine, and the API refuses this one by hash. It stays in history, which is why it is refused rather than just deleted. |
 | `KEY = '…'` | `RecoveryKeyScreen.test.ts` | A test fixture. |
 | `finance` / `finance` database credentials | `docker-compose.yml` | Development only; production uses `POSTGRES_PASSWORD`. |
 | `.env.example`, every version | — | Only placeholders and `mail.infomaniak.com` / `587`. No real value was ever committed. |
@@ -99,11 +99,11 @@ by pull request; **(you)** means a setting or decision only the owner can make.
 - [ ] **(me)** Run gitleaks in CI on every pull request, with the test fixture
       above allowed in `.gitleaks.toml`, so a real key is caught before it
       lands, not after.
-- [ ] **(me)** Label the development secrets in `docker-compose.yml` as such, and
-      have the API **refuse to start** when `COOKIE_SECURE=true` (production)
-      and `ENCRYPTION_KEY` is the development key. A production instance on
-      the published key would let anyone who reads this repository decrypt its
-      TOTP secrets.
+- [x] **(me)** Dropped the published development key. The development stack
+      generates its own per machine (`devkey` in `docker-compose.override.yml`),
+      the API reads it through `ENCRYPTION_KEY_FILE`, and it refuses to start
+      with the formerly published key, matched by hash. `SECURITY.md` says what
+      to do if an instance ran on it.
 
 ### Your identity
 

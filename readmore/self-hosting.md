@@ -49,7 +49,7 @@ after 0.4.0 in [CHANGELOG.md](../CHANGELOG.md).
 | `APP_URL` | Public base URL, used in links in emails — e.g. `https://finance.example.ch` |
 | `CORS_ORIGINS` | Allowed origins for CORS and CSRF checks; usually the same as `APP_URL` |
 | `NAFIN_LISTEN` | Where the frontend is published: `4000` (default, every interface) or `127.0.0.1:4000` (loopback only) |
-| `ENCRYPTION_KEY` | 64 hex characters encrypting TOTP secrets. `openssl rand -hex 32`. Back it up: losing it makes every enrolled 2FA secret unusable. |
+| `ENCRYPTION_KEY` | 64 hex characters encrypting TOTP secrets. `openssl rand -hex 32`. Back it up: losing it makes every enrolled 2FA secret unusable. The API refuses the development key this repository once published. |
 | `SMTP_HOST` | Mail server. Leave empty to disable email — see [Mail](#mail). |
 | `SMTP_PORT` | `587` (STARTTLS) or `465` (implicit TLS) |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | SMTP credentials |
@@ -62,6 +62,7 @@ The API also reads these, with defaults that suit the compose files:
 | `DATABASE_URL` | set by compose | PostgreSQL connection string |
 | `PORT` | `8080` | API listen port |
 | `COOKIE_SECURE` | `false`; `true` in production | Marks the session cookie `Secure` |
+| `ENCRYPTION_KEY_FILE` | — | A file holding the key instead of `ENCRYPTION_KEY`, for Docker secrets. `ENCRYPTION_KEY` wins when both are set. |
 | `TRUSTED_PROXIES` | private ranges, set by compose | CIDRs allowed to set forwarded-for headers |
 | `MIGRATIONS_DIR` | `migrations` | Where the SQL migrations are |
 

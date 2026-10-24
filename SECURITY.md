@@ -70,16 +70,45 @@ moves to [Security fixes](#security-fixes).
 - **A fresh instance belongs to whoever reaches it first.** The first account
   created becomes the administrator. Set it up before the instance is reachable
   from the internet.
-- **The development secrets are public.** `docker-compose.yml` carries an
-  `ENCRYPTION_KEY` and database password for local development. An instance
-  running on them has no protection for its 2FA secrets. Production must take
-  its own from `.env`, as [readmore/self-hosting.md](readmore/self-hosting.md)
-  describes.
+- **The development database password is public.** `docker-compose.yml` sets
+  `finance` / `finance` for local development. Production takes
+  `POSTGRES_PASSWORD` from `.env`, and the database is never published to the
+  network in production.
+
+### If your instance ran on the published key
+
+Until 2026-10-24, `docker-compose.yml` carried a fixed development
+`ENCRYPTION_KEY`, and it stays readable in the repository's history. An instance
+that used it in production had no protection for its 2FA secrets: anyone with a
+copy of the database could decrypt them. The API now refuses to start with that
+key. To recover:
+
+1. Generate a key of your own, `openssl rand -hex 32`, and put it in `.env` as
+   `ENCRYPTION_KEY`.
+2. Treat every enrolled second factor as exposed, and remove them all. They can't
+   be read under the new key anyway:
+
+   ```sh
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db psql -U finance -d finance -c "
+     DELETE FROM totp_secrets; DELETE FROM recovery_codes; UPDATE users SET totp_enabled = FALSE;"
+   ```
+3. Start the stack. Administrators are asked to set up 2FA again at their next
+   sign-in. Ask every user who had it to set it up again under Profile, or
+   require it for everyone (see
+   [readmore/administration.md](readmore/administration.md#requiring-two-factor-for-everyone)).
 
 ## Security fixes
 
 What has been fixed, newest first. The upgrade notes for each are in
 [CHANGELOG.md](CHANGELOG.md).
+
+### Unreleased
+
+- **No published encryption key.** `docker-compose.yml` no longer carries a
+  development `ENCRYPTION_KEY`. Development generates one per machine instead,
+  and the API refuses to start with the formerly published one, however it got
+  into the configuration. See
+  [If your instance ran on the published key](#if-your-instance-ran-on-the-published-key).
 
 ### 0.5.1 — 2026-10-24
 
