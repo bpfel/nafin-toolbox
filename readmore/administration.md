@@ -18,6 +18,29 @@ service accounts: they see **Users**, **Audit**, **Upkeep** and **Profile**, and
 have no vault, no budget and no recovery key. To use the app yourself, invite
 yourself as a regular user.
 
+**Administrators must use two-factor sign-in.** An administrator can reset anyone's
+password and read the audit log, so a stolen password alone must not be enough. An
+administrator without 2FA is asked to set it up at sign-in, and the server refuses
+every administrative action until they have. Once it's on, it can't be turned off
+from the app. The only exception is an instance without `ENCRYPTION_KEY`, where 2FA
+can't be enabled at all. The API warns about that when it starts.
+
+### An administrator who lost their authenticator
+
+If the phone is gone, sign in with one of the recovery codes. If those are gone
+too, remove the second factor in the database; the administrator is then asked to
+set it up again at their next sign-in:
+
+```sh
+dc exec db psql -U finance -d finance -c "
+  DELETE FROM totp_secrets WHERE user_id = (SELECT id FROM users WHERE email = 'admin@example.ch');
+  DELETE FROM recovery_codes WHERE user_id = (SELECT id FROM users WHERE email = 'admin@example.ch');
+  UPDATE users SET totp_enabled = FALSE WHERE email = 'admin@example.ch';"
+```
+
+Anyone with database access can do this, which is why database access must stay
+with whoever runs the server.
+
 Every regular user has an independent vault, so one user's password reset never
 touches another's data.
 
@@ -28,6 +51,10 @@ links, resets passwords and deletes accounts. Deleting takes two steps, and the
 last administrator cannot be deleted.
 
 ## Password resets
+
+A reset under **Users** gives a temporary password, shown once, which the user must
+change at their next sign-in. **It stops working after three days**; the box says
+when. Past that, reset again.
 
 ### An administrator's password
 
@@ -85,6 +112,20 @@ curl -b cookies.txt -X POST https://finance.example.ch/api/auth/settings/require
 ```
 
 Users without two-factor then see a mandatory setup screen at their next sign-in.
+While it's on, nobody can turn their two-factor off; the server refuses it, and
+Profile doesn't offer it. The administrator sending this needs 2FA themselves.
+
+## Sign-in lockouts
+
+Failed sign-ins are limited per client, per account and per account from anywhere;
+see [In case of an attack](under-attack.md#what-the-app-already-does-on-its-own).
+**Audit** lists every lockout in force, with when it lifts. **Clear** lets that
+address, client or account try again at once, and **Clear all** lifts every one.
+Clearing is recorded in the audit log as `lockout_cleared`.
+
+Someone who says "it keeps telling me too many attempts" is usually here. If their
+address is listed with attempts from many places, somebody else is trying it, and
+[In case of an attack](under-attack.md) is the page to read.
 
 ## Audit log
 

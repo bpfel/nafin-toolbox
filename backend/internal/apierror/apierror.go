@@ -86,6 +86,9 @@ var codes = map[string]string{
 	Auth + "|cannot delete yourself via admin endpoint":         "AUTH-040",
 	Auth + "|cannot reset your own password via admin endpoint": "AUTH-041",
 	Auth + "|cannot delete the last administrator":              "AUTH-042",
+	Auth + "|administrators must enable 2FA":                    "AUTH-043",
+	Auth + "|administrators must keep 2FA":                      "AUTH-044",
+	Auth + "|kind and key, or all, required":                    "AUTH-045",
 
 	// --- Validation of what was typed ---
 	// AUTH-050 is retired. It stood for every rule at once, so a user reading
@@ -124,13 +127,14 @@ var codes = map[string]string{
 	Vault + "|failed to save identity":       "VAULT-039",
 
 	// --- Upkeep reminders ---
-	Upkeep + "|invalid request body":    "UPK-001",
-	Upkeep + "|admin access required":   "UPK-002",
-	Upkeep + "|nothing to remind about": "UPK-003",
-	Upkeep + "|too many entries":        "UPK-004",
-	Upkeep + "|an entry has no subject": "UPK-005",
-	Upkeep + "|failed to send reminder": "UPK-006",
-	Upkeep + "|too many reminders":      "UPK-007",
+	Upkeep + "|invalid request body":           "UPK-001",
+	Upkeep + "|admin access required":          "UPK-002",
+	Upkeep + "|nothing to remind about":        "UPK-003",
+	Upkeep + "|too many entries":               "UPK-004",
+	Upkeep + "|an entry has no subject":        "UPK-005",
+	Upkeep + "|failed to send reminder":        "UPK-006",
+	Upkeep + "|too many reminders":             "UPK-007",
+	Upkeep + "|administrators must enable 2FA": "UPK-008",
 
 	// --- Request handling ---
 	Server + "|origin not allowed": "SRV-001",

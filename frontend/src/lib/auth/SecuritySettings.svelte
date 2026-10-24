@@ -25,8 +25,10 @@
   // While the instance requires 2FA the server refuses to turn it off, so the
   // button that would ask is not offered. Read once: an admin changing the
   // policy meanwhile only means the server's answer is the one that shows.
-  let twofaRequired = $state(false)
-  getSettings().then((s) => { twofaRequired = s.require_2fa })
+  // An administrator may never turn it off.
+  let policyRequires2FA = $state(false)
+  getSettings().then((s) => { policyRequires2FA = s.require_2fa })
+  let twofaRequired = $derived(policyRequires2FA || authState.currentUser?.role === 'admin')
 
   async function handleDisable2FA() {
     if (!password) return

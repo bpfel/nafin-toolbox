@@ -20,6 +20,12 @@ export interface AppSettings {
    * server from before it was reported does not send it.
    */
   email_enabled?: boolean
+  /**
+   * Whether 2FA can be turned on here at all (the server has an encryption
+   * key). Optional for the same reason as email_enabled; absent is read as
+   * yes, which is every server that ever offered 2FA.
+   */
+  twofa_available?: boolean
 }
 
 const API_BASE = '/api'
@@ -543,6 +549,33 @@ export interface AuditLogEntry {
 export interface AuditLogResponse {
   entries: AuditLogEntry[]
   total: number
+}
+
+export interface Lockout {
+  kind: string
+  key: string
+  attempts: number
+  until: string
+  email?: string
+}
+
+export async function listLockouts(): Promise<{ lockouts: Lockout[] } | { error: string }> {
+  const res = await fetch(`${API_BASE}/auth/lockouts`, { credentials: 'include' })
+  const data = await res.json().catch(() => ({ error: 'Failed to load lockouts' }))
+  if (res.ok) return { lockouts: data.lockouts ?? [] }
+  return { error: withCode(data) || 'Failed to load lockouts' }
+}
+
+export async function clearLockouts(request: { kind: string; key: string } | { all: true }): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/auth/lockouts/clear`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  })
+  if (res.ok) return null
+  const data = await res.json().catch(() => ({ error: 'Failed to clear lockouts' }))
+  return withCode(data) || 'Failed to clear lockouts'
 }
 
 export async function fetchAuditLogs(params: {

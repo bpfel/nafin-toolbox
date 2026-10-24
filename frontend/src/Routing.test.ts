@@ -35,6 +35,8 @@ vi.mock('./lib/auth/authStore.svelte', () => ({
   // where no `await` in a test can catch it. It surfaces as an unhandled error
   // that leaves every assertion passing and the run exiting non-zero.
   fetchAuditLogs: vi.fn(async () => ({ entries: [], total: 0 })),
+  listLockouts: vi.fn(async () => ({ lockouts: [] })),
+  clearLockouts: vi.fn(async () => null),
   deleteUser: vi.fn(),
   resendVerification: vi.fn(),
   adminResetPassword: vi.fn(),

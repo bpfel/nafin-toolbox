@@ -2,6 +2,8 @@ package auth
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -332,5 +334,58 @@ func TestReserve_EmptyKey(t *testing.T) {
 	}
 	if _, ok := rl.Reserve(""); ok {
 		t.Fatal("and is limited like any other")
+	}
+}
+
+// --- What an administrator sees and clears ---
+
+func TestLockouts_ListsOnlyFullKeys(t *testing.T) {
+	rl := NewLoginRateLimiter(2, time.Minute)
+	rl.Reserve("full")
+	first := time.Now()
+	rl.Reserve("full")
+	rl.Reserve("half")
+
+	got := rl.Lockouts()
+	if len(got) != 1 || got[0].Key != "full" || got[0].Attempts != 2 {
+		t.Fatalf("Lockouts() = %+v, want only full with 2 attempts", got)
+	}
+	// Until is when the oldest attempt leaves the window.
+	if d := got[0].Until.Sub(first.Add(time.Minute)); d > time.Second || d < -time.Second {
+		t.Errorf("Until = %v, want about %v", got[0].Until, first.Add(time.Minute))
+	}
+}
+
+func TestForgetWhere_ClearsWhatMatches(t *testing.T) {
+	rl := NewLoginRateLimiter(1, time.Minute)
+	rl.Reserve("1.2.3.4|anna@example.ch")
+	rl.Reserve("5.6.7.8|anna@example.ch")
+	rl.Reserve("1.2.3.4|ben@example.ch")
+
+	if n := rl.ForgetWhere(func(k string) bool { return strings.HasSuffix(k, "|anna@example.ch") }); n != 2 {
+		t.Fatalf("cleared %d, want 2", n)
+	}
+	if _, ok := rl.Reserve("5.6.7.8|anna@example.ch"); !ok {
+		t.Error("anna should be clear")
+	}
+	if _, ok := rl.Reserve("1.2.3.4|ben@example.ch"); ok {
+		t.Error("ben should still be locked out")
+	}
+}
+
+// A key tried once used to stay for good, so cycling through addresses grew
+// the map without end.
+func TestSweep_DropsKeysWithNothingInTheirWindow(t *testing.T) {
+	rl := NewLoginRateLimiter(5, 20*time.Millisecond)
+	for i := 0; i < 1000; i++ {
+		rl.Reserve("address" + strconv.Itoa(i) + "@example.ch")
+	}
+	time.Sleep(30 * time.Millisecond)
+	rl.Reserve("one-more@example.ch")
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	if n := len(rl.attempts); n != 1 {
+		t.Errorf("%d keys kept after their window passed, want 1", n)
 	}
 }

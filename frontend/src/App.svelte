@@ -84,7 +84,12 @@
   async function checkRequire2FA() {
     const settings = await getSettings()
     require2FA = settings.require_2fa
-    if (require2FA && authState.currentUser && !authState.currentUser.totp_enabled) {
+    // An administrator is held to 2FA whatever the setting says: the server
+    // refuses every admin action until it is on. Not where 2FA cannot be
+    // turned on at all — that screen could only fail.
+    const user = authState.currentUser
+    const required = require2FA || user?.role === 'admin'
+    if (required && settings.twofa_available !== false && user && !user.totp_enabled) {
       show2FAEnforcement = true
     }
   }

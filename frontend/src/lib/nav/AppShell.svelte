@@ -16,6 +16,7 @@
   import JoinHousehold from '../household/JoinHousehold.svelte'
   import InvitePanel from '../auth/InvitePanel.svelte'
   import AuditLogViewer from '../auth/AuditLogViewer.svelte'
+  import LockoutsPanel from '../auth/LockoutsPanel.svelte'
   import UpkeepScreen from '../../screens/UpkeepScreen.svelte'
   import { startInvitationWatch } from '../household/invitations.svelte'
 
@@ -130,6 +131,7 @@
       {#if route.screen === 'users'}
         <InvitePanel />
       {:else if route.screen === 'audit'}
+        <LockoutsPanel />
         <AuditLogViewer />
       {:else if route.screen === 'upkeep'}
         <UpkeepScreen />
