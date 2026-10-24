@@ -10,15 +10,30 @@ release may change things without a deprecation period. Each release is a tag on
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-24
+
+A security patch: the server's toolchain, libraries and base image, which had
+fallen out of support. Nothing changes for anyone using the app.
+
+### Upgrading from 0.5.0
+
+- **Rebuild the `api` image, pulling fresh bases** (`docker compose build --pull`).
+  There are no migrations. The fixes are in Go itself and in the base images, so a
+  build from cached `golang` or `alpine` layers may not include them.
+
 ### Security
 
 - The server is built with Go 1.27. It was built with Go 1.23, which stopped
-  receiving security fixes in August 2025.
+  receiving security fixes in August 2025 and had since collected flaws in its
+  HTTP, TLS and template packages.
+- The server's image runs on Alpine 3.24. Alpine 3.20 stopped receiving security
+  fixes in April 2026.
 - Updated the libraries the server uses for the database (pgx), routing (chi) and
-  email (go-mail), and Go's text and crypto packages. The versions before had
-  known flaws on paths the server uses, among them an SQL injection in pgx's
-  placeholder handling and an open redirect in chi. None is known to have been
-  used against an instance.
+  email (go-mail), and Go's text and crypto packages, all past known flaws. The
+  two that sound worst could not be reached through this server: the SQL
+  injection in pgx needs a query mode the server does not use, and the open
+  redirect in chi a middleware it does not use. None is known to have been used
+  against an instance.
 
 ## [0.5.0] — 2026-10-19
 
