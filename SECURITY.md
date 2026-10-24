@@ -1,0 +1,89 @@
+# Security
+
+nafin-toolbox holds people's finances, so a security problem in it matters more
+than most bugs. Thank you for taking the time to report one.
+
+## Reporting a vulnerability
+
+**Please do not open a public issue.** Report it privately through GitHub:
+**Security → Report a vulnerability** on this repository. Only the maintainer sees
+the report, and it can become a published advisory once a fix is out.
+
+Include what you can:
+
+- what an attacker could do, and what they need first (an account, a session,
+  access to the database, a position on the network);
+- how to reproduce it, against a local instance (`docker compose up`, see
+  [readmore/development.md](readmore/development.md));
+- the version (Profile shows it) or commit.
+
+This is a project maintained by one person. Expect an acknowledgement within a
+week, and a fix, or an honest account of why there isn't one yet, as soon as it
+can be done properly. You're welcome to be credited in the fix's release notes
+and in this file; say if you'd rather not be.
+
+Please test only against an instance you run yourself, never against somebody
+else's, and don't access data that isn't yours.
+
+## Supported versions
+
+Only the **latest release** receives security fixes. Releases are tagged on
+`main`; the upgrade notes in [CHANGELOG.md](CHANGELOG.md) say what each one needs.
+
+## Scope
+
+**In scope:** the API (`backend/`), the web app (`frontend/`), the end-to-end
+encryption of the vault, the authentication and session handling, and the
+defaults in the compose files and documentation an operator is told to follow.
+
+**Out of scope:** an instance its operator has configured against the
+documentation, such as plain HTTP or the development secrets in production;
+denial of service by sheer volume, which belongs to the reverse proxy in front;
+vulnerabilities in
+dependencies that the app doesn't reach, which are better reported upstream.
+
+## Known limitations
+
+These are properties of the current design, not oversights. They're listed so
+that nobody relies on a protection the app doesn't give. When one is fixed, it
+moves to [Security fixes](#security-fixes).
+
+- **The server operator could read vaults.** The vault key is derived from the
+  login password, and the password is sent to the server at every sign-in.
+  So whoever runs the server, or anyone who takes it over, could capture a
+  password and decrypt that user's vault and their households' keys. The
+  encryption protects against a stolen database or backup, not against a
+  malicious or compromised server. Use an instance run by someone you trust.
+  Fixing this means deriving separate keys for signing in and for the vault,
+  with a migration of every vault; it is not planned in detail yet.
+- **A session can overwrite a vault.** Whoever holds a signed-in session can
+  replace that user's encrypted vault, and the server keeps no earlier versions.
+  The data can't be read this way, but it can be destroyed.
+- **The vault key stays in the browser tab's session storage** while the vault
+  is unlocked, so that a reload doesn't ask for the password again. A script
+  running in the page could read it. The Content Security Policy allows only the
+  app's own scripts, which is what keeps that out.
+- **A malicious server could roll a vault back** to an earlier version it has
+  kept, and the app would not notice.
+- **Household keys are trusted on first use.** A member's device trusts the keys
+  it first sees for the other members.
+- **A fresh instance belongs to whoever reaches it first.** The first account
+  created becomes the administrator. Set it up before the instance is reachable
+  from the internet.
+- **The development secrets are public.** `docker-compose.yml` carries an
+  `ENCRYPTION_KEY` and database password for local development. An instance
+  running on them has no protection for its 2FA secrets. Production must take
+  its own from `.env`, as [readmore/self-hosting.md](readmore/self-hosting.md)
+  describes.
+
+## Security fixes
+
+What has been fixed, newest first. The upgrade notes for each are in
+[CHANGELOG.md](CHANGELOG.md).
+
+### 0.5.1 — 2026-10-24
+
+- The server was built with Go 1.23, which no longer received security fixes,
+  on an Alpine image past its end of life. It is now built with Go 1.27 on
+  Alpine 3.24. The database, routing and email libraries were updated past known
+  flaws too. None of those flaws was reachable through the app's own code.
