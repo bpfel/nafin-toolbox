@@ -75,19 +75,14 @@ by pull request; **(you)** means a setting or decision only the owner can make.
 ### Licence
 
 - [x] **(me)** `LICENSE` with the AGPL-3.0 text from gnu.org; a licence section
-      in the README; `"license": "AGPL-3.0-or-later"` in `package.json`.
-- [ ] **(you)** Confirm two choices made in that change before it merges:
-  - **`-or-later` or `-only`.** "Or later" is the FSF's recommended notice: a
-    future AGPL v4 could be applied without asking every contributor. "Only"
-    keeps that decision with you. Both are common.
-  - **The copyright line** reads *GianAndrea Müller*, as the commit history
-    already does. A handle or "the nafin-toolbox authors" works too.
-- [ ] **(me)** `CONTRIBUTING.md`, saying that contributions are licensed under
-      the AGPL-3.0, with a [DCO](https://developercertificate.org/) sign-off
-      line. **If you might ever want to dual-license**, for example AGPL for
-      everybody and a paid licence for a company that won't accept the AGPL,
-      you need a contributor agreement *before* the first outside contribution.
-      Without one you can only relicense code you wrote yourself.
+      in the README; `"license": "AGPL-3.0-only"` in `package.json`.
+- [x] **(you)** Decided: **AGPL-3.0-only**, copyright *GianAndrea Müller*.
+- [x] **(me)** `CONTRIBUTING.md`: contributions are licensed under the
+      AGPL-3.0-only, inbound equals outbound, with no contributor licence
+      agreement. That means only code you wrote yourself could ever be
+      relicensed, for example dual-licensed; contributions from others stay
+      AGPL-3.0-only. If dual-licensing becomes a goal, add a contributor
+      agreement before the first outside contribution.
 - [ ] **(me)** Give users a way to the source. AGPL §13 obliges anyone who runs a
       *modified* version to offer its source to the people using it over the
       network. A **Source** link in the app (`source-link-plan.md`) is how a fork
@@ -128,13 +123,16 @@ by pull request; **(you)** means a setting or decision only the owner can make.
 
 - [ ] **(you)** Turn on **private vulnerability reporting** (Settings → Code
       security). Without it, the only way to report a hole is a public issue.
-- [ ] **(me)** `SECURITY.md`: how to report privately, what is in scope, and the
-      **known limitations**, stated plainly. The biggest is audit finding #1:
-      the login password also derives the vault key and is sent to the server,
-      so a malicious server operator could decrypt vaults. No fix is planned in
-      detail yet: separating the login key from the vault key needs its own plan
-      and a migration of every vault. Users of someone else's instance should
-      know about it today.
+- [x] **(me)** `SECURITY.md`: how to report privately, the scope, the **known
+      limitations** stated plainly (the biggest being audit finding #1: the
+      server operator could read vaults), and a log of **security fixes** by
+      release. `CLAUDE.md` now requires every security fix to update it in the
+      same pull request.
+- [ ] **(me)** When #50, #51 and #54 merge, add their fixes to `SECURITY.md`
+      under *Unreleased*, link `readmore/under-attack.md` from its scope
+      section, and update the limitation about the development secrets: with
+      device cookies, a production instance on the development key would let
+      anyone forge a "known device".
 - [ ] **(you)** Turn on **Dependabot alerts** and **security updates**.
 
 ### Presentation
