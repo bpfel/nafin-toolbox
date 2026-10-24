@@ -7,7 +7,12 @@ import {
   generateRecoveryKey,
   wrapMEKWithRecovery,
   unwrapMEKWithRecovery,
+  derivePasswordKeys,
+  deriveRecoveryKeys,
+  masterKeyForTest,
+  recoveryAuthForTest,
 } from './keys'
+import { fromBase64 } from './bytes'
 
 // Ensure crypto is available in test environment (Node.js 19+ provides globalThis.crypto)
 beforeAll(() => {
@@ -507,3 +512,66 @@ describe('wrapMEKWithRecovery and unwrapMEKWithRecovery', () => {
     expect(elapsed).toBeGreaterThan(0)
   })
 })
+
+// --- Version 2 ---
+//
+// Computed independently with Python's hashlib and hmac. kdf_test.go checks
+// the server against the same values, so the browser and the server agree
+// without either being checked against the other.
+describe('derivePasswordKeys', () => {
+  const password = 'correct horse battery staple'
+  const email = 'Anna@Example.ch'
+
+  test('the master key and the auth key match the vectors', async () => {
+    expect(await masterKeyForTest(password, email.toLowerCase(), 1000)).toBe('T8LqHmQYruP0ctOfBEDUcb4licApzYjQy42L8SYC9yQ=')
+    expect((await derivePasswordKeys(password, email, 1000)).authKey).toBe('9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo=')
+    expect((await derivePasswordKeys('Grüezi-Chuchichäschtli', 'ben@example.ch', 1000)).authKey).toBe('nnohXZbg/yNYvts4BMMgG5b3N6n4SRd8UFt2kzxl6eI=')
+  })
+
+  test('the vault key matches the vector', async () => {
+    // Not extractable, so checked through what it does: a MEK wrapped under a
+    // key imported from the vector's bytes unwraps under the derived one.
+    const keys = await derivePasswordKeys(password, email, 1000)
+    const vector = await crypto.subtle.importKey('raw', fromBase64('Npp4XZdOlC0dSQgxjXm1qZRmxyDiRbtnm9FBFVeTS/Y='), 'AES-GCM', false, ['wrapKey'])
+    const mek = await generateMEK()
+    const back = await unwrapMEK(await wrapMEK(mek, vector), keys.vaultKEK)
+    expect(await exported(back)).toEqual(await exported(mek))
+  })
+
+  test('the legacy key is exactly the version 1 KEK', async () => {
+    const keys = await derivePasswordKeys(password, email, 1000)
+    const mek = await generateMEK()
+    const wrappedByV1 = await wrapMEK(mek, await deriveKEK(password, email, 1000))
+    expect(await exported(await unwrapMEK(wrappedByV1, keys.legacyKEK))).toEqual(await exported(mek))
+  })
+
+  test('the vault key is not the legacy key', async () => {
+    const keys = await derivePasswordKeys(password, email, 1000)
+    const wrapped = await wrapMEK(await generateMEK(), keys.legacyKEK)
+    await expect(unwrapMEK(wrapped, keys.vaultKEK)).rejects.toThrow()
+  })
+
+  test('the auth key is not the password, and changes with it', async () => {
+    const a = await derivePasswordKeys(password, email, 1000)
+    const b = await derivePasswordKeys(password + '!', email, 1000)
+    expect(a.authKey).not.toContain(password)
+    expect(a.authKey).not.toBe(b.authKey)
+  })
+})
+
+describe('deriveRecoveryKeys', () => {
+  const rk = 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-4567-ABCD-EFGH-IJKL-MNOP-QRST-UV'
+
+  test('matches the vectors', async () => {
+    expect(await masterKeyForTest(rk, 'nafin-recovery', 1000)).toBe('4WLPP5fiHjczClHVcleiM2TRMmmvm2FVxKmJLTPPSSY=')
+    expect(await recoveryAuthForTest(rk, 1000)).toBe('l1vKXKm/itMumYomXdESJZ7V0wydUfu1pN0tFbVbn/k=')
+    const keys = await deriveRecoveryKeys(rk, 1000)
+    const vector = await crypto.subtle.importKey('raw', fromBase64('KNEOylbhwMX00Q8MYcNVaeXDGpqQKtRKjNttr8QXp7c='), 'AES-GCM', false, ['wrapKey'])
+    const mek = await generateMEK()
+    expect(await exported(await unwrapMEK(await wrapMEK(mek, vector), keys.recoveryKEK))).toEqual(await exported(mek))
+  })
+})
+
+async function exported(key: CryptoKey): Promise<number[]> {
+  return Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', key)))
+}
