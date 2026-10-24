@@ -37,13 +37,34 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Upgrading
 
+- **Set up two-factor sign-in for every administrator right after upgrading.**
+  Administrators now must have it: until they do, they are held at the setup
+  screen and the server refuses every administrative action. Do it first, before
+  anyone else who knows an admin password could enrol their own phone. Lost an
+  administrator's authenticator? See
+  [Administration](readmore/administration.md#an-administrator-who-lost-their-authenticator).
+- **The stack's Docker network now has a fixed subnet**, `172.31.250.0/24`, and
+  only that subnet is trusted to report a client's address. Before, every
+  private range was. Recent Docker Compose recreates the network by itself; if
+  yours stops with a message that the network must be recreated, run `dc down`
+  — **without `-v`**, which would delete the database — and then `dc up -d`.
+  - If the subnet collides with one your host already uses, set `NAFIN_SUBNET`
+    in `.env`.
+  - **A reverse proxy on another machine** is no longer trusted by default. Add
+    its address to `TRUSTED_PROXIES_EXTRA`, or every visitor will look like the
+    proxy.
+  - **A reverse proxy on the same host** needs nothing, but publish the app on
+    loopback (`NAFIN_LISTEN=127.0.0.1:4000`) if you don't already. See
+    [Trusted proxies](readmore/self-hosting.md#trusted-proxies).
 - **One migration** (`014`) adds two empty columns; it cannot fail on existing
   data. Temporary passwords handed out before the upgrade get no deadline —
   reset them again if you want them to expire.
 - **An address can now be locked out of signing in for up to an hour** by
   thirty wrong passwords, from anywhere. That is the cost of stopping guesses
   spread across many machines, and anyone who knows the address can trigger it.
-  Sessions already open are not affected.
+  Sessions already open are not affected, and an administrator can lift it under
+  **Audit** → **Sign-in lockouts**. Read
+  [In case of an attack](readmore/under-attack.md) once.
 
 ### Security
 
@@ -67,6 +88,20 @@ release may change things without a deprecation period. Each release is a tag on
 - Signing in with an address that has no account takes as long as a wrong
   password. It answered faster, which told anyone timing it which addresses
   exist.
+- Only the stack's own network is trusted to say where a request came from.
+  Every private range was, so anyone on a LAN or a VPN could claim any address
+  and escape the per-client limits.
+- Administrators must use two-factor sign-in and cannot turn it off.
+- The sign-in limits forget an address once its window has passed. One tried
+  once was kept for good, so cycling through a million addresses could run the
+  server out of memory.
+
+### New
+
+- **Audit** lists every sign-in lockout in force, and lets an administrator clear
+  one or all of them.
+- [In case of an attack](readmore/under-attack.md): what the app limits on its
+  own, and what to do, step by step, when somebody is trying to get in.
 
 ## [0.5.1] — 2026-10-24
 

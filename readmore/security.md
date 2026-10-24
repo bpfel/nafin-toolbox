@@ -53,7 +53,9 @@ member holds the same key. The design is in `plans/shared-vault-plan.md`.
 
 ## Two-factor authentication (TOTP)
 
-- Optional per user, from Profile, with any authenticator app.
+- Optional per user, from Profile, with any authenticator app. **Required for
+  administrators**, who cannot turn it off.
+- A code works once: one read over a shoulder can't be used again.
 - Ten single-use recovery codes, stored bcrypt-hashed and regenerable.
 - TOTP secrets encrypted with AES-256-GCM under `ENCRYPTION_KEY`, which never
   touches the database.
@@ -63,14 +65,26 @@ member holds the same key. The design is in `plans/shared-vault-plan.md`.
 ## Request protection
 
 - **CSRF:** the `Origin` header is checked on every state-changing request.
-- **Rate limits** per IP on sign-in, setup, email verification and two-factor.
-  Sign-in allows five failures per account and twenty across all accounts, per
-  IP, in 15 minutes. So one person's typos don't lock out others behind the same
-  router, and the right password resets that account's count.
+- **Rate limits** on sign-in, setup, email verification and two-factor. Sign-in
+  allows five failures per account and twenty across all accounts, per client,
+  in 15 minutes, so one person's typos don't lock out others behind the same
+  router. Each account also allows thirty failures an hour from anywhere, against
+  guesses spread over many machines. Two-factor codes are limited per client and
+  per account. An attempt is counted before it is checked, so parallel requests
+  get no more tries than sequential ones. The limits and how to lift them are in
+  [In case of an attack](under-attack.md).
+- **Password re-checks** behind a session — changing it, turning off 2FA, new
+  recovery codes, deleting the account — allow five failures in 15 minutes, so a
+  stolen session cannot be used to guess the password.
+- **Unknown addresses** take as long to refuse as a wrong password, so timing
+  doesn't reveal which addresses have accounts.
+- **Temporary passwords** from an admin reset stop working after three days.
 - **Trusted proxies:** the client address is read from `X-Forwarded-For`,
-  right to left, skipping addresses in `TRUSTED_PROXIES`. The first address
+  right to left, skipping addresses in `TRUSTED_PROXIES`: the stack's own Docker
+  network, and any proxy listed in `TRUSTED_PROXIES_EXTRA`. The first address
   outside them is the client. A client can't pick its own address by sending
-  the header. `X-Real-IP` is used only when there is no `X-Forwarded-For`.
+  the header. `X-Real-IP` is used only when there is no `X-Forwarded-For`. See
+  [Trusted proxies](self-hosting.md#trusted-proxies).
 - **Headers:** `Content-Security-Policy` (nginx), and `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy` and `Permissions-Policy`
   from both nginx and the API.
@@ -80,7 +94,8 @@ member holds the same key. The design is in `plans/shared-vault-plan.md`.
 Security events are logged with user, IP address, user agent and time:
 `login_success`, `login_failed`, `logout`, `password_changed`, `2fa_enabled`,
 `2fa_disabled`, `2fa_verified`, `2fa_failed`, `recovery_code_used`,
-`user_invited`, `email_verified`, `user_deleted`, `password_reset`. When a user is
+`user_invited`, `email_verified`, `user_deleted`, `password_reset`,
+`lockout_cleared`. When a user is
 deleted their entries are kept with the user removed.
 
 ## Data protection (nDSG / GDPR)

@@ -13,6 +13,7 @@ phone, and available in German, French, Italian and English.
 - [Self-hosting](readmore/self-hosting.md) — production setup: configuration, reverse proxy, mail
 - [Self-hosting on a Synology NAS](readmore/synology-selfhosting.md) — a private instance on your home network
 - [Administration](readmore/administration.md) — users, password resets, audit log, backups, updates
+- [In case of an attack](readmore/under-attack.md) — what the app limits on its own, and what to do when someone is trying to get in
 - [Development](readmore/development.md) — running the stack locally, tests, tech stack
 - [Roadmap](readmore/roadmap.md) — planned modules and bank connections
 

@@ -1561,3 +1561,75 @@ func TestDisable2FA_RefusedWhileTheInstanceRequiresIt(t *testing.T) {
 		t.Error("2FA was turned off anyway")
 	}
 }
+
+// --- Lockouts an administrator clears, and their own 2FA ---
+
+func clearLockoutsAs(t *testing.T, deps *HandlerDeps, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	// A real account: the audit row names who cleared it, by a foreign key.
+	admin, _ := deps.Store.GetUserByEmail(context.Background(), "root@example.ch")
+	if admin == nil {
+		var err error
+		if admin, err = deps.Store.CreateUserFull(context.Background(), "root@example.ch", mustHash("right-pass-1"), RoleAdmin, false, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	admin.TOTPEnabled = true
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/lockouts/clear", strings.NewReader(body))
+	req = req.WithContext(ContextWithUser(context.Background(), admin))
+	w := httptest.NewRecorder()
+	HandleClearLockouts(deps).ServeHTTP(w, req)
+	return w
+}
+
+func TestClearLockouts_LetsAnAddressSignInAgainFromAnywhere(t *testing.T) {
+	deps := loginDeps(t)
+	deps.LoginEmailLimiter = NewLoginRateLimiter(3, time.Hour)
+	for i := 0; i < 5; i++ {
+		loginFrom(t, deps, "198.51.100."+strconv.Itoa(i%3+1), "father@example.ch", "wrong-pass")
+	}
+	if got := loginFrom(t, deps, "198.51.100.1", "father@example.ch", "right-pass-1"); got != http.StatusTooManyRequests {
+		t.Fatalf("before clearing = %d, want 429", got)
+	}
+
+	if w := clearLockoutsAs(t, deps, `{"kind":"address","key":"father@example.ch"}`); w.Code != http.StatusOK {
+		t.Fatalf("clear = %d: %s", w.Code, w.Body.String())
+	}
+	// Including from a device whose own count was full.
+	if got := loginFrom(t, deps, "198.51.100.1", "father@example.ch", "right-pass-1"); got != http.StatusOK {
+		t.Errorf("after clearing = %d, want 200", got)
+	}
+	var logged int
+	testDB.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE event = 'lockout_cleared'`).Scan(&logged)
+	if logged != 1 {
+		t.Errorf("audit entries for lockout_cleared = %d, want 1", logged)
+	}
+}
+
+func TestClearLockouts_NeedsWhatToClear(t *testing.T) {
+	deps := loginDeps(t)
+	if w := clearLockoutsAs(t, deps, `{"kind":"address"}`); w.Code != http.StatusBadRequest {
+		t.Errorf("no key = %d, want 400", w.Code)
+	}
+	if w := clearLockoutsAs(t, deps, `{"kind":"nonsense","key":"x"}`); w.Code != http.StatusBadRequest {
+		t.Errorf("unknown kind = %d, want 400", w.Code)
+	}
+}
+
+func TestDisable2FA_AnAdministratorMayNot(t *testing.T) {
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	if _, err := deps.Store.CreateUserFull(context.Background(), "root@example.ch", mustHash("right-pass-1"), RoleAdmin, false, true); err != nil {
+		t.Fatal(err)
+	}
+	with2FA(t, deps, "root@example.ch")
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/auth/2fa", strings.NewReader(`{"password":"right-pass-1"}`))
+	req = req.WithContext(asUser(t, deps.Store, "root@example.ch"))
+	w := httptest.NewRecorder()
+	HandleDisable2FA(deps).ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "AUTH-044") {
+		t.Errorf("admin disabling 2FA = %d %s, want 409 AUTH-044", w.Code, w.Body.String())
+	}
+}

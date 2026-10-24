@@ -235,8 +235,7 @@ func HandleMe(w http.ResponseWriter, r *http.Request) {
 func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -362,8 +361,7 @@ func emailEnabled(deps *HandlerDeps) bool {
 func HandleListUsers(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -833,6 +831,11 @@ func HandleDisable2FA(deps *HandlerDeps) http.HandlerFunc {
 			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is required on this instance")
 			return
 		}
+		// And an administrator never may. See AdminReady.
+		if user.IsAdmin() {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "administrators must keep 2FA")
+			return
+		}
 
 		if err := deps.Store.SetTOTPEnabled(r.Context(), user.ID, false); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
@@ -952,8 +955,7 @@ func HandleDeleteAccount(deps *HandlerDeps) http.HandlerFunc {
 func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1004,8 +1006,7 @@ const TempPasswordLifetime = 72 * time.Hour
 func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1073,8 +1074,7 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 func HandleResendVerification(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1125,8 +1125,7 @@ func HandleResendVerification(deps *HandlerDeps) http.HandlerFunc {
 func HandleAdminRequire2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1165,6 +1164,9 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 			// because HandleInvite then requires one. Until it said so, the
 			// form could not invite anybody on an instance without SMTP.
 			"email_enabled": emailEnabled(deps),
+			// Whether 2FA can be turned on here at all. Without it the browser
+			// would hold an admin at a setup screen that can only fail.
+			"twofa_available": deps.EncryptionKey != nil,
 		})
 	}
 }
@@ -1173,8 +1175,7 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 func HandleListAuditLogs(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1286,6 +1287,38 @@ func passwordMatches(user *User, password string) bool {
 		return false
 	}
 	return CheckPassword(user.PasswordHash, password)
+}
+
+// AdminReady reports whether u may act as an administrator: an admin, with a
+// second factor whenever this instance can offer one.
+//
+// An admin session can reset anybody's password, read the audit log and turn
+// the instance's defences on and off, so it is the one account a stolen
+// password must not be enough for. Users are held to 2FA only when an admin
+// asks for it; admins always are.
+//
+// Where no ENCRYPTION_KEY is set, 2FA cannot be enabled at all, and requiring
+// it would lock every admin out of everything. The server says so at start
+// instead; see server.New.
+func (d *HandlerDeps) AdminReady(u *User) bool {
+	if u == nil || !u.IsAdmin() {
+		return false
+	}
+	return u.TOTPEnabled || d.EncryptionKey == nil
+}
+
+// adminOnly lets an administrator through, writing the refusal itself when the
+// caller is not one, or is one who has not turned on 2FA yet.
+func adminOnly(w http.ResponseWriter, deps *HandlerDeps, caller *User) bool {
+	if caller == nil || !caller.IsAdmin() {
+		apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		return false
+	}
+	if !deps.AdminReady(caller) {
+		apierror.Write(w, apierror.Auth, http.StatusForbidden, "administrators must enable 2FA")
+		return false
+	}
+	return true
 }
 
 // confirmPassword asks the signed-in user for their password again, before

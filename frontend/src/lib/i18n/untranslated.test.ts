@@ -28,6 +28,7 @@ const ADMIN_ONLY = [
   'InvitePanel.svelte',
   'DeleteUserModal.svelte',
   'UpkeepScreen.svelte',
+  'LockoutsPanel.svelte',
 ]
 
 /**

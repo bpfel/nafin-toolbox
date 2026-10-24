@@ -3,6 +3,8 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
+	"net"
 	"net/http"
 
 	"github.com/bpfel/nafin-toolbox/internal/apierror"
@@ -35,6 +37,9 @@ func New(db *sql.DB, emailSender email.Sender, encryptionKey []byte, appURL stri
 }
 
 func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL string) {
+	if encryptionKey == nil {
+		log.Printf("WARNING: no ENCRYPTION_KEY, so 2FA cannot be enabled — and administrators, who must use it wherever it can be enabled, act on a password alone. Set ENCRYPTION_KEY (openssl rand -hex 32).")
+	}
 	allowedOrigins := getAllowedOrigins()
 
 	s.router.Use(middleware.Logger)
@@ -68,10 +73,20 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		var cidrs []string
 		for _, c := range strings.Split(proxies, ",") {
 			c = strings.TrimSpace(c)
-			if c != "" {
-				cidrs = append(cidrs, c)
+			if c == "" {
+				continue
 			}
+			// A typo here used to be skipped without a word, and the proxy it
+			// meant went untrusted: every visitor then looked like the proxy.
+			if _, _, err := net.ParseCIDR(c); err != nil {
+				log.Printf("TRUSTED_PROXIES: ignoring %q, which is not a CIDR such as 203.0.113.10/32", c)
+				continue
+			}
+			cidrs = append(cidrs, c)
 		}
+		// Said once at start: an operator reading why every visitor shares one
+		// address, or why a forged one was believed, starts here.
+		log.Printf("trusting forwarded-for headers from %s", strings.Join(cidrs, ", "))
 		authStore.SetTrustedProxies(cidrs)
 		loginLimiter.SetTrustedProxies(cidrs)
 		setupLimiter.SetTrustedProxies(cidrs)
@@ -132,6 +147,8 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))
+			r.Get("/auth/lockouts", auth.HandleListLockouts(deps))
+			r.Post("/auth/lockouts/clear", auth.HandleClearLockouts(deps))
 
 			r.Post("/upkeep/remind", upkeep.Handle(deps, remindLimiter))
 

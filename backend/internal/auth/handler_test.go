@@ -1499,3 +1499,55 @@ func TestConfirmPassword_IsLimitedPerAccount(t *testing.T) {
 		t.Errorf("body %q does not carry AUTH-013", w.Body.String())
 	}
 }
+
+// --- Administrators and 2FA ---
+
+func TestAdminOnly_AnAdminWithout2FAIsRefused(t *testing.T) {
+	list := func(deps *HandlerDeps, totp bool) *httptest.ResponseRecorder {
+		admin := &User{ID: 1, Email: "admin@test.com", Role: RoleAdmin, EmailVerified: true, TOTPEnabled: totp}
+		req := httptest.NewRequest(http.MethodGet, "/api/auth/lockouts", nil)
+		req = req.WithContext(ContextWithUser(context.Background(), admin))
+		w := httptest.NewRecorder()
+		HandleListLockouts(deps).ServeHTTP(w, req)
+		return w
+	}
+
+	if w := list(testDepsWithKey(), false); w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "AUTH-043") {
+		t.Errorf("admin without 2FA = %d %s, want 403 AUTH-043", w.Code, w.Body.String())
+	}
+	if w := list(testDepsWithKey(), true); w.Code != http.StatusOK {
+		t.Errorf("admin with 2FA = %d %s, want 200", w.Code, w.Body.String())
+	}
+	// Where 2FA cannot be enabled at all, requiring it would lock every
+	// admin out of everything.
+	if w := list(testDeps(), false); w.Code != http.StatusOK {
+		t.Errorf("admin without 2FA, none available = %d, want 200", w.Code)
+	}
+}
+
+func TestHandleListLockouts_ListsWhoIsKeptOut(t *testing.T) {
+	deps := testDeps()
+	deps.LoginEmailLimiter = NewLoginRateLimiter(1, time.Hour)
+	deps.LoginEmailLimiter.Reserve("anna@example.ch")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/lockouts", nil).WithContext(adminCtx())
+	w := httptest.NewRecorder()
+	HandleListLockouts(deps).ServeHTTP(w, req)
+
+	var body struct {
+		Lockouts []LockoutEntry `json:"lockouts"`
+	}
+	json.NewDecoder(w.Body).Decode(&body)
+	if len(body.Lockouts) != 1 || body.Lockouts[0].Kind != "address" || body.Lockouts[0].Key != "anna@example.ch" {
+		t.Errorf("lockouts = %+v, want the one address", body.Lockouts)
+	}
+}
+
+func TestHandleListLockouts_NotForUsers(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/lockouts", nil).WithContext(userCtx())
+	w := httptest.NewRecorder()
+	HandleListLockouts(testDeps()).ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("a user = %d, want 403", w.Code)
+	}
+}
