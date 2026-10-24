@@ -70,11 +70,14 @@ moves to [Security fixes](#security-fixes).
 - **A fresh instance belongs to whoever reaches it first.** The first account
   created becomes the administrator. Set it up before the instance is reachable
   from the internet.
-- **Anyone who knows an address can keep its owner from signing in.** Thirty
-  wrong passwords an hour, from anywhere, lock that address out of signing in
-  for up to an hour. That limit is what stops guessing spread across many
-  machines, and it can be filled on purpose. Sessions already open are not
-  affected, and an administrator can lift the lockout under **Audit**.
+- **Anyone who knows an address can keep it from signing in on a new device.**
+  Thirty wrong passwords an hour, from anywhere, lock that address out of
+  signing in for up to an hour. That limit is what stops guessing spread across
+  many machines, and it can be filled on purpose. A device the owner has signed
+  in on before is not affected (it carries a signed cookie and is counted on its
+  own), nor are sessions already open, and an administrator can lift the lockout
+  under **Audit**. Without `ENCRYPTION_KEY`, which signs those cookies, every
+  device counts as new.
 - **What reaches the app through Docker's own port forwarding is trusted** to
   say where it came from, because that is how a reverse proxy on the same host
   reaches it. Publish the app on loopback (`NAFIN_LISTEN=127.0.0.1:4000`) so that
@@ -138,6 +141,12 @@ What has been fixed, newest first. The upgrade notes for each are in
   and get past the per-client limits.
 - **Administrators must use two-factor sign-in**, wherever it can be enabled,
   and can't turn it off.
+- **A lockout made on purpose no longer keeps the owner out on their own
+  devices.** After a complete sign-in, the browser carries a signed cookie for
+  that account, and a sign-in with it is counted against that device alone
+  (five tries in fifteen minutes) instead of against the address. The cookie
+  grants nothing by itself. An administrator's password reset and **Log out
+  everywhere** retire every device of the account.
 - **The sign-in limits can't be used to exhaust memory.** An address tried once
   stayed in memory for good, so cycling through millions of addresses could run
   the server out of memory.
