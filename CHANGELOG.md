@@ -12,31 +12,6 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Upgrading
 
-- **The API refuses to start with the development `ENCRYPTION_KEY` that
-  `docker-compose.yml` used to publish.** A production instance following the
-  docs takes its own key from `.env` and notices nothing. An instance that ran on
-  the published key had no protection for its 2FA secrets; see
-  [If your instance ran on the published key](SECURITY.md#if-your-instance-ran-on-the-published-key).
-- **Developers:** the development stack now generates its key per machine. 2FA
-  set up on a local database before this no longer decrypts; see
-  [readmore/development.md](readmore/development.md#running-it-locally) for the
-  one-line reset.
-
-### Security
-
-- `docker-compose.yml` no longer carries an encryption key. A key in a public
-  file protects nothing, and anybody who copied it into production was running
-  with one everyone could read.
-
-### License
-
-- nafin-toolbox is licensed under the **GNU Affero General Public License,
-  version 3 only** (see [LICENSE](LICENSE)). It had no licence before, which left the
-  public code "all rights reserved". Running it is free. Anyone who runs a
-  modified version for other people must offer them its source.
-
-### Upgrading
-
 - **Set up two-factor sign-in for every administrator right after upgrading.**
   Administrators now must have it: until they do, they are held at the setup
   screen and the server refuses every administrative action. Do it first, before
@@ -65,9 +40,21 @@ release may change things without a deprecation period. Each release is a tag on
   Sessions already open are not affected, and an administrator can lift it under
   **Audit** → **Sign-in lockouts**. Read
   [In case of an attack](readmore/under-attack.md) once.
+- **The API refuses to start with the development `ENCRYPTION_KEY` that
+  `docker-compose.yml` used to publish.** A production instance following the
+  docs takes its own key from `.env` and notices nothing. An instance that ran on
+  the published key had no protection for its 2FA secrets; see
+  [If your instance ran on the published key](SECURITY.md#if-your-instance-ran-on-the-published-key).
+- **Developers:** the development stack now generates its key per machine. 2FA
+  set up on a local database before this no longer decrypts; see
+  [readmore/development.md](readmore/development.md#running-it-locally) for the
+  one-line reset.
 
 ### Security
 
+- `docker-compose.yml` no longer carries an encryption key. A key in a public
+  file protects nothing, and anybody who copied it into production was running
+  with one everyone could read.
 - Sign-in limits held only one request at a time. Every attempt that arrived
   while the first wrong password was still being checked got through, so fifty
   guesses sent at once were fifty guesses, not five. An attempt is now counted
@@ -102,6 +89,13 @@ release may change things without a deprecation period. Each release is a tag on
   one or all of them.
 - [In case of an attack](readmore/under-attack.md): what the app limits on its
   own, and what to do, step by step, when somebody is trying to get in.
+
+### License
+
+- nafin-toolbox is licensed under the **GNU Affero General Public License,
+  version 3 only** (see [LICENSE](LICENSE)). It had no licence before, which left the
+  public code "all rights reserved". Running it is free. Anyone who runs a
+  modified version for other people must offer them its source.
 
 ## [0.5.1] — 2026-10-24
 

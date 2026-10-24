@@ -38,8 +38,8 @@ defaults in the compose files and documentation an operator is told to follow.
 
 **Out of scope:** an instance its operator has configured against the
 documentation, such as plain HTTP or the development secrets in production;
-denial of service by sheer volume, which belongs to the reverse proxy in front;
-vulnerabilities in
+denial of service by sheer volume, which belongs to the reverse proxy in front
+(see [readmore/under-attack.md](readmore/under-attack.md)); vulnerabilities in
 dependencies that the app doesn't reach, which are better reported upstream.
 
 ## Known limitations
@@ -74,7 +74,12 @@ moves to [Security fixes](#security-fixes).
   wrong passwords an hour, from anywhere, lock that address out of signing in
   for up to an hour. That limit is what stops guessing spread across many
   machines, and it can be filled on purpose. Sessions already open are not
-  affected.
+  affected, and an administrator can lift the lockout under **Audit**.
+- **What reaches the app through Docker's own port forwarding is trusted** to
+  say where it came from, because that is how a reverse proxy on the same host
+  reaches it. Publish the app on loopback (`NAFIN_LISTEN=127.0.0.1:4000`) so that
+  only the proxy can; see
+  [Trusted proxies](readmore/self-hosting.md#trusted-proxies).
 - **The development database password is public.** `docker-compose.yml` sets
   `finance` / `finance` for local development. Production takes
   `POSTGRES_PASSWORD` from `.env`, and the database is never published to the
@@ -128,6 +133,14 @@ What has been fixed, newest first. The upgrade notes for each are in
   enforced this before.
 - **Signing in with an unknown address takes as long as a wrong password**, so
   timing no longer tells which addresses have accounts.
+- **Only the stack's own network is trusted to report a client's address.**
+  Every private range was, so anyone on a LAN or a VPN could claim any address
+  and get past the per-client limits.
+- **Administrators must use two-factor sign-in**, wherever it can be enabled,
+  and can't turn it off.
+- **The sign-in limits can't be used to exhaust memory.** An address tried once
+  stayed in memory for good, so cycling through millions of addresses could run
+  the server out of memory.
 - **No published encryption key.** `docker-compose.yml` no longer carries a
   development `ENCRYPTION_KEY`. Development generates one per machine instead,
   and the API refuses to start with the formerly published one, however it got
