@@ -24,6 +24,10 @@ const (
 	AuditUserDeleted      AuditEvent = "user_deleted"
 	AuditPasswordReset    AuditEvent = "password_reset"
 	AuditLockoutCleared   AuditEvent = "lockout_cleared"
+	// An account moved to separate keys for signing in and for the vault.
+	AuditCredentialsUpgraded AuditEvent = "credentials_upgraded"
+	// An account renewed its vault key, recovery key and password together.
+	AuditKeysRenewed AuditEvent = "keys_renewed"
 )
 
 // LogAudit records a security event in the audit_log table.

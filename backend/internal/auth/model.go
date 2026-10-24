@@ -22,6 +22,12 @@ type User struct {
 	// The generation of trusted-device cookies this account accepts. See
 	// device.go.
 	DeviceEpoch int `json:"-"`
+	// What PasswordHash is a hash of: the password (1) or an auth key (2).
+	// Sent, so that a browser holding a version 1 session knows to migrate.
+	// See kdf.go.
+	AuthVersion int `json:"auth_version"`
+	// The PBKDF2 rounds the browser derives this account's keys with.
+	KDFIterations int `json:"-"`
 }
 
 func (u *User) IsAdmin() bool {
@@ -42,27 +48,77 @@ type Session struct {
 	CreatedAt time.Time
 }
 
+// Secret is how a request proves the password. A version 2 account sends the
+// auth key its browser derived, and the server never sees the password. A
+// version 1 account sends the password itself, as it always did, until it
+// migrates. See secretMatches.
+type Secret struct {
+	Password string `json:"password,omitempty"`
+	AuthKey  string `json:"auth_key,omitempty"`
+}
+
+// Empty reports whether neither form was sent.
+func (s Secret) Empty() bool { return s.Password == "" && s.AuthKey == "" }
+
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email string `json:"email"`
+	Secret
+}
+
+// SetupRequest makes the first administrator, who is version 2 from the start.
+type SetupRequest struct {
+	Email   string `json:"email"`
+	AuthKey string `json:"auth_key"`
+}
+
+type PreloginRequest struct {
+	Email string `json:"email"`
+}
+
+// PreloginResponse is how the browser derives an account's keys before signing
+// in. An address with no account gets the defaults, so it reads like any other.
+type PreloginResponse struct {
+	AuthVersion int    `json:"auth_version"`
+	KDF         string `json:"kdf"`
+	Iterations  int    `json:"iterations"`
+}
+
+// UpgradeRequest moves an account to version 2, proven by its current secret.
+// Which of the new values are required depends on what the account still
+// lacks; see HandleUpgrade.
+type UpgradeRequest struct {
+	Secret
+	NewAuthKey           string `json:"new_auth_key,omitempty"`
+	EncryptedMEK         string `json:"encrypted_mek,omitempty"`
+	RecoveryAuth         string `json:"recovery_auth,omitempty"`
+	EncryptedMEKRecovery string `json:"encrypted_mek_recovery,omitempty"`
 }
 
 // InviteRequest — when SMTP is configured, only email+role needed.
 // Password field is optional (fallback for no-SMTP mode).
 type InviteRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password,omitempty"`
-	Role     string `json:"role"`
+	Email string `json:"email"`
+	// The invitee's first password, as an auth key the admin's browser
+	// derived for the invitee's address. Only without email.
+	AuthKey string `json:"auth_key,omitempty"`
+	Role    string `json:"role"`
 }
 
 type ChangePasswordRequest struct {
-	CurrentPassword string `json:"current_password"`
-	NewPassword     string `json:"new_password"`
+	// The current secret, in the account's own form (see Secret).
+	CurrentPassword string `json:"current_password,omitempty"`
+	CurrentAuthKey  string `json:"current_auth_key,omitempty"`
+	// Always an auth key: a changed password makes the account version 2.
+	NewAuthKey string `json:"new_auth_key"`
+}
+
+func (r ChangePasswordRequest) Current() Secret {
+	return Secret{Password: r.CurrentPassword, AuthKey: r.CurrentAuthKey}
 }
 
 type VerifyEmailRequest struct {
-	Token    string `json:"token"`
-	Password string `json:"password"`
+	Token   string `json:"token"`
+	AuthKey string `json:"auth_key"`
 }
 
 type Verify2FARequest struct {
@@ -84,15 +140,15 @@ type Confirm2FAResponse struct {
 }
 
 type Disable2FARequest struct {
-	Password string `json:"password"`
+	Secret
 }
 
 type RegenerateRecoveryCodesRequest struct {
-	Password string `json:"password"`
+	Secret
 }
 
 type DeleteAccountRequest struct {
-	Password string `json:"password"`
+	Secret
 }
 
 type Require2FARequest struct {

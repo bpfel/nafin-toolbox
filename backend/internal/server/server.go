@@ -67,6 +67,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	verify2FAUserLimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
 	passwordCheckLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	deviceLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	preloginLimiter := auth.NewLoginRateLimiter(100, 15*time.Minute)
 	// Four figures change about four times a year between them; six sends an
 	// hour is room to retry a bounced one without leaving a mail button open.
 	remindLimiter := auth.NewLoginRateLimiter(6, time.Hour)
@@ -94,6 +95,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		verifyEmailLimiter.SetTrustedProxies(cidrs)
 		verify2FALimiter.SetTrustedProxies(cidrs)
 		remindLimiter.SetTrustedProxies(cidrs)
+		preloginLimiter.SetTrustedProxies(cidrs)
 	}
 
 	deps := &auth.HandlerDeps{
@@ -107,6 +109,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		Verify2FAUserLimiter: verify2FAUserLimiter,
 		PasswordCheckLimiter: passwordCheckLimiter,
 		DeviceLimiter:        deviceLimiter,
+		PreloginLimiter:      preloginLimiter,
 		EmailSender:          emailSender,
 		EncryptionKey:        encryptionKey,
 		AppURL:               appURL,
@@ -117,6 +120,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 
 		// Public routes (no auth required)
 		r.Get("/health", s.handleHealth)
+		r.Post("/auth/prelogin", auth.HandlePrelogin(deps))
 		r.Post("/auth/login", auth.HandleLogin(deps))
 		r.Get("/auth/needs-setup", auth.HandleNeedsSetup(deps))
 		r.Post("/auth/setup", auth.HandleSetup(deps))
@@ -130,6 +134,8 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Post("/auth/logout", auth.HandleLogout(deps))
 			r.Post("/auth/logout-everywhere", auth.HandleLogoutEverywhere(deps))
 			r.Post("/auth/change-password", auth.HandleChangePassword(deps))
+			r.Post("/auth/upgrade", auth.HandleUpgrade(deps))
+			r.Post("/auth/renew-keys", auth.HandleRenewKeys(deps))
 			r.Get("/auth/settings", auth.HandleGetSettings(deps))
 
 			// 2FA management

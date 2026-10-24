@@ -121,6 +121,7 @@ func (s *Store) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, r
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE users
 		 SET encrypted_mek = $2, recovery_key_hash = $3, encrypted_mek_recovery = $4,
+		     recovery_version = 2,
 		     public_key = $5, encrypted_private_key = $6,
 		     verifying_key = $7, encrypted_signing_key = $8
 		 WHERE id = $1`,
@@ -167,10 +168,21 @@ func (s *Store) UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK
 	return err
 }
 
-func (s *Store) GetRecoveryData(ctx context.Context, userID int) (recoveryKeyHash, encryptedMEKRecovery string, err error) {
-	err = s.db.QueryRowContext(ctx,
-		`SELECT recovery_key_hash, encrypted_mek_recovery FROM users WHERE id = $1`,
+// RecoveryData is what recovery needs: the hash to check against, the MEK
+// wrapped for recovery, and which scheme both are in (see KeysResponse).
+type RecoveryData struct {
+	Hash         string
+	EncryptedMEK string
+	Version      int
+}
+
+func (s *Store) GetRecoveryData(ctx context.Context, userID int) (RecoveryData, error) {
+	var hash, mek sql.NullString
+	var d RecoveryData
+	err := s.db.QueryRowContext(ctx,
+		`SELECT recovery_key_hash, encrypted_mek_recovery, recovery_version FROM users WHERE id = $1`,
 		userID,
-	).Scan(&recoveryKeyHash, &encryptedMEKRecovery)
-	return
+	).Scan(&hash, &mek, &d.Version)
+	d.Hash, d.EncryptedMEK = hash.String, mek.String
+	return d, err
 }

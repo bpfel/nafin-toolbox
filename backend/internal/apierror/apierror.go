@@ -98,6 +98,19 @@ var codes = map[string]string{
 	Auth + "|validation":                             "AUTH-050",
 	Auth + "|password must be at least 8 characters": "AUTH-051",
 	Auth + "|invalid email address":                  "AUTH-052",
+	// An auth key that is not 32 bytes of base64: a browser that sent the
+	// password itself, or something that is not this app's browser at all.
+	Auth + "|invalid auth key": "AUTH-053",
+
+	// --- Moving an account to separate keys (key separation) ---
+	Auth + "|nothing to upgrade":             "AUTH-060",
+	Auth + "|rewrapped vault key required":   "AUTH-061",
+	Auth + "|new recovery key required":      "AUTH-062",
+	Auth + "|account was upgraded meanwhile": "AUTH-063",
+	Auth + "|upgrade before renewing":        "AUTH-064",
+	// A save from another device, or a household joined, between reading
+	// and renewing. The browser reads again and repeats.
+	Auth + "|changed while renewing": "AUTH-065",
 
 	// --- The vault ---
 	Vault + "|invalid JSON":                "VAULT-010",

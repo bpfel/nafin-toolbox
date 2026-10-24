@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -35,11 +36,11 @@ func (s *Store) SetTrustedProxies(cidrs []string) {
 
 // ---- User CRUD ----
 
-const userColumns = `id, email, role, password_hash, must_change_password, email_verified, totp_enabled, created_at, temp_password_expires_at, device_epoch`
+const userColumns = `id, email, role, password_hash, must_change_password, email_verified, totp_enabled, created_at, temp_password_expires_at, device_epoch, auth_version, kek_iterations`
 
 func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Email, &u.Role, &u.PasswordHash, &u.MustChangePassword, &u.EmailVerified, &u.TOTPEnabled, &u.CreatedAt, &u.TempPasswordExpiresAt, &u.DeviceEpoch)
+	err := row.Scan(&u.ID, &u.Email, &u.Role, &u.PasswordHash, &u.MustChangePassword, &u.EmailVerified, &u.TOTPEnabled, &u.CreatedAt, &u.TempPasswordExpiresAt, &u.DeviceEpoch, &u.AuthVersion, &u.KDFIterations)
 	return &u, err
 }
 
@@ -108,13 +109,70 @@ func (s *Store) ListUsers(ctx context.Context) ([]User, error) {
 	return users, rows.Err()
 }
 
+// UpdatePassword stores the hash of a new auth key. Every password set since
+// key separation is one the browser turned into an auth key, so the account is
+// version 2 from here on, whatever it was before. See kdf.go.
 func (s *Store) UpdatePassword(ctx context.Context, userID int, newHash string) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET password_hash = $1 WHERE id = $2`,
+		`UPDATE users SET password_hash = $1, auth_version = 2 WHERE id = $2`,
 		newHash, userID,
 	)
 	return err
 }
+
+// CredentialState is what an account still lacks of version 2.
+type CredentialState struct {
+	AuthVersion     int
+	HasVault        bool
+	HasRecovery     bool
+	RecoveryVersion int
+}
+
+// NeedsAuth reports whether the account still signs in with its password.
+func (c CredentialState) NeedsAuth() bool { return c.AuthVersion < AuthVersionKey }
+
+// NeedsRecovery reports whether the account's recovery key is still one the
+// server received in the clear.
+func (c CredentialState) NeedsRecovery() bool {
+	return c.HasVault && c.HasRecovery && c.RecoveryVersion < 2
+}
+
+func (s *Store) GetCredentialState(ctx context.Context, userID int) (CredentialState, error) {
+	var c CredentialState
+	err := s.db.QueryRowContext(ctx,
+		`SELECT auth_version, encrypted_mek IS NOT NULL, recovery_key_hash IS NOT NULL, recovery_version
+		   FROM users WHERE id = $1`, userID,
+	).Scan(&c.AuthVersion, &c.HasVault, &c.HasRecovery, &c.RecoveryVersion)
+	return c, err
+}
+
+// Upgrade stores what an account needs for version 2, all of it at once.
+// Each argument left empty leaves its column alone. It applies only while the
+// account is still at fromAuthVersion, so two tabs migrating together cannot
+// both write; the second gets ErrUpgradeRaced.
+func (s *Store) Upgrade(ctx context.Context, userID, fromAuthVersion int, authHash, encryptedMEK, recoveryHash, encryptedMEKRecovery string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE users SET
+		    password_hash          = COALESCE(NULLIF($3, ''), password_hash),
+		    auth_version           = CASE WHEN $3 = '' THEN auth_version ELSE 2 END,
+		    encrypted_mek          = COALESCE(NULLIF($4, ''), encrypted_mek),
+		    recovery_key_hash      = COALESCE(NULLIF($5, ''), recovery_key_hash),
+		    encrypted_mek_recovery = COALESCE(NULLIF($6, ''), encrypted_mek_recovery),
+		    recovery_version       = CASE WHEN $5 = '' THEN recovery_version ELSE 2 END
+		  WHERE id = $1 AND auth_version = $2`,
+		userID, fromAuthVersion, authHash, encryptedMEK, recoveryHash, encryptedMEKRecovery,
+	)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return ErrUpgradeRaced
+	}
+	return nil
+}
+
+// ErrUpgradeRaced: the account changed version while the upgrade was prepared.
+var ErrUpgradeRaced = errors.New("account was upgraded meanwhile")
 
 func (s *Store) ClearMustChangePassword(ctx context.Context, userID int) error {
 	_, err := s.db.ExecContext(ctx,
@@ -134,7 +192,7 @@ func (s *Store) ClearMustChangePassword(ctx context.Context, userID int) error {
 // reset answers "someone else may have this".
 func (s *Store) SetTemporaryPassword(ctx context.Context, userID int, passwordHash string, expiresAt time.Time) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET password_hash = $2, must_change_password = TRUE, temp_password_expires_at = $3,
+		`UPDATE users SET password_hash = $2, auth_version = 2, must_change_password = TRUE, temp_password_expires_at = $3,
 		        device_epoch = device_epoch + 1 WHERE id = $1`,
 		userID, passwordHash, expiresAt,
 	)
