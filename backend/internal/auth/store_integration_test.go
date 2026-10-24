@@ -1083,7 +1083,7 @@ func TestHandleGetSettings_ReportsEmail(t *testing.T) {
 // frontend's nginx, which sets X-Real-IP to the outer proxy's address.
 func loginFrom(t *testing.T, deps *HandlerDeps, client, email, password string) int {
 	t.Helper()
-	body := strings.NewReader(`{"email":"` + email + `","password":"` + password + `"}`)
+	body := strings.NewReader(`{"email":"` + email + `","auth_key":"` + password + `"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
 	req.RemoteAddr = "172.18.0.3:40000"
 	req.Header.Set("X-Real-IP", "172.18.0.1")
@@ -1183,7 +1183,7 @@ func TestLogin_AuditRecordsTheClientNotTheProxy(t *testing.T) {
 // signIn signs in as a browser would and returns the session it was given.
 func signIn(t *testing.T, deps *HandlerDeps, email string) string {
 	t.Helper()
-	body := strings.NewReader(`{"email":"` + email + `","password":"right-pass-1"}`)
+	body := strings.NewReader(`{"email":"` + email + `","auth_key":"right-pass-1"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
 	w := httptest.NewRecorder()
 	HandleLogin(deps).ServeHTTP(w, req)
@@ -1375,8 +1375,20 @@ func TestLogin_TheRightPasswordDoesNotClearOtherAddressesMisses(t *testing.T) {
 	}
 }
 
+// tempAuthKey is what a browser sends for a temporary password: its auth key,
+// derived with the account's own rounds.
+func tempAuthKey(t *testing.T, deps *HandlerDeps, email, temp string) string {
+	t.Helper()
+	u, _ := deps.Store.GetUserByEmail(context.Background(), email)
+	key, err := DeriveAuthKey(temp, email, u.KDFIterations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
+}
+
 // resetPassword resets email's password as an admin would and returns the
-// temporary one.
+// auth key of the temporary one, as the browser would send it.
 func resetPassword(t *testing.T, deps *HandlerDeps, email string) string {
 	t.Helper()
 	target, _ := deps.Store.GetUserByEmail(context.Background(), email)
@@ -1399,7 +1411,7 @@ func resetPassword(t *testing.T, deps *HandlerDeps, email string) string {
 	if err != nil || time.Until(expires) < TempPasswordLifetime-time.Minute {
 		t.Fatalf("temp_expires_at = %q, want about %v from now", body.TempExpiresAt, TempPasswordLifetime)
 	}
-	return body.TempPassword
+	return tempAuthKey(t, deps, email, body.TempPassword)
 }
 
 func TestAdminResetPassword_TheTemporaryPasswordExpires(t *testing.T) {
@@ -1411,7 +1423,7 @@ func TestAdminResetPassword_TheTemporaryPasswordExpires(t *testing.T) {
 	}
 
 	testDB.Exec(`UPDATE users SET temp_password_expires_at = NOW() - INTERVAL '1 minute' WHERE email = 'father@example.ch'`)
-	body := strings.NewReader(`{"email":"father@example.ch","password":"` + temp + `"}`)
+	body := strings.NewReader(`{"email":"father@example.ch","auth_key":"` + temp + `"}`)
 	w := httptest.NewRecorder()
 	HandleLogin(deps).ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/auth/login", body))
 	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "AUTH-037") {
@@ -1424,7 +1436,7 @@ func TestChangePassword_EndsTheTemporaryPasswordsDeadline(t *testing.T) {
 	temp := resetPassword(t, deps, "father@example.ch")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password",
-		strings.NewReader(`{"current_password":"`+temp+`","new_password":"chosen-pass-1"}`))
+		strings.NewReader(`{"current_auth_key":"`+temp+`","new_auth_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`))
 	req = req.WithContext(asUser(t, deps.Store, "father@example.ch"))
 	w := httptest.NewRecorder()
 	HandleChangePassword(deps).ServeHTTP(w, req)
@@ -1549,7 +1561,7 @@ func TestDisable2FA_RefusedWhileTheInstanceRequiresIt(t *testing.T) {
 	with2FA(t, deps, "father@example.ch")
 	deps.Store.SetSetting(context.Background(), "require_2fa", "true")
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/auth/2fa", strings.NewReader(`{"password":"right-pass-1"}`))
+	req := httptest.NewRequest(http.MethodDelete, "/api/auth/2fa", strings.NewReader(`{"auth_key":"right-pass-1"}`))
 	req = req.WithContext(asUser(t, deps.Store, "father@example.ch"))
 	w := httptest.NewRecorder()
 	HandleDisable2FA(deps).ServeHTTP(w, req)
@@ -1624,7 +1636,7 @@ func TestDisable2FA_AnAdministratorMayNot(t *testing.T) {
 	}
 	with2FA(t, deps, "root@example.ch")
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/auth/2fa", strings.NewReader(`{"password":"right-pass-1"}`))
+	req := httptest.NewRequest(http.MethodDelete, "/api/auth/2fa", strings.NewReader(`{"auth_key":"right-pass-1"}`))
 	req = req.WithContext(asUser(t, deps.Store, "root@example.ch"))
 	w := httptest.NewRecorder()
 	HandleDisable2FA(deps).ServeHTTP(w, req)
@@ -1639,7 +1651,7 @@ func TestDisable2FA_AnAdministratorMayNot(t *testing.T) {
 // loginWith signs in from client carrying cookies, and returns the response.
 func loginWith(t *testing.T, deps *HandlerDeps, client, email, password string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
 	t.Helper()
-	body := strings.NewReader(`{"email":"` + email + `","password":"` + password + `"}`)
+	body := strings.NewReader(`{"email":"` + email + `","auth_key":"` + password + `"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
 	req.RemoteAddr = "172.18.0.3:40000"
 	req.Header.Set("X-Forwarded-For", client+", 172.18.0.1")
@@ -1758,5 +1770,288 @@ func TestVerify2FA_TheDeviceIsRememberedOnlyAfterTheSecondFactor(t *testing.T) {
 	code, _ := totp.GenerateCode(secret, time.Now())
 	if v := verify2FAFrom(t, deps, "203.0.113.7", userID, code); v.Code != http.StatusOK || deviceCookie(v) == nil {
 		t.Errorf("second factor = %d, device cookie %v: want 200 and one", v.Code, deviceCookie(v))
+	}
+}
+
+// --- Key separation: prelogin, migration, renewal ---
+
+const (
+	newKey  = "9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="
+	recAuth = "l1vKXKm/itMumYomXdESJZ7V0wydUfu1pN0tFbVbn/k="
+	newKey2 = "nnohXZbg/yNYvts4BMMgG5b3N6n4SRd8UFt2kzxl6eI="
+)
+
+// legacyAccount makes a version 1 account as one from before key separation:
+// signed in with its password, a vault key wrapped under it, and a recovery
+// key stored as the hash of the raw key.
+func legacyAccount(t *testing.T, store *Store, email string, withVault bool) *User {
+	t.Helper()
+	u, err := store.CreateUserFull(context.Background(), email, mustHash("old-pass-1"), RoleUser, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testDB.Exec(`UPDATE users SET auth_version = 1 WHERE id = $1`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if withVault {
+		if _, err := testDB.Exec(`UPDATE users SET encrypted_mek = 'mek-under-password', recovery_key_hash = $2,
+		     encrypted_mek_recovery = 'mek-under-raw-recovery', recovery_version = 1 WHERE id = $1`,
+			u.ID, mustHash("RAW-RECOVERY-KEY")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	u, _ = store.GetUserByID(context.Background(), u.ID)
+	return u
+}
+
+func post(t *testing.T, h http.HandlerFunc, ctx context.Context, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/x", strings.NewReader(body)).WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	return w
+}
+
+func TestPrelogin_SaysHowToDeriveAndHidesUnknownAddresses(t *testing.T) {
+	deps := loginDeps(t)
+	legacyAccount(t, deps.Store, "old@example.ch", false)
+
+	read := func(email string) PreloginResponse {
+		w := post(t, HandlePrelogin(deps), context.Background(), `{"email":"`+email+`"}`)
+		var r PreloginResponse
+		json.NewDecoder(w.Body).Decode(&r)
+		return r
+	}
+	if r := read("father@example.ch"); r.AuthVersion != 2 || r.KDF != "pbkdf2-sha256" || r.Iterations != DefaultKDFIterations {
+		t.Errorf("a version 2 account: %+v", r)
+	}
+	if r := read("old@example.ch"); r.AuthVersion != 1 {
+		t.Errorf("a version 1 account: %+v, want version 1", r)
+	}
+	if read("nobody@example.ch") != read("father@example.ch") {
+		t.Error("an unknown address answers differently from a new account")
+	}
+}
+
+func TestLogin_AVersion1AccountSignsInWithItsPasswordAndSaysSo(t *testing.T) {
+	deps := loginDeps(t)
+	legacyAccount(t, deps.Store, "old@example.ch", true)
+
+	body := `{"email":"old@example.ch","password":"old-pass-1"}`
+	w := post(t, HandleLogin(deps), context.Background(), body)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"auth_version":1`) {
+		t.Errorf("version 1 with its password = %d %s, want 200 with auth_version 1", w.Code, w.Body.String())
+	}
+	if w := post(t, HandleLogin(deps), context.Background(), `{"email":"old@example.ch","auth_key":"old-pass-1"}`); w.Code != http.StatusUnauthorized {
+		t.Errorf("version 1 with an auth key = %d, want 401", w.Code)
+	}
+}
+
+func TestUpgrade_MovesAVersion1AccountInOneStep(t *testing.T) {
+	deps := loginDeps(t)
+	u := legacyAccount(t, deps.Store, "old@example.ch", true)
+	ctx := ContextWithUser(context.Background(), u)
+	full := `"new_auth_key":"` + newKey + `","encrypted_mek":"mek-under-vault-kek","recovery_auth":"` + recAuth + `","encrypted_mek_recovery":"mek-under-recovery-kek"`
+
+	for name, tc := range map[string]struct {
+		body string
+		code int
+		want string
+	}{
+		"a session alone":          {`{` + full + `}`, 400, "AUTH-017"},
+		"the wrong password":       {`{"password":"guess",` + full + `}`, 401, "AUTH-015"},
+		"no rewrapped vault key":   {`{"password":"old-pass-1","new_auth_key":"` + newKey + `","recovery_auth":"` + recAuth + `","encrypted_mek_recovery":"r"}`, 400, "AUTH-061"},
+		"no new recovery key":      {`{"password":"old-pass-1","new_auth_key":"` + newKey + `","encrypted_mek":"m"}`, 400, "AUTH-062"},
+		"the password as auth key": {`{"password":"old-pass-1","new_auth_key":"old-pass-1","encrypted_mek":"m","recovery_auth":"` + recAuth + `","encrypted_mek_recovery":"r"}`, 400, "AUTH-053"},
+	} {
+		if w := post(t, HandleUpgrade(deps), ctx, tc.body); w.Code != tc.code || !strings.Contains(w.Body.String(), tc.want) {
+			t.Errorf("%s = %d %s, want %d %s", name, w.Code, w.Body.String(), tc.code, tc.want)
+		}
+	}
+	if after, _ := deps.Store.GetUserByID(context.Background(), u.ID); after.AuthVersion != 1 {
+		t.Fatal("a refused upgrade changed the account")
+	}
+
+	if w := post(t, HandleUpgrade(deps), ctx, `{"password":"old-pass-1",`+full+`}`); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"auth_version":2`) {
+		t.Fatalf("upgrade = %d %s, want 200 with auth_version 2", w.Code, w.Body.String())
+	}
+
+	var mek, mekRec string
+	var rv int
+	testDB.QueryRow(`SELECT encrypted_mek, encrypted_mek_recovery, recovery_version FROM users WHERE id = $1`, u.ID).Scan(&mek, &mekRec, &rv)
+	if mek != "mek-under-vault-kek" || mekRec != "mek-under-recovery-kek" || rv != 2 {
+		t.Errorf("stored: mek %q, recovery %q v%d", mek, mekRec, rv)
+	}
+	// The password itself no longer signs in; its auth key does.
+	if w := post(t, HandleLogin(deps), context.Background(), `{"email":"old@example.ch","password":"old-pass-1"}`); w.Code != http.StatusUnauthorized {
+		t.Errorf("the old password after upgrading = %d, want 401", w.Code)
+	}
+	if w := post(t, HandleLogin(deps), context.Background(), `{"email":"old@example.ch","auth_key":"`+newKey+`"}`); w.Code != http.StatusOK {
+		t.Errorf("the auth key after upgrading = %d, want 200", w.Code)
+	}
+	if !strings.Contains(post(t, HandleUpgrade(deps), ContextWithUser(context.Background(), mustUser(t, deps.Store, u.ID)), `{"auth_key":"`+newKey+`"}`).Body.String(), "AUTH-060") {
+		t.Error("a second upgrade was not refused as nothing to upgrade")
+	}
+	var logged int
+	testDB.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE event = 'credentials_upgraded'`).Scan(&logged)
+	if logged != 1 {
+		t.Errorf("credentials_upgraded audit rows = %d, want 1", logged)
+	}
+}
+
+func TestUpgrade_AnAccountWithoutAVaultMovesItsPasswordOnly(t *testing.T) {
+	deps := loginDeps(t)
+	u := legacyAccount(t, deps.Store, "admin-old@example.ch", false)
+	w := post(t, HandleUpgrade(deps), ContextWithUser(context.Background(), u), `{"password":"old-pass-1","new_auth_key":"`+newKey+`"}`)
+	if w.Code != http.StatusOK {
+		t.Errorf("no vault = %d %s, want 200", w.Code, w.Body.String())
+	}
+}
+
+func TestUpgrade_ARecoveryKeyLeftAtVersion1IsRenewedAlone(t *testing.T) {
+	// An account whose password became version 2 by a change or a reset, with
+	// its recovery key still the one the server received raw.
+	deps := loginDeps(t)
+	u := legacyAccount(t, deps.Store, "half@example.ch", true)
+	testDB.Exec(`UPDATE users SET auth_version = 2, password_hash = $2 WHERE id = $1`, u.ID, mustHash(newKey))
+	u = mustUser(t, deps.Store, u.ID)
+
+	w := post(t, HandleUpgrade(deps), ContextWithUser(context.Background(), u),
+		`{"auth_key":"`+newKey+`","recovery_auth":"`+recAuth+`","encrypted_mek_recovery":"mek-under-recovery-kek"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("recovery only = %d %s, want 200", w.Code, w.Body.String())
+	}
+	var mek string
+	var rv int
+	testDB.QueryRow(`SELECT encrypted_mek, recovery_version FROM users WHERE id = $1`, u.ID).Scan(&mek, &rv)
+	if mek != "mek-under-password" || rv != 2 {
+		t.Errorf("mek %q (should be untouched), recovery v%d", mek, rv)
+	}
+}
+
+func TestStoreUpgrade_TwoTabsCannotBothWrite(t *testing.T) {
+	deps := loginDeps(t)
+	u := legacyAccount(t, deps.Store, "old@example.ch", false)
+	ctx := context.Background()
+	if err := deps.Store.Upgrade(ctx, u.ID, 1, mustHash(newKey), "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := deps.Store.Upgrade(ctx, u.ID, 1, mustHash(newKey2), "", "", ""); !errors.Is(err, ErrUpgradeRaced) {
+		t.Errorf("second upgrade from version 1 = %v, want ErrUpgradeRaced", err)
+	}
+}
+
+func mustUser(t *testing.T, store *Store, id int) *User {
+	t.Helper()
+	u, err := store.GetUserByID(context.Background(), id)
+	if err != nil || u == nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+// renewalAccount is a version 2 account with everything renewal touches: a
+// vault, a keypair, and one household key held as 'self'.
+func renewalAccount(t *testing.T, deps *HandlerDeps) (*User, int, time.Time, string) {
+	t.Helper()
+	u, err := deps.Store.CreateUserFull(context.Background(), "renew@example.ch", mustHash(newKey), RoleUser, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testDB.Exec(`UPDATE users SET encrypted_mek = 'old-mek', recovery_key_hash = 'x', encrypted_mek_recovery = 'old-rec', recovery_version = 2,
+	             public_key = 'pub', encrypted_private_key = 'old-priv', verifying_key = 'ver', encrypted_signing_key = 'old-sign' WHERE id = $1`, u.ID)
+	var at time.Time
+	testDB.QueryRow(`INSERT INTO user_vaults (user_id, ciphertext, nonce, version) VALUES ($1, 'old', 'n', 11) RETURNING updated_at`, u.ID).Scan(&at)
+	var hh int
+	testDB.QueryRow(`INSERT INTO shared_vaults (encrypted_name, ciphertext, nonce) VALUES ('n', 'c', 'n') RETURNING id`).Scan(&hh)
+	testDB.Exec(`INSERT INTO shared_vault_members (vault_id, user_id, wrapped_key, wrap_kind, role) VALUES ($1, $2, 'old-hk', 'self', 'owner')`, hh, u.ID)
+	sess, err := deps.Store.CreateSession(context.Background(), u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return mustUser(t, deps.Store, u.ID), hh, at, sess.Token
+}
+
+func renewBody(households string, at time.Time) string {
+	return `{"auth_key":"` + newKey + `","new_auth_key":"` + newKey2 + `","encrypted_mek":"new-mek",
+	  "recovery_auth":"` + recAuth + `","encrypted_mek_recovery":"new-rec",
+	  "encrypted_private_key":"new-priv","encrypted_signing_key":"new-sign",
+	  "vault":{"ciphertext":"bmV3","nonce":"bm4=","version":11,"expected_updated_at":"` + at.Format(time.RFC3339Nano) + `"},
+	  "households":` + households + `}`
+}
+
+func renewAs(t *testing.T, deps *HandlerDeps, u *User, token, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/renew-keys", strings.NewReader(body)).WithContext(ContextWithUser(context.Background(), u))
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	w := httptest.NewRecorder()
+	HandleRenewKeys(deps).ServeHTTP(w, req)
+	return w
+}
+
+func TestRenewKeys_ReplacesEverythingSealedUnderTheOldKey(t *testing.T) {
+	deps := loginDeps(t)
+	u, hh, at, token := renewalAccount(t, deps)
+	other, _ := deps.Store.CreateSession(context.Background(), u.ID)
+
+	w := renewAs(t, deps, u, token, renewBody(`[{"id":`+strconv.Itoa(hh)+`,"wrapped_key":"new-hk"}]`, at))
+	if w.Code != http.StatusOK {
+		t.Fatalf("renew = %d %s", w.Code, w.Body.String())
+	}
+
+	var mek, rec, priv, sign, ct, hk string
+	testDB.QueryRow(`SELECT encrypted_mek, encrypted_mek_recovery, encrypted_private_key, encrypted_signing_key FROM users WHERE id = $1`, u.ID).Scan(&mek, &rec, &priv, &sign)
+	testDB.QueryRow(`SELECT convert_from(ciphertext, 'UTF8') FROM user_vaults WHERE user_id = $1`, u.ID).Scan(&ct)
+	testDB.QueryRow(`SELECT wrapped_key FROM shared_vault_members WHERE user_id = $1`, u.ID).Scan(&hk)
+	if mek != "new-mek" || rec != "new-rec" || priv != "new-priv" || sign != "new-sign" || ct != "new" || hk != "new-hk" {
+		t.Errorf("after renewal: mek %q rec %q priv %q sign %q vault %q household %q", mek, rec, priv, sign, ct, hk)
+	}
+	if !stillSignedIn(t, deps.Store, token) {
+		t.Error("the renewing device was signed out")
+	}
+	if stillSignedIn(t, deps.Store, other.Token) {
+		t.Error("another device, holding the old vault key, stayed signed in")
+	}
+	if w := post(t, HandleLogin(deps), context.Background(), `{"email":"renew@example.ch","auth_key":"`+newKey2+`"}`); w.Code != http.StatusOK {
+		t.Errorf("the new password = %d, want 200", w.Code)
+	}
+}
+
+func TestRenewKeys_RefusedWhenTheAccountMovedUnderIt(t *testing.T) {
+	for name, tc := range map[string]struct {
+		households func(hh int) string
+		staleVault bool
+	}{
+		"a household left out": {func(int) string { return `[]` }, false},
+		"a household not held": {func(hh int) string {
+			return `[{"id":` + strconv.Itoa(hh) + `,"wrapped_key":"a"},{"id":999999,"wrapped_key":"b"}]`
+		}, false},
+		"a vault saved meanwhile": {func(hh int) string { return `[{"id":` + strconv.Itoa(hh) + `,"wrapped_key":"a"}]` }, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			deps := loginDeps(t)
+			u, hh, at, token := renewalAccount(t, deps)
+			if tc.staleVault {
+				testDB.Exec(`UPDATE user_vaults SET updated_at = NOW() + INTERVAL '1 second' WHERE user_id = $1`, u.ID)
+			}
+			w := renewAs(t, deps, u, token, renewBody(tc.households(hh), at))
+			if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "AUTH-065") {
+				t.Errorf("= %d %s, want 409 AUTH-065", w.Code, w.Body.String())
+			}
+			var mek string
+			testDB.QueryRow(`SELECT encrypted_mek FROM users WHERE id = $1`, u.ID).Scan(&mek)
+			if mek != "old-mek" {
+				t.Error("a refused renewal changed the account")
+			}
+		})
+	}
+}
+
+func TestRenewKeys_AVersion1AccountMigratesFirst(t *testing.T) {
+	deps := loginDeps(t)
+	u := legacyAccount(t, deps.Store, "old@example.ch", true)
+	sess, _ := deps.Store.CreateSession(context.Background(), u.ID)
+	if w := renewAs(t, deps, u, sess.Token, `{"password":"old-pass-1"}`); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "AUTH-064") {
+		t.Errorf("= %d %s, want 409 AUTH-064", w.Code, w.Body.String())
 	}
 }

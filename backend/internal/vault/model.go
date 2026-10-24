@@ -88,6 +88,10 @@ func (i Identity) Empty() bool {
 type KeysResponse struct {
 	EncryptedMEK string `json:"encrypted_mek"`
 	Iterations   int    `json:"iterations"`
+	// How encrypted_mek_recovery is wrapped: 1, under PBKDF2 of the recovery
+	// key itself; 2, under a recovery KEK the server never receives. See
+	// plans/key-separation-plan.md.
+	RecoveryVersion int `json:"recovery_version"`
 	// Inline rather than nested, so a client reads one flat object. Every field
 	// is empty for a user who set their vault up before identities existed.
 	Identity
@@ -95,8 +99,10 @@ type KeysResponse struct {
 
 // KeySetupRequest is sent by POST /vault/keys (initial setup).
 type KeySetupRequest struct {
-	EncryptedMEK         string `json:"encrypted_mek"`
-	RecoveryKeyHash      string `json:"recovery_key_hash"`
+	EncryptedMEK string `json:"encrypted_mek"`
+	// Derived from the recovery key in the browser; the recovery key itself
+	// never reaches the server (it used to, as recovery_key_hash, unhashed).
+	RecoveryAuth         string `json:"recovery_auth"`
 	EncryptedMEKRecovery string `json:"encrypted_mek_recovery"`
 	Identity
 }
@@ -107,13 +113,18 @@ type KeyUpdateRequest struct {
 }
 
 // RecoveryRequest is sent by POST /vault/recovery.
+// RecoveryRequest is sent by POST /vault/recovery: the recovery key itself for
+// a version 1 recovery, its auth key for version 2. The browser learns which
+// from recovery_version on GET /keys.
 type RecoveryRequest struct {
-	RecoveryKey string `json:"recovery_key"`
+	RecoveryKey  string `json:"recovery_key,omitempty"`
+	RecoveryAuth string `json:"recovery_auth,omitempty"`
 }
 
 // RecoveryResponse is returned after successful recovery verification.
 type RecoveryResponse struct {
 	EncryptedMEKRecovery string `json:"encrypted_mek_recovery"`
+	RecoveryVersion      int    `json:"recovery_version"`
 	// Carried here as well as on KeysResponse, because recovery is the one path
 	// that reaches an unlocked vault without going through GET /keys. The
 	// identity is sealed under the MEK rather than the password, so it survives

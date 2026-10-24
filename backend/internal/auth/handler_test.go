@@ -27,6 +27,7 @@ func testDeps() *HandlerDeps {
 		Verify2FAUserLimiter: limiter,
 		PasswordCheckLimiter: limiter,
 		DeviceLimiter:        limiter,
+		PreloginLimiter:      limiter,
 		EmailSender:          &email.LogSender{},
 		AppURL:               "http://localhost:3000",
 	}
@@ -47,6 +48,10 @@ func userCtx() context.Context {
 	user := &User{ID: 2, Email: "user@test.com", Role: RoleUser, EmailVerified: true, PasswordHash: mustHash("user1234")}
 	return context.WithValue(context.Background(), userContextKey, user)
 }
+
+// testAuthKey stands in for what a browser derives from a password: 32
+// bytes of base64. Handlers check its shape, never its origin.
+const testAuthKey = "9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="
 
 func mustHash(pw string) string {
 	h, err := HashPassword(pw)
@@ -211,12 +216,12 @@ func TestHandleInvite_FallbackRequiresPassword(t *testing.T) {
 	}
 }
 
-func TestHandleInvite_FallbackShortPassword(t *testing.T) {
+func TestHandleInvite_FallbackFirstPasswordMustBeAnAuthKey(t *testing.T) {
 	deps := testDeps()
 	handler := HandleInvite(deps)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/invite",
-		strings.NewReader(`{"email":"new@test.com","password":"short"}`))
+		strings.NewReader(`{"email":"new@test.com","auth_key":"short"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(adminCtx())
 	w := httptest.NewRecorder()
@@ -226,7 +231,7 @@ func TestHandleInvite_FallbackShortPassword(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(w.Body.String(), "password must be at least 8 characters") {
+	if !strings.Contains(w.Body.String(), "invalid auth key") {
 		t.Errorf("body %q does not contain password length error", w.Body.String())
 	}
 }
@@ -259,19 +264,19 @@ func TestValidationErrorsHaveTheirOwnCodes(t *testing.T) {
 	}
 }
 
-func TestHandleChangePassword_ShortPasswordCarriesItsCode(t *testing.T) {
+func TestHandleChangePassword_ANewPasswordMustArriveAsAnAuthKey(t *testing.T) {
 	deps := testDeps()
 	hash, _ := HashPassword("old-pass-123")
 	user := &User{ID: 1, Email: "a@example.ch", Role: RoleUser, PasswordHash: hash}
-	body := strings.NewReader(`{"current_password":"old-pass-123","new_password":"short"}`)
+	body := strings.NewReader(`{"current_password":"old-pass-123","new_auth_key":"a new password, sent as itself"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", body)
 	req = req.WithContext(ContextWithUser(req.Context(), user))
 	w := httptest.NewRecorder()
 
 	HandleChangePassword(deps).ServeHTTP(w, req)
 
-	if !strings.Contains(w.Body.String(), `"code":"AUTH-051"`) {
-		t.Errorf("body %q does not carry AUTH-051", w.Body.String())
+	if !strings.Contains(w.Body.String(), `"code":"AUTH-053"`) {
+		t.Errorf("body %q does not carry AUTH-053", w.Body.String())
 	}
 }
 
@@ -449,7 +454,7 @@ func TestHandleChangePassword_WrongCurrentPassword(t *testing.T) {
 	handler := HandleChangePassword(deps)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password",
-		strings.NewReader(`{"current_password":"wrongpassword","new_password":"newpass12"}`))
+		strings.NewReader(`{"current_password":"wrongpassword","new_auth_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx())
 	w := httptest.NewRecorder()
@@ -464,12 +469,12 @@ func TestHandleChangePassword_WrongCurrentPassword(t *testing.T) {
 	}
 }
 
-func TestHandleChangePassword_ShortNewPassword(t *testing.T) {
+func TestHandleChangePassword_ANewSecretThatIsNotAnAuthKey(t *testing.T) {
 	deps := testDeps()
 	handler := HandleChangePassword(deps)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password",
-		strings.NewReader(`{"current_password":"user1234","new_password":"short"}`))
+		strings.NewReader(`{"current_password":"user1234","new_auth_key":"short"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx())
 	w := httptest.NewRecorder()
@@ -479,7 +484,7 @@ func TestHandleChangePassword_ShortNewPassword(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(w.Body.String(), "password must be at least 8 characters") {
+	if !strings.Contains(w.Body.String(), "invalid auth key") {
 		t.Errorf("body %q does not contain password length error", w.Body.String())
 	}
 }
@@ -516,15 +521,18 @@ func TestHandleSetup_Validation(t *testing.T) {
 		},
 		{
 			name:       "invalid email",
-			body:       `{"email":"notanemail","password":"password123"}`,
+			body:       `{"email":"notanemail","auth_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`,
 			wantStatus: http.StatusBadRequest,
 			wantSubstr: "invalid email",
 		},
 		{
-			name:       "short password",
-			body:       `{"email":"admin@test.com","password":"short"}`,
+			// The password's own rules are the browser's; the server sees
+			// only an auth key, and refuses anything else, the password itself
+			// included.
+			name:       "a password instead of an auth key",
+			body:       `{"email":"admin@test.com","auth_key":"password123"}`,
 			wantStatus: http.StatusBadRequest,
-			wantSubstr: "password must be at least 8 characters",
+			wantSubstr: "AUTH-053",
 		},
 	}
 
@@ -697,14 +705,14 @@ func TestHandleVerifyEmail_Validation(t *testing.T) {
 			wantSubstr: "token and password required",
 		},
 		{
-			name:       "short password",
-			body:       `{"token":"abc","password":"short"}`,
+			name:       "a password instead of an auth key",
+			body:       `{"token":"abc","auth_key":"longpassword"}`,
 			wantStatus: http.StatusBadRequest,
-			wantSubstr: "password must be at least 8 characters",
+			wantSubstr: "AUTH-053",
 		},
 		{
 			name:       "missing token",
-			body:       `{"password":"longpassword"}`,
+			body:       `{"auth_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`,
 			wantStatus: http.StatusBadRequest,
 			wantSubstr: "token and password required",
 		},
@@ -1449,18 +1457,18 @@ func TestTempPasswordExpired(t *testing.T) {
 	}
 }
 
-func TestPasswordMatches_NoAccountTakesAsLongAsAWrongPassword(t *testing.T) {
-	user := &User{PasswordHash: mustHash("right-pass-1")}
+func TestSecretMatches_NoAccountTakesAsLongAsAWrongPassword(t *testing.T) {
+	user := &User{PasswordHash: mustHash(testAuthKey), AuthVersion: AuthVersionKey}
 	dummyHash() // computed once, up front, as the first real request would
 
 	start := time.Now()
-	if passwordMatches(user, "wrong-pass") {
-		t.Fatal("a wrong password matched")
+	if secretMatches(user, Secret{AuthKey: "wrong"}) {
+		t.Fatal("a wrong auth key matched")
 	}
 	wrong := time.Since(start)
 
 	start = time.Now()
-	if passwordMatches(nil, "wrong-pass") {
+	if secretMatches(nil, Secret{AuthKey: "wrong"}) {
 		t.Fatal("no account matched")
 	}
 	missing := time.Since(start)
@@ -1470,6 +1478,27 @@ func TestPasswordMatches_NoAccountTakesAsLongAsAWrongPassword(t *testing.T) {
 	// inside scheduling noise.
 	if missing < wrong/2 {
 		t.Errorf("no account took %v, a wrong password %v: the difference tells which addresses exist", missing, wrong)
+	}
+}
+
+// A version 2 account never takes the password itself, so a browser that
+// sent it by mistake fails instead of putting it back on the wire; a version
+// 1 account takes nothing but the password it stored.
+func TestSecretMatches_OnlyInTheAccountsOwnForm(t *testing.T) {
+	v2 := &User{PasswordHash: mustHash(testAuthKey), AuthVersion: AuthVersionKey}
+	if !secretMatches(v2, Secret{AuthKey: testAuthKey}) {
+		t.Error("version 2 refused its auth key")
+	}
+	if secretMatches(v2, Secret{Password: testAuthKey}) {
+		t.Error("version 2 took its secret under the password field")
+	}
+
+	v1 := &User{PasswordHash: mustHash("right-pass-1"), AuthVersion: AuthVersionPassword}
+	if !secretMatches(v1, Secret{Password: "right-pass-1"}) {
+		t.Error("version 1 refused its password")
+	}
+	if secretMatches(v1, Secret{AuthKey: "right-pass-1"}) {
+		t.Error("version 1 took its password under the auth key field")
 	}
 }
 
