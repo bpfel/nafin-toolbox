@@ -34,6 +34,8 @@ func (deps *HandlerDeps) lockoutLimiters() map[string]*LoginRateLimiter {
 		// do not exist.
 		"two_factor_client": deps.Verify2FALimiter,
 		"verification":      deps.VerifyEmailLimiter,
+		// Keyed by device: failures from a browser that signed in before.
+		"device": deps.DeviceLimiter,
 	}
 }
 

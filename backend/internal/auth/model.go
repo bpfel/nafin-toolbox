@@ -19,6 +19,9 @@ type User struct {
 	// Set while the password is one an admin handed out. See
 	// SetTemporaryPassword.
 	TempPasswordExpiresAt *time.Time `json:"-"`
+	// The generation of trusted-device cookies this account accepts. See
+	// device.go.
+	DeviceEpoch int `json:"-"`
 }
 
 func (u *User) IsAdmin() bool {

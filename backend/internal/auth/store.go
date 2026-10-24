@@ -35,11 +35,11 @@ func (s *Store) SetTrustedProxies(cidrs []string) {
 
 // ---- User CRUD ----
 
-const userColumns = `id, email, role, password_hash, must_change_password, email_verified, totp_enabled, created_at, temp_password_expires_at`
+const userColumns = `id, email, role, password_hash, must_change_password, email_verified, totp_enabled, created_at, temp_password_expires_at, device_epoch`
 
 func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Email, &u.Role, &u.PasswordHash, &u.MustChangePassword, &u.EmailVerified, &u.TOTPEnabled, &u.CreatedAt, &u.TempPasswordExpiresAt)
+	err := row.Scan(&u.ID, &u.Email, &u.Role, &u.PasswordHash, &u.MustChangePassword, &u.EmailVerified, &u.TOTPEnabled, &u.CreatedAt, &u.TempPasswordExpiresAt, &u.DeviceEpoch)
 	return &u, err
 }
 
@@ -127,12 +127,15 @@ func (s *Store) ClearMustChangePassword(ctx context.Context, userID int) error {
 // SetTemporaryPassword gives a user a password somebody else chose, which they
 // must change at their next sign-in and which stops working at expiresAt.
 //
-// One statement for the three, so there is no moment, and no failure, in
+// One statement for all of it, so there is no moment, and no failure, in
 // which the password has been replaced and is not yet temporary: the flag used
-// to be set separately afterwards, and an error there was only logged.
+// to be set separately afterwards, and an error there was only logged. The
+// same statement retires the account's trusted devices (see device.go): a
+// reset answers "someone else may have this".
 func (s *Store) SetTemporaryPassword(ctx context.Context, userID int, passwordHash string, expiresAt time.Time) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET password_hash = $2, must_change_password = TRUE, temp_password_expires_at = $3 WHERE id = $1`,
+		`UPDATE users SET password_hash = $2, must_change_password = TRUE, temp_password_expires_at = $3,
+		        device_epoch = device_epoch + 1 WHERE id = $1`,
 		userID, passwordHash, expiresAt,
 	)
 	return err
@@ -421,6 +424,13 @@ func (s *Store) GetTOTPSecret(ctx context.Context, userID int) (string, error) {
 
 func (s *Store) DeleteTOTPSecret(ctx context.Context, userID int) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM totp_secrets WHERE user_id = $1`, userID)
+	return err
+}
+
+// ForgetDevices retires every trusted-device cookie of an account. See
+// device.go.
+func (s *Store) ForgetDevices(ctx context.Context, userID int) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET device_epoch = device_epoch + 1 WHERE id = $1`, userID)
 	return err
 }
 

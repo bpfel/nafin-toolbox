@@ -26,6 +26,7 @@ func testDeps() *HandlerDeps {
 		LoginEmailLimiter:    limiter,
 		Verify2FAUserLimiter: limiter,
 		PasswordCheckLimiter: limiter,
+		DeviceLimiter:        limiter,
 		EmailSender:          &email.LogSender{},
 		AppURL:               "http://localhost:3000",
 	}

@@ -66,6 +66,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	loginEmailLimiter := auth.NewLoginRateLimiter(30, time.Hour)
 	verify2FAUserLimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
 	passwordCheckLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	deviceLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	// Four figures change about four times a year between them; six sends an
 	// hour is room to retry a bounced one without leaving a mail button open.
 	remindLimiter := auth.NewLoginRateLimiter(6, time.Hour)
@@ -105,6 +106,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		LoginEmailLimiter:    loginEmailLimiter,
 		Verify2FAUserLimiter: verify2FAUserLimiter,
 		PasswordCheckLimiter: passwordCheckLimiter,
+		DeviceLimiter:        deviceLimiter,
 		EmailSender:          emailSender,
 		EncryptionKey:        encryptionKey,
 		AppURL:               appURL,
