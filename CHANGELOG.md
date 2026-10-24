@@ -10,6 +10,13 @@ release may change things without a deprecation period. Each release is a tag on
 
 ## [Unreleased]
 
+### License
+
+- nafin-toolbox is licensed under the **GNU Affero General Public License v3.0
+  or later** (see [LICENSE](LICENSE)). It had no licence before, which left the
+  public code "all rights reserved". Running it is free. Anyone who runs a
+  modified version for other people must offer them its source.
+
 ### Upgrading
 
 - **One migration** (`014`) adds two empty columns; it cannot fail on existing
