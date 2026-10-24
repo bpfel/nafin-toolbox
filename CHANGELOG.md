@@ -34,6 +34,8 @@ fallen out of support. Nothing changes for anyone using the app.
   injection in pgx needs a query mode the server does not use, and the open
   redirect in chi a middleware it does not use. None is known to have been used
   against an instance.
+- Updated the tools the app is built and tested with (Vite, Vitest), past
+  advisories against their development servers. None of them ships in the app.
 
 ## [0.5.0] — 2026-10-19
 
