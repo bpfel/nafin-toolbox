@@ -37,6 +37,7 @@ describe('gateFor — one condition at a time', () => {
     ['password must change', { user: { role: 'user', mustChangePassword: true } }, 'mustChangePassword'],
     ['2FA required of everyone', { enforce2FA: true }, 'enforce2FA'],
     ['a recovery key to write down', { recoveryKeyPending: true }, 'recoveryKey'],
+    ['a new recovery key, for the move to separate keys', { recoveryKeyRenewalPending: true }, 'recoveryKeyRenewal'],
     ['vault written by a newer build', { vaultVersionAhead: true }, 'vaultAhead'],
     ['no vault yet', { vaultNeedsSetup: true }, 'vaultSetup'],
     ['vault will not decrypt', { vaultDecryptFailed: true }, 'vaultDecryptFailed'],

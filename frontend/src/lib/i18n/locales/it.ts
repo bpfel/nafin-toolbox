@@ -257,6 +257,7 @@ export const it: Messages = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Conserva la tua chiave di recupero',
+  'recoveryKey.renewalIntro': 'Il tuo account tiene ora la chiave del tuo budget separata da tutto ciò che viene inviato al server. Ecco una nuova chiave di recupero. Quella vecchia smette di funzionare appena confermi questa.',
   'recoveryKey.copy': 'Copia la chiave',
   'recoveryKey.confirmTitle': 'Verifica di averla davvero',
   'recoveryKey.label': 'Chiave di recupero',

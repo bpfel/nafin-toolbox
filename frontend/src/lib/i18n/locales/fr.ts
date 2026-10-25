@@ -257,6 +257,7 @@ export const fr: Messages = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Conserve ta clé de récupération',
+  'recoveryKey.renewalIntro': 'Ton compte garde désormais la clé de ton budget à l’écart de tout ce qui est envoyé au serveur. Voici une nouvelle clé de récupération. L’ancienne ne fonctionne plus dès que tu confirmes celle-ci.',
   'recoveryKey.copy': 'Copier la clé',
   'recoveryKey.confirmTitle': 'Vérifie que tu l’as vraiment',
   'recoveryKey.label': 'Clé de récupération',
