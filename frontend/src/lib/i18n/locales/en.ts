@@ -271,6 +271,7 @@ export const en = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Save Your Recovery Key',
+  'recoveryKey.renewalIntro': 'Your account now keeps the key to your budget apart from anything sent to the server. Here is a new recovery key to go with it. Your old one stops working once you confirm this one.',
   'recoveryKey.copy': 'Copy key',
   'recoveryKey.confirmTitle': 'Check you really have it',
   'recoveryKey.label': 'Recovery key',

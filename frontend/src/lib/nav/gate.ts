@@ -31,6 +31,7 @@ export type Gate =
   | 'mustChangePassword'
   | 'enforce2FA'
   | 'recoveryKey'
+  | 'recoveryKeyRenewal'
   | 'vaultAhead'
   | 'vaultSetup'
   | 'vaultDecryptFailed'
@@ -51,6 +52,11 @@ export interface GateState {
   enforce2FA: boolean
   /** A freshly minted recovery key is waiting to be written down. */
   recoveryKeyPending: boolean
+  /**
+   * The account is moving to separate keys and its new recovery key waits to
+   * be written down; nothing is stored until it has been. See confirmUpgrade.
+   */
+  recoveryKeyRenewalPending?: boolean
   /** The stored vault is newer than this build knows how to read. */
   vaultVersionAhead: boolean
   vaultNeedsSetup: boolean
@@ -87,6 +93,7 @@ export function gateFor(state: GateState): Gate | null {
   if (state.user.role === 'admin') return null
 
   if (state.recoveryKeyPending) return 'recoveryKey'
+  if (state.recoveryKeyRenewalPending) return 'recoveryKeyRenewal'
 
   // Before every other vault state: a vault this build cannot read will also
   // fail to decrypt and report itself locked, and those screens would invite

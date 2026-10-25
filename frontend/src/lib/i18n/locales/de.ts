@@ -246,6 +246,7 @@ export const de: Messages = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Wiederherstellungsschlüssel sichern',
+  'recoveryKey.renewalIntro': 'Dein Konto hält den Schlüssel zu deinem Budget jetzt getrennt von allem, was an den Server geht. Dazu gehört ein neuer Wiederherstellungsschlüssel. Der alte gilt nicht mehr, sobald du diesen bestätigst.',
   'recoveryKey.copy': 'Schlüssel kopieren',
   'recoveryKey.confirmTitle': 'Prüf, ob du ihn wirklich hast',
   'recoveryKey.label': 'Wiederherstellungsschlüssel',

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { setOnUnauthorized } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
+  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, confirmUpgrade, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
   import { getVaultState, sessionEndedElsewhere } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
@@ -124,6 +124,13 @@
     clearRecoveryKey()
   }
 
+  // The move to separate keys is stored only now that its new recovery key
+  // has been typed back. A failure keeps the key on screen to try again.
+  let upgradeError = $state<string | null>(null)
+  async function handleUpgradeConfirmed() {
+    upgradeError = await confirmUpgrade()
+  }
+
   async function handleUnlock() {
     if (!unlockPassword) return
     unlocking = true
@@ -170,6 +177,7 @@
         : null,
       enforce2FA: show2FAEnforcement,
       recoveryKeyPending: authState.recoveryKeyToShow != null,
+      recoveryKeyRenewalPending: authState.upgradeRecoveryKey != null,
       vaultVersionAhead: vaultState.versionAhead,
       vaultNeedsSetup: authState.vaultNeedsSetup,
       vaultDecryptFailed: authState.vaultDecryptFailed,
@@ -238,6 +246,13 @@
   <RecoveryKeyScreen
     recoveryKey={authState.recoveryKeyToShow}
     onconfirmed={handleRecoveryKeyDismiss}
+  />
+{:else if gate === 'recoveryKeyRenewal' && authState.upgradeRecoveryKey}
+  <RecoveryKeyScreen
+    recoveryKey={authState.upgradeRecoveryKey}
+    intro={t('recoveryKey.renewalIntro')}
+    error={upgradeError}
+    onconfirmed={handleUpgradeConfirmed}
   />
 {:else if gate === 'vaultAhead'}
   <main>
