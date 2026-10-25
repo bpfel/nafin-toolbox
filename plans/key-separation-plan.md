@@ -1,7 +1,7 @@
 # The server never receives a key to the vault — plan
 
-Written 2026-10-24. **Status: in progress.** Phases 1 and 2 being built together on
-`feature/key-separation`. Fixes the first
+Written 2026-10-24. **Status: built.** Phases 1 and 2 on `feature/key-separation`
+(2026-10-25); phase 3 not started. Fixes the first
 known limitation in `SECURITY.md` ("the server operator could read vaults"),
 audit finding #1 of the 0.5.0 security review.
 

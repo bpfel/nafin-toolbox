@@ -12,6 +12,14 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Upgrading
 
+- **Every account moves to separate keys on its next sign-in.** Nothing to do
+  for the operator beyond the usual rebuild; migration `016` adds two columns.
+  Each user signs in as usual and is shown a **new recovery key**, which they
+  write down and type back. Tell your users it's coming: the old recovery key
+  stops working once they confirm the new one. Administrators move silently.
+- **Rebuild the frontend and the API together.** The new API refuses the plain
+  password from accounts that have moved, and the new frontend needs the new
+  endpoints.
 - **Set up two-factor sign-in for every administrator right after upgrading.**
   Administrators now must have it: until they do, they are held at the setup
   screen and the server refuses every administrative action. Do it first, before
@@ -52,6 +60,12 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Security
 
+- **The server no longer receives anything that opens a vault.** The vault key
+  was derived from the login password, which the server received at every
+  sign-in; now the browser derives one key to sign in with and another for the
+  vault, and only the first leaves it. The recovery key is split the same way.
+  An operator who changes the app's code could still capture a password as it
+  is typed; no web app can rule that out (see SECURITY.md).
 - `docker-compose.yml` no longer carries an encryption key. A key in a public
   file protects nothing, and anybody who copied it into production was running
   with one everyone could read.
@@ -85,6 +99,10 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### New
 
+- **Profile → Encryption keys → Renew keys** makes a new password, a new key
+  for your budget and a new recovery key, and seals everything again under the
+  new key, for anyone who does not trust what a server might have kept from
+  before. Your other devices are signed out.
 - **A device you have signed in on before can always sign in.** Somebody who
   fills an address's sign-in limit on purpose now locks out only devices that
   address has never used. The device's own limit is five tries in a quarter of an

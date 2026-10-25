@@ -48,14 +48,28 @@ These are properties of the current design, not oversights. They're listed so
 that nobody relies on a protection the app doesn't give. When one is fixed, it
 moves to [Security fixes](#security-fixes).
 
-- **The server operator could read vaults.** The vault key is derived from the
-  login password, and the password is sent to the server at every sign-in.
-  So whoever runs the server, or anyone who takes it over, could capture a
-  password and decrypt that user's vault and their households' keys. The
-  encryption protects against a stolen database or backup, not against a
-  malicious or compromised server. Use an instance run by someone you trust.
-  Fixing this means deriving separate keys for signing in and for the vault,
-  with a migration of every vault; it is not planned in detail yet.
+- **The server delivers the app's code, so a server operator who changes it
+  could read vaults.** The browser sends the server nothing that opens a vault:
+  it derives one key to sign in with and a separate one for the vault, and only
+  the first leaves the browser (see
+  [readmore/security.md](readmore/security.md#end-to-end-encryption)). But the
+  same server sends the JavaScript that does this. An operator who deliberately
+  serves modified code could capture a password as it is typed. No web app can
+  rule this out; Bitwarden's and Proton's web vaults state the same limit. Use
+  an instance run by someone you trust.
+- **An account that has not signed in since key separation still sends its
+  password once more.** Accounts migrate on their next sign-in or unlock, and
+  that one request carries the password as before. Until then, the account's
+  password and recovery key are ones the server has received. Anyone who
+  doubts what a server may have kept from before can renew every key under
+  Profile → Encryption keys, with a new password.
+- **Which accounts have not migrated yet can be read out.** Asking how to
+  derive an address's keys (`/auth/prelogin`) answers "version 1" for those,
+  and like a new account for every other address, including ones that don't
+  exist. That stops once they migrate.
+- **The password rules are checked only in the browser.** The server receives
+  an auth key, not the password, and cannot tell a long password from a short
+  one. Someone who bypasses the app can give their own account a weak password.
 - **A session can overwrite a vault.** Whoever holds a signed-in session can
   replace that user's encrypted vault, and the server keeps no earlier versions.
   The data can't be read this way, but it can be destroyed.
@@ -117,6 +131,16 @@ What has been fixed, newest first. The upgrade notes for each are in
 
 ### Unreleased
 
+- **The server no longer receives anything that opens a vault.** The vault key
+  was derived from the login password, and the password was sent to the server
+  at every sign-in, as the recovery key was when it was set up and used; so
+  anyone who could read requests could decrypt vaults. The browser now derives
+  separate keys from the password, one to sign in with and one for the vault,
+  and only the first leaves it; the recovery key is split the same way. Every
+  account moves on its next sign-in, and gets a new recovery key then. **Profile
+  → Encryption keys** renews the password, the vault key and the recovery key
+  together, for anyone who does not trust what a server may have kept from
+  before. Audit finding #1 of the 0.5.0 review.
 - **Sign-in limits hold under parallel requests.** An attempt was counted only
   after its password check finished, so every request that arrived meanwhile got
   through: fifty guesses sent at once were fifty guesses, not five. Attempts are
