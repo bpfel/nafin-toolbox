@@ -244,6 +244,10 @@ export const en = {
   'security.regenerateCodes': 'Regenerate Recovery Codes',
   'security.newCodesWarning': 'Save these new recovery codes. Old codes are now invalid.',
   'security.passwordTitle': 'Password',
+  'security.keysTitle': 'Encryption keys',
+  'security.keysHint': 'Makes a new password and new keys for your budget, in case anything from before could still open it. Your other devices are signed out.',
+  'security.renewKeys': 'Renew keys',
+  'security.keysRenewed': 'Your keys are renewed.',
   'security.deleteAccountTitle': 'Delete Account',
   'security.deleteAccountHint': 'Permanently delete your account and all associated data. This cannot be undone.',
   'security.deletePrompt': 'Enter your password to confirm account deletion:',
@@ -272,6 +276,7 @@ export const en = {
   // --- Recovery key ---
   'recoveryKey.title': 'Save Your Recovery Key',
   'recoveryKey.renewalIntro': 'Your account now keeps the key to your budget apart from anything sent to the server. Here is a new recovery key to go with it. Your old one stops working once you confirm this one.',
+  'recoveryKey.renewedIntro': 'Your password and every key behind your budget are new. Here is the recovery key that goes with them. Your old one stops working once you confirm this one, and your other devices are signed out.',
   'recoveryKey.copy': 'Copy key',
   'recoveryKey.confirmTitle': 'Check you really have it',
   'recoveryKey.label': 'Recovery key',

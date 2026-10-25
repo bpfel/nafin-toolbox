@@ -17,9 +17,12 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
   tryRestoreVault: vi.fn(),
   saveVault: vi.fn(),
   getVaultState: () => ({ dirty: false }),
+  opensVault: vi.fn(async () => true),
+  prepareRenewal: vi.fn(async () => ({ recoveryKey: 'RENEWED-RECOVERY-KEY', body: { new_auth_key: 'NEW-AUTH-KEY-PLACEHOLDER', encrypted_mek: 'NEW-MEK' }, newMEK: {} })),
+  renewalStored: vi.fn(),
 }))
 
-import { login, logout, confirmUpgrade, getAuthState, verifyEmail, inviteUser, disable2FA } from './authStore.svelte'
+import { login, logout, confirmKeyChange, getAuthState, verifyEmail, inviteUser, disable2FA } from './authStore.svelte'
 
 const PASSWORD = 'correct horse battery staple'
 
@@ -53,6 +56,7 @@ beforeEach(async () => {
     if (url.endsWith('/auth/prelogin')) return respond({ auth_version: server.version, kdf: 'pbkdf2-sha256', iterations: 1000 })
     if (url.endsWith('/auth/login')) return respond(account(server.version, server.role))
     if (url.endsWith('/auth/upgrade')) return respond(account(2, server.role))
+    if (url.endsWith('/auth/renew-keys')) return respond({ status: 'ok', vault_updated_at: '2026-10-25T00:00:00Z' })
     if (url.endsWith('/auth/invitation')) return respond({ email: 'ben@example.ch', iterations: 1000 })
     if (url.endsWith('/auth/verify-email')) return respond(account(2))
     return respond({ status: 'ok' })
@@ -98,7 +102,7 @@ describe('signing in', () => {
     expect(getAuthState().upgradeRecoveryKey).toBe('NEW-RECOVERY-KEY')
     expect(sent('/auth/upgrade')).toHaveLength(0)
 
-    expect(await confirmUpgrade()).toBeNull()
+    expect(await confirmKeyChange()).toBeNull()
     const [upgrade] = sent('/auth/upgrade')
     expect(upgrade).toMatchObject({ encrypted_mek: 'M', recovery_auth: 'R', encrypted_mek_recovery: 'MR' })
     expect(getAuthState().upgradeRecoveryKey).toBeNull()
@@ -136,5 +140,33 @@ describe('everywhere else a password used to go', () => {
 
     expect(Object.keys(sent('/auth/2fa')[0])).toEqual(['auth_key'])
     expect(everyBody()).not.toContain(PASSWORD)
+  })
+})
+
+describe('renewing every key', () => {
+  test('nothing is sent until the new recovery key is typed back, and then the current key proves it', async () => {
+    const { renewKeys, confirmKeyChange } = await import('./authStore.svelte')
+    await login('anna@example.ch', PASSWORD)
+    fetchMock.mockClear()
+
+    expect(await renewKeys(PASSWORD, 'a different password')).toBeNull()
+    expect(getAuthState().upgradeRecoveryKey).toBe('RENEWED-RECOVERY-KEY')
+    expect(getAuthState().keyChangeKind).toBe('renewal')
+    expect(sent('/auth/renew-keys')).toHaveLength(0)
+
+    expect(await confirmKeyChange()).toBeNull()
+    const [body] = sent('/auth/renew-keys')
+    expect(body.auth_key).toMatch(/^[A-Za-z0-9+/]{43}=$/)
+    expect(body.new_auth_key).toBe('NEW-AUTH-KEY-PLACEHOLDER') // as prepared by the vault store
+    expect(body.encrypted_mek).toBe('NEW-MEK')
+    expect(everyBody()).not.toContain(PASSWORD)
+    expect(getAuthState().keysRenewed).toBe(true)
+  })
+
+  test('the same password again is refused before anything is made', async () => {
+    const { renewKeys } = await import('./authStore.svelte')
+    await login('anna@example.ch', PASSWORD)
+    expect(await renewKeys(PASSWORD, PASSWORD)).toContain('AUTH-066')
+    expect(getAuthState().upgradeRecoveryKey).toBeNull()
   })
 })

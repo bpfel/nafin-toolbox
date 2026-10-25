@@ -2,7 +2,20 @@
   import { t } from '../i18n/index.svelte'
   import { changePassword, logout } from './authStore.svelte'
 
-  let { message = '', onDone, showLogout = false }: { message?: string; onDone?: () => void; showLogout?: boolean } = $props()
+  interface Props {
+    message?: string
+    onDone?: () => void
+    showLogout?: boolean
+    /**
+     * What the two passwords are for. Changing the password is the default;
+     * renewing every key (renewKeys) asks for exactly the same three fields.
+     */
+    action?: (current: string, next: string) => Promise<string | null>
+    title?: string
+    submitLabel?: string
+  }
+
+  let { message = '', onDone, showLogout = false, action = changePassword, title, submitLabel }: Props = $props()
 
   let currentPassword = $state('')
   let newPassword = $state('')
@@ -20,7 +33,7 @@
     }
 
     submitting = true
-    const result = await changePassword(currentPassword, newPassword)
+    const result = await action(currentPassword, newPassword)
     submitting = false
 
     if (result) {
@@ -33,7 +46,7 @@
 
 <div class="change-pw-container">
   <div class="change-pw-card">
-    <h2>{t('password.changeTitle')}</h2>
+    <h2>{title ?? t('password.changeTitle')}</h2>
     {#if message}
       <p class="hint">{message}</p>
     {/if}
@@ -79,7 +92,7 @@
       {/if}
 
       <button type="submit" disabled={submitting}>
-        {submitting ? t('password.changing') : t('password.changeTitle')}
+        {submitting ? t('password.changing') : (submitLabel ?? t('password.changeTitle'))}
       </button>
     </form>
 

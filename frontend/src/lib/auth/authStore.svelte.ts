@@ -1,6 +1,6 @@
 import { withCode } from '../api/client'
-import { passwordChangeProblem } from './rules'
-import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault, saveVault, getVaultState, prepareUpgrade, recoveryNeedsRenewal, upgradeStored } from '../crypto/vaultStore.svelte'
+import { passwordChangeProblem, passwordProblem } from './rules'
+import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault, saveVault, getVaultState, prepareUpgrade, recoveryNeedsRenewal, upgradeStored, prepareRenewal, renewalStored, opensVault } from '../crypto/vaultStore.svelte'
 import { derivePasswordKeys, type PasswordKeys } from '../crypto/keys'
 
 export interface User {
@@ -48,9 +48,18 @@ let heldKeys: PasswordKeys | null = null
 let heldPassword = $state<string | null>(null)
 let heldEmail = $state<string | null>(null)
 
-// An upgrade waiting for its new recovery key to be written down. See
-// offerUpgrade.
-let pendingUpgrade = $state<{ recoveryKey: string; body: Record<string, string> } | null>(null)
+// A change of keys waiting for its new recovery key to be written down: the
+// move to separate keys (offerUpgrade) or a renewal (renewKeys). Nothing is
+// sent until it has been typed back; `commit` then sends it.
+interface PendingKeyChange {
+  kind: 'upgrade' | 'renewal'
+  recoveryKey: string
+  commit: () => Promise<string | null>
+}
+let pendingKeyChange = $state<PendingKeyChange | null>(null)
+
+// Set once a renewal has been stored, so Profile can say so.
+let keysRenewed = $state(false)
 
 /** What a new account's keys are derived with; prelogin answers the same for unknown addresses. */
 const DEFAULT_ITERATIONS = 600000
@@ -70,7 +79,9 @@ export function getAuthState() {
     get vaultDecryptFailed() { return vaultDecryptFailed },
     get vaultLocked() { return vaultLocked },
     get recoveryKeyToShow() { return recoveryKeyToShow },
-    get upgradeRecoveryKey() { return pendingUpgrade?.recoveryKey ?? null },
+    get upgradeRecoveryKey() { return pendingKeyChange?.recoveryKey ?? null },
+    get keyChangeKind() { return pendingKeyChange?.kind ?? null },
+    get keysRenewed() { return keysRenewed },
   }
 }
 
@@ -222,7 +233,7 @@ async function afterSignIn(keys: PasswordKeys, password: string | null, email: s
  * Upgrade what this account still lacks of version 2, now that its vault is
  * open. A new recovery key is involved whenever the old one is one the server
  * received; then nothing is sent until it has been written down and typed back
- * (confirmUpgrade). Otherwise the upgrade goes at once.
+ * (confirmKeyChange). Otherwise the upgrade goes at once.
  */
 async function offerUpgrade(keys: PasswordKeys, password: string | null): Promise<void> {
   if (!currentUser) return
@@ -241,7 +252,7 @@ async function offerUpgrade(keys: PasswordKeys, password: string | null): Promis
     body.encrypted_mek_recovery = prepared.encrypted_mek_recovery
   }
   if (prepared.recoveryKey) {
-    pendingUpgrade = { recoveryKey: prepared.recoveryKey, body }
+    pendingKeyChange = { kind: 'upgrade', recoveryKey: prepared.recoveryKey, commit: () => upgradeNow(body) }
     return
   }
   await upgradeNow(body)
@@ -265,16 +276,70 @@ async function upgradeNow(body: Record<string, string>): Promise<string | null> 
 }
 
 /**
- * The new recovery key has been written down and typed back: store the
- * upgrade. If another tab got there first (AUTH-063), this one's recovery key
- * was never stored — so it is not kept, and the account is read again.
+ * The new recovery key has been written down and typed back: send what was
+ * waiting for it. If another tab moved the account first (AUTH-063), this
+ * one's recovery key was never stored — so it is not kept, and the account is
+ * read again. A renewal refused because the account moved under it (AUTH-065)
+ * is dropped too, to be started again from Profile.
  */
-export async function confirmUpgrade(): Promise<string | null> {
-  if (!pendingUpgrade) return null
-  const problem = await upgradeNow(pendingUpgrade.body)
-  if (problem && !problem.includes('AUTH-063')) return problem
-  pendingUpgrade = null
-  if (problem) await checkAuth()
+export async function confirmKeyChange(): Promise<string | null> {
+  if (!pendingKeyChange) return null
+  const problem = await pendingKeyChange.commit()
+  if (problem && !problem.includes('AUTH-063') && !problem.includes('AUTH-065')) return problem
+  pendingKeyChange = null
+  if (problem?.includes('AUTH-063')) await checkAuth()
+  return problem?.includes('AUTH-065') ? problem : null
+}
+
+/**
+ * Renew every key: a new password, a new vault key with everything sealed
+ * under it again, and a new recovery key. For whoever does not trust what a
+ * server might have kept from before the move to separate keys. Prepared now;
+ * sent once the new recovery key has been typed back (confirmKeyChange).
+ */
+export async function renewKeys(currentPassword: string, newPassword: string): Promise<string | null> {
+  if (!currentUser) return 'Not logged in'
+  const problem = passwordChangeProblem(currentPassword, newPassword)
+  if (problem) return problem
+  if (currentPassword === newPassword) {
+    return withCode({ error: 'the new password must differ from the current one', code: 'AUTH-066' })
+  }
+  if (versionOf(currentUser) < 2) return withCode({ error: 'upgrade before renewing', code: 'AUTH-064' })
+
+  let iterations: number
+  try {
+    iterations = (await prelogin(currentUser.email)).iterations
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Renewal failed'
+  }
+  const current = await derivePasswordKeys(currentPassword, currentUser.email, iterations)
+  if (!(await opensVault(current, 2))) return withCode({ error: 'incorrect password', code: 'AUTH-015' })
+  const next = await derivePasswordKeys(newPassword, currentUser.email, iterations)
+
+  let prepared: Awaited<ReturnType<typeof prepareRenewal>>
+  try {
+    prepared = await prepareRenewal(next)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Renewal failed'
+  }
+
+  pendingKeyChange = {
+    kind: 'renewal',
+    recoveryKey: prepared.recoveryKey,
+    commit: async () => {
+      const res = await fetch(`${API_BASE}/auth/renew-keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ auth_key: current.authKey, ...prepared.body }),
+      })
+      const data = await res.json().catch(() => ({ error: 'Renewal failed' }))
+      if (!res.ok) return withCode(data) || 'Renewal failed'
+      await renewalStored(prepared, data.vault_updated_at ?? null)
+      keysRenewed = true
+      return null
+    },
+  }
   return null
 }
 
@@ -378,7 +443,8 @@ export async function logout() {
     heldKeys = null
     heldPassword = null
     heldEmail = null
-    pendingUpgrade = null
+    pendingKeyChange = null
+    keysRenewed = false
     vaultNeedsSetup = false
     vaultDecryptFailed = false
     vaultLocked = false
@@ -504,6 +570,8 @@ export async function inviteUser(email: string, role: 'admin' | 'user' = 'user',
   const body: Record<string, string> = { email, role }
   // A first password, without email: sent as the invitee's auth key, derived
   // here for their address, so the server never sees it.
+  const problem = password ? passwordProblem(password) : null
+  if (problem) return { error: problem }
   if (password) body.auth_key = (await derivePasswordKeys(password, email, DEFAULT_ITERATIONS)).authKey
 
   const res = await fetch(`${API_BASE}/auth/invite`, {
@@ -530,6 +598,8 @@ export async function listUsers(): Promise<User[]> {
 }
 
 export async function setup(email: string, password: string): Promise<string | null> {
+  const problem = passwordProblem(password)
+  if (problem) return problem
   const keys = await derivePasswordKeys(password, email, DEFAULT_ITERATIONS)
   const res = await fetch(`${API_BASE}/auth/setup`, {
     method: 'POST',
@@ -561,6 +631,8 @@ export async function setup(email: string, password: string): Promise<string | n
 }
 
 export async function verifyEmail(token: string, password: string): Promise<string | null> {
+  const problem = passwordProblem(password)
+  if (problem) return problem
   // The keys are derived from the invitee's address, which the link does not
   // carry: asked for first, by token.
   const who = await fetch(`${API_BASE}/auth/invitation`, {

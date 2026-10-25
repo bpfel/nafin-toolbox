@@ -230,6 +230,10 @@ export const it: Messages = {
   'security.regenerateCodes': 'Rigenera i codici di recupero',
   'security.newCodesWarning': 'Conserva questi nuovi codici di recupero. I codici precedenti non sono più validi.',
   'security.passwordTitle': 'Password',
+  'security.keysTitle': 'Chiavi di cifratura',
+  'security.keysHint': 'Crea una nuova password e nuove chiavi per il tuo budget, nel caso qualcosa di prima potesse ancora aprirlo. I tuoi altri dispositivi vengono disconnessi.',
+  'security.renewKeys': 'Rinnova le chiavi',
+  'security.keysRenewed': 'Le tue chiavi sono rinnovate.',
   'security.deleteAccountTitle': 'Elimina l’account',
   'security.deleteAccountHint': 'Elimina definitivamente il tuo account e tutti i dati associati. L’operazione è irreversibile.',
   'security.deletePrompt': 'Inserisci la password per confermare l’eliminazione dell’account:',
@@ -258,6 +262,7 @@ export const it: Messages = {
   // --- Recovery key ---
   'recoveryKey.title': 'Conserva la tua chiave di recupero',
   'recoveryKey.renewalIntro': 'Il tuo account tiene ora la chiave del tuo budget separata da tutto ciò che viene inviato al server. Ecco una nuova chiave di recupero. Quella vecchia smette di funzionare appena confermi questa.',
+  'recoveryKey.renewedIntro': 'La tua password e tutte le chiavi del tuo budget sono nuove. Ecco la chiave di recupero che le accompagna. Quella vecchia smette di funzionare appena confermi questa, e i tuoi altri dispositivi vengono disconnessi.',
   'recoveryKey.copy': 'Copia la chiave',
   'recoveryKey.confirmTitle': 'Verifica di averla davvero',
   'recoveryKey.label': 'Chiave di recupero',

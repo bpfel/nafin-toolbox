@@ -230,6 +230,10 @@ export const fr: Messages = {
   'security.regenerateCodes': 'Régénérer les codes de récupération',
   'security.newCodesWarning': 'Conserve ces nouveaux codes de récupération. Les anciens ne sont plus valables.',
   'security.passwordTitle': 'Mot de passe',
+  'security.keysTitle': 'Clés de chiffrement',
+  'security.keysHint': 'Crée un nouveau mot de passe et de nouvelles clés pour ton budget, au cas où quelque chose d’avant pourrait encore l’ouvrir. Tes autres appareils sont déconnectés.',
+  'security.renewKeys': 'Renouveler les clés',
+  'security.keysRenewed': 'Tes clés sont renouvelées.',
   'security.deleteAccountTitle': 'Supprimer le compte',
   'security.deleteAccountHint': 'Supprime définitivement ton compte et toutes les données associées. Cette action est irréversible.',
   'security.deletePrompt': 'Saisis ton mot de passe pour confirmer la suppression du compte:',
@@ -258,6 +262,7 @@ export const fr: Messages = {
   // --- Recovery key ---
   'recoveryKey.title': 'Conserve ta clé de récupération',
   'recoveryKey.renewalIntro': 'Ton compte garde désormais la clé de ton budget à l’écart de tout ce qui est envoyé au serveur. Voici une nouvelle clé de récupération. L’ancienne ne fonctionne plus dès que tu confirmes celle-ci.',
+  'recoveryKey.renewedIntro': 'Ton mot de passe et toutes les clés de ton budget sont nouveaux. Voici la clé de récupération qui va avec. L’ancienne ne fonctionne plus dès que tu confirmes celle-ci, et tes autres appareils sont déconnectés.',
   'recoveryKey.copy': 'Copier la clé',
   'recoveryKey.confirmTitle': 'Vérifie que tu l’as vraiment',
   'recoveryKey.label': 'Clé de récupération',
