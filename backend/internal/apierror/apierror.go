@@ -119,6 +119,9 @@ var codes = map[string]string{
 	Vault + "|failed to save keys":         "VAULT-012",
 	Vault + "|failed to update keys":       "VAULT-013",
 	Vault + "|failed to hash recovery key": "VAULT-014",
+	// Not a 404: the vault may well be there, the server just could not
+	// read it, and the browser must not start an empty one in its place.
+	Vault + "|failed to load vault": "VAULT-015",
 
 	// --- Households, which are vaults with more than one person in them ---
 	Vault + "|failed to list households":  "VAULT-020",

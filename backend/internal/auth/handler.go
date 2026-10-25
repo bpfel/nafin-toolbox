@@ -441,12 +441,7 @@ func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if err := deps.Store.UpdatePassword(r.Context(), user.ID, newHash); err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
-
-		if err := deps.Store.ClearMustChangePassword(r.Context(), user.ID); err != nil {
+		if err := deps.Store.ChangePassword(r.Context(), user.ID, newHash, req.EncryptedMEK); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}

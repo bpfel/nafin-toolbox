@@ -131,6 +131,17 @@ What has been fixed, newest first. The upgrade notes for each are in
 
 ### Unreleased
 
+- **A vault that could not be loaded is no longer replaced with an empty one.**
+  If reading the vault failed at sign-in, reload or recovery (the server
+  restarting during an update, a dropped connection), the app took it for an
+  account without a vault, started an empty one and saved it over the real one,
+  for good. A failed read now leaves the vault locked, and a save meant only to
+  create a vault can no longer replace one that exists.
+- **A refused password change no longer locks the vault.** The vault key was
+  re-wrapped under the new password before the server checked the current one,
+  so a mistyped current password left the vault opening only with the recovery
+  key. The server now stores the new password and the re-wrapped key together,
+  after the check.
 - **The server no longer receives anything that opens a vault.** The vault key
   was derived from the login password, and the password was sent to the server
   at every sign-in, as the recovery key was when it was set up and used; so

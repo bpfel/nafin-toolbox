@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"testing"
 
@@ -86,4 +87,33 @@ func TestStore_SetIdentityIfAbsent(t *testing.T) {
 			t.Fatalf("set = %v, err = %v; want refused", set, err)
 		}
 	})
+}
+
+// A write with no token only creates. The client sends none when it believes
+// there is no vault yet, and a failed load once made it believe that wrongly:
+// the empty vault it then saved replaced the real one.
+func TestStore_PutVaultWithoutTokenOnlyCreates(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+	id := makeUser(t, db, "first-save@example.ch", true)
+
+	created, err := store.PutVault(ctx, id, []byte("real"), []byte("n1"), 1, nil)
+	if err != nil {
+		t.Fatalf("first save: %v", err)
+	}
+
+	if _, err := store.PutVault(ctx, id, []byte("empty"), []byte("n2"), 1, nil); !errors.Is(err, ErrVaultConflict) {
+		t.Fatalf("second token-less save: err = %v, want ErrVaultConflict", err)
+	}
+	if v, _ := store.GetVault(ctx, id); string(v.Ciphertext) != "real" {
+		t.Fatalf("stored = %q, want the first save kept", v.Ciphertext)
+	}
+
+	if _, err := store.PutVault(ctx, id, []byte("edited"), []byte("n3"), 1, &created); err != nil {
+		t.Fatalf("save with the token: %v", err)
+	}
+	if v, _ := store.GetVault(ctx, id); string(v.Ciphertext) != "edited" {
+		t.Fatalf("stored = %q, want the edit", v.Ciphertext)
+	}
 }

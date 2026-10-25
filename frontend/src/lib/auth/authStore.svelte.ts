@@ -1,6 +1,6 @@
 import { withCode } from '../api/client'
 import { passwordChangeProblem, passwordProblem } from './rules'
-import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault, saveVault, getVaultState, prepareUpgrade, recoveryNeedsRenewal, upgradeStored, prepareRenewal, renewalStored, opensVault } from '../crypto/vaultStore.svelte'
+import { initializeVault, setupKeys, clearVault, wrapMEKFor, recoverVault, tryRestoreVault, saveVault, getVaultState, prepareUpgrade, recoveryNeedsRenewal, upgradeStored, prepareRenewal, renewalStored, opensVault } from '../crypto/vaultStore.svelte'
 import { derivePasswordKeys, type PasswordKeys } from '../crypto/keys'
 
 export interface User {
@@ -227,6 +227,10 @@ async function afterSignIn(keys: PasswordKeys, password: string | null, email: s
     vaultDecryptFailed = true
   } else if (vaultResult === 'ok') {
     await offerUpgrade(keys, password)
+  } else if (vaultResult === 'unavailable') {
+    // Signed in, but the vault could not be read just now. Locked rather than
+    // started empty: unlocking again reads it once the server answers.
+    vaultLocked = true
   }
 }
 
@@ -393,6 +397,8 @@ export async function unlockVault(password: string): Promise<string | null> {
     // The one moment a still-open version 1 session has the password.
     await offerUpgrade(keys, password)
     return null
+  } else if (vaultResult === 'unavailable') {
+    return 'The vault could not be loaded. Try again in a moment.'
   } else if (vaultResult === 'no-keys') {
     // Keys don't exist yet — need setup
     heldKeys = keys
@@ -481,8 +487,8 @@ export async function changePassword(currentPassword: string, newPassword: strin
   // re-encrypt, and the vault is set up afterwards under the new password.
   // Without this, that change failed with "Vault not unlocked" and the account
   // could never get past it.
-  // Before anything else: the vault key is re-wrapped under the new password
-  // first, and a password the server then refused would leave it there.
+  // Before anything else: a password the server would refuse is better caught
+  // here, before any key is derived for it.
   const problem = passwordChangeProblem(currentPassword, newPassword)
   if (problem) return problem
 
@@ -504,11 +510,16 @@ export async function changePassword(currentPassword: string, newPassword: strin
     ? { current_password: currentPassword }
     : { current_auth_key: (await derivePasswordKeys(currentPassword, currentUser.email, iterations)).authKey }
 
+  // The vault key, wrapped under the new password, travels with the change
+  // and is stored with it — only once the current password is proven. Stored
+  // ahead of that, a refused change left the vault opening with a password
+  // the account did not have.
+  let rewrapped: { encrypted_mek?: string } = {}
   if (currentUser.role !== 'admin') {
     const mustChangeWithLockedVault = currentUser.must_change_password && vaultDecryptFailed
     if (!mustChangeWithLockedVault && !vaultNeedsSetup) {
       try {
-        await reEncryptMEK(newKeys)
+        rewrapped = { encrypted_mek: await wrapMEKFor(newKeys) }
       } catch (e) {
         return e instanceof Error ? e.message : 'Failed to re-encrypt vault keys'
       }
@@ -519,7 +530,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ ...current, new_auth_key: newKeys.authKey }),
+    body: JSON.stringify({ ...current, new_auth_key: newKeys.authKey, ...rewrapped }),
   })
 
   if (res.ok) {

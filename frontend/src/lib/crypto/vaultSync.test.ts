@@ -23,11 +23,12 @@ vi.mock('../api/client', () => {
   class VaultReadOnlyError extends Error {}
   class VaultGoneError extends Error {}
   class SessionEndedError extends Error {}
+  class VaultUnavailableError extends Error {}
   class VaultSaveError extends Error {
     constructor(readonly status: number) { super(String(status)) }
   }
   return {
-    VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError,
+    VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError, VaultUnavailableError,
     signalUnauthorized: vi.fn(),
     fetchVaultKeys: vi.fn(async () => ({ encrypted_mek: '', iterations: 600000 })),
     setupVaultKeys: vi.fn(), setupIdentity: vi.fn(), updateVaultKeys: vi.fn(), recoverVaultKeys: vi.fn(),
@@ -43,7 +44,7 @@ vi.mock('../api/client', () => {
 
 import * as client from '../api/client'
 const api = client as unknown as Record<string, ReturnType<typeof vi.fn>>
-const { VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError } = client
+const { VaultConflictError, VaultReadOnlyError, VaultGoneError, SessionEndedError, VaultSaveError, VaultUnavailableError } = client
 
 import { getVaultState, tryRestoreVault, clearVault, commit, saveVault, switchTo, refreshIfQuiet, beginPreview, endPreview, sessionEndedElsewhere, nameMember, peopleOf, closeEndedMonths } from './vaultStore.svelte'
 import { getNotices, type Notice } from '../sync/notices.svelte'
@@ -82,9 +83,13 @@ async function elsewhere(change: (v: VaultData) => void): Promise<void> {
   await store(v)
 }
 
-/** The server's side of a save: refuse it if it was built on an old version. */
+/**
+ * The server's side of a save: refuse it if it was built on an old version,
+ * and refuse one with no version at all, which may only create a vault —
+ * there is always one here.
+ */
 function serve(body: { ciphertext: string; nonce: string; expected_updated_at?: string }) {
-  if (body.expected_updated_at !== undefined && body.expected_updated_at !== server.updated_at) {
+  if (body.expected_updated_at !== server.updated_at) {
     throw new VaultConflictError('stale')
   }
   server = { ciphertext: body.ciphertext, nonce: body.nonce, updated_at: stamp() }
@@ -960,5 +965,46 @@ describe('Belege', () => {
     await saveVault()
 
     expect((await onServer()).budget.snapshots.some(c => c.month === '2026-10')).toBe(true)
+  })
+})
+
+// --- a vault that could not be read -----------------------------------------
+
+describe('a vault that could not be read', () => {
+  // A failed read once looked like "no vault yet": an empty vault was started
+  // and saved over the real one — after a redeploy, say, while nginx answered
+  // 502 for a few seconds.
+  async function cacheKey(): Promise<void> {
+    const raw = await crypto.subtle.exportKey('raw', key)
+    sessionStorage.setItem('vault_mek', btoa(String.fromCharCode(...new Uint8Array(raw))))
+  }
+
+  test('a reload that cannot read it starts no empty vault, and keeps the key', async () => {
+    const before = await onServer()
+    clearVault()
+    await cacheKey()
+    api.fetchVault.mockRejectedValueOnce(new VaultUnavailableError())
+
+    expect(await tryRestoreVault(42)).toBe(false)
+
+    expect(state.vault).toBeNull()
+    expect(sessionStorage.getItem('vault_mek')).not.toBeNull()
+    expect(api.putVault).not.toHaveBeenCalled()
+    expect(await onServer()).toEqual(before)
+
+    // Once the server answers again, the reload finds the real vault.
+    expect(await tryRestoreVault(42)).toBe(true)
+    expect(state.vault).toEqual(before)
+  })
+
+  test('a refresh that cannot read it leaves the vault as it was', async () => {
+    const shown = JSON.parse(JSON.stringify(state.vault))
+    await elsewhere(v => budget.createEntry(v, { name: 'Gym', type: 'expense', categoryName: 'Health' }))
+    api.fetchVault.mockRejectedValueOnce(new VaultUnavailableError())
+
+    await refreshIfQuiet()
+
+    expect(state.vault).toEqual(shown)
+    expect(api.putVault).not.toHaveBeenCalled()
   })
 })

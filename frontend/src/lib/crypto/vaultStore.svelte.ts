@@ -1,7 +1,7 @@
 import { generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, unwrapMEKWithRecovery, deriveRecoveryKeys, derivePasswordKeys, type PasswordKeys } from './keys'
 import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, VAULT_VERSION, type VaultData, type VaultPerson } from './vault'
 import {
-  fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
+  fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError, VaultUnavailableError,
   VaultGoneError, SessionEndedError, VaultSaveError, signalUnauthorized,
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
@@ -650,7 +650,9 @@ export async function tryRestoreVault(userId: number): Promise<boolean> {
       current.versionAhead = true
       return false
     }
-    clearCachedMEK()
+    // Nor when the vault could not be read: the key is fine, and the next
+    // reload may well find the server back.
+    if (!(e instanceof VaultUnavailableError)) clearCachedMEK()
     return false
   }
 }
@@ -664,7 +666,7 @@ export async function initializeVault(
   passwordKeys: PasswordKeys,
   userId: number,
   authVersion: number,
-): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead'> {
+): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead' | 'unavailable'> {
   const keys = await fetchVaultKeys()
   if (!keys) return 'no-keys'
   owner = userId
@@ -698,6 +700,9 @@ export async function initializeVault(
       current.versionAhead = true
       return 'version-ahead'
     }
+    // Not 'decrypt-failed': the password was right, and recovery is not what
+    // a server restarting calls for.
+    if (e instanceof VaultUnavailableError) return 'unavailable'
     return 'decrypt-failed'
   }
 }
@@ -1029,7 +1034,13 @@ async function fetchNewer(
   slot: VaultSlot,
   id: VaultId,
 ): Promise<{ data: VaultData; updatedAt: string } | 'unreachable' | 'stopped'> {
-  const payload = id === 'personal' ? await fetchVault() : await fetchHouseholdVault(id)
+  let payload
+  try {
+    payload = id === 'personal' ? await fetchVault() : await fetchHouseholdVault(id)
+  } catch (e) {
+    if (e instanceof VaultUnavailableError) return 'unreachable'
+    throw e
+  }
   if (!payload || !slot.key) return 'unreachable'
   try {
     return { data: await decryptVault(payload.ciphertext, payload.nonce, slot.key), updatedAt: payload.updated_at }
@@ -1289,11 +1300,15 @@ export function clearVault(): void {
 }
 
 /**
- * Re-encrypt MEK after password change.
+ * The vault key wrapped under a new password, for a password change to carry.
+ *
+ * Not stored from here: the server stores it with the new password, after the
+ * current one is proven. Stored ahead of that, a mistyped current password
+ * left the vault openable only with a password the account did not have.
  */
-export async function reEncryptMEK(newKeys: PasswordKeys): Promise<void> {
+export async function wrapMEKFor(newKeys: PasswordKeys): Promise<string> {
   if (!mek) throw new Error('Vault not unlocked')
-  await updateVaultKeys(await wrapMEK(mek, newKeys.vaultKEK))
+  return wrapMEK(mek, newKeys.vaultKEK)
 }
 
 /**

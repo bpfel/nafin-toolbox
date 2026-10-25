@@ -46,9 +46,18 @@ vault, the keypair's private halves and your own copy of each household key. It
 is for anyone who does not trust what a server might have recorded before the
 move. Other devices are signed out, since they hold the old MEK.
 
+**Changing the password** re-wraps the MEK under the new password's KEK. The
+server stores the re-wrapped MEK together with the new auth key, and only once
+the current password has been proven, so a refused change leaves both as they
+were.
+
 **Unlocked state.** After unlocking, the MEK is kept in `sessionStorage`, so a
 page reload does not ask again. It is cleared when the tab closes and on sign-out.
 There is no inactivity lock yet: the vault stays open for the life of the tab.
+If the vault cannot be read when it is opened (the server is restarting, say),
+it stays locked and the app asks again. An empty vault is started only for an
+account the server says has none, and the server will not let that first save
+replace a vault that exists.
 
 **What follows from this**
 - Losing both password and recovery key means the data is gone. There is no

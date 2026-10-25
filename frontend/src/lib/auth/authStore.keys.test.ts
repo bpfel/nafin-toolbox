@@ -10,7 +10,7 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
   prepareUpgrade: (...args: unknown[]) => prepareUpgrade(...args),
   recoveryNeedsRenewal: () => state.recoveryNeedsRenewal,
   upgradeStored: vi.fn(),
-  reEncryptMEK: vi.fn(),
+  wrapMEKFor: vi.fn(),
   setupKeys: vi.fn(async () => 'NEW-RECOVERY-KEY'),
   clearVault: vi.fn(),
   recoverVault: vi.fn(),

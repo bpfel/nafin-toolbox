@@ -60,6 +60,17 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Security
 
+- A vault that could not be loaded is no longer replaced with an empty one. A
+  failed read at sign-in, reload or recovery — the server restarting during an
+  update, say — was taken for an account with no vault yet, and the empty vault
+  the app then started was saved over the real one. The app now stays locked
+  and asks again; the server also refuses to let a first save replace a vault
+  that exists.
+- A refused password change no longer locks the vault. A mistyped current
+  password was rejected only after the vault key had been re-wrapped under the
+  new one, leaving the recovery key as the only way in. The new password and
+  the re-wrapped key are now stored together, after the current password is
+  checked.
 - **The server no longer receives anything that opens a vault.** The vault key
   was derived from the login password, which the server received at every
   sign-in; now the browser derives one key to sign in with and another for the

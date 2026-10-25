@@ -2055,3 +2055,67 @@ func TestRenewKeys_AVersion1AccountMigratesFirst(t *testing.T) {
 		t.Errorf("= %d %s, want 409 AUTH-064", w.Code, w.Body.String())
 	}
 }
+
+// --- Change password ---
+
+func changePassword(t *testing.T, deps *HandlerDeps, email, current, encryptedMEK string) int {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{
+		"current_auth_key": current,
+		"new_auth_key":     testAuthKey,
+		"encrypted_mek":    encryptedMEK,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", strings.NewReader(string(body)))
+	req = req.WithContext(asUser(t, deps.Store, email))
+	w := httptest.NewRecorder()
+	HandleChangePassword(deps).ServeHTTP(w, req)
+	return w.Code
+}
+
+func storedMEK(t *testing.T, email string) string {
+	t.Helper()
+	var mek string
+	if err := testDB.QueryRow(`SELECT encrypted_mek FROM users WHERE email = $1`, email).Scan(&mek); err != nil {
+		t.Fatalf("reading encrypted_mek: %v", err)
+	}
+	return mek
+}
+
+func TestChangePassword_TheVaultKeyMovesOnlyWithThePassword(t *testing.T) {
+	// The report: a mistyped current password was refused, but the vault key
+	// had already been re-wrapped under the new one, and the vault no longer
+	// opened with the password the account still had.
+	deps := loginDeps(t)
+	if _, err := testDB.Exec(`UPDATE users SET encrypted_mek = 'wrapped-under-old' WHERE email = 'father@example.ch'`); err != nil {
+		t.Fatalf("seeding encrypted_mek: %v", err)
+	}
+
+	if got := changePassword(t, deps, "father@example.ch", "wrong-pass", "wrapped-under-new"); got != http.StatusUnauthorized {
+		t.Fatalf("wrong current password = %d, want 401", got)
+	}
+	if got := storedMEK(t, "father@example.ch"); got != "wrapped-under-old" {
+		t.Fatalf("after a refused change the vault key is %q, want it untouched", got)
+	}
+
+	if got := changePassword(t, deps, "father@example.ch", "right-pass-1", "wrapped-under-new"); got != http.StatusOK {
+		t.Fatalf("right current password = %d, want 200", got)
+	}
+	if got := storedMEK(t, "father@example.ch"); got != "wrapped-under-new" {
+		t.Errorf("after the change the vault key is %q, want the new wrap", got)
+	}
+}
+
+func TestChangePassword_WithoutAVaultKeyLeavesTheStoredOneAlone(t *testing.T) {
+	// An account changing a first password before it has a vault sends none.
+	deps := loginDeps(t)
+	if _, err := testDB.Exec(`UPDATE users SET encrypted_mek = 'kept' WHERE email = 'father@example.ch'`); err != nil {
+		t.Fatalf("seeding encrypted_mek: %v", err)
+	}
+
+	if got := changePassword(t, deps, "father@example.ch", "right-pass-1", ""); got != http.StatusOK {
+		t.Fatalf("change = %d, want 200", got)
+	}
+	if got := storedMEK(t, "father@example.ch"); got != "kept" {
+		t.Errorf("vault key = %q, want it kept", got)
+	}
+}

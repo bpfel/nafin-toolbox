@@ -3,6 +3,7 @@ package vault
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -147,7 +148,7 @@ func TestHandleGetVault_RequiresAuth(t *testing.T) {
 
 func TestHandleGetVault_NoVaultFound(t *testing.T) {
 	store := &mockStore{
-		getVaultErr: context.DeadlineExceeded, // Simulate "not found" error
+		getVaultErr: sql.ErrNoRows,
 	}
 	handler := handleGetVault(store)
 
@@ -162,6 +163,24 @@ func TestHandleGetVault_NoVaultFound(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "no vault found") {
 		t.Errorf("body %q does not contain 'no vault found'", w.Body.String())
+	}
+}
+
+// A failed read is not an absent vault. The client starts an empty vault on
+// 404, so a database error answered that way would have it saved over the
+// real one.
+func TestHandleGetVault_StoreErrorIsNotNotFound(t *testing.T) {
+	store := &mockStore{getVaultErr: context.DeadlineExceeded}
+	handler := handleGetVault(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/vault", nil)
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusInternalServerError)
 	}
 }
 
