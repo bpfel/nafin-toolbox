@@ -2,7 +2,7 @@
 
 [← Back to README](../README.md)
 
-Ideas and plans, not promises. Detailed plans live in [`plans/`](../plans/).
+Ideas and plans, not promises. To propose something, open an issue.
 
 ## Planned modules
 
