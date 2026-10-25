@@ -1,6 +1,6 @@
 <script lang="ts">
   import { setOnUnauthorized } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, confirmUpgrade, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
+  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, confirmKeyChange, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
   import { getVaultState, sessionEndedElsewhere } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
@@ -128,7 +128,7 @@
   // has been typed back. A failure keeps the key on screen to try again.
   let upgradeError = $state<string | null>(null)
   async function handleUpgradeConfirmed() {
-    upgradeError = await confirmUpgrade()
+    upgradeError = await confirmKeyChange()
   }
 
   async function handleUnlock() {
@@ -250,7 +250,7 @@
 {:else if gate === 'recoveryKeyRenewal' && authState.upgradeRecoveryKey}
   <RecoveryKeyScreen
     recoveryKey={authState.upgradeRecoveryKey}
-    intro={t('recoveryKey.renewalIntro')}
+    intro={authState.keyChangeKind === 'renewal' ? t('recoveryKey.renewedIntro') : t('recoveryKey.renewalIntro')}
     error={upgradeError}
     onconfirmed={handleUpgradeConfirmed}
   />

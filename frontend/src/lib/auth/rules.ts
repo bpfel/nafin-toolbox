@@ -1,5 +1,10 @@
-// The server's rules for what a user types, checked here first, under the
-// server's own messages and codes.
+// The rules for what a user types, under the server's messages and codes.
+//
+// For a password these are the only check there is. The server receives an
+// auth key derived from the password, never the password, and cannot tell a
+// long one from a short one (plans/key-separation-plan.md). Every place that
+// takes a new password — setup, an invitation, a first password set by an
+// admin, a change, a key renewal — checks it here before deriving anything.
 //
 // The forms used to leave these to the browser — `required`, `minlength`,
 // `type="email"` — which refuses to submit and shows a bubble saying why.

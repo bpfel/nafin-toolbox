@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount, getSettings } from './authStore.svelte'
+  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount, getSettings, renewKeys } from './authStore.svelte'
   import TwoFactorSetup from './TwoFactorSetup.svelte'
   import Sheet from '../nav/Sheet.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
@@ -16,6 +16,7 @@
   let showDeleteAccount = $state(false)
   let showDeleteData = $state(false)
   let showChangePassword = $state(false)
+  let showRenewKeys = $state(false)
 
   let password = $state('')
   let error = $state<string | null>(null)
@@ -193,6 +194,23 @@
   </div>
 
   <!--
+    Renewing every key: a new password, a new vault key, a new recovery key.
+    For whoever does not trust what a server might have kept from before the
+    move to separate keys (plans/key-separation-plan.md). Not for an
+    administrator, who has no vault — changing the password is all there is.
+  -->
+  {#if authState.currentUser?.role !== 'admin'}
+    <div class="settings-card">
+      <h3>{t('security.keysTitle')}</h3>
+      <p class="info">{t('security.keysHint')}</p>
+      {#if authState.keysRenewed}
+        <p class="status enabled">{t('security.keysRenewed')}</p>
+      {/if}
+      <button class="btn-secondary" onclick={() => (showRenewKeys = true)}>{t('security.renewKeys')}</button>
+    </div>
+  {/if}
+
+  <!--
     Delete all data: everything in the vault, short of the account itself. It
     replaced Reset budget, which cleared the budget and left its history, its
     receipts and its accounts behind — a reset that kept a history of the
@@ -256,6 +274,18 @@
 {#if showChangePassword}
   <Sheet label={t('password.changeTitle')} onclose={() => (showChangePassword = false)}>
     <ChangePasswordForm onDone={() => (showChangePassword = false)} />
+  </Sheet>
+{/if}
+
+{#if showRenewKeys}
+  <Sheet label={t('security.renewKeys')} onclose={() => (showRenewKeys = false)}>
+    <ChangePasswordForm
+      action={renewKeys}
+      title={t('security.renewKeys')}
+      submitLabel={t('security.renewKeys')}
+      message={t('security.keysHint')}
+      onDone={() => (showRenewKeys = false)}
+    />
   </Sheet>
 {/if}
 

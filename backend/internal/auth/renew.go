@@ -222,6 +222,12 @@ func HandleRenewKeys(deps *HandlerDeps) http.HandlerFunc {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid auth key")
 			return
 		}
+		// The same password would derive the same vault key a server might
+		// have recorded, and renewing would protect nothing.
+		if req.NewAuthKey == req.AuthKey {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "the new password must differ from the current one")
+			return
+		}
 		if req.EncryptedMEK == "" || req.EncryptedMEKRecovery == "" {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "rewrapped vault key required")
 			return

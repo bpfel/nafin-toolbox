@@ -219,6 +219,10 @@ export const de: Messages = {
   'security.regenerateCodes': 'Wiederherstellungscodes neu erzeugen',
   'security.newCodesWarning': 'Bewahr diese neuen Wiederherstellungscodes auf. Die alten Codes sind jetzt ungültig.',
   'security.passwordTitle': 'Passwort',
+  'security.keysTitle': 'Verschlüsselungsschlüssel',
+  'security.keysHint': 'Erstellt ein neues Passwort und neue Schlüssel für dein Budget, falls etwas von früher es noch öffnen könnte. Deine anderen Geräte werden abgemeldet.',
+  'security.renewKeys': 'Schlüssel erneuern',
+  'security.keysRenewed': 'Deine Schlüssel sind erneuert.',
   'security.deleteAccountTitle': 'Konto löschen',
   'security.deleteAccountHint': 'Löscht dein Konto und alle zugehörigen Daten dauerhaft. Dies kann nicht rückgängig gemacht werden.',
   'security.deletePrompt': 'Gib dein Passwort ein, um die Kontolöschung zu bestätigen:',
@@ -247,6 +251,7 @@ export const de: Messages = {
   // --- Recovery key ---
   'recoveryKey.title': 'Wiederherstellungsschlüssel sichern',
   'recoveryKey.renewalIntro': 'Dein Konto hält den Schlüssel zu deinem Budget jetzt getrennt von allem, was an den Server geht. Dazu gehört ein neuer Wiederherstellungsschlüssel. Der alte gilt nicht mehr, sobald du diesen bestätigst.',
+  'recoveryKey.renewedIntro': 'Dein Passwort und alle Schlüssel zu deinem Budget sind neu. Hier ist der Wiederherstellungsschlüssel dazu. Der alte gilt nicht mehr, sobald du diesen bestätigst, und deine anderen Geräte werden abgemeldet.',
   'recoveryKey.copy': 'Schlüssel kopieren',
   'recoveryKey.confirmTitle': 'Prüf, ob du ihn wirklich hast',
   'recoveryKey.label': 'Wiederherstellungsschlüssel',
