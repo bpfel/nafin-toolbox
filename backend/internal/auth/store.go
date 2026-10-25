@@ -120,6 +120,27 @@ func (s *Store) UpdatePassword(ctx context.Context, userID int, newHash string) 
 	return err
 }
 
+// ChangePassword stores a new password, and with it the vault key wrapped
+// under that password, in one statement — and clears a must-change.
+//
+// One statement because they belong together. The client once stored the new
+// wrap first, in a request of its own, and only then asked for the password
+// change; a mistyped current password was refused after the wrap had already
+// moved, and the vault no longer opened with the password the account still
+// had. An empty encryptedMEK leaves the stored wrap alone: an administrator,
+// or an account with no vault yet, has none to re-wrap.
+func (s *Store) ChangePassword(ctx context.Context, userID int, newHash, encryptedMEK string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users
+		 SET password_hash = $1, auth_version = 2,
+		     must_change_password = FALSE, temp_password_expires_at = NULL,
+		     encrypted_mek = COALESCE(NULLIF($3, ''), encrypted_mek)
+		 WHERE id = $2`,
+		newHash, userID, encryptedMEK,
+	)
+	return err
+}
+
 // CredentialState is what an account still lacks of version 2.
 type CredentialState struct {
 	AuthVersion     int
@@ -173,14 +194,6 @@ func (s *Store) Upgrade(ctx context.Context, userID, fromAuthVersion int, authHa
 
 // ErrUpgradeRaced: the account changed version while the upgrade was prepared.
 var ErrUpgradeRaced = errors.New("account was upgraded meanwhile")
-
-func (s *Store) ClearMustChangePassword(ctx context.Context, userID int) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET must_change_password = FALSE, temp_password_expires_at = NULL WHERE id = $1`,
-		userID,
-	)
-	return err
-}
 
 // SetTemporaryPassword gives a user a password somebody else chose, which they
 // must change at their next sign-in and which stops working at expiresAt.

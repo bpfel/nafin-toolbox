@@ -51,9 +51,17 @@ func handleGetVault(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		// 404 only when there is no row. The client treats 404 as "this account
+		// has no vault yet" and starts an empty one, so answering it for a
+		// database that is merely unreachable would have the empty vault saved
+		// over the real one.
 		v, err := store.GetVault(r.Context(), user.ID)
-		if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "no vault found"})
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to load vault")
 			return
 		}
 

@@ -6,6 +6,7 @@ import {
   setupVaultKeys,
   updateVaultKeys,
   fetchVault,
+  VaultUnavailableError,
   putVault,
   recoverVaultKeys,
   setOnUnauthorized,
@@ -324,27 +325,16 @@ describe('fetchVault', () => {
     const result = await fetchVault()
 
     expect(result).toEqual(payload)
-    expect(mockFetch).toHaveBeenCalledWith('/api/vault', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    })
+    expect(mockFetch).toHaveBeenCalledWith('/api/vault', { credentials: 'include' })
   })
 
-  test('returns null on error', async () => {
+  test('returns null when there is no vault', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 404,
       statusText: 'Not Found',
       json: async () => ({ error: 'Vault not found' }),
     })
-
-    const result = await fetchVault()
-
-    expect(result).toBeNull()
-  })
-
-  test('returns null on network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
     const result = await fetchVault()
 
@@ -406,6 +396,20 @@ describe('fetchVault', () => {
     const result = await fetchVault()
 
     expect(result).toEqual(payload)
+  })
+
+  // Every caller starts an empty vault on null and saves it. A failed read
+  // taken for "no vault" once put that empty vault over the real one.
+  test('throws, rather than reporting no vault, when the server fails', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 502, statusText: 'Bad Gateway', json: async () => ({}) })
+
+    await expect(fetchVault()).rejects.toBeInstanceOf(VaultUnavailableError)
+  })
+
+  test('throws, rather than reporting no vault, when the network fails', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    await expect(fetchVault()).rejects.toBeInstanceOf(VaultUnavailableError)
   })
 })
 

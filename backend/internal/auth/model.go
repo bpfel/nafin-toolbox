@@ -110,6 +110,10 @@ type ChangePasswordRequest struct {
 	CurrentAuthKey  string `json:"current_auth_key,omitempty"`
 	// Always an auth key: a changed password makes the account version 2.
 	NewAuthKey string `json:"new_auth_key"`
+	// The vault key wrapped under the new password, when the account has a
+	// vault open to re-wrap. Stored together with the password, and only after
+	// the current one is proven; see Store.ChangePassword.
+	EncryptedMEK string `json:"encrypted_mek,omitempty"`
 }
 
 func (r ChangePasswordRequest) Current() Secret {
