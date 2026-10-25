@@ -9,16 +9,42 @@ the browser before it leaves it. The server stores opaque blobs and cannot read
 them; neither can its administrator.
 
 **Key hierarchy**
-- **KEK** (key encryption key) — derived from your password and email with PBKDF2
-  (600,000 iterations, SHA-256). Never stored.
+- **Master key** — derived from your password and email with PBKDF2 (600,000
+  iterations, SHA-256), in the browser. Never stored, never sent.
+- **Auth key** — derived from the master key with HKDF. This is what the browser
+  sends to sign in, instead of the password; the server stores a bcrypt hash of
+  it. It leads nowhere near the vault.
+- **KEK** (key encryption key) — derived from the master key with HKDF, beside
+  the auth key. Never stored, never sent.
 - **MEK** (master encryption key) — a random 256-bit AES-GCM key, wrapped with the
   KEK and stored on the server in that form only.
 - **Vault** — one JSON document holding your data, encrypted with the MEK
   (AES-256-GCM).
 
+**The server never sees your password.** Signing in, changing it, setting it from
+an invitation and confirming it in Profile all send the auth key. The one
+exception is the temporary password of an admin reset, which the server makes
+itself; it opens no vault (the vault is reached with the recovery key after a
+reset), and it must be changed at the next sign-in. Because the server cannot see
+the password, the rule that it has at least 8 characters is checked by the app.
+
 **Recovery key.** Shown once when the vault is created. It wraps the MEK
 independently of your password, and is the only way back in after a forgotten
-password or an admin reset.
+password or an admin reset. It is split like the password: the server gets a
+recovery auth key to check it against, and the MEK is wrapped under a separate
+key derived beside it.
+
+**Accounts from before key separation** signed in with the password itself, and
+their vault key was derived from it. They move on their next sign-in or unlock:
+the vault key is re-wrapped, the server stores the auth key in place of the
+password, and the account is shown a new recovery key, which replaces the old one
+once it has been typed back.
+
+**Renewing every key.** Profile → Encryption keys makes a new password, a new
+MEK and a new recovery key, and re-encrypts everything under the new MEK: the
+vault, the keypair's private halves and your own copy of each household key. It
+is for anyone who does not trust what a server might have recorded before the
+move. Other devices are signed out, since they hold the old MEK.
 
 **Unlocked state.** After unlocking, the MEK is kept in `sessionStorage`, so a
 page reload does not ask again. It is cleared when the tab closes and on sign-out.
@@ -27,6 +53,8 @@ There is no inactivity lock yet: the vault stays open for the life of the tab.
 **What follows from this**
 - Losing both password and recovery key means the data is gone. There is no
   backdoor.
+- The server that delivers the app could deliver different code; see
+  [Known limitations](../SECURITY.md#known-limitations).
 - An admin password reset leaves the vault locked until the user enters their
   recovery key.
 
