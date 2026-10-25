@@ -159,3 +159,47 @@ func HandleUpgrade(deps *HandlerDeps) http.HandlerFunc {
 		json.NewEncoder(w).Encode(updated)
 	}
 }
+
+// HandleInvitationEmail answers which address an invitation link is for.
+//
+// The browser derives the invitee's auth key from their new password and
+// their address, and an invitation link carries only its token. So the page
+// asks first. Only a valid token gets an answer, and a wrong one counts
+// against the same limit as a wrong verification, so this tells nobody
+// anything the link does not already prove its holder knows.
+func HandleInvitationEmail(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		attempt, ok := deps.VerifyEmailLimiter.Reserve(deps.VerifyEmailLimiter.ClientIP(r))
+		if !ok {
+			w.Header().Set("Retry-After", "900")
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
+			return
+		}
+		var req struct {
+			Token string `json:"token"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Token == "" {
+			attempt.Release()
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		userID, err := deps.Store.ValidateVerificationToken(r.Context(), req.Token, "email_verify")
+		if err != nil {
+			attempt.Release()
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if userID == 0 {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid or expired token")
+			return
+		}
+		attempt.Release()
+		user, err := deps.Store.GetUserByID(r.Context(), userID)
+		if err != nil || user == nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"email": user.Email, "iterations": user.KDFIterations})
+	}
+}

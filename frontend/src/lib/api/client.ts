@@ -83,6 +83,12 @@ export interface VaultKeysResponse {
   encrypted_mek: string
   iterations: number
   /**
+   * How the recovery copy of the MEK is wrapped: 1 under PBKDF2 of the
+   * recovery key itself, which the server once received; 2 under a recovery
+   * KEK it never sees. Absent from a server before key separation.
+   */
+  recovery_version?: number
+  /**
    * The user's two keypairs, flat on the same object.
    *
    * Every field is absent for anyone who set their vault up before identities
@@ -174,7 +180,8 @@ export async function setupIdentity(body: {
 
 export async function setupVaultKeys(body: {
   encrypted_mek: string
-  recovery_key_hash: string
+  /** Derived from the recovery key; the key itself never leaves the browser. */
+  recovery_auth: string
   encrypted_mek_recovery: string
   public_key: string
   encrypted_private_key: string
@@ -240,6 +247,8 @@ export async function putVault(body: {
 
 export interface VaultRecoveryResponse {
   encrypted_mek_recovery: string
+  /** 1: wrapped under PBKDF2 of the recovery key itself; 2: under its recovery KEK. */
+  recovery_version?: number
   /** As on VaultKeysResponse: absent for a vault created before identities. */
   public_key?: string
   encrypted_private_key?: string
@@ -247,11 +256,15 @@ export interface VaultRecoveryResponse {
   encrypted_signing_key?: string
 }
 
-export async function recoverVaultKeys(recoveryKey: string): Promise<VaultRecoveryResponse | null> {
+/**
+ * Prove the recovery key, in the form the account's recovery was stored in:
+ * the key itself for version 1, its recovery auth key for version 2.
+ */
+export async function recoverVaultKeys(proof: { recovery_key: string } | { recovery_auth: string }): Promise<VaultRecoveryResponse | null> {
   try {
     return await request<VaultRecoveryResponse>('/vault/recovery', {
       method: 'POST',
-      body: JSON.stringify({ recovery_key: recoveryKey }),
+      body: JSON.stringify(proof),
     })
   } catch {
     return null

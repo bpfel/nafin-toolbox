@@ -11,6 +11,9 @@ vi.mock('../crypto/vaultStore.svelte', () => ({
   clearVault: vi.fn(),
   recoverVault: vi.fn(),
   tryRestoreVault: vi.fn(),
+  prepareUpgrade: vi.fn(),
+  recoveryNeedsRenewal: () => false,
+  upgradeStored: vi.fn(),
 }))
 
 import { login, changePassword } from './authStore.svelte'
@@ -23,6 +26,7 @@ const user = {
   email_verified: true,
   totp_enabled: false,
   created_at: '2026-10-04T00:00:00Z',
+  auth_version: 2,
 }
 
 function respond(body: unknown, status = 200): Response {
@@ -38,7 +42,9 @@ describe('changing the password', () => {
     initializeVault.mockReset()
     reEncryptMEK.mockReset()
     fetchMock = vi.fn(async (url: string) =>
-      url.endsWith('/auth/login') ? respond(user) : respond({ message: 'password changed' }),
+      url.endsWith('/auth/prelogin') ? respond({ auth_version: 2, kdf: 'pbkdf2-sha256', iterations: 1000 })
+        : url.endsWith('/auth/login') ? respond(user)
+        : respond({ message: 'password changed' }),
     )
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -72,7 +78,22 @@ describe('changing the password', () => {
     const result = await changePassword('old-pass-123', 'new-pass-456')
 
     expect(result).toBeNull()
-    expect(reEncryptMEK).toHaveBeenCalledWith('old-pass-123', 'new-pass-456', user.email)
+    expect(reEncryptMEK).toHaveBeenCalledWith(expect.objectContaining({ authKey: expect.any(String) }))
+  })
+
+  test('neither password is sent, only keys derived from them', async () => {
+    initializeVault.mockResolvedValue('ok')
+    reEncryptMEK.mockResolvedValue(undefined)
+    await login(user.email, 'old-pass-123')
+    await changePassword('old-pass-123', 'new-pass-456')
+
+    const sent = fetchMock.mock.calls.map(([, init]) => String((init as RequestInit | undefined)?.body ?? ''))
+    for (const body of sent) {
+      expect(body).not.toContain('old-pass-123')
+      expect(body).not.toContain('new-pass-456')
+    }
+    const change = JSON.parse(sent[fetchMock.mock.calls.findIndex(([url]) => String(url).endsWith('/auth/change-password'))])
+    expect(Object.keys(change).sort()).toEqual(['current_auth_key', 'new_auth_key'])
   })
 
   test('if the key cannot be re-encrypted, the password is not changed', async () => {
