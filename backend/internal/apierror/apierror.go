@@ -110,7 +110,7 @@ var codes = map[string]string{
 	Auth + "|upgrade before renewing":        "AUTH-064",
 	// A save from another device, or a household joined, between reading
 	// and renewing. The browser reads again and repeats.
-	Auth + "|changed while renewing": "AUTH-065",
+	Auth + "|changed while renewing":                            "AUTH-065",
 	Auth + "|the new password must differ from the current one": "AUTH-066",
 
 	// --- The vault ---
