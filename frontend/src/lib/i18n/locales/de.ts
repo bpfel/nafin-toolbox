@@ -62,6 +62,7 @@ export const de: Messages = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Zwei-Faktor-Authentifizierung erforderlich',
   'twofa.requiredHint': 'Dein Administrator verlangt, dass alle Benutzer vor dem Fortfahren die Zwei-Faktor-Authentifizierung aktivieren.',
+  'twofa.requiredAdminHint': 'Administratorkonten verwenden immer die Zwei-Faktor-Authentifizierung: Mit ihnen lässt sich jedes Passwort zurücksetzen, deshalb darf ein Passwort allein nicht genügen. Richte sie ein, um fortzufahren.',
 
   // --- Common fields and actions ---
   'field.password': 'Passwort',
@@ -220,9 +221,8 @@ export const de: Messages = {
   'security.newCodesWarning': 'Bewahr diese neuen Wiederherstellungscodes auf. Die alten Codes sind jetzt ungültig.',
   'security.passwordTitle': 'Passwort',
   'security.keysTitle': 'Verschlüsselungsschlüssel',
-  'security.keysHint': 'Erstellt ein neues Passwort und neue Schlüssel für dein Budget, falls etwas von früher es noch öffnen könnte. Deine anderen Geräte werden abgemeldet.',
+  'security.keysHint': 'Nutze dies, wenn du dein Passwort oder deinen Wiederherstellungsschlüssel versehentlich weitergegeben haben könntest. Du erhältst ein neues Passwort, neue Schlüssel und einen neuen Wiederherstellungsschlüssel; deine anderen Geräte werden abgemeldet.',
   'security.renewKeys': 'Schlüssel erneuern',
-  'security.keysRenewed': 'Deine Schlüssel sind erneuert.',
   'security.deleteAccountTitle': 'Konto löschen',
   'security.deleteAccountHint': 'Löscht dein Konto und alle zugehörigen Daten dauerhaft. Dies kann nicht rückgängig gemacht werden.',
   'security.deletePrompt': 'Gib dein Passwort ein, um die Kontolöschung zu bestätigen:',

@@ -160,7 +160,7 @@ describe('renewing every key', () => {
     expect(body.new_auth_key).toBe('NEW-AUTH-KEY-PLACEHOLDER') // as prepared by the vault store
     expect(body.encrypted_mek).toBe('NEW-MEK')
     expect(everyBody()).not.toContain(PASSWORD)
-    expect(getAuthState().keysRenewed).toBe(true)
+    expect(getAuthState().upgradeRecoveryKey).toBeNull() // done: the key screen is gone
   })
 
   test('the same password again is refused before anything is made', async () => {

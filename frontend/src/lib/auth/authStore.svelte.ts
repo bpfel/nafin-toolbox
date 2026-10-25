@@ -58,9 +58,6 @@ interface PendingKeyChange {
 }
 let pendingKeyChange = $state<PendingKeyChange | null>(null)
 
-// Set once a renewal has been stored, so Profile can say so.
-let keysRenewed = $state(false)
-
 /** What a new account's keys are derived with; prelogin answers the same for unknown addresses. */
 const DEFAULT_ITERATIONS = 600000
 
@@ -81,7 +78,6 @@ export function getAuthState() {
     get recoveryKeyToShow() { return recoveryKeyToShow },
     get upgradeRecoveryKey() { return pendingKeyChange?.recoveryKey ?? null },
     get keyChangeKind() { return pendingKeyChange?.kind ?? null },
-    get keysRenewed() { return keysRenewed },
   }
 }
 
@@ -341,7 +337,6 @@ export async function renewKeys(currentPassword: string, newPassword: string): P
       const data = await res.json().catch(() => ({ error: 'Renewal failed' }))
       if (!res.ok) return withCode(data) || 'Renewal failed'
       await renewalStored(prepared, data.vault_updated_at ?? null)
-      keysRenewed = true
       return null
     },
   }
@@ -449,7 +444,6 @@ export async function logout() {
     heldPassword = null
     heldEmail = null
     pendingKeyChange = null
-    keysRenewed = false
     vaultNeedsSetup = false
     vaultDecryptFailed = false
     vaultLocked = false

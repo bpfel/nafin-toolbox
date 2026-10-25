@@ -70,6 +70,7 @@ export const en = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Two-Factor Authentication Required',
   'twofa.requiredHint': 'Your administrator requires all users to enable two-factor authentication before continuing.',
+  'twofa.requiredAdminHint': 'Administrator accounts always use two-factor authentication: they can reset anyone’s password, so a password alone must not be enough. Set it up to continue.',
 
   // --- Common fields and actions ---
   'field.password': 'Password',
@@ -245,9 +246,8 @@ export const en = {
   'security.newCodesWarning': 'Save these new recovery codes. Old codes are now invalid.',
   'security.passwordTitle': 'Password',
   'security.keysTitle': 'Encryption keys',
-  'security.keysHint': 'Makes a new password and new keys for your budget, in case anything from before could still open it. Your other devices are signed out.',
+  'security.keysHint': 'Use this if you might have shared your password or recovery key by mistake. You get a new password, new keys and a new recovery key; your other devices are signed out.',
   'security.renewKeys': 'Renew keys',
-  'security.keysRenewed': 'Your keys are renewed.',
   'security.deleteAccountTitle': 'Delete Account',
   'security.deleteAccountHint': 'Permanently delete your account and all associated data. This cannot be undone.',
   'security.deletePrompt': 'Enter your password to confirm account deletion:',
