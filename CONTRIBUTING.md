@@ -18,9 +18,10 @@ the AGPL-3.0-only, like the rest of the code.
 ## Before you start
 
 - **For anything bigger than a fix**, open an issue first and describe what you
-  want to change and why. Larger features are written up as a plan in
-  [`plans/`](plans/) before any code. A plan says what is built and what is
-  decided, and it is where a design is easiest to change.
+  want to change and why. Larger features are written up as a plan before any
+  code; the maintainer drafts plans privately and brings the design to the
+  issue, where it is easiest to change. [`plans/`](plans/) keeps the designs of
+  shipped security features, which reviewers need to read.
 - [readmore/features.md](readmore/features.md) and
   [readmore/roadmap.md](readmore/roadmap.md) say what exists and what is
   intended. [CLAUDE.md](CLAUDE.md) holds the project's architecture and

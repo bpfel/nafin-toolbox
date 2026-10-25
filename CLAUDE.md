@@ -230,6 +230,15 @@ request or commit message: it goes in a private GitHub security advisory until t
 fix ships. Design limitations users should know about belong in `SECURITY.md`
 openly.
 
+### Plans live in the private planning repo
+A new plan, idea or work package is written in the private repo
+`bpfel/nafin-toolbox-planning` (cloned at `~/nafin-toolbox-planning`, under `plans/`),
+never in this one. Its README is the project board. `plans/` here keeps only the
+designs of shipped security features, because `readmore/security.md` and the code
+cite them and a reviewer needs to read them; a plan moves here when its feature
+ships and the public docs depend on it. Anything a plan says is public once it
+lands here, and the history keeps it.
+
 ### Git Worktrees — CRITICAL
 **Always check which worktree you are working in before making any changes.**
 
