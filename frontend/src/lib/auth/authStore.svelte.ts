@@ -148,11 +148,16 @@ function versionOf(user: User | null): number {
   return user?.auth_version ?? 1
 }
 
-/** The proof of a password in the signed-in account's own form. */
+/**
+ * The proof of a password in the signed-in account's own form — as the server
+ * knows it now, not as this tab last heard. A tab left open since before the
+ * account moved on another device still holds version 1, and sending the
+ * password itself would be refused.
+ */
 async function proofFor(password: string): Promise<{ password: string } | { auth_key: string }> {
   if (!currentUser) throw new Error('Not logged in')
-  if (versionOf(currentUser) < 2) return { password }
-  const { iterations } = await prelogin(currentUser.email)
+  const { auth_version, iterations } = await prelogin(currentUser.email)
+  if (auth_version < 2) return { password }
   return { auth_key: (await derivePasswordKeys(password, currentUser.email, iterations)).authKey }
 }
 
@@ -304,11 +309,11 @@ export async function renewKeys(currentPassword: string, newPassword: string): P
   if (currentPassword === newPassword) {
     return withCode({ error: 'the new password must differ from the current one', code: 'AUTH-066' })
   }
-  if (versionOf(currentUser) < 2) return withCode({ error: 'upgrade before renewing', code: 'AUTH-064' })
-
   let iterations: number
   try {
-    iterations = (await prelogin(currentUser.email)).iterations
+    const pre = await prelogin(currentUser.email)
+    if (pre.auth_version < 2) return withCode({ error: 'upgrade before renewing', code: 'AUTH-064' })
+    iterations = pre.iterations
   } catch (e) {
     return e instanceof Error ? e.message : 'Renewal failed'
   }
@@ -492,14 +497,16 @@ export async function changePassword(currentPassword: string, newPassword: strin
   // Both passwords become keys here; neither is sent. The current one as the
   // account's own proof, the new one always as an auth key, which makes a
   // version 1 account version 2.
+  // The account's version as the server knows it now: see proofFor.
   let iterations: number
+  let version: number
   try {
-    iterations = (await prelogin(currentUser.email)).iterations
+    ;({ iterations, auth_version: version } = await prelogin(currentUser.email))
   } catch (e) {
     return e instanceof Error ? e.message : 'Password change failed'
   }
   const newKeys = await derivePasswordKeys(newPassword, currentUser.email, iterations)
-  const current = versionOf(currentUser) < 2
+  const current = version < 2
     ? { current_password: currentPassword }
     : { current_auth_key: (await derivePasswordKeys(currentPassword, currentUser.email, iterations)).authKey }
 
