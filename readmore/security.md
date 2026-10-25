@@ -74,6 +74,8 @@ under their own vault key. A household has a key of its own, handed to each new
 member by *signcryption*, with sender, recipient, household and epoch bound in.
 An invitee's public key is checked against a secret that never reaches the server,
 keys are pinned once verified, and a per-household epoch refuses a replayed grant.
+Both are kept in your personal vault, and every household key is checked against
+them there, whichever vault is open.
 
 Roles (writer, reader) are enforced by the server, not by cryptography: every
 member holds the same key. The design is in `plans/shared-vault-plan.md`.

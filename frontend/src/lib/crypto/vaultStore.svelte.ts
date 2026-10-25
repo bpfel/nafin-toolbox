@@ -494,14 +494,19 @@ async function openGranted(listing: {
   role: string
   updated_at: string
 }): Promise<OpenHousehold | null> {
-  if (!identity || !current.data) return null
+  // The personal vault's record, whichever vault is on screen. The households
+  // are listed again while one of them is open too (a payload that will not
+  // decrypt, the join screen's wait), and a household's own vault holds no
+  // record of this person's — any of its writers can put one there.
+  const trust = personalSlot()?.data?.trust
+  if (!identity || !trust) return null
 
   const members = await fetchHouseholdMembers(listing.id)
   const { key, epoch, pin } = await openGrantedKey({
     grant: listing.wrapped_key,
     householdId: listing.id,
     members,
-    trust: current.data.trust,
+    trust,
     identity,
   })
 
@@ -524,6 +529,11 @@ async function openGranted(listing: {
  * would start over and accept whatever key was there then.
  */
 function rememberTrust(userId: number, verifyingKey: string, householdId: number, epoch: number): void {
+  // Written only while the personal vault is on screen: `commit` changes the
+  // vault on screen, and a household's is not this person's record. Unlock
+  // opens every household with the personal vault on screen, so what is
+  // learned meanwhile is written down then.
+  if (currentId !== 'personal') return
   const trust = current.data?.trust
   if (!trust) return
 

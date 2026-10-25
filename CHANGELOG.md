@@ -60,6 +60,9 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Security
 
+- A household opened while another one was on screen had its key checked
+  against that other household's vault, not against your own record of whom
+  you have verified. It is now checked against your own record every time.
 - A vault that could not be loaded is no longer replaced with an empty one. A
   failed read at sign-in, reload or recovery — the server restarting during an
   update, say — was taken for an account with no vault yet, and the empty vault

@@ -131,6 +131,13 @@ What has been fixed, newest first. The upgrade notes for each are in
 
 ### Unreleased
 
+- **Household keys are always checked against your own record.** The keys
+  pinned for the members of a household, and the lowest key version accepted
+  for it, are kept in the personal vault. A household opened while another was
+  on screen was checked against that household's vault instead, which records
+  none of this, so a server could get a substituted key accepted. The check now
+  reads the personal record whichever vault is on screen, and writes to nothing
+  else.
 - **A vault that could not be loaded is no longer replaced with an empty one.**
   If reading the vault failed at sign-in, reload or recovery (the server
   restarting during an update, a dropped connection), the app took it for an
