@@ -203,9 +203,6 @@
     <div class="settings-card">
       <h3>{t('security.keysTitle')}</h3>
       <p class="info">{t('security.keysHint')}</p>
-      {#if authState.keysRenewed}
-        <p class="status enabled">{t('security.keysRenewed')}</p>
-      {/if}
       <button class="btn-secondary" onclick={() => (showRenewKeys = true)}>{t('security.renewKeys')}</button>
     </div>
   {/if}

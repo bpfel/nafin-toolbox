@@ -76,6 +76,7 @@ export const it: Messages = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Autenticazione a due fattori richiesta',
   'twofa.requiredHint': 'Il tuo amministratore richiede che tutti gli utenti attivino l’autenticazione a due fattori prima di continuare.',
+  'twofa.requiredAdminHint': 'Gli account amministratore usano sempre l’autenticazione a due fattori: possono reimpostare qualsiasi password, quindi una password da sola non deve bastare. Configurala per continuare.',
 
   // --- Fields ---
   'field.password': 'Password',
@@ -231,9 +232,8 @@ export const it: Messages = {
   'security.newCodesWarning': 'Conserva questi nuovi codici di recupero. I codici precedenti non sono più validi.',
   'security.passwordTitle': 'Password',
   'security.keysTitle': 'Chiavi di cifratura',
-  'security.keysHint': 'Crea una nuova password e nuove chiavi per il tuo budget, nel caso qualcosa di prima potesse ancora aprirlo. I tuoi altri dispositivi vengono disconnessi.',
+  'security.keysHint': 'Usalo se potresti aver condiviso per errore la tua password o la tua chiave di recupero. Ricevi una nuova password, nuove chiavi e una nuova chiave di recupero; i tuoi altri dispositivi vengono disconnessi.',
   'security.renewKeys': 'Rinnova le chiavi',
-  'security.keysRenewed': 'Le tue chiavi sono rinnovate.',
   'security.deleteAccountTitle': 'Elimina l’account',
   'security.deleteAccountHint': 'Elimina definitivamente il tuo account e tutti i dati associati. L’operazione è irreversibile.',
   'security.deletePrompt': 'Inserisci la password per confermare l’eliminazione dell’account:',

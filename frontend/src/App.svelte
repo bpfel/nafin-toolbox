@@ -237,7 +237,12 @@
     <div class="enforcement-container">
       <div class="enforcement-card">
         <h1>{t('twofa.requiredTitle')}</h1>
-        <p class="hint">{t('twofa.requiredHint')}</p>
+        <!--
+          An administrator is held here by the design, not by a setting: their
+          account can reset anyone's password. "Your administrator requires" read
+          as if they had imposed it on themselves.
+        -->
+        <p class="hint">{authState.currentUser?.role === 'admin' ? t('twofa.requiredAdminHint') : t('twofa.requiredHint')}</p>
         <TwoFactorSetup onDone={() => { show2FAEnforcement = false; window.location.reload() }} />
       </div>
     </div>

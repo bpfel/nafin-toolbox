@@ -76,6 +76,7 @@ export const fr: Messages = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Authentification à deux facteurs requise',
   'twofa.requiredHint': 'Ton administrateur exige que tous les utilisateurs activent l’authentification à deux facteurs avant de continuer.',
+  'twofa.requiredAdminHint': 'Les comptes administrateur utilisent toujours l’authentification à deux facteurs: ils peuvent réinitialiser n’importe quel mot de passe, un mot de passe seul ne doit donc pas suffire. Configure-la pour continuer.',
 
   // --- Fields ---
   'field.password': 'Mot de passe',
@@ -231,9 +232,8 @@ export const fr: Messages = {
   'security.newCodesWarning': 'Conserve ces nouveaux codes de récupération. Les anciens ne sont plus valables.',
   'security.passwordTitle': 'Mot de passe',
   'security.keysTitle': 'Clés de chiffrement',
-  'security.keysHint': 'Crée un nouveau mot de passe et de nouvelles clés pour ton budget, au cas où quelque chose d’avant pourrait encore l’ouvrir. Tes autres appareils sont déconnectés.',
+  'security.keysHint': 'Utilise ceci si tu as peut-être partagé ton mot de passe ou ta clé de récupération par erreur. Tu obtiens un nouveau mot de passe, de nouvelles clés et une nouvelle clé de récupération; tes autres appareils sont déconnectés.',
   'security.renewKeys': 'Renouveler les clés',
-  'security.keysRenewed': 'Tes clés sont renouvelées.',
   'security.deleteAccountTitle': 'Supprimer le compte',
   'security.deleteAccountHint': 'Supprime définitivement ton compte et toutes les données associées. Cette action est irréversible.',
   'security.deletePrompt': 'Saisis ton mot de passe pour confirmer la suppression du compte:',
