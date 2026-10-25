@@ -125,6 +125,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		r.Get("/auth/needs-setup", auth.HandleNeedsSetup(deps))
 		r.Post("/auth/setup", auth.HandleSetup(deps))
 		r.Post("/auth/verify-email", auth.HandleVerifyEmail(deps))
+		r.Post("/auth/invitation", auth.HandleInvitationEmail(deps))
 		r.Post("/auth/verify-2fa", auth.HandleVerify2FA(deps))
 
 		// Protected routes (require auth)

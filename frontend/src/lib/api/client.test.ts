@@ -178,7 +178,7 @@ describe('setupVaultKeys', () => {
   test('sets up vault keys successfully', async () => {
     const body = {
       encrypted_mek: 'base64encodedmek',
-      recovery_key_hash: 'hash123',
+      recovery_auth: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
       public_key: 'base64spki',
       encrypted_private_key: 'base64sealedprivate',
@@ -205,7 +205,7 @@ describe('setupVaultKeys', () => {
   test('handles empty strings in body', async () => {
     const body = {
       encrypted_mek: '',
-      recovery_key_hash: '',
+      recovery_auth: '',
       encrypted_mek_recovery: '',
       public_key: 'base64spki',
       encrypted_private_key: 'base64sealedprivate',
@@ -232,7 +232,7 @@ describe('setupVaultKeys', () => {
   test('throws error on conflict', async () => {
     const body = {
       encrypted_mek: 'base64encodedmek',
-      recovery_key_hash: 'hash123',
+      recovery_auth: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
       public_key: 'base64spki',
       encrypted_private_key: 'base64sealedprivate',
@@ -518,7 +518,7 @@ describe('recoverVaultKeys', () => {
       json: async () => response,
     })
 
-    const result = await recoverVaultKeys('recovery-key-123')
+    const result = await recoverVaultKeys({ recovery_key: 'recovery-key-123' })
 
     expect(result).toEqual(response)
     expect(mockFetch).toHaveBeenCalledWith('/api/vault/recovery', {
@@ -537,7 +537,7 @@ describe('recoverVaultKeys', () => {
       json: async () => ({ error: 'Invalid recovery key' }),
     })
 
-    const result = await recoverVaultKeys('invalid-key')
+    const result = await recoverVaultKeys({ recovery_key: 'invalid-key' })
 
     expect(result).toBeNull()
   })
@@ -545,7 +545,7 @@ describe('recoverVaultKeys', () => {
   test('returns null on network error', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
-    const result = await recoverVaultKeys('recovery-key-123')
+    const result = await recoverVaultKeys({ recovery_key: 'recovery-key-123' })
 
     expect(result).toBeNull()
   })
@@ -558,7 +558,7 @@ describe('recoverVaultKeys', () => {
       json: async () => ({ error: 'Empty recovery key' }),
     })
 
-    const result = await recoverVaultKeys('')
+    const result = await recoverVaultKeys({ recovery_key: '' })
 
     expect(result).toBeNull()
   })
@@ -572,7 +572,7 @@ describe('recoverVaultKeys', () => {
       json: async () => response,
     })
 
-    const result = await recoverVaultKeys('AAAA-BBBB-CCCC-DDDD')
+    const result = await recoverVaultKeys({ recovery_key: 'AAAA-BBBB-CCCC-DDDD' })
 
     expect(result).toEqual(response)
     expect(mockFetch).toHaveBeenCalledWith('/api/vault/recovery', {
@@ -593,7 +593,7 @@ describe('recoverVaultKeys', () => {
       json: async () => response,
     })
 
-    const result = await recoverVaultKeys(longKey)
+    const result = await recoverVaultKeys({ recovery_key: longKey })
 
     expect(result).toEqual(response)
   })
@@ -606,7 +606,7 @@ describe('recoverVaultKeys', () => {
       json: async () => ({ error: 'Invalid recovery key format' }),
     })
 
-    const result = await recoverVaultKeys('密码🔑émoji')
+    const result = await recoverVaultKeys({ recovery_key: '密码🔑émoji' })
 
     expect(result).toBeNull()
   })
