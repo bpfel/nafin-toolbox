@@ -35,7 +35,7 @@ function account(version: number, role = 'user') {
 }
 
 let fetchMock: ReturnType<typeof vi.fn>
-let server: { version: number; role: string }
+let server: { version: number; role: string; upgradeFails?: boolean }
 
 function sent(path: string): Record<string, string>[] {
   return fetchMock.mock.calls
@@ -55,7 +55,7 @@ beforeEach(async () => {
   fetchMock = vi.fn(async (url: string) => {
     if (url.endsWith('/auth/prelogin')) return respond({ auth_version: server.version, kdf: 'pbkdf2-sha256', iterations: 1000 })
     if (url.endsWith('/auth/login')) return respond(account(server.version, server.role))
-    if (url.endsWith('/auth/upgrade')) return respond(account(2, server.role))
+    if (url.endsWith('/auth/upgrade')) return server.upgradeFails ? respond({ error: 'internal error' }, 500) : respond(account(2, server.role))
     if (url.endsWith('/auth/renew-keys')) return respond({ status: 'ok', vault_updated_at: '2026-10-25T00:00:00Z' })
     if (url.endsWith('/auth/invitation')) return respond({ email: 'ben@example.ch', iterations: 1000 })
     if (url.endsWith('/auth/verify-email')) return respond(account(2))
@@ -168,5 +168,21 @@ describe('renewing every key', () => {
     await login('anna@example.ch', PASSWORD)
     expect(await renewKeys(PASSWORD, PASSWORD)).toContain('AUTH-066')
     expect(getAuthState().upgradeRecoveryKey).toBeNull()
+  })
+})
+
+describe('a tab left open across the move', () => {
+  test('asks the server which form to prove a password in, not its own memory', async () => {
+    server.version = 1
+    server.upgradeFails = true // so this tab's own upgrade does not happen …
+    await login('anna@example.ch', PASSWORD)
+    expect(getAuthState().currentUser?.auth_version).toBe(1) // … and it still thinks version 1
+    server.version = 2 // while the account moved on another device
+    fetchMock.mockClear()
+
+    await disable2FA(PASSWORD)
+
+    expect(Object.keys(sent('/auth/2fa')[0])).toEqual(['auth_key'])
+    expect(everyBody()).not.toContain(PASSWORD)
   })
 })
