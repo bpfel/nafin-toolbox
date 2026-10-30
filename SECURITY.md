@@ -129,7 +129,7 @@ key. To recover:
 What has been fixed, newest first. The upgrade notes for each are in
 [CHANGELOG.md](CHANGELOG.md).
 
-### Unreleased
+### 0.6.0 — 2026-10-30
 
 - **Setting up two-factor sign-in needs the password.** A signed-in session
   alone could enrol a second factor, and with it lock the account's owner out;

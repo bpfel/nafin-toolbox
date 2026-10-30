@@ -8,9 +8,14 @@ Versions follow [semantic versioning](https://semver.org/) — pre-1.0, so a min
 release may change things without a deprecation period. Each release is a tag on
 `main`; see [RELEASING.md](RELEASING.md) for how one is cut.
 
-## [Unreleased]
+## [0.6.0] — 2026-10-30
 
-### Upgrading
+The security release. The server no longer receives anything that opens a
+vault, sign-in is much harder to attack, and the findings of a full security
+audit are fixed, among them two ways an ordinary hiccup could lose a budget.
+Every user is shown a new recovery key at their next sign-in.
+
+### Upgrading from 0.5.1
 
 - **Every account moves to separate keys on its next sign-in.** Nothing to do
   for the operator beyond the usual rebuild; migration `016` adds two columns.
@@ -39,9 +44,15 @@ release may change things without a deprecation period. Each release is a tag on
   - **A reverse proxy on the same host** needs nothing, but publish the app on
     loopback (`NAFIN_LISTEN=127.0.0.1:4000`) if you don't already. See
     [Trusted proxies](readmore/self-hosting.md#trusted-proxies).
-- **One migration** (`014`) adds two empty columns; it cannot fail on existing
-  data. Temporary passwords handed out before the upgrade get no deadline —
-  reset them again if you want them to expire.
+- **"Require 2FA for everyone" is now held by the server.** If you turned it on,
+  users without two-factor can do nothing but set it up; their budget opens
+  once they have. Sessions opened before the upgrade are held the same way.
+- **A person can own at most ten households.** Anyone above that keeps them all,
+  but cannot start another.
+- **Three migrations** (`014`–`016`) only add columns, and cannot fail on
+  existing data; checked against a 0.5.1 database. Temporary passwords handed
+  out before the upgrade get no deadline — reset them again if you want them to
+  expire.
 - **An address can now be locked out of signing in for up to an hour** by
   thirty wrong passwords, from anywhere. That is the cost of stopping guesses
   spread across many machines, and anyone who knows the address can trigger it.
