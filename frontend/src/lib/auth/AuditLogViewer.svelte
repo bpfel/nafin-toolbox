@@ -19,7 +19,7 @@
     'password_changed', '2fa_enabled', '2fa_disabled',
     '2fa_verified', '2fa_failed', 'recovery_code_used',
     'user_invited', 'email_verified', 'user_deleted',
-    'password_reset', 'lockout_cleared',
+    'password_reset', '2fa_removed', 'lockout_cleared',
   ]
 
   const eventColors: Record<string, string> = {
@@ -37,6 +37,7 @@
     email_verified: '#155724',
     user_deleted: '#721c24',
     password_reset: '#856404',
+    '2fa_removed': '#856404',
     lockout_cleared: '#856404',
   }
 
@@ -55,6 +56,7 @@
     email_verified: '#d4edda',
     user_deleted: '#f8d7da',
     password_reset: '#fff3cd',
+    '2fa_removed': '#fff3cd',
     lockout_cleared: '#fff3cd',
   }
 

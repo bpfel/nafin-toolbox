@@ -76,6 +76,10 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "email and password required")
 			return
 		}
+		if len(req.Email) > MaxEmailLength {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid email address")
+			return
+		}
 
 		// Looked up first, because which limits apply depends on it: a device
 		// this account has signed in on before is counted on its own, and not
@@ -740,6 +744,19 @@ func HandleSetup2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
+		// The password first. Enrolling a factor locks the account to whoever
+		// holds it, so a session alone — a browser left signed in — could
+		// otherwise lock its owner out. Confirming needs no second proof: the
+		// secret it checks against goes only to whoever passed this one.
+		var req Setup2FARequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Secret.Empty() {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
+			return
+		}
+		if !confirmPassword(w, deps, user, req.Secret, "incorrect password") {
+			return
+		}
+
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "Finance Tracker",
 			AccountName: user.Email,
@@ -1021,10 +1038,58 @@ func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 
 		// After the fact: the caller survives their own request, so the audit
 		// row keeps them, and it no longer records a deletion that was refused.
-		deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserDeleted, r, map[string]any{
-			"deleted_user_id": targetID,
-		})
+		// Without the deleted account's id, which would name the person whose
+		// entries were just anonymised (see redactAuditMetadata).
+		deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserDeleted, r, nil)
 
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// HandleAdminRemove2FA takes a user's second factor away, for the user who has
+// lost theirs — or who did not enrol it. Before this the way back was SQL on
+// the server. Their sessions and trusted devices go with it, since whoever
+// enrolled a factor they did not may still hold one; if the instance requires
+// 2FA, they are asked to set it up again at their next sign-in.
+//
+// Not for administrators, whose factor is what AdminReady stands on: removing
+// one admin's would let another sign in as them after a password reset.
+func HandleAdminRemove2FA(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		caller := UserFromContext(r.Context())
+		if !adminOnly(w, deps, caller) {
+			return
+		}
+
+		targetID, err := strconv.Atoi(chi.URLParam(r, "id"))
+		if err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid user ID")
+			return
+		}
+		target, err := deps.Store.GetUserByID(r.Context(), targetID)
+		if err != nil || target == nil {
+			apierror.Write(w, apierror.Auth, http.StatusNotFound, "user not found")
+			return
+		}
+		if target.IsAdmin() {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "administrators must keep 2FA")
+			return
+		}
+		if !target.TOTPEnabled {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is not enabled")
+			return
+		}
+
+		if err := deps.Store.RemoveSecondFactor(r.Context(), targetID); err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		deps.Store.LogAudit(r.Context(), &caller.ID, Audit2FARemoved, r, map[string]any{
+			"target_user_id": targetID,
+			"target_email":   target.Email,
+		})
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
@@ -1281,7 +1346,16 @@ func ValidatePassword(pw string) error {
 }
 
 // ValidateEmail checks that the email has a basic valid format.
+// MaxEmailLength is the longest address SMTP can carry (RFC 5321). Anything
+// longer is refused before it is looked up, counted or logged: an address is
+// a key in the sign-in limiters and a value in the audit log, and neither
+// should hold a megabyte a stranger chose.
+const MaxEmailLength = 254
+
 func ValidateEmail(email string) error {
+	if len(email) > MaxEmailLength {
+		return errInvalidEmail
+	}
 	at := strings.Index(email, "@")
 	if at < 1 {
 		return errInvalidEmail

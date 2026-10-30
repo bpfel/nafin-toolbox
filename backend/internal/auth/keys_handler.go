@@ -37,6 +37,10 @@ func HandlePrelogin(deps *HandlerDeps) http.HandlerFunc {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "email required")
 			return
 		}
+		if len(req.Email) > MaxEmailLength {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid email address")
+			return
+		}
 
 		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {

@@ -50,6 +50,24 @@ Under **Users**, an administrator invites people by email, resends verification
 links, resets passwords and deletes accounts. Deleting takes two steps, and the
 last administrator cannot be deleted.
 
+A person owns at most **ten households**; the eleventh is refused. A household is
+stored on the server like a vault, and the limit keeps one account from filling the
+disk everybody shares.
+
+### A user who lost their authenticator
+
+If they still have a recovery code, they sign in with that. Otherwise **Remove 2FA**
+next to their name turns their second factor off, signs them out everywhere and
+forgets their trusted devices. They sign in with their password again, and if the
+instance requires two-factor, they are asked to set it up anew. It is recorded in the
+audit log as `2fa_removed`.
+
+Use it too for an account that has a second factor its owner did not set up: setting
+one up needs the password, but a factor enrolled before that rule was added may not
+be theirs. **Remove 2FA** is not offered for administrators, whose second factor is
+what their powers rest on; see
+[An administrator who lost their authenticator](#an-administrator-who-lost-their-authenticator).
+
 ## Password resets
 
 A reset under **Users** gives a temporary password, shown once, which the user must
@@ -112,8 +130,12 @@ curl -b cookies.txt -X POST https://finance.example.ch/api/auth/settings/require
 ```
 
 Users without two-factor then see a mandatory setup screen at their next sign-in.
-While it's on, nobody can turn their two-factor off; the server refuses it, and
-Profile doesn't offer it. The administrator sending this needs 2FA themselves.
+The server holds the rule too: until they have set it up, their session can do
+nothing but set it up, change a password they were told to change, delete the
+account or sign out; their budget opens once it is done. That includes sessions
+opened before the setting was turned on. While it's on, nobody can turn their
+two-factor off; the server refuses it, and Profile doesn't offer it. The
+administrator sending this needs 2FA themselves.
 
 ## Sign-in lockouts
 

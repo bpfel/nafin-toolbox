@@ -231,6 +231,7 @@ export const en = {
   'household.personal': 'Personal',
   'household.needsKeys': 'Set up encryption before starting a household.',
   'household.failed': 'That did not work. Try again.',
+  'household.limitReached': 'You already own ten households, the most one person can.',
 
   'security.twofaTitle': 'Two-Factor Authentication',
   'security.currentPasswordPlaceholder': 'Current password',

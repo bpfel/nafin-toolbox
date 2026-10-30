@@ -1322,3 +1322,69 @@ func TestStore_ADepartingWriterDoesNotMoveOwnership(t *testing.T) {
 		t.Errorf("Anna is %q (%v), want owner", role, err)
 	}
 }
+
+// One account could fill the database every account shares: each household
+// is a row of up to a megabyte, and nothing bounded how many one person made.
+func TestStore_OneAccountOwnsAtMostTenHouseholds(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-many@example.ch")
+	for i := 0; i < MaxOwnedHouseholds; i++ {
+		if _, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n")); err != nil {
+			t.Fatalf("household %d: %v", i+1, err)
+		}
+	}
+	if _, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n")); err != ErrTooManyHouseholds {
+		t.Fatalf("household %d: err = %v, want ErrTooManyHouseholds", MaxOwnedHouseholds+1, err)
+	}
+
+	// The limit is per person.
+	ben := makeUser(t, db, "ben-one@example.ch")
+	if _, _, err := store.Create(ctx, ben, aCreateRequest(), []byte("ct"), []byte("n")); err != nil {
+		t.Fatalf("another account's first household: %v", err)
+	}
+}
+
+func TestStore_ExpiredInvitesAreDeleted(t *testing.T) {
+	db := testDB(t)
+	store := NewStore(db)
+	ctx := context.Background()
+
+	anna := makeUser(t, db, "anna-invites@example.ch")
+	id, _, err := store.Create(ctx, anna, aCreateRequest(), []byte("ct"), []byte("n"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	for _, invite := range []struct {
+		email   string
+		expires time.Time
+	}{
+		{"old@example.ch", time.Now().Add(-time.Hour)},
+		{"new@example.ch", time.Now().Add(time.Hour)},
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO shared_vault_invites (vault_id, token_hash, invited_email, secret_sealed, token_sealed, expires_at, role)
+			 VALUES ($1, $2, $3, 's', 't', $4, 'writer')`,
+			id, "hash-"+invite.email, invite.email, invite.expires,
+		); err != nil {
+			t.Fatalf("seeding invite: %v", err)
+		}
+	}
+
+	if err := store.DeleteExpiredInvites(ctx); err != nil {
+		t.Fatalf("DeleteExpiredInvites: %v", err)
+	}
+	var left []string
+	rows, _ := db.Query(`SELECT invited_email FROM shared_vault_invites WHERE vault_id = $1`, id)
+	for rows.Next() {
+		var e string
+		rows.Scan(&e)
+		left = append(left, e)
+	}
+	rows.Close()
+	if len(left) != 1 || left[0] != "new@example.ch" {
+		t.Errorf("invites left = %v, want only the unexpired one", left)
+	}
+}

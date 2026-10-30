@@ -36,6 +36,7 @@ describe('the two-factor code is drawn here', () => {
 
   async function scanStep() {
     render(TwoFactorSetup)
+    await userEvent.type(screen.getByPlaceholderText(/.+/), 'my-password-1')
     await userEvent.click(screen.getByRole('button'))
     return screen.findByRole('img')
   }
@@ -56,6 +57,27 @@ describe('the two-factor code is drawn here', () => {
   test('a screen reader is not read the secret', async () => {
     const code = await scanStep()
     expect(code.getAttribute('aria-label')).not.toContain('JBSWY3DPEHPK3PXP')
+  })
+})
+
+/**
+ * Whoever enrols a second factor decides who can sign in from then on, so a
+ * session alone — a browser left signed in — must not be enough to do it.
+ */
+describe('setting up asks for the password', () => {
+  afterEach(cleanup)
+
+  test('nothing is set up without it, and it goes with the request', async () => {
+    const { setup2FA } = await import('./authStore.svelte')
+    vi.mocked(setup2FA).mockClear()
+    render(TwoFactorSetup)
+
+    expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(true)
+
+    await userEvent.type(screen.getByPlaceholderText(/.+/), 'my-password-1')
+    await userEvent.click(screen.getByRole('button'))
+
+    expect(setup2FA).toHaveBeenCalledWith('my-password-1')
   })
 })
 

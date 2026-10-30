@@ -2119,3 +2119,152 @@ func TestChangePassword_WithoutAVaultKeyLeavesTheStoredOneAlone(t *testing.T) {
 		t.Errorf("vault key = %q, want it kept", got)
 	}
 }
+
+// --- Deleting an account anonymises its audit entries ---
+
+func TestDeleteUser_TheAuditLogNoLongerNamesTheAccount(t *testing.T) {
+	// The promise in readmore/security.md, which only the foreign key kept:
+	// user_id went to NULL, while the metadata still named the address.
+	deps := loginDeps(t)
+	store := deps.Store
+	ctx := context.Background()
+	gone, _ := store.GetUserByEmail(ctx, "father@example.ch")
+	admin, _ := store.GetUserByEmail(ctx, "admin@example.ch")
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+
+	store.LogAudit(ctx, &gone.ID, AuditLoginFailed, req, map[string]any{"email": "Father@Example.ch"})
+	store.LogAudit(ctx, &admin.ID, AuditUserInvited, req, map[string]any{"invited_user_id": gone.ID, "invited_email": "father@example.ch", "method": "email"})
+	store.LogAudit(ctx, &admin.ID, AuditPasswordReset, req, map[string]any{"target_user_id": gone.ID, "target_email": "father@example.ch"})
+	// Somebody else's entry stays as it was.
+	store.LogAudit(ctx, &admin.ID, AuditPasswordReset, req, map[string]any{"target_user_id": admin.ID + 100, "target_email": "other@example.ch"})
+
+	if err := store.DeleteUserGuardingLastAdmin(ctx, gone.ID); err != nil {
+		t.Fatalf("DeleteUserGuardingLastAdmin: %v", err)
+	}
+
+	var named int
+	if err := testDB.QueryRow(`SELECT count(*) FROM audit_log WHERE metadata::text ILIKE '%father@example.ch%' OR metadata->>'invited_user_id' = $1 OR metadata->>'target_user_id' = $1`,
+		strconv.Itoa(gone.ID)).Scan(&named); err != nil {
+		t.Fatalf("counting: %v", err)
+	}
+	if named != 0 {
+		t.Errorf("%d audit entries still name the deleted account", named)
+	}
+	var events, others int
+	testDB.QueryRow(`SELECT count(*) FROM audit_log`).Scan(&events)
+	testDB.QueryRow(`SELECT count(*) FROM audit_log WHERE metadata->>'target_email' = 'other@example.ch'`).Scan(&others)
+	if events != 4 || others != 1 {
+		t.Errorf("events = %d, others = %d; want every event kept and the other account's untouched", events, others)
+	}
+}
+
+// --- An administrator removes a user's second factor ---
+
+func TestAdminRemove2FA_TheUserSignsInWithThePasswordAgain(t *testing.T) {
+	// A factor somebody else enrolled, or one the user lost: the way back was
+	// SQL on the server. Now an admin can take it away, and with it every
+	// session, since whoever enrolled it may still hold one.
+	deps := loginDeps(t)
+	store := deps.Store
+	ctx := context.Background()
+	father, _ := store.GetUserByEmail(ctx, "father@example.ch")
+	session := signIn(t, deps, "father@example.ch")
+	if err := store.SetTOTPEnabled(ctx, father.ID, true); err != nil {
+		t.Fatalf("SetTOTPEnabled: %v", err)
+	}
+	if err := store.SaveTOTPSecret(ctx, father.ID, "sealed"); err != nil {
+		t.Fatalf("SaveTOTPSecret: %v", err)
+	}
+
+	root, err := store.CreateUserFull(ctx, "root@example.ch", mustHash("right-pass-1"), RoleAdmin, true, true)
+	if err != nil {
+		t.Fatalf("CreateUserFull: %v", err)
+	}
+	remove := func(target int) int {
+		r := chi.NewRouter()
+		r.Delete("/api/auth/users/{id}/2fa", HandleAdminRemove2FA(deps))
+		req := httptest.NewRequest(http.MethodDelete, "/api/auth/users/"+strconv.Itoa(target)+"/2fa", nil)
+		req = req.WithContext(context.WithValue(req.Context(), userContextKey, root))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	if got := remove(father.ID); got != http.StatusOK {
+		t.Fatalf("remove = %d, want 200", got)
+	}
+	after, _ := store.GetUserByID(ctx, father.ID)
+	if after.TOTPEnabled {
+		t.Error("2FA is still enabled")
+	}
+	if stillSignedIn(t, store, session) {
+		t.Error("the user's session survived")
+	}
+	if got := remove(father.ID); got != http.StatusConflict {
+		t.Errorf("removing it twice = %d, want 409", got)
+	}
+	if got := remove(root.ID); got != http.StatusConflict {
+		t.Errorf("an administrator's = %d, want 409", got)
+	}
+}
+
+// --- The instance's 2FA requirement is held on the server ---
+
+func TestRequireEnrolment_APasswordAloneReachesOnlyEnrolment(t *testing.T) {
+	// The report: with require_2fa on, a password-only sign-in got a full
+	// session, and only the browser's screen asked for a second factor.
+	deps := loginDeps(t)
+	deps.EncryptionKey = make([]byte, 32)
+	store := deps.Store
+	ctx := context.Background()
+	if err := store.SetSetting(ctx, "require_2fa", "true"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	session := signIn(t, deps, "father@example.ch")
+
+	r := chi.NewRouter()
+	r.Route("/api", func(r chi.Router) {
+		r.Use(RequireAuth(store), RequireEnrolment(deps))
+		ok := func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
+		r.Get("/auth/me", ok)
+		r.Post("/auth/2fa/setup", ok)
+		r.Post("/auth/change-password", ok)
+		r.Get("/vault", ok)
+		r.Get("/households", ok)
+	})
+	call := func(method, path string) int {
+		req := httptest.NewRequest(method, path, nil)
+		req.AddCookie(&http.Cookie{Name: "session", Value: session})
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	for _, c := range []struct {
+		method, path string
+		want         int
+	}{
+		{"GET", "/api/auth/me", 200},
+		{"POST", "/api/auth/2fa/setup", 200},
+		{"GET", "/api/vault", 403},
+		{"GET", "/api/households", 403},
+		// Only for a password the user was told to change.
+		{"POST", "/api/auth/change-password", 403},
+	} {
+		if got := call(c.method, c.path); got != c.want {
+			t.Errorf("%s %s = %d, want %d", c.method, c.path, got, c.want)
+		}
+	}
+
+	// Enrolled, everything opens; and with the setting off, nothing was held.
+	father, _ := store.GetUserByEmail(ctx, "father@example.ch")
+	store.SetTOTPEnabled(ctx, father.ID, true)
+	if got := call("GET", "/api/vault"); got != 200 {
+		t.Errorf("enrolled: GET /api/vault = %d, want 200", got)
+	}
+	store.SetTOTPEnabled(ctx, father.ID, false)
+	store.SetSetting(ctx, "require_2fa", "false")
+	if got := call("GET", "/api/vault"); got != 200 {
+		t.Errorf("not required: GET /api/vault = %d, want 200", got)
+	}
+}

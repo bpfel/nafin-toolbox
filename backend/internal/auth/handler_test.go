@@ -854,6 +854,32 @@ func TestHandleSetup2FA_AlreadyEnabled(t *testing.T) {
 	}
 }
 
+// A session alone must not enrol a second factor: whoever does decides who
+// can sign in from then on. Both refusals come before anything is stored.
+func TestHandleSetup2FA_NeedsThePassword(t *testing.T) {
+	for _, tt := range []struct {
+		name, body string
+		status     int
+		code       string
+	}{
+		{"none", ``, http.StatusBadRequest, "AUTH-017"},
+		{"empty", `{}`, http.StatusBadRequest, "AUTH-017"},
+		{"wrong", `{"password":"not-it-123"}`, http.StatusUnauthorized, "AUTH-015"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/auth/2fa/setup", strings.NewReader(tt.body))
+			req = req.WithContext(userCtx())
+			w := httptest.NewRecorder()
+
+			HandleSetup2FA(testDepsWithKey()).ServeHTTP(w, req)
+
+			if w.Code != tt.status || !strings.Contains(w.Body.String(), tt.code) {
+				t.Errorf("status %d, body %s; want %d with %s", w.Code, w.Body.String(), tt.status, tt.code)
+			}
+		})
+	}
+}
+
 // --- Confirm2FA handler tests ---
 
 func TestHandleConfirm2FA_RequiresAuth(t *testing.T) {

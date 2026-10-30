@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -291,10 +292,46 @@ func (s *Store) DeleteUserGuardingLastAdmin(ctx context.Context, userID int) err
 		}
 	}
 
+	if err := redactAuditMetadata(ctx, tx, userID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID); err != nil {
 		return fmt.Errorf("deleting user: %w", err)
 	}
 	return tx.Commit()
+}
+
+// redactAuditMetadata removes from the audit log what still names an account
+// once it is gone: its address and its id, wherever an event copied them into
+// the metadata. The foreign key nulls audit_log.user_id, but a failed sign-in
+// keeps the address that was typed, an invitation the invitee's address, a
+// reset its target's. The events stay, so the log still says what happened;
+// only who it happened to goes.
+//
+// Addresses are compared without case: a failed sign-in stores the address as
+// it was typed, the account its lower-case form.
+func redactAuditMetadata(ctx context.Context, tx *sql.Tx, userID int) error {
+	var email string
+	if err := tx.QueryRowContext(ctx, `SELECT lower(email) FROM users WHERE id = $1`, userID).Scan(&email); err != nil {
+		return fmt.Errorf("reading email: %w", err)
+	}
+	id := strconv.Itoa(userID)
+	_, err := tx.ExecContext(ctx, `
+		UPDATE audit_log SET metadata = metadata
+			- (CASE WHEN lower(metadata->>'email') = $1 THEN 'email' ELSE '' END)
+			- (CASE WHEN lower(metadata->>'invited_email') = $1 THEN 'invited_email' ELSE '' END)
+			- (CASE WHEN lower(metadata->>'target_email') = $1 THEN 'target_email' ELSE '' END)
+			- (CASE WHEN metadata->>'invited_user_id' = $2 THEN 'invited_user_id' ELSE '' END)
+			- (CASE WHEN metadata->>'target_user_id' = $2 THEN 'target_user_id' ELSE '' END)
+		WHERE metadata IS NOT NULL
+		  AND (lower(metadata->>'email') = $1 OR lower(metadata->>'invited_email') = $1
+		    OR lower(metadata->>'target_email') = $1
+		    OR metadata->>'invited_user_id' = $2 OR metadata->>'target_user_id' = $2)`,
+		email, id)
+	if err != nil {
+		return fmt.Errorf("redacting audit metadata: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) UserCount(ctx context.Context) (int, error) {
@@ -496,6 +533,30 @@ func (s *Store) GetTOTPSecret(ctx context.Context, userID int) (string, error) {
 func (s *Store) DeleteTOTPSecret(ctx context.Context, userID int) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM totp_secrets WHERE user_id = $1`, userID)
 	return err
+}
+
+// RemoveSecondFactor turns an account's 2FA off and removes everything that
+// belongs to it, together: the secret, the recovery codes, pending sign-in
+// challenges, every session and every trusted device.
+func (s *Store) RemoveSecondFactor(ctx context.Context, userID int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, q := range []string{
+		`UPDATE users SET totp_enabled = FALSE, device_epoch = device_epoch + 1 WHERE id = $1`,
+		`DELETE FROM totp_secrets WHERE user_id = $1`,
+		`DELETE FROM recovery_codes WHERE user_id = $1`,
+		`DELETE FROM mfa_challenges WHERE user_id = $1`,
+		`DELETE FROM sessions WHERE user_id = $1`,
+	} {
+		if _, err := tx.ExecContext(ctx, q, userID); err != nil {
+			return fmt.Errorf("removing second factor: %w", err)
+		}
+	}
+	return tx.Commit()
 }
 
 // ForgetDevices retires every trusted-device cookie of an account. See

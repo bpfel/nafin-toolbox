@@ -159,6 +159,10 @@ func handleCreate(store Storer) http.HandlerFunc {
 		}
 
 		id, updatedAt, err := store.Create(r.Context(), userID, req, ciphertext, nonce)
+		if errors.Is(err, ErrTooManyHouseholds) {
+			apierror.Write(w, apierror.Vault, http.StatusConflict, "household limit reached")
+			return
+		}
 		if err != nil {
 			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to create household")
 			return

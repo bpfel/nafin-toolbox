@@ -60,6 +60,22 @@ release may change things without a deprecation period. Each release is a tag on
 
 ### Security
 
+- Setting up two-factor sign-in asks for the password. A session alone was
+  enough, so a browser left signed in could have a second factor enrolled that
+  locks its owner out. Administrators can remove a user's second factor under
+  **Users** (not another administrator's); before, only SQL could.
+- "Require 2FA for everyone" is now enforced by the server: until a user has set
+  it up, their session can only set it up, change a password they were told to
+  change, delete the account or sign out. Their budget opens once it is set up.
+- Deleting an account removes its email address and id from the details of
+  audit entries, as the documentation promised. Only the user column was
+  cleared before.
+- Audit entries are no longer lost to an unusual User-Agent. Request details are
+  cleaned and capped before they are stored.
+- Email addresses longer than 254 bytes are refused at sign-in. One of up to a
+  megabyte used to be kept in memory and written to the audit log.
+- A person can own at most ten households, and expired household invitations are
+  deleted once an hour.
 - A household opened while another one was on screen had its key checked
   against that other household's vault, not against your own record of whom
   you have verified. It is now checked against your own record every time.
