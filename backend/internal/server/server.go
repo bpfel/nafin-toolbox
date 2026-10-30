@@ -131,6 +131,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		// Protected routes (require auth)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(authStore))
+			r.Use(auth.RequireEnrolment(deps))
 			r.Get("/auth/me", auth.HandleMe)
 			r.Post("/auth/logout", auth.HandleLogout(deps))
 			r.Post("/auth/logout-everywhere", auth.HandleLogoutEverywhere(deps))
@@ -153,6 +154,7 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Get("/auth/users", auth.HandleListUsers(deps))
 			r.Delete("/auth/users/{id}", auth.HandleAdminDeleteUser(deps))
 			r.Post("/auth/users/{id}/reset-password", auth.HandleAdminResetPassword(deps))
+			r.Delete("/auth/users/{id}/2fa", auth.HandleAdminRemove2FA(deps))
 			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))

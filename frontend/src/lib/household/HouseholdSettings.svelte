@@ -96,8 +96,9 @@
       unfolded = await createHousehold(trimmed)
       naming = false
       name = ''
-    } catch {
-      error = t('household.failed')
+    } catch (e) {
+      // VAULT-026: see household.MaxOwnedHouseholds on the server.
+      error = e instanceof Error && e.message.includes('VAULT-026') ? t('household.limitReached') : t('household.failed')
     } finally {
       busy = false
     }

@@ -112,6 +112,9 @@ var codes = map[string]string{
 	// and renewing. The browser reads again and repeats.
 	Auth + "|changed while renewing":                            "AUTH-065",
 	Auth + "|the new password must differ from the current one": "AUTH-066",
+	// The instance requires 2FA and this account has none yet: everything
+	// but enrolling is refused until it does (RequireEnrolment).
+	Auth + "|2FA setup required": "AUTH-067",
 
 	// --- The vault ---
 	Vault + "|invalid JSON":                "VAULT-010",
@@ -130,6 +133,8 @@ var codes = map[string]string{
 	Vault + "|failed to save household":   "VAULT-023",
 	Vault + "|failed to rename household": "VAULT-024",
 	Vault + "|failed to delete household": "VAULT-025",
+	// Ten owned households per person: see household.MaxOwnedHouseholds.
+	Vault + "|household limit reached": "VAULT-026",
 
 	// --- Inviting somebody into a household ---
 	Vault + "|failed to create invitation":   "VAULT-030",

@@ -13,6 +13,7 @@ import (
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/database"
 	"github.com/bpfel/nafin-toolbox/internal/email"
+	"github.com/bpfel/nafin-toolbox/internal/household"
 	"github.com/bpfel/nafin-toolbox/internal/server"
 )
 
@@ -73,6 +74,7 @@ func main() {
 
 	// Start background cleanup (every hour)
 	authStore := auth.NewStore(db)
+	householdStore := household.NewStore(db)
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -86,6 +88,9 @@ func main() {
 			}
 			if err := authStore.DeleteExpiredMFAChallenges(ctx); err != nil {
 				log.Printf("MFA challenge cleanup error: %v", err)
+			}
+			if err := householdStore.DeleteExpiredInvites(ctx); err != nil {
+				log.Printf("household invite cleanup error: %v", err)
 			}
 			log.Println("expired tokens cleaned up")
 		}

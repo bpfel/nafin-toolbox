@@ -135,6 +135,13 @@ type Enable2FAResponse struct {
 	URL    string `json:"url"`
 }
 
+// Setup2FARequest proves the password before a second factor is set up: who
+// enrols one decides who can sign in from then on, which is no decision for a
+// session alone.
+type Setup2FARequest struct {
+	Secret
+}
+
 type Confirm2FARequest struct {
 	Code string `json:"code"`
 }

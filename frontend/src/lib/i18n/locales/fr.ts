@@ -217,6 +217,7 @@ export const fr: Messages = {
   'household.personal': 'Personnel',
   'household.needsKeys': 'Configure d’abord le chiffrement.',
   'household.failed': 'Cela n’a pas fonctionné. Réessaie.',
+  'household.limitReached': 'Tu possèdes déjà dix ménages, le maximum par personne.',
 
   'security.twofaTitle': 'Authentification à deux facteurs',
   'security.currentPasswordPlaceholder': 'Mot de passe actuel',

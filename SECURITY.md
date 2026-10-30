@@ -131,6 +131,26 @@ What has been fixed, newest first. The upgrade notes for each are in
 
 ### Unreleased
 
+- **Setting up two-factor sign-in needs the password.** A signed-in session
+  alone could enrol a second factor, and with it lock the account's owner out;
+  an admin password reset left that factor in place, and only SQL removed it.
+  Administrators can now remove a user's second factor under **Users**.
+- **"Require 2FA for everyone" is held by the server.** Only the browser enforced
+  it, so anything that skipped the app's screens used every route with the
+  password alone. Until a user has set up 2FA, their session can now only set it
+  up, change a password they were told to change, delete the account or sign out.
+- **Deleting an account removes its address from the audit log.** Entries about
+  failed sign-ins, invitations and password resets kept the deleted account's
+  email and id in their details; only the user column was cleared, though the
+  documentation promised anonymised entries.
+- **The audit log records every event.** A User-Agent that was not valid UTF-8
+  made the database refuse the whole entry, so a failed sign-in sent with one left
+  no trace. Request details are now cleaned and capped before they are stored, and
+  an entry that cannot be stored is logged by the server.
+- **Sign-in and households have size limits.** An email address of up to a
+  megabyte was kept by the sign-in limits and written to the audit log at every
+  failed sign-in; addresses over 254 bytes are now refused first. A person can own
+  at most ten households, and expired household invitations are deleted.
 - **Household keys are always checked against your own record.** The keys
   pinned for the members of a household, and the lowest key version accepted
   for it, are kept in the personal vault. A household opened while another was

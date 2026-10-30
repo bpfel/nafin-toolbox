@@ -45,6 +45,13 @@ let needsSetup = $state(false)
 // keys a password stands for, never the password — except for a version 1
 // account, whose password is the proof its one upgrade needs.
 let heldKeys: PasswordKeys | null = null
+/**
+ * A sign-in waiting for a second factor: the instance requires one and this
+ * account has none yet. The server refuses the vault until it is set up
+ * (RequireEnrolment), so the vault is opened afterwards, by confirm2FA, with
+ * what is held here.
+ */
+let heldForEnrolment: { keys: PasswordKeys; password: string | null; email: string } | null = null
 let heldPassword = $state<string | null>(null)
 let heldEmail = $state<string | null>(null)
 
@@ -209,6 +216,14 @@ async function afterSignIn(keys: PasswordKeys, password: string | null, email: s
   if (currentUser.role === 'admin') {
     if (version < 2 && password) await upgradeNow({ password, new_auth_key: keys.authKey })
     return
+  }
+
+  if (!currentUser.totp_enabled) {
+    const settings = await getSettings()
+    if (settings.require_2fa && settings.twofa_available !== false) {
+      heldForEnrolment = { keys, password, email }
+      return
+    }
   }
 
   const vaultResult = await initializeVault(keys, currentUser.id, version)
@@ -447,6 +462,7 @@ export async function logout() {
   } finally {
     currentUser = null
     heldKeys = null
+    heldForEnrolment = null
     heldPassword = null
     heldEmail = null
     pendingKeyChange = null
@@ -517,7 +533,10 @@ export async function changePassword(currentPassword: string, newPassword: strin
   let rewrapped: { encrypted_mek?: string } = {}
   if (currentUser.role !== 'admin') {
     const mustChangeWithLockedVault = currentUser.must_change_password && vaultDecryptFailed
-    if (!mustChangeWithLockedVault && !vaultNeedsSetup) {
+    // Waiting for a second factor, the vault was never opened: there is no
+    // key in memory to re-wrap, and it is opened under the new password once
+    // the factor is set up.
+    if (!mustChangeWithLockedVault && !vaultNeedsSetup && !heldForEnrolment) {
       try {
         rewrapped = { encrypted_mek: await wrapMEKFor(newKeys) }
       } catch (e) {
@@ -539,6 +558,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
     // the session they described.
     currentUser = null
     heldKeys = null
+    heldForEnrolment = null
     heldPassword = null
     heldEmail = null
     vaultNeedsSetup = false
@@ -686,10 +706,20 @@ export async function verifyEmail(token: string, password: string): Promise<stri
   return withCode(data) || 'Verification failed'
 }
 
-export async function setup2FA(): Promise<{ secret: string; url: string } | { error: string }> {
+export async function setup2FA(password: string): Promise<{ secret: string; url: string } | { error: string }> {
+  // The password first, as for turning 2FA off: whoever enrols a factor
+  // decides who can sign in from then on.
+  let proof: { password: string } | { auth_key: string }
+  try {
+    proof = await proofFor(password)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : '2FA setup failed' }
+  }
   const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
+    body: JSON.stringify(proof),
   })
 
   if (res.ok) {
@@ -709,7 +739,14 @@ export async function confirm2FA(code: string): Promise<{ recovery_codes: string
   })
 
   if (res.ok) {
-    return res.json()
+    const confirmed = await res.json()
+    const held = heldForEnrolment
+    if (held && currentUser) {
+      heldForEnrolment = null
+      currentUser = { ...currentUser, totp_enabled: true }
+      await afterSignIn(held.keys, held.password, held.email)
+    }
+    return confirmed
   }
 
   const data = await res.json().catch(() => ({ error: 'Confirmation failed' }))
@@ -803,6 +840,19 @@ export async function adminResetPassword(id: number): Promise<{ temp_password: s
   const data = await res.json().catch(() => ({ error: 'Failed to reset password' }))
   if (res.ok) return { temp_password: data.temp_password, temp_expires_at: data.temp_expires_at }
   return { error: withCode(data) || 'Failed to reset password' }
+}
+
+/** Take a user's second factor away, for one who lost it or did not enrol it. */
+export async function adminRemove2FA(id: number): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/auth/users/${id}/2fa`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  if (res.ok) return null
+
+  const data = await res.json().catch(() => ({ error: 'Failed to remove 2FA' }))
+  return withCode(data) || 'Failed to remove 2FA'
 }
 
 export async function resendVerification(id: number): Promise<string | null> {

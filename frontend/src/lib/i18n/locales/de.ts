@@ -206,6 +206,7 @@ export const de: Messages = {
   'household.personal': 'Persönlich',
   'household.needsKeys': 'Richte zuerst die Verschlüsselung ein.',
   'household.failed': 'Das hat nicht geklappt. Bitte erneut versuchen.',
+  'household.limitReached': 'Du besitzt schon zehn Haushalte, das Maximum pro Person.',
 
   'security.twofaTitle': 'Zwei-Faktor-Authentifizierung',
   'security.currentPasswordPlaceholder': 'Aktuelles Passwort',

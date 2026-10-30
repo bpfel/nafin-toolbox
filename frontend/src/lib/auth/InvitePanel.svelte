@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatDate, formatDateTime } from '../util/calendar'
-  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, getSettings, type User, getAuthState } from './authStore.svelte'
+  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, adminRemove2FA, getSettings, type User, getAuthState } from './authStore.svelte'
   import DeleteUserModal from './DeleteUserModal.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
@@ -106,6 +106,22 @@
     }
   }
 
+  let confirmingRemove2FA = $state<number | null>(null)
+  let removing2FA = $state<number | null>(null)
+
+  async function handleRemove2FA(user: User) {
+    removing2FA = user.id
+    const result = await adminRemove2FA(user.id)
+    removing2FA = null
+    confirmingRemove2FA = null
+    if (result) {
+      error = result
+    } else {
+      success = `2FA removed for ${user.email}. They are signed out everywhere.`
+      await loadUsers()
+    }
+  }
+
   function askDelete(user: User) {
     deleteError = null
     pendingDelete = user
@@ -201,6 +217,34 @@
                       onclick={() => confirmingReset = u.id}
                     >
                       Reset PW
+                    </button>
+                  {/if}
+                {/if}
+                {#if u.totp_enabled && u.role !== 'admin'}
+                  {#if confirmingRemove2FA === u.id}
+                    <span class="confirm-reset">
+                      <span class="confirm-label">Remove 2FA?</span>
+                      <button
+                        class="btn-small btn-danger-small"
+                        onclick={() => handleRemove2FA(u)}
+                        disabled={removing2FA === u.id}
+                      >
+                        {removing2FA === u.id ? 'Removing...' : 'Confirm'}
+                      </button>
+                      <button
+                        class="btn-small"
+                        onclick={() => confirmingRemove2FA = null}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  {:else}
+                    <button
+                      class="btn-small"
+                      onclick={() => confirmingRemove2FA = u.id}
+                      title="For a user who lost their authenticator, or did not set it up themselves"
+                    >
+                      Remove 2FA
                     </button>
                   {/if}
                 {/if}

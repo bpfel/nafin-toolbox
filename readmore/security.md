@@ -87,19 +87,24 @@ member holds the same key. The design is in `plans/shared-vault-plan.md`.
 - **Passwords** hashed with bcrypt; at least 8 characters.
 - **Session tokens** stored SHA-256-hashed; the raw token exists only in an
   `HttpOnly`, `SameSite=Lax` cookie, `Secure` in production.
-- Expired sessions, verification tokens and two-factor challenges are purged hourly.
+- Expired sessions, verification tokens, two-factor challenges and household
+  invitations are purged hourly.
 - An email address is one account however it is capitalised.
 
 ## Two-factor authentication (TOTP)
 
-- Optional per user, from Profile, with any authenticator app. **Required for
-  administrators**, who cannot turn it off.
+- Optional per user, from Profile, with any authenticator app. Setting it up asks
+  for the password. **Required for administrators**, who cannot turn it off.
 - A code works once: one read over a shoulder can't be used again.
 - Ten single-use recovery codes, stored bcrypt-hashed and regenerable.
 - TOTP secrets encrypted with AES-256-GCM under `ENCRYPTION_KEY`, which never
   touches the database.
 - Administrators can require it for everyone — see
-  [Administration](administration.md#requiring-two-factor-for-everyone).
+  [Administration](administration.md#requiring-two-factor-for-everyone). The
+  server enforces that, not only the app: until a user has set it up, their
+  session can do nothing else.
+- An administrator can remove a user's second factor (not another
+  administrator's), for one who has lost theirs.
 
 ## Request protection
 
@@ -145,6 +150,7 @@ deleted their entries are kept with the user removed.
 - **Minimal personal data:** the email address is the only personal data the
   server can read.
 - **Right to deletion:** deleting an account removes all of its data; audit entries
-  are anonymised.
+  are anonymised: the user is removed from them, and so is their address and id
+  wherever an entry's details named them.
 - **At rest:** passwords and recovery codes bcrypt-hashed, sessions SHA-256-hashed,
   TOTP secrets AES-256-GCM-encrypted, financial data end-to-end encrypted.
