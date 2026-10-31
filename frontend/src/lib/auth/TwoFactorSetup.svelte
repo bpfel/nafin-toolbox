@@ -11,15 +11,18 @@
   let secret = $state('')
   let otpauthURL = $state('')
   let code = $state('')
+  let password = $state('')
   let recoveryCodes = $state<string[]>([])
   let error = $state<string | null>(null)
   let loading = $state(false)
 
   async function handleSetup() {
+    if (!password) return
     loading = true
     error = null
-    const result = await setup2FA()
+    const result = await setup2FA(password)
     loading = false
+    password = ''
 
     if ('error' in result) {
       error = result.error
@@ -72,9 +75,18 @@
       <p class="error">{error}</p>
     {/if}
 
-    <button onclick={handleSetup} disabled={loading}>
-      {loading ? t('twofa.settingUp') : t('twofa.setupAction')}
-    </button>
+    <form class="password-form" novalidate onsubmit={(e) => { e.preventDefault(); handleSetup() }}>
+      <input
+        type="password"
+        bind:value={password}
+        placeholder={t('security.currentPasswordPlaceholder')}
+        autocomplete="current-password"
+        disabled={loading}
+      />
+      <button type="submit" disabled={loading || !password}>
+        {loading ? t('twofa.settingUp') : t('twofa.setupAction')}
+      </button>
+    </form>
 
   {:else if step === 'scan'}
     <h2>{t('twofa.scanTitle')}</h2>
@@ -138,6 +150,21 @@
 <style>
   .setup-2fa {
     max-width: 460px;
+  }
+
+  .password-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .password-form input {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
   }
 
   h2 {

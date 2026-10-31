@@ -70,6 +70,7 @@ export const en = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Two-Factor Authentication Required',
   'twofa.requiredHint': 'Your administrator requires all users to enable two-factor authentication before continuing.',
+  'twofa.requiredAdminHint': 'Administrator accounts always use two-factor authentication: they can reset anyone’s password, so a password alone must not be enough. Set it up to continue.',
 
   // --- Common fields and actions ---
   'field.password': 'Password',
@@ -230,6 +231,7 @@ export const en = {
   'household.personal': 'Personal',
   'household.needsKeys': 'Set up encryption before starting a household.',
   'household.failed': 'That did not work. Try again.',
+  'household.limitReached': 'You already own ten households, the most one person can.',
 
   'security.twofaTitle': 'Two-Factor Authentication',
   'security.currentPasswordPlaceholder': 'Current password',
@@ -244,6 +246,9 @@ export const en = {
   'security.regenerateCodes': 'Regenerate Recovery Codes',
   'security.newCodesWarning': 'Save these new recovery codes. Old codes are now invalid.',
   'security.passwordTitle': 'Password',
+  'security.keysTitle': 'Encryption keys',
+  'security.keysHint': 'Use this if you might have shared your password or recovery key by mistake. You get a new password, new keys and a new recovery key; your other devices are signed out.',
+  'security.renewKeys': 'Renew keys',
   'security.deleteAccountTitle': 'Delete Account',
   'security.deleteAccountHint': 'Permanently delete your account and all associated data. This cannot be undone.',
   'security.deletePrompt': 'Enter your password to confirm account deletion:',
@@ -271,6 +276,8 @@ export const en = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Save Your Recovery Key',
+  'recoveryKey.renewalIntro': 'Your account now keeps the key to your budget apart from anything sent to the server. Here is a new recovery key to go with it. Your old one stops working once you confirm this one.',
+  'recoveryKey.renewedIntro': 'Your password and every key behind your budget are new. Here is the recovery key that goes with them. Your old one stops working once you confirm this one, and your other devices are signed out.',
   'recoveryKey.copy': 'Copy key',
   'recoveryKey.confirmTitle': 'Check you really have it',
   'recoveryKey.label': 'Recovery key',
@@ -537,6 +544,7 @@ export const en = {
   'error.createEntry': 'Failed to create entry',
 
   'security.twofaEnabled': '2FA is enabled',
+  'security.twofaRequired': 'Required here, so it cannot be turned off.',
   'security.twofaNotEnabled': '2FA is not enabled',
   'twofa.enterCode.label': 'Enter code',
   'accountForm.qrIbanNote': 'a QR-IBAN — bills will use a QR reference (QRR)',

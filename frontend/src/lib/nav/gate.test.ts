@@ -37,10 +37,12 @@ describe('gateFor — one condition at a time', () => {
     ['password must change', { user: { role: 'user', mustChangePassword: true } }, 'mustChangePassword'],
     ['2FA required of everyone', { enforce2FA: true }, 'enforce2FA'],
     ['a recovery key to write down', { recoveryKeyPending: true }, 'recoveryKey'],
+    ['a new recovery key, for the move to separate keys', { recoveryKeyRenewalPending: true }, 'recoveryKeyRenewal'],
     ['vault written by a newer build', { vaultVersionAhead: true }, 'vaultAhead'],
     ['no vault yet', { vaultNeedsSetup: true }, 'vaultSetup'],
     ['vault will not decrypt', { vaultDecryptFailed: true }, 'vaultDecryptFailed'],
     ['vault locked', { vaultLocked: true }, 'vaultLocked'],
+    ['vault open, a new recovery key may be due', { openingVault: true }, 'loading'],
   ] as const)('%s', (_name, over, expected) => {
     expect(gateFor(state(over))).toBe(expected)
   })
@@ -125,5 +127,17 @@ describe('gateFor — no encryption in this browser', () => {
     expect(gateFor(state({ canEncrypt: false, loading: true }))).toBe('insecure')
     expect(gateFor(state({ canEncrypt: false, user: null, onVerifyPath: true }))).toBe('insecure')
     expect(gateFor(state({ canEncrypt: false, user: { role: 'admin', mustChangePassword: false } }))).toBe('insecure')
+  })
+})
+
+// The budget flashed up for a second after a sign-in or a recovery, before the
+// new recovery key's screen: the vault was open, and the key not yet ready.
+describe('opening the vault', () => {
+  test('holds the budget back, not the forms in front of it', () => {
+    // Still being unlocked, or recovered: the form stays, with any error it shows.
+    expect(gateFor(state({ openingVault: true, vaultUnlocked: false }))).toBe('vaultLocked')
+    expect(gateFor(state({ openingVault: true, vaultDecryptFailed: true }))).toBe('vaultDecryptFailed')
+    // The new recovery key, once ready, goes first.
+    expect(gateFor(state({ openingVault: true, recoveryKeyRenewalPending: true }))).toBe('recoveryKeyRenewal')
   })
 })

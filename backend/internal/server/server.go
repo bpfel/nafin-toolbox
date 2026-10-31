@@ -3,6 +3,8 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
+	"net"
 	"net/http"
 
 	"github.com/bpfel/nafin-toolbox/internal/apierror"
@@ -35,6 +37,9 @@ func New(db *sql.DB, emailSender email.Sender, encryptionKey []byte, appURL stri
 }
 
 func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL string) {
+	if encryptionKey == nil {
+		log.Printf("WARNING: no ENCRYPTION_KEY, so 2FA cannot be enabled — and administrators, who must use it wherever it can be enabled, act on a password alone. Set ENCRYPTION_KEY (openssl rand -hex 32).")
+	}
 	allowedOrigins := getAllowedOrigins()
 
 	s.router.Use(middleware.Logger)
@@ -56,6 +61,13 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 	setupLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verifyEmailLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
 	verify2FALimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
+	// Keyed by address or by account rather than by client, so none of these
+	// three reads a forwarding header or needs the trusted proxies below.
+	loginEmailLimiter := auth.NewLoginRateLimiter(30, time.Hour)
+	verify2FAUserLimiter := auth.NewLoginRateLimiter(10, 15*time.Minute)
+	passwordCheckLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	deviceLimiter := auth.NewLoginRateLimiter(5, 15*time.Minute)
+	preloginLimiter := auth.NewLoginRateLimiter(100, 15*time.Minute)
 	// Four figures change about four times a year between them; six sends an
 	// hour is room to retry a bounced one without leaving a mail button open.
 	remindLimiter := auth.NewLoginRateLimiter(6, time.Hour)
@@ -63,28 +75,44 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 		var cidrs []string
 		for _, c := range strings.Split(proxies, ",") {
 			c = strings.TrimSpace(c)
-			if c != "" {
-				cidrs = append(cidrs, c)
+			if c == "" {
+				continue
 			}
+			// A typo here used to be skipped without a word, and the proxy it
+			// meant went untrusted: every visitor then looked like the proxy.
+			if _, _, err := net.ParseCIDR(c); err != nil {
+				log.Printf("TRUSTED_PROXIES: ignoring %q, which is not a CIDR such as 203.0.113.10/32", c)
+				continue
+			}
+			cidrs = append(cidrs, c)
 		}
+		// Said once at start: an operator reading why every visitor shares one
+		// address, or why a forged one was believed, starts here.
+		log.Printf("trusting forwarded-for headers from %s", strings.Join(cidrs, ", "))
 		authStore.SetTrustedProxies(cidrs)
 		loginLimiter.SetTrustedProxies(cidrs)
 		setupLimiter.SetTrustedProxies(cidrs)
 		verifyEmailLimiter.SetTrustedProxies(cidrs)
 		verify2FALimiter.SetTrustedProxies(cidrs)
 		remindLimiter.SetTrustedProxies(cidrs)
+		preloginLimiter.SetTrustedProxies(cidrs)
 	}
 
 	deps := &auth.HandlerDeps{
-		Store:               authStore,
-		LoginLimiter:        loginLimiter,
-		LoginAccountLimiter: loginAccountLimiter,
-		SetupLimiter:        setupLimiter,
-		VerifyEmailLimiter:  verifyEmailLimiter,
-		Verify2FALimiter:    verify2FALimiter,
-		EmailSender:         emailSender,
-		EncryptionKey:       encryptionKey,
-		AppURL:              appURL,
+		Store:                authStore,
+		LoginLimiter:         loginLimiter,
+		LoginAccountLimiter:  loginAccountLimiter,
+		SetupLimiter:         setupLimiter,
+		VerifyEmailLimiter:   verifyEmailLimiter,
+		Verify2FALimiter:     verify2FALimiter,
+		LoginEmailLimiter:    loginEmailLimiter,
+		Verify2FAUserLimiter: verify2FAUserLimiter,
+		PasswordCheckLimiter: passwordCheckLimiter,
+		DeviceLimiter:        deviceLimiter,
+		PreloginLimiter:      preloginLimiter,
+		EmailSender:          emailSender,
+		EncryptionKey:        encryptionKey,
+		AppURL:               appURL,
 	}
 
 	s.router.Route("/api", func(r chi.Router) {
@@ -92,19 +120,24 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 
 		// Public routes (no auth required)
 		r.Get("/health", s.handleHealth)
+		r.Post("/auth/prelogin", auth.HandlePrelogin(deps))
 		r.Post("/auth/login", auth.HandleLogin(deps))
 		r.Get("/auth/needs-setup", auth.HandleNeedsSetup(deps))
 		r.Post("/auth/setup", auth.HandleSetup(deps))
 		r.Post("/auth/verify-email", auth.HandleVerifyEmail(deps))
+		r.Post("/auth/invitation", auth.HandleInvitationEmail(deps))
 		r.Post("/auth/verify-2fa", auth.HandleVerify2FA(deps))
 
 		// Protected routes (require auth)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(authStore))
+			r.Use(auth.RequireEnrolment(deps))
 			r.Get("/auth/me", auth.HandleMe)
 			r.Post("/auth/logout", auth.HandleLogout(deps))
 			r.Post("/auth/logout-everywhere", auth.HandleLogoutEverywhere(deps))
 			r.Post("/auth/change-password", auth.HandleChangePassword(deps))
+			r.Post("/auth/upgrade", auth.HandleUpgrade(deps))
+			r.Post("/auth/renew-keys", auth.HandleRenewKeys(deps))
 			r.Get("/auth/settings", auth.HandleGetSettings(deps))
 
 			// 2FA management
@@ -121,9 +154,12 @@ func (s *Server) routes(emailSender email.Sender, encryptionKey []byte, appURL s
 			r.Get("/auth/users", auth.HandleListUsers(deps))
 			r.Delete("/auth/users/{id}", auth.HandleAdminDeleteUser(deps))
 			r.Post("/auth/users/{id}/reset-password", auth.HandleAdminResetPassword(deps))
+			r.Delete("/auth/users/{id}/2fa", auth.HandleAdminRemove2FA(deps))
 			r.Post("/auth/resend-verification/{id}", auth.HandleResendVerification(deps))
 			r.Post("/auth/settings/require-2fa", auth.HandleAdminRequire2FA(deps))
 			r.Get("/auth/audit-logs", auth.HandleListAuditLogs(deps))
+			r.Get("/auth/lockouts", auth.HandleListLockouts(deps))
+			r.Post("/auth/lockouts/clear", auth.HandleClearLockouts(deps))
 
 			r.Post("/upkeep/remind", upkeep.Handle(deps, remindLimiter))
 

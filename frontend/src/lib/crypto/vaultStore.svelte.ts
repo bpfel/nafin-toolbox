@@ -1,7 +1,7 @@
-import { deriveKEK, generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, wrapMEKWithRecovery, unwrapMEKWithRecovery } from './keys'
-import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, type VaultData, type VaultPerson } from './vault'
+import { generateMEK, wrapMEK, unwrapMEK, generateRecoveryKey, unwrapMEKWithRecovery, deriveRecoveryKeys, derivePasswordKeys, type PasswordKeys } from './keys'
+import { encryptVault, decryptVault, createEmptyVault, assertVaultShape, VaultVersionAheadError, VAULT_VERSION, type VaultData, type VaultPerson } from './vault'
 import {
-  fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError,
+  fetchVaultKeys, setupVaultKeys, updateVaultKeys, setupIdentity, fetchVault, putVault, recoverVaultKeys, VaultConflictError, VaultReadOnlyError, VaultUnavailableError,
   VaultGoneError, SessionEndedError, VaultSaveError, signalUnauthorized,
   fetchHouseholds, createHousehold as postHousehold, fetchHouseholdVault, putHouseholdVault,
   renameHousehold as putHouseholdName, deleteHousehold as removeHousehold,
@@ -11,7 +11,7 @@ import {
 } from '../api/client'
 import { generateIdentity, sealIdentity, openIdentity, isComplete, type OpenIdentity } from './identity'
 import {
-  generateHouseholdKey, sealKeyForSelf, sealName, openName, openListedHousehold, openGrantedKey,
+  generateHouseholdKey, sealKeyForSelf, openKeyFromSelf, sealName, openName, openListedHousehold, openGrantedKey,
   HOUSEHOLD_NAME_MAX,
   type OpenHousehold,
 } from './household'
@@ -494,14 +494,19 @@ async function openGranted(listing: {
   role: string
   updated_at: string
 }): Promise<OpenHousehold | null> {
-  if (!identity || !current.data) return null
+  // The personal vault's record, whichever vault is on screen. The households
+  // are listed again while one of them is open too (a payload that will not
+  // decrypt, the join screen's wait), and a household's own vault holds no
+  // record of this person's — any of its writers can put one there.
+  const trust = personalSlot()?.data?.trust
+  if (!identity || !trust) return null
 
   const members = await fetchHouseholdMembers(listing.id)
   const { key, epoch, pin } = await openGrantedKey({
     grant: listing.wrapped_key,
     householdId: listing.id,
     members,
-    trust: current.data.trust,
+    trust,
     identity,
   })
 
@@ -524,6 +529,11 @@ async function openGranted(listing: {
  * would start over and accept whatever key was there then.
  */
 function rememberTrust(userId: number, verifyingKey: string, householdId: number, epoch: number): void {
+  // Written only while the personal vault is on screen: `commit` changes the
+  // vault on screen, and a household's is not this person's record. Unlock
+  // opens every household with the personal vault on screen, so what is
+  // learned meanwhile is written down then.
+  if (currentId !== 'personal') return
   const trust = current.data?.trust
   if (!trust) return
 
@@ -636,6 +646,7 @@ export async function tryRestoreVault(userId: number): Promise<boolean> {
     // this were left out, reloading the page would silently take away the
     // ability to share a household until the next real sign-in.
     const keys = await fetchVaultKeys()
+    recoveryVersion = keys?.recovery_version ?? 1
     identity = await ensureIdentity(keys, cachedMEK)
     await loadHouseholds(cachedMEK)
     unlocked = true
@@ -650,7 +661,9 @@ export async function tryRestoreVault(userId: number): Promise<boolean> {
       current.versionAhead = true
       return false
     }
-    clearCachedMEK()
+    // Nor when the vault could not be read: the key is fine, and the next
+    // reload may well find the server back.
+    if (!(e instanceof VaultUnavailableError)) clearCachedMEK()
     return false
   }
 }
@@ -661,17 +674,17 @@ export async function tryRestoreVault(userId: number): Promise<boolean> {
  * or 'decrypt-failed' if keys exist but unwrap/decrypt failed.
  */
 export async function initializeVault(
-  password: string,
-  email: string,
+  passwordKeys: PasswordKeys,
   userId: number,
-): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead'> {
+  authVersion: number,
+): Promise<'ok' | 'no-keys' | 'decrypt-failed' | 'version-ahead' | 'unavailable'> {
   const keys = await fetchVaultKeys()
   if (!keys) return 'no-keys'
   owner = userId
+  recoveryVersion = keys.recovery_version ?? 1
 
   try {
-    const kek = await deriveKEK(password, email, keys.iterations)
-    mek = await unwrapMEK(keys.encrypted_mek, kek)
+    mek = await unwrapMEK(keys.encrypted_mek, kekFor(passwordKeys, authVersion))
     current.key = mek
     identity = await ensureIdentity(keys, mek)
 
@@ -698,6 +711,9 @@ export async function initializeVault(
       current.versionAhead = true
       return 'version-ahead'
     }
+    // Not 'decrypt-failed': the password was right, and recovery is not what
+    // a server restarting calls for.
+    if (e instanceof VaultUnavailableError) return 'unavailable'
     return 'decrypt-failed'
   }
 }
@@ -741,17 +757,27 @@ async function ensureIdentity(
  * Set up encryption keys for the first time.
  * Returns the recovery key that must be shown to the user.
  */
-export async function setupKeys(password: string, email: string, userId: number): Promise<string> {
-  owner = userId
+/**
+ * A new vault's keys, made but not yet stored, and its recovery key to show.
+ *
+ * Stored by `store`, once the recovery key has been typed back. It used to be
+ * the other way round, and a reload on the screen showing the key stored a
+ * vault whose only way back had never been seen. Until `store` runs nothing is
+ * on the server: a reload leaves the account without a vault, and setting it
+ * up again makes a new key.
+ */
+export async function prepareSetup(
+  passwordKeys: PasswordKeys,
+  userId: number,
+): Promise<{ recoveryKey: string; store: () => Promise<void> }> {
   const newMEK = await generateMEK()
-  const kek = await deriveKEK(password, email, 600000)
-  const encryptedMEK = await wrapMEK(newMEK, kek)
+  const encryptedMEK = await wrapMEK(newMEK, passwordKeys.vaultKEK)
 
+  // The recovery key stays here; the server gets its auth key, and the MEK is
+  // wrapped under a key derived beside it that never leaves the browser.
   const recoveryKey = generateRecoveryKey()
-  const encryptedMEKRecovery = await wrapMEKWithRecovery(newMEK, recoveryKey)
-
-  // Hash the recovery key for server-side verification
-  const recoveryKeyHash = await hashRecoveryKey(recoveryKey)
+  const recovery = await deriveRecoveryKeys(recoveryKey)
+  const encryptedMEKRecovery = await wrapMEK(newMEK, recovery.recoveryKEK)
 
   // Generated for everyone, sharing or not. A keypair that only appears when
   // somebody first wants to share is a keypair that is missing at the moment an
@@ -760,22 +786,26 @@ export async function setupKeys(password: string, email: string, userId: number)
   const freshIdentity = await generateIdentity()
   const sealed = await sealIdentity(freshIdentity, newMEK)
 
-  await setupVaultKeys({
-    encrypted_mek: encryptedMEK,
-    recovery_key_hash: recoveryKeyHash,
-    encrypted_mek_recovery: encryptedMEKRecovery,
-    ...sealed,
-  })
+  const store = async () => {
+    owner = userId
+    await setupVaultKeys({
+      encrypted_mek: encryptedMEK,
+      recovery_auth: recovery.recoveryAuth,
+      encrypted_mek_recovery: encryptedMEKRecovery,
+      ...sealed,
+    })
 
-  identity = await openIdentity(sealed, newMEK)
-  mek = newMEK
-  current.key = newMEK
-  current.data = createEmptyVault(mainAccountName())
-  await saveVault()
-  await cacheMEK(newMEK)
-  unlocked = true
+    identity = await openIdentity(sealed, newMEK)
+    recoveryVersion = 2
+    mek = newMEK
+    current.key = newMEK
+    current.data = createEmptyVault(mainAccountName())
+    await saveVault()
+    await cacheMEK(newMEK)
+    unlocked = true
+  }
 
-  return recoveryKey
+  return { recoveryKey, store }
 }
 
 /**
@@ -791,8 +821,11 @@ export async function setupKeys(password: string, email: string, userId: number)
 export async function deleteAllMyData(password: string, email: string): Promise<'ok' | 'wrong-password'> {
   const keys = await fetchVaultKeys()
   if (!keys) return 'wrong-password'
+  // Either form of the vault key: this check needs no version, only the
+  // password, and a version 1 account still wraps under the legacy one.
+  const derived = await derivePasswordKeys(password, email, keys.iterations)
   try {
-    await unwrapMEK(keys.encrypted_mek, await deriveKEK(password, email, keys.iterations))
+    await unwrapMEK(keys.encrypted_mek, derived.vaultKEK).catch(() => unwrapMEK(keys.encrypted_mek, derived.legacyKEK))
   } catch {
     return 'wrong-password'
   }
@@ -1026,7 +1059,13 @@ async function fetchNewer(
   slot: VaultSlot,
   id: VaultId,
 ): Promise<{ data: VaultData; updatedAt: string } | 'unreachable' | 'stopped'> {
-  const payload = id === 'personal' ? await fetchVault() : await fetchHouseholdVault(id)
+  let payload
+  try {
+    payload = id === 'personal' ? await fetchVault() : await fetchHouseholdVault(id)
+  } catch (e) {
+    if (e instanceof VaultUnavailableError) return 'unreachable'
+    throw e
+  }
   if (!payload || !slot.key) return 'unreachable'
   try {
     return { data: await decryptVault(payload.ciphertext, payload.nonce, slot.key), updatedAt: payload.updated_at }
@@ -1286,14 +1325,15 @@ export function clearVault(): void {
 }
 
 /**
- * Re-encrypt MEK after password change.
+ * The vault key wrapped under a new password, for a password change to carry.
+ *
+ * Not stored from here: the server stores it with the new password, after the
+ * current one is proven. Stored ahead of that, a mistyped current password
+ * left the vault openable only with a password the account did not have.
  */
-export async function reEncryptMEK(oldPassword: string, newPassword: string, email: string): Promise<void> {
+export async function wrapMEKFor(newKeys: PasswordKeys): Promise<string> {
   if (!mek) throw new Error('Vault not unlocked')
-
-  const newKEK = await deriveKEK(newPassword, email, 600000)
-  const newEncryptedMEK = await wrapMEK(mek, newKEK)
-  await updateVaultKeys(newEncryptedMEK)
+  return wrapMEK(mek, newKeys.vaultKEK)
 }
 
 /**
@@ -1305,21 +1345,25 @@ export async function reEncryptMEK(oldPassword: string, newPassword: string, ema
  */
 export async function recoverVault(
   recoveryKey: string,
-  newPassword: string,
-  email: string,
+  passwordKeys: PasswordKeys,
+  authVersion: number,
   userId: number,
 ): Promise<void> {
   owner = userId
-  // Get recovery-wrapped MEK from server (server verifies recovery key)
-  const result = await recoverVaultKeys(recoveryKey)
+  // Proven in the form the account's recovery was stored in: the raw key for
+  // version 1, which the server already had; its auth key for version 2.
+  const version = (await fetchVaultKeys())?.recovery_version ?? 1
+  const derived = version >= 2 ? await deriveRecoveryKeys(recoveryKey) : null
+  const result = await recoverVaultKeys(derived ? { recovery_auth: derived.recoveryAuth } : { recovery_key: recoveryKey })
   if (!result) throw new Error('Invalid recovery key')
+  recoveryVersion = result.recovery_version ?? version
 
-  // Unwrap MEK using recovery key
-  const recoveredMEK = await unwrapMEKWithRecovery(result.encrypted_mek_recovery, recoveryKey)
+  const recoveredMEK = derived
+    ? await unwrapMEK(result.encrypted_mek_recovery, derived.recoveryKEK)
+    : await unwrapMEKWithRecovery(result.encrypted_mek_recovery, recoveryKey)
 
-  // Re-wrap MEK with new password
-  const newKEK = await deriveKEK(newPassword, email, 600000)
-  const newEncryptedMEK = await wrapMEK(recoveredMEK, newKEK)
+  // Re-wrap MEK with the password the account has now
+  const newEncryptedMEK = await wrapMEK(recoveredMEK, kekFor(passwordKeys, authVersion))
   await updateVaultKeys(newEncryptedMEK)
 
   // The identity is sealed under the MEK rather than under the password, so a
@@ -1344,12 +1388,149 @@ export async function recoverVault(
   unlocked = true
 }
 
+// --- Moving an account to separate keys (key separation) ---
+//
+// See plans/key-separation-plan.md. The store holds the MEK, so the parts of
+// an upgrade that wrap it are made here; authStore sends them.
+
+/** How this account's recovery copy of the MEK is wrapped. See VaultKeysResponse. */
+let recoveryVersion = 2
+
+/** The KEK an account's MEK is wrapped under, by its version. */
+function kekFor(passwordKeys: PasswordKeys, authVersion: number): CryptoKey {
+  return authVersion >= 2 ? passwordKeys.vaultKEK : passwordKeys.legacyKEK
+}
+
+/** Whether the open vault's recovery key is one the server once received. */
+export function recoveryNeedsRenewal(): boolean {
+  return unlocked && recoveryVersion < 2
+}
+
+/** What POST /auth/upgrade needs from the vault, and a new recovery key to show. */
+export interface PreparedUpgrade {
+  recoveryKey: string | null
+  encrypted_mek?: string
+  recovery_auth?: string
+  encrypted_mek_recovery?: string
+}
+
 /**
- * Send raw recovery key to server — the server bcrypt-hashes it on receipt.
- * bcrypt is not available in the browser Web Crypto API.
+ * Wrap the open MEK for version 2: under the password's new vault KEK, and
+ * under a new recovery key's KEK. Nothing is sent from here; the upgrade
+ * goes out only once the new recovery key has been written down.
  */
-async function hashRecoveryKey(recoveryKey: string): Promise<string> {
-  return recoveryKey
+export async function prepareUpgrade(passwordKeys: PasswordKeys, rewrapMEK: boolean, renewRecovery: boolean): Promise<PreparedUpgrade> {
+  if (!mek) throw new Error('Vault not unlocked')
+  const out: PreparedUpgrade = { recoveryKey: null }
+  if (rewrapMEK) out.encrypted_mek = await wrapMEK(mek, passwordKeys.vaultKEK)
+  if (renewRecovery) {
+    const recoveryKey = generateRecoveryKey()
+    const derived = await deriveRecoveryKeys(recoveryKey)
+    out.recoveryKey = recoveryKey
+    out.recovery_auth = derived.recoveryAuth
+    out.encrypted_mek_recovery = await wrapMEK(mek, derived.recoveryKEK)
+  }
+  return out
+}
+
+/** The server stored an upgrade: the recovery copy is version 2 now. */
+export function upgradeStored(renewedRecovery: boolean): void {
+  if (renewedRecovery) recoveryVersion = 2
+}
+
+// --- Renewing every key (key separation, phase 2) ---
+//
+// A new MEK, and everything sealed under the old one sealed again: the
+// personal vault, the identity's private keys, this account's own copy of each
+// household key. Made here, sent by authStore once the new recovery key has
+// been written down, and stored by the server in one transaction (renew.go).
+
+/**
+ * Whether these keys open this account's vault — the check that a typed
+ * password is the current one, made here so that nothing is prepared, or
+ * shown, on the strength of a mistyped one.
+ */
+export async function opensVault(passwordKeys: PasswordKeys, authVersion: number): Promise<boolean> {
+  const keys = await fetchVaultKeys()
+  if (!keys) return false
+  try {
+    await unwrapMEK(keys.encrypted_mek, kekFor(passwordKeys, authVersion))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** A renewal, made and not yet sent. */
+export interface PreparedRenewal {
+  recoveryKey: string
+  /** Everything POST /auth/renew-keys needs except the proofs. */
+  body: Record<string, unknown>
+  newMEK: CryptoKey
+}
+
+/** The personal vault's slot, on screen or set aside behind a household. */
+function personalSlot(): VaultSlot | undefined {
+  return currentId === 'personal' ? current : stashed.get('personal')
+}
+
+export class UnsavedChangesError extends Error {
+  constructor() {
+    super('Some changes are still being saved. Try again in a moment.')
+  }
+}
+
+export async function prepareRenewal(newKeys: PasswordKeys): Promise<PreparedRenewal> {
+  if (!mek) throw new Error('Vault not unlocked')
+  // What is re-encrypted is what the server holds, so nothing may be waiting
+  // to be saved under the old key.
+  const slot = personalSlot()
+  if (slot === current && current.dirty) await saveVault()
+  if (slot?.dirty || slot?.saving) throw new UnsavedChangesError()
+
+  const newMEK = await generateMEK()
+  const body: Record<string, unknown> = {
+    new_auth_key: newKeys.authKey,
+    encrypted_mek: await wrapMEK(newMEK, newKeys.vaultKEK),
+  }
+
+  const recoveryKey = generateRecoveryKey()
+  const recovery = await deriveRecoveryKeys(recoveryKey)
+  body.recovery_auth = recovery.recoveryAuth
+  body.encrypted_mek_recovery = await wrapMEK(newMEK, recovery.recoveryKEK)
+
+  const stored = await fetchVault()
+  if (stored) {
+    const data = await decryptVault(stored.ciphertext, stored.nonce, mek)
+    body.vault = { ...(await encryptVault(data, newMEK)), version: VAULT_VERSION, expected_updated_at: stored.updated_at }
+  }
+
+  const keys = await fetchVaultKeys()
+  if (keys?.encrypted_private_key && keys.encrypted_signing_key) {
+    body.encrypted_private_key = await sealUnder(await openUnder(keys.encrypted_private_key, mek), newMEK)
+    body.encrypted_signing_key = await sealUnder(await openUnder(keys.encrypted_signing_key, mek), newMEK)
+  }
+
+  const listed = await fetchHouseholds()
+  body.households = await Promise.all(
+    listed
+      .filter(l => l.wrap_kind === 'self')
+      .map(async l => ({ id: l.id, wrapped_key: await sealKeyForSelf(await openKeyFromSelf(l.wrapped_key, mek!), newMEK) })),
+  )
+
+  return { recoveryKey, body, newMEK }
+}
+
+/** The server stored a renewal: from here on the vault is the new MEK's. */
+export async function renewalStored(renewal: PreparedRenewal, vaultUpdatedAt: string | null): Promise<void> {
+  mek = renewal.newMEK
+  const slot = personalSlot()
+  if (slot) {
+    slot.key = renewal.newMEK
+    if (vaultUpdatedAt) slot.lastUpdatedAt = vaultUpdatedAt
+  }
+  recoveryVersion = 2
+  await cacheMEK(renewal.newMEK)
 }
 
 // Back online, or back in front of the user: try what is waiting now rather

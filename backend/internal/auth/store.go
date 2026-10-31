@@ -8,8 +8,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -35,11 +37,11 @@ func (s *Store) SetTrustedProxies(cidrs []string) {
 
 // ---- User CRUD ----
 
-const userColumns = `id, email, role, password_hash, must_change_password, email_verified, totp_enabled, created_at`
+const userColumns = `id, email, role, password_hash, must_change_password, email_verified, totp_enabled, created_at, temp_password_expires_at, device_epoch, auth_version, kek_iterations`
 
 func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Email, &u.Role, &u.PasswordHash, &u.MustChangePassword, &u.EmailVerified, &u.TOTPEnabled, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.Role, &u.PasswordHash, &u.MustChangePassword, &u.EmailVerified, &u.TOTPEnabled, &u.CreatedAt, &u.TempPasswordExpiresAt, &u.DeviceEpoch, &u.AuthVersion, &u.KDFIterations)
 	return &u, err
 }
 
@@ -108,26 +110,105 @@ func (s *Store) ListUsers(ctx context.Context) ([]User, error) {
 	return users, rows.Err()
 }
 
+// UpdatePassword stores the hash of a new auth key. Every password set since
+// key separation is one the browser turned into an auth key, so the account is
+// version 2 from here on, whatever it was before. See kdf.go.
 func (s *Store) UpdatePassword(ctx context.Context, userID int, newHash string) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET password_hash = $1 WHERE id = $2`,
+		`UPDATE users SET password_hash = $1, auth_version = 2 WHERE id = $2`,
 		newHash, userID,
 	)
 	return err
 }
 
-func (s *Store) ClearMustChangePassword(ctx context.Context, userID int) error {
+// ChangePassword stores a new password, and with it the vault key wrapped
+// under that password, in one statement — and clears a must-change.
+//
+// One statement because they belong together. The client once stored the new
+// wrap first, in a request of its own, and only then asked for the password
+// change; a mistyped current password was refused after the wrap had already
+// moved, and the vault no longer opened with the password the account still
+// had. An empty encryptedMEK leaves the stored wrap alone: an administrator,
+// or an account with no vault yet, has none to re-wrap.
+func (s *Store) ChangePassword(ctx context.Context, userID int, newHash, encryptedMEK string) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET must_change_password = FALSE WHERE id = $1`,
-		userID,
+		`UPDATE users
+		 SET password_hash = $1, auth_version = 2,
+		     must_change_password = FALSE, temp_password_expires_at = NULL,
+		     encrypted_mek = COALESCE(NULLIF($3, ''), encrypted_mek)
+		 WHERE id = $2`,
+		newHash, userID, encryptedMEK,
 	)
 	return err
 }
 
-func (s *Store) SetMustChangePassword(ctx context.Context, userID int) error {
+// CredentialState is what an account still lacks of version 2.
+type CredentialState struct {
+	AuthVersion     int
+	HasVault        bool
+	HasRecovery     bool
+	RecoveryVersion int
+}
+
+// NeedsAuth reports whether the account still signs in with its password.
+func (c CredentialState) NeedsAuth() bool { return c.AuthVersion < AuthVersionKey }
+
+// NeedsRecovery reports whether the account's recovery key is still one the
+// server received in the clear.
+func (c CredentialState) NeedsRecovery() bool {
+	return c.HasVault && c.HasRecovery && c.RecoveryVersion < 2
+}
+
+func (s *Store) GetCredentialState(ctx context.Context, userID int) (CredentialState, error) {
+	var c CredentialState
+	err := s.db.QueryRowContext(ctx,
+		`SELECT auth_version, encrypted_mek IS NOT NULL, recovery_key_hash IS NOT NULL, recovery_version
+		   FROM users WHERE id = $1`, userID,
+	).Scan(&c.AuthVersion, &c.HasVault, &c.HasRecovery, &c.RecoveryVersion)
+	return c, err
+}
+
+// Upgrade stores what an account needs for version 2, all of it at once.
+// Each argument left empty leaves its column alone. It applies only while the
+// account is still at fromAuthVersion, so two tabs migrating together cannot
+// both write; the second gets ErrUpgradeRaced.
+func (s *Store) Upgrade(ctx context.Context, userID, fromAuthVersion int, authHash, encryptedMEK, recoveryHash, encryptedMEKRecovery string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE users SET
+		    password_hash          = COALESCE(NULLIF($3, ''), password_hash),
+		    auth_version           = CASE WHEN $3 = '' THEN auth_version ELSE 2 END,
+		    encrypted_mek          = COALESCE(NULLIF($4, ''), encrypted_mek),
+		    recovery_key_hash      = COALESCE(NULLIF($5, ''), recovery_key_hash),
+		    encrypted_mek_recovery = COALESCE(NULLIF($6, ''), encrypted_mek_recovery),
+		    recovery_version       = CASE WHEN $5 = '' THEN recovery_version ELSE 2 END
+		  WHERE id = $1 AND auth_version = $2`,
+		userID, fromAuthVersion, authHash, encryptedMEK, recoveryHash, encryptedMEKRecovery,
+	)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return ErrUpgradeRaced
+	}
+	return nil
+}
+
+// ErrUpgradeRaced: the account changed version while the upgrade was prepared.
+var ErrUpgradeRaced = errors.New("account was upgraded meanwhile")
+
+// SetTemporaryPassword gives a user a password somebody else chose, which they
+// must change at their next sign-in and which stops working at expiresAt.
+//
+// One statement for all of it, so there is no moment, and no failure, in
+// which the password has been replaced and is not yet temporary: the flag used
+// to be set separately afterwards, and an error there was only logged. The
+// same statement retires the account's trusted devices (see device.go): a
+// reset answers "someone else may have this".
+func (s *Store) SetTemporaryPassword(ctx context.Context, userID int, passwordHash string, expiresAt time.Time) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET must_change_password = TRUE WHERE id = $1`,
-		userID,
+		`UPDATE users SET password_hash = $2, auth_version = 2, must_change_password = TRUE, temp_password_expires_at = $3,
+		        device_epoch = device_epoch + 1 WHERE id = $1`,
+		userID, passwordHash, expiresAt,
 	)
 	return err
 }
@@ -211,10 +292,46 @@ func (s *Store) DeleteUserGuardingLastAdmin(ctx context.Context, userID int) err
 		}
 	}
 
+	if err := redactAuditMetadata(ctx, tx, userID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID); err != nil {
 		return fmt.Errorf("deleting user: %w", err)
 	}
 	return tx.Commit()
+}
+
+// redactAuditMetadata removes from the audit log what still names an account
+// once it is gone: its address and its id, wherever an event copied them into
+// the metadata. The foreign key nulls audit_log.user_id, but a failed sign-in
+// keeps the address that was typed, an invitation the invitee's address, a
+// reset its target's. The events stay, so the log still says what happened;
+// only who it happened to goes.
+//
+// Addresses are compared without case: a failed sign-in stores the address as
+// it was typed, the account its lower-case form.
+func redactAuditMetadata(ctx context.Context, tx *sql.Tx, userID int) error {
+	var email string
+	if err := tx.QueryRowContext(ctx, `SELECT lower(email) FROM users WHERE id = $1`, userID).Scan(&email); err != nil {
+		return fmt.Errorf("reading email: %w", err)
+	}
+	id := strconv.Itoa(userID)
+	_, err := tx.ExecContext(ctx, `
+		UPDATE audit_log SET metadata = metadata
+			- (CASE WHEN lower(metadata->>'email') = $1 THEN 'email' ELSE '' END)
+			- (CASE WHEN lower(metadata->>'invited_email') = $1 THEN 'invited_email' ELSE '' END)
+			- (CASE WHEN lower(metadata->>'target_email') = $1 THEN 'target_email' ELSE '' END)
+			- (CASE WHEN metadata->>'invited_user_id' = $2 THEN 'invited_user_id' ELSE '' END)
+			- (CASE WHEN metadata->>'target_user_id' = $2 THEN 'target_user_id' ELSE '' END)
+		WHERE metadata IS NOT NULL
+		  AND (lower(metadata->>'email') = $1 OR lower(metadata->>'invited_email') = $1
+		    OR lower(metadata->>'target_email') = $1
+		    OR metadata->>'invited_user_id' = $2 OR metadata->>'target_user_id' = $2)`,
+		email, id)
+	if err != nil {
+		return fmt.Errorf("redacting audit metadata: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) UserCount(ctx context.Context) (int, error) {
@@ -389,9 +506,10 @@ func (s *Store) DeleteExpiredVerificationTokens(ctx context.Context) error {
 // ---- TOTP Secrets ----
 
 func (s *Store) SaveTOTPSecret(ctx context.Context, userID int, encryptedSecret string) error {
+	// A new secret starts its codes over: last_used_step belonged to the old one.
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO totp_secrets (user_id, encrypted_secret) VALUES ($1, $2)
-		 ON CONFLICT (user_id) DO UPDATE SET encrypted_secret = $2`,
+		 ON CONFLICT (user_id) DO UPDATE SET encrypted_secret = $2, last_used_step = NULL`,
 		userID, encryptedSecret,
 	)
 	return err
@@ -415,6 +533,53 @@ func (s *Store) GetTOTPSecret(ctx context.Context, userID int) (string, error) {
 func (s *Store) DeleteTOTPSecret(ctx context.Context, userID int) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM totp_secrets WHERE user_id = $1`, userID)
 	return err
+}
+
+// RemoveSecondFactor turns an account's 2FA off and removes everything that
+// belongs to it, together: the secret, the recovery codes, pending sign-in
+// challenges, every session and every trusted device.
+func (s *Store) RemoveSecondFactor(ctx context.Context, userID int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, q := range []string{
+		`UPDATE users SET totp_enabled = FALSE, device_epoch = device_epoch + 1 WHERE id = $1`,
+		`DELETE FROM totp_secrets WHERE user_id = $1`,
+		`DELETE FROM recovery_codes WHERE user_id = $1`,
+		`DELETE FROM mfa_challenges WHERE user_id = $1`,
+		`DELETE FROM sessions WHERE user_id = $1`,
+	} {
+		if _, err := tx.ExecContext(ctx, q, userID); err != nil {
+			return fmt.Errorf("removing second factor: %w", err)
+		}
+	}
+	return tx.Commit()
+}
+
+// ForgetDevices retires every trusted-device cookie of an account. See
+// device.go.
+func (s *Store) ForgetDevices(ctx context.Context, userID int) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET device_epoch = device_epoch + 1 WHERE id = $1`, userID)
+	return err
+}
+
+// ClaimTOTPStep records that a code from this time step has been used, and
+// reports false when one from it or a later step already was — the code has
+// been spent. See validateTOTPCode.
+func (s *Store) ClaimTOTPStep(ctx context.Context, userID int, step int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE totp_secrets SET last_used_step = $2
+		  WHERE user_id = $1 AND (last_used_step IS NULL OR last_used_step < $2)`,
+		userID, step,
+	)
+	if err != nil {
+		return false, fmt.Errorf("claiming TOTP step: %w", err)
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
 }
 
 // ---- Recovery Codes ----
@@ -464,12 +629,19 @@ func (s *Store) GetRecoveryCodes(ctx context.Context, userID int) ([]RecoveryCod
 	return codes, rows.Err()
 }
 
-func (s *Store) MarkRecoveryCodeUsed(ctx context.Context, codeID int) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE recovery_codes SET used = TRUE WHERE id = $1`,
+// ClaimRecoveryCode spends a recovery code, and reports whether this call was
+// the one that spent it. A code two requests both found unused is claimed by
+// one of them only.
+func (s *Store) ClaimRecoveryCode(ctx context.Context, codeID int) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE recovery_codes SET used = TRUE WHERE id = $1 AND NOT used`,
 		codeID,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
 }
 
 func (s *Store) DeleteRecoveryCodes(ctx context.Context, userID int) error {

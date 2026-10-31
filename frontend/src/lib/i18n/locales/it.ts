@@ -76,6 +76,7 @@ export const it: Messages = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Autenticazione a due fattori richiesta',
   'twofa.requiredHint': 'Il tuo amministratore richiede che tutti gli utenti attivino l’autenticazione a due fattori prima di continuare.',
+  'twofa.requiredAdminHint': 'Gli account amministratore usano sempre l’autenticazione a due fattori: possono reimpostare qualsiasi password, quindi una password da sola non deve bastare. Configurala per continuare.',
 
   // --- Fields ---
   'field.password': 'Password',
@@ -216,6 +217,7 @@ export const it: Messages = {
   'household.personal': 'Personale',
   'household.needsKeys': 'Configura prima la cifratura.',
   'household.failed': 'Non ha funzionato. Riprova.',
+  'household.limitReached': 'Possiedi già dieci economie domestiche, il massimo per persona.',
 
   'security.twofaTitle': 'Autenticazione a due fattori',
   'security.currentPasswordPlaceholder': 'Password attuale',
@@ -230,6 +232,9 @@ export const it: Messages = {
   'security.regenerateCodes': 'Rigenera i codici di recupero',
   'security.newCodesWarning': 'Conserva questi nuovi codici di recupero. I codici precedenti non sono più validi.',
   'security.passwordTitle': 'Password',
+  'security.keysTitle': 'Chiavi di cifratura',
+  'security.keysHint': 'Usalo se potresti aver condiviso per errore la tua password o la tua chiave di recupero. Ricevi una nuova password, nuove chiavi e una nuova chiave di recupero; i tuoi altri dispositivi vengono disconnessi.',
+  'security.renewKeys': 'Rinnova le chiavi',
   'security.deleteAccountTitle': 'Elimina l’account',
   'security.deleteAccountHint': 'Elimina definitivamente il tuo account e tutti i dati associati. L’operazione è irreversibile.',
   'security.deletePrompt': 'Inserisci la password per confermare l’eliminazione dell’account:',
@@ -257,6 +262,8 @@ export const it: Messages = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Conserva la tua chiave di recupero',
+  'recoveryKey.renewalIntro': 'Il tuo account tiene ora la chiave del tuo budget separata da tutto ciò che viene inviato al server. Ecco una nuova chiave di recupero. Quella vecchia smette di funzionare appena confermi questa.',
+  'recoveryKey.renewedIntro': 'La tua password e tutte le chiavi del tuo budget sono nuove. Ecco la chiave di recupero che le accompagna. Quella vecchia smette di funzionare appena confermi questa, e i tuoi altri dispositivi vengono disconnessi.',
   'recoveryKey.copy': 'Copia la chiave',
   'recoveryKey.confirmTitle': 'Verifica di averla davvero',
   'recoveryKey.label': 'Chiave di recupero',
@@ -491,6 +498,7 @@ export const it: Messages = {
   'error.createEntry': 'Creazione della voce non riuscita',
 
   'security.twofaEnabled': 'La 2FA è attiva',
+  'security.twofaRequired': 'Obbligatoria qui: non può essere disattivata.',
   'security.twofaNotEnabled': 'La 2FA non è attiva',
   'twofa.enterCode.label': 'Inserisci il codice',
   'accountForm.qrIbanNote': 'un QR-IBAN — le fatture useranno un riferimento QR (QRR)',

@@ -76,6 +76,7 @@ export const fr: Messages = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Authentification à deux facteurs requise',
   'twofa.requiredHint': 'Ton administrateur exige que tous les utilisateurs activent l’authentification à deux facteurs avant de continuer.',
+  'twofa.requiredAdminHint': 'Les comptes administrateur utilisent toujours l’authentification à deux facteurs: ils peuvent réinitialiser n’importe quel mot de passe, un mot de passe seul ne doit donc pas suffire. Configure-la pour continuer.',
 
   // --- Fields ---
   'field.password': 'Mot de passe',
@@ -216,6 +217,7 @@ export const fr: Messages = {
   'household.personal': 'Personnel',
   'household.needsKeys': 'Configure d’abord le chiffrement.',
   'household.failed': 'Cela n’a pas fonctionné. Réessaie.',
+  'household.limitReached': 'Tu possèdes déjà dix ménages, le maximum par personne.',
 
   'security.twofaTitle': 'Authentification à deux facteurs',
   'security.currentPasswordPlaceholder': 'Mot de passe actuel',
@@ -230,6 +232,9 @@ export const fr: Messages = {
   'security.regenerateCodes': 'Régénérer les codes de récupération',
   'security.newCodesWarning': 'Conserve ces nouveaux codes de récupération. Les anciens ne sont plus valables.',
   'security.passwordTitle': 'Mot de passe',
+  'security.keysTitle': 'Clés de chiffrement',
+  'security.keysHint': 'Utilise ceci si tu as peut-être partagé ton mot de passe ou ta clé de récupération par erreur. Tu obtiens un nouveau mot de passe, de nouvelles clés et une nouvelle clé de récupération; tes autres appareils sont déconnectés.',
+  'security.renewKeys': 'Renouveler les clés',
   'security.deleteAccountTitle': 'Supprimer le compte',
   'security.deleteAccountHint': 'Supprime définitivement ton compte et toutes les données associées. Cette action est irréversible.',
   'security.deletePrompt': 'Saisis ton mot de passe pour confirmer la suppression du compte:',
@@ -257,6 +262,8 @@ export const fr: Messages = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Conserve ta clé de récupération',
+  'recoveryKey.renewalIntro': 'Ton compte garde désormais la clé de ton budget à l’écart de tout ce qui est envoyé au serveur. Voici une nouvelle clé de récupération. L’ancienne ne fonctionne plus dès que tu confirmes celle-ci.',
+  'recoveryKey.renewedIntro': 'Ton mot de passe et toutes les clés de ton budget sont nouveaux. Voici la clé de récupération qui va avec. L’ancienne ne fonctionne plus dès que tu confirmes celle-ci, et tes autres appareils sont déconnectés.',
   'recoveryKey.copy': 'Copier la clé',
   'recoveryKey.confirmTitle': 'Vérifie que tu l’as vraiment',
   'recoveryKey.label': 'Clé de récupération',
@@ -491,6 +498,7 @@ export const fr: Messages = {
   'error.createEntry': 'Échec de la création de l’entrée',
 
   'security.twofaEnabled': 'La 2FA est activée',
+  'security.twofaRequired': 'Obligatoire ici: elle ne peut pas être désactivée.',
   'security.twofaNotEnabled': 'La 2FA n’est pas activée',
   'twofa.enterCode.label': 'Saisir le code',
   'accountForm.qrIbanNote': 'un QR-IBAN — les factures utiliseront une référence QR (QRR)',

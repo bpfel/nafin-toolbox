@@ -12,6 +12,7 @@ vi.mock('../lib/auth/authStore.svelte', () => ({
   disable2FA: vi.fn(),
   regenerateRecoveryCodes: vi.fn(),
   deleteAccount: vi.fn(),
+  getSettings: vi.fn(async () => ({ require_2fa: false })),
   logoutEverywhere: vi.fn(async () => auth.result),
 }))
 

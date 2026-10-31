@@ -27,7 +27,7 @@ type VaultStorer interface {
 	SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, recoveryKeyHash, encryptedMEKRecovery string, identity Identity) error
 	UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK string) error
 	SetIdentityIfAbsent(ctx context.Context, userID int, identity Identity) (bool, error)
-	GetRecoveryData(ctx context.Context, userID int) (string, string, error)
+	GetRecoveryData(ctx context.Context, userID int) (RecoveryData, error)
 }
 
 func Routes(db *sql.DB) func(r chi.Router) {
@@ -51,9 +51,17 @@ func handleGetVault(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
+		// 404 only when there is no row. The client treats 404 as "this account
+		// has no vault yet" and starts an empty one, so answering it for a
+		// database that is merely unreachable would have the empty vault saved
+		// over the real one.
 		v, err := store.GetVault(r.Context(), user.ID)
-		if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "no vault found"})
+			return
+		}
+		if err != nil {
+			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to load vault")
 			return
 		}
 
@@ -133,11 +141,13 @@ func handleGetKeys(store VaultStorer) http.HandlerFunc {
 		// missing, and refusing to hand over the MEK because of it would lock a
 		// user out of a vault they can otherwise open perfectly well.
 		identity, _ := store.GetIdentity(r.Context(), user.ID)
+		recovery, _ := store.GetRecoveryData(r.Context(), user.ID)
 
 		writeJSON(w, http.StatusOK, KeysResponse{
-			EncryptedMEK: encMEK,
-			Iterations:   iterations,
-			Identity:     identity,
+			EncryptedMEK:    encMEK,
+			Iterations:      iterations,
+			RecoveryVersion: recovery.Version,
+			Identity:        identity,
 		})
 	}
 }
@@ -163,8 +173,12 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		if req.EncryptedMEK == "" || req.RecoveryKeyHash == "" || req.EncryptedMEKRecovery == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "encrypted_mek, recovery_key_hash, and encrypted_mek_recovery are required"})
+		if req.EncryptedMEK == "" || req.RecoveryAuth == "" || req.EncryptedMEKRecovery == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "encrypted_mek, recovery_auth, and encrypted_mek_recovery are required"})
+			return
+		}
+		if !auth.ValidAuthKey(req.RecoveryAuth) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "recovery_auth must be 32 bytes of base64"})
 			return
 		}
 
@@ -180,8 +194,9 @@ func handleSetupKeys(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		// The client sends the raw recovery key; we bcrypt-hash it for storage
-		hashedRecoveryKey, err := bcrypt.GenerateFromPassword([]byte(req.RecoveryKeyHash), bcrypt.DefaultCost)
+		// The recovery key's auth key, derived in the browser. Stored as a
+		// bcrypt hash, like a password.
+		hashedRecoveryKey, err := bcrypt.GenerateFromPassword([]byte(req.RecoveryAuth), bcrypt.DefaultCost)
 		if err != nil {
 			apierror.Write(w, apierror.Vault, http.StatusInternalServerError, "failed to hash recovery key")
 			return
@@ -274,18 +289,25 @@ func handleRecovery(store VaultStorer) http.HandlerFunc {
 			return
 		}
 
-		if req.RecoveryKey == "" {
+		if req.RecoveryKey == "" && req.RecoveryAuth == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "recovery_key is required"})
 			return
 		}
 
-		hash, encMEKRecovery, err := store.GetRecoveryData(r.Context(), user.ID)
-		if err != nil || hash == "" {
+		rec, err := store.GetRecoveryData(r.Context(), user.ID)
+		if err != nil || rec.Hash == "" {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "no recovery key configured"})
 			return
 		}
 
-		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.RecoveryKey)); err != nil {
+		// Checked in the form the account's recovery key was stored in. A
+		// version 2 recovery never accepts the raw key, so a browser that sent
+		// it by mistake fails instead of putting it back on the wire.
+		given := req.RecoveryKey
+		if rec.Version >= 2 {
+			given = req.RecoveryAuth
+		}
+		if given == "" || bcrypt.CompareHashAndPassword([]byte(rec.Hash), []byte(given)) != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid recovery key"})
 			return
 		}
@@ -293,7 +315,8 @@ func handleRecovery(store VaultStorer) http.HandlerFunc {
 		identity, _ := store.GetIdentity(r.Context(), user.ID)
 
 		writeJSON(w, http.StatusOK, RecoveryResponse{
-			EncryptedMEKRecovery: encMEKRecovery,
+			EncryptedMEKRecovery: rec.EncryptedMEK,
+			RecoveryVersion:      rec.Version,
 			Identity:             identity,
 		})
 	}

@@ -8,7 +8,171 @@ Versions follow [semantic versioning](https://semver.org/) — pre-1.0, so a min
 release may change things without a deprecation period. Each release is a tag on
 `main`; see [RELEASING.md](RELEASING.md) for how one is cut.
 
-## [Unreleased]
+## [0.6.0] — 2026-10-31
+
+The security release. The server no longer receives anything that opens a
+vault, sign-in is much harder to attack, and the findings of a full security
+audit are fixed, among them two ways an ordinary hiccup could lose a budget.
+Every user is shown a new recovery key at their next sign-in.
+
+### Upgrading from 0.5.1
+
+- **Every account moves to separate keys on its next sign-in.** Nothing to do
+  for the operator beyond the usual rebuild; migration `016` adds two columns.
+  Each user signs in as usual and is shown a **new recovery key**, which they
+  write down and type back. Tell your users it's coming: the old recovery key
+  stops working once they confirm the new one. Administrators move silently.
+- **Rebuild the frontend and the API together.** The new API refuses the plain
+  password from accounts that have moved, and the new frontend needs the new
+  endpoints.
+- **Set up two-factor sign-in for every administrator right after upgrading.**
+  Administrators now must have it: until they do, they are held at the setup
+  screen and the server refuses every administrative action. Do it first, before
+  anyone else who knows an admin password could enrol their own phone. Lost an
+  administrator's authenticator? See
+  [Administration](readmore/administration.md#an-administrator-who-lost-their-authenticator).
+- **The stack's Docker network now has a fixed subnet**, `172.31.250.0/24`, and
+  only that subnet is trusted to report a client's address. Before, every
+  private range was. Recent Docker Compose recreates the network by itself; if
+  yours stops with a message that the network must be recreated, run `dc down`
+  — **without `-v`**, which would delete the database — and then `dc up -d`.
+  - If the subnet collides with one your host already uses, set `NAFIN_SUBNET`
+    in `.env`.
+  - **A reverse proxy on another machine** is no longer trusted by default. Add
+    its address to `TRUSTED_PROXIES_EXTRA`, or every visitor will look like the
+    proxy.
+  - **A reverse proxy on the same host** needs nothing, but publish the app on
+    loopback (`NAFIN_LISTEN=127.0.0.1:4000`) if you don't already. See
+    [Trusted proxies](readmore/self-hosting.md#trusted-proxies).
+- **"Require 2FA for everyone" is now held by the server.** If you turned it on,
+  users without two-factor can do nothing but set it up; their budget opens
+  once they have. Sessions opened before the upgrade are held the same way.
+- **A person can own at most ten households.** Anyone above that keeps them all,
+  but cannot start another.
+- **Three migrations** (`014`–`016`) only add columns, and cannot fail on
+  existing data; checked against a 0.5.1 database. Temporary passwords handed
+  out before the upgrade get no deadline — reset them again if you want them to
+  expire.
+- **An address can now be locked out of signing in for up to an hour** by
+  thirty wrong passwords, from anywhere. That is the cost of stopping guesses
+  spread across many machines, and anyone who knows the address can trigger it.
+  Sessions already open are not affected, and an administrator can lift it under
+  **Audit** → **Sign-in lockouts**. Read
+  [In case of an attack](readmore/under-attack.md) once.
+- **The API refuses to start with the development `ENCRYPTION_KEY` that
+  `docker-compose.yml` used to publish.** A production instance following the
+  docs takes its own key from `.env` and notices nothing. An instance that ran on
+  the published key had no protection for its 2FA secrets; see
+  [If your instance ran on the published key](SECURITY.md#if-your-instance-ran-on-the-published-key).
+- **Developers:** the development stack now generates its key per machine. 2FA
+  set up on a local database before this no longer decrypts; see
+  [readmore/development.md](readmore/development.md#running-it-locally) for the
+  one-line reset.
+
+### Security
+
+- A recovery key can no longer be skipped by reloading its screen. A new
+  vault's first key was stored before it was shown, so a reload left a vault
+  whose recovery key nobody had seen; it is now stored only once it has been
+  typed back. A reload on the new key for the move to separate keys opened the
+  budget from the browser's cache and put the move off; it now asks for the
+  password, and shows a new key.
+- Setting up two-factor sign-in asks for the password. A session alone was
+  enough, so a browser left signed in could have a second factor enrolled that
+  locks its owner out. Administrators can remove a user's second factor under
+  **Users** (not another administrator's); before, only SQL could.
+- "Require 2FA for everyone" is now enforced by the server: until a user has set
+  it up, their session can only set it up, change a password they were told to
+  change, delete the account or sign out. Their budget opens once it is set up.
+- Deleting an account removes its email address and id from the details of
+  audit entries, as the documentation promised. Only the user column was
+  cleared before.
+- Audit entries are no longer lost to an unusual User-Agent. Request details are
+  cleaned and capped before they are stored.
+- Email addresses longer than 254 bytes are refused at sign-in. One of up to a
+  megabyte used to be kept in memory and written to the audit log.
+- A person can own at most ten households, and expired household invitations are
+  deleted once an hour.
+- A household opened while another one was on screen had its key checked
+  against that other household's vault, not against your own record of whom
+  you have verified. It is now checked against your own record every time.
+- A vault that could not be loaded is no longer replaced with an empty one. A
+  failed read at sign-in, reload or recovery — the server restarting during an
+  update, say — was taken for an account with no vault yet, and the empty vault
+  the app then started was saved over the real one. The app now stays locked
+  and asks again; the server also refuses to let a first save replace a vault
+  that exists.
+- A refused password change no longer locks the vault. A mistyped current
+  password was rejected only after the vault key had been re-wrapped under the
+  new one, leaving the recovery key as the only way in. The new password and
+  the re-wrapped key are now stored together, after the current password is
+  checked.
+- **The server no longer receives anything that opens a vault.** The vault key
+  was derived from the login password, which the server received at every
+  sign-in; now the browser derives one key to sign in with and another for the
+  vault, and only the first leaves it. The recovery key is split the same way.
+  An operator who changes the app's code could still capture a password as it
+  is typed; no web app can rule that out (see SECURITY.md).
+- `docker-compose.yml` no longer carries an encryption key. A key in a public
+  file protects nothing, and anybody who copied it into production was running
+  with one everyone could read.
+- Sign-in limits held only one request at a time. Every attempt that arrived
+  while the first wrong password was still being checked got through, so fifty
+  guesses sent at once were fifty guesses, not five. An attempt is now counted
+  before it is checked. The same applies to two-factor codes and to the link in
+  an invitation.
+- Wrong passwords for one address are also counted across every machine they
+  come from — thirty an hour — and wrong two-factor codes per account, wherever
+  they come from.
+- Asking for the password again — to change it, turn off two-factor sign-in,
+  get new recovery codes or delete the account — is limited to five tries in a
+  quarter of an hour. A stolen session could ask as often as it liked before.
+- A two-factor code or recovery code works once. A code used to stay good for
+  its whole minute and a half, so one read over a shoulder could be used again.
+- A temporary password from an admin reset stops working after three days. The
+  admin sees when, and resets again if it was not used in time.
+- While an instance requires two-factor sign-in, nobody can turn theirs off,
+  and Profile no longer offers to. Only the browser enforced the rule before.
+- Signing in with an address that has no account takes as long as a wrong
+  password. It answered faster, which told anyone timing it which addresses
+  exist.
+- Only the stack's own network is trusted to say where a request came from.
+  Every private range was, so anyone on a LAN or a VPN could claim any address
+  and escape the per-client limits.
+- Administrators must use two-factor sign-in and cannot turn it off.
+- The sign-in limits forget an address once its window has passed. One tried
+  once was kept for good, so cycling through a million addresses could run the
+  server out of memory.
+
+### New
+
+- **Profile → Encryption keys → Renew keys** makes a new password, a new key
+  for your budget and a new recovery key, and seals everything again under the
+  new key, for anyone who does not trust what a server might have kept from
+  before. Your other devices are signed out.
+- **A device you have signed in on before can always sign in.** Somebody who
+  fills an address's sign-in limit on purpose now locks out only devices that
+  address has never used. The device's own limit is five tries in a quarter of an
+  hour. The signed cookie that marks it grants nothing without the password and
+  the second factor. An administrator reset and **Log out everywhere** make an
+  account forget its devices. Needs `ENCRYPTION_KEY`; migration `015` adds one
+  column.
+- **Audit** lists every sign-in lockout in force, and lets an administrator clear
+  one or all of them.
+- [In case of an attack](readmore/under-attack.md): what the app limits on its
+  own, and what to do, step by step, when somebody is trying to get in.
+
+### Fixed
+
+- After signing in, the budget no longer flashes up for a second before the
+  screen with the new recovery key.
+
+### License
+
+- nafin-toolbox is licensed under the **GNU Affero General Public License,
+  version 3 only** (see [LICENSE](LICENSE)). It had no licence before, which left the
+  public code "all rights reserved". Running it is free. Anyone who runs a
+  modified version for other people must offer them its source.
 
 ## [0.5.1] — 2026-10-24
 

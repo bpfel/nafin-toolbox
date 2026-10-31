@@ -11,19 +11,25 @@ import (
 
 	"github.com/bpfel/nafin-toolbox/internal/apierror"
 	"github.com/bpfel/nafin-toolbox/internal/email"
+	"github.com/pquerna/otp/totp"
 )
 
 func testDeps() *HandlerDeps {
 	limiter := NewLoginRateLimiter(100, time.Minute)
 	return &HandlerDeps{
-		Store:               &Store{db: nil},
-		LoginLimiter:        limiter,
-		LoginAccountLimiter: limiter,
-		SetupLimiter:        limiter,
-		VerifyEmailLimiter:  limiter,
-		Verify2FALimiter:    limiter,
-		EmailSender:         &email.LogSender{},
-		AppURL:              "http://localhost:3000",
+		Store:                &Store{db: nil},
+		LoginLimiter:         limiter,
+		LoginAccountLimiter:  limiter,
+		SetupLimiter:         limiter,
+		VerifyEmailLimiter:   limiter,
+		Verify2FALimiter:     limiter,
+		LoginEmailLimiter:    limiter,
+		Verify2FAUserLimiter: limiter,
+		PasswordCheckLimiter: limiter,
+		DeviceLimiter:        limiter,
+		PreloginLimiter:      limiter,
+		EmailSender:          &email.LogSender{},
+		AppURL:               "http://localhost:3000",
 	}
 }
 
@@ -42,6 +48,10 @@ func userCtx() context.Context {
 	user := &User{ID: 2, Email: "user@test.com", Role: RoleUser, EmailVerified: true, PasswordHash: mustHash("user1234")}
 	return context.WithValue(context.Background(), userContextKey, user)
 }
+
+// testAuthKey stands in for what a browser derives from a password: 32
+// bytes of base64. Handlers check its shape, never its origin.
+const testAuthKey = "9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="
 
 func mustHash(pw string) string {
 	h, err := HashPassword(pw)
@@ -206,12 +216,12 @@ func TestHandleInvite_FallbackRequiresPassword(t *testing.T) {
 	}
 }
 
-func TestHandleInvite_FallbackShortPassword(t *testing.T) {
+func TestHandleInvite_FallbackFirstPasswordMustBeAnAuthKey(t *testing.T) {
 	deps := testDeps()
 	handler := HandleInvite(deps)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/invite",
-		strings.NewReader(`{"email":"new@test.com","password":"short"}`))
+		strings.NewReader(`{"email":"new@test.com","auth_key":"short"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(adminCtx())
 	w := httptest.NewRecorder()
@@ -221,7 +231,7 @@ func TestHandleInvite_FallbackShortPassword(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(w.Body.String(), "password must be at least 8 characters") {
+	if !strings.Contains(w.Body.String(), "invalid auth key") {
 		t.Errorf("body %q does not contain password length error", w.Body.String())
 	}
 }
@@ -254,19 +264,19 @@ func TestValidationErrorsHaveTheirOwnCodes(t *testing.T) {
 	}
 }
 
-func TestHandleChangePassword_ShortPasswordCarriesItsCode(t *testing.T) {
+func TestHandleChangePassword_ANewPasswordMustArriveAsAnAuthKey(t *testing.T) {
 	deps := testDeps()
 	hash, _ := HashPassword("old-pass-123")
 	user := &User{ID: 1, Email: "a@example.ch", Role: RoleUser, PasswordHash: hash}
-	body := strings.NewReader(`{"current_password":"old-pass-123","new_password":"short"}`)
+	body := strings.NewReader(`{"current_password":"old-pass-123","new_auth_key":"a new password, sent as itself"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", body)
 	req = req.WithContext(ContextWithUser(req.Context(), user))
 	w := httptest.NewRecorder()
 
 	HandleChangePassword(deps).ServeHTTP(w, req)
 
-	if !strings.Contains(w.Body.String(), `"code":"AUTH-051"`) {
-		t.Errorf("body %q does not carry AUTH-051", w.Body.String())
+	if !strings.Contains(w.Body.String(), `"code":"AUTH-053"`) {
+		t.Errorf("body %q does not carry AUTH-053", w.Body.String())
 	}
 }
 
@@ -444,7 +454,7 @@ func TestHandleChangePassword_WrongCurrentPassword(t *testing.T) {
 	handler := HandleChangePassword(deps)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password",
-		strings.NewReader(`{"current_password":"wrongpassword","new_password":"newpass12"}`))
+		strings.NewReader(`{"current_password":"wrongpassword","new_auth_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx())
 	w := httptest.NewRecorder()
@@ -459,12 +469,12 @@ func TestHandleChangePassword_WrongCurrentPassword(t *testing.T) {
 	}
 }
 
-func TestHandleChangePassword_ShortNewPassword(t *testing.T) {
+func TestHandleChangePassword_ANewSecretThatIsNotAnAuthKey(t *testing.T) {
 	deps := testDeps()
 	handler := HandleChangePassword(deps)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password",
-		strings.NewReader(`{"current_password":"user1234","new_password":"short"}`))
+		strings.NewReader(`{"current_password":"user1234","new_auth_key":"short"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx())
 	w := httptest.NewRecorder()
@@ -474,7 +484,7 @@ func TestHandleChangePassword_ShortNewPassword(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(w.Body.String(), "password must be at least 8 characters") {
+	if !strings.Contains(w.Body.String(), "invalid auth key") {
 		t.Errorf("body %q does not contain password length error", w.Body.String())
 	}
 }
@@ -511,15 +521,18 @@ func TestHandleSetup_Validation(t *testing.T) {
 		},
 		{
 			name:       "invalid email",
-			body:       `{"email":"notanemail","password":"password123"}`,
+			body:       `{"email":"notanemail","auth_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`,
 			wantStatus: http.StatusBadRequest,
 			wantSubstr: "invalid email",
 		},
 		{
-			name:       "short password",
-			body:       `{"email":"admin@test.com","password":"short"}`,
+			// The password's own rules are the browser's; the server sees
+			// only an auth key, and refuses anything else, the password itself
+			// included.
+			name:       "a password instead of an auth key",
+			body:       `{"email":"admin@test.com","auth_key":"password123"}`,
 			wantStatus: http.StatusBadRequest,
-			wantSubstr: "password must be at least 8 characters",
+			wantSubstr: "AUTH-053",
 		},
 	}
 
@@ -692,14 +705,14 @@ func TestHandleVerifyEmail_Validation(t *testing.T) {
 			wantSubstr: "token and password required",
 		},
 		{
-			name:       "short password",
-			body:       `{"token":"abc","password":"short"}`,
+			name:       "a password instead of an auth key",
+			body:       `{"token":"abc","auth_key":"longpassword"}`,
 			wantStatus: http.StatusBadRequest,
-			wantSubstr: "password must be at least 8 characters",
+			wantSubstr: "AUTH-053",
 		},
 		{
 			name:       "missing token",
-			body:       `{"password":"longpassword"}`,
+			body:       `{"auth_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`,
 			wantStatus: http.StatusBadRequest,
 			wantSubstr: "token and password required",
 		},
@@ -838,6 +851,32 @@ func TestHandleSetup2FA_AlreadyEnabled(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "already enabled") {
 		t.Errorf("body %q does not contain 'already enabled'", w.Body.String())
+	}
+}
+
+// A session alone must not enrol a second factor: whoever does decides who
+// can sign in from then on. Both refusals come before anything is stored.
+func TestHandleSetup2FA_NeedsThePassword(t *testing.T) {
+	for _, tt := range []struct {
+		name, body string
+		status     int
+		code       string
+	}{
+		{"none", ``, http.StatusBadRequest, "AUTH-017"},
+		{"empty", `{}`, http.StatusBadRequest, "AUTH-017"},
+		{"wrong", `{"password":"not-it-123"}`, http.StatusUnauthorized, "AUTH-015"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/auth/2fa/setup", strings.NewReader(tt.body))
+			req = req.WithContext(userCtx())
+			w := httptest.NewRecorder()
+
+			HandleSetup2FA(testDepsWithKey()).ServeHTTP(w, req)
+
+			if w.Code != tt.status || !strings.Contains(w.Body.String(), tt.code) {
+				t.Errorf("status %d, body %s; want %d with %s", w.Code, w.Body.String(), tt.status, tt.code)
+			}
+		})
 	}
 }
 
@@ -1375,5 +1414,196 @@ func TestSessionCookie_Properties(t *testing.T) {
 	}
 	if c.SameSite != http.SameSiteLaxMode {
 		t.Errorf("SameSite = %d, want SameSiteLaxMode", c.SameSite)
+	}
+}
+
+// --- Spent codes, temporary passwords and password re-checks ---
+
+func TestTOTPStep_MatchesTheDriftWindowAndNothingElse(t *testing.T) {
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "test", AccountName: "a@b.ch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_000, 0)
+	current := now.Unix() / totpPeriod
+
+	for _, offset := range []int64{-1, 0, 1} {
+		code, _ := totp.GenerateCode(key.Secret(), time.Unix((current+offset)*totpPeriod, 0))
+		step, ok := totpStep(key.Secret(), code, now)
+		if !ok || step != current+offset {
+			t.Errorf("offset %d: step=%d ok=%v, want %d true", offset, step, ok, current+offset)
+		}
+	}
+	// Two steps out is outside the window totp.Validate allows.
+	stale, _ := totp.GenerateCode(key.Secret(), time.Unix((current-2)*totpPeriod, 0))
+	if _, ok := totpStep(key.Secret(), stale, now); ok {
+		t.Error("a code two steps old was accepted")
+	}
+	for _, bad := range []string{"", "12345", "1234567", "abcdef"} {
+		if _, ok := totpStep(key.Secret(), bad, now); ok {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+}
+
+func TestLooksLikeRecoveryCode(t *testing.T) {
+	for code, want := range map[string]bool{
+		"0a1b2c3d": true,
+		"123456":   false, // a TOTP code: never costs a bcrypt
+		"0A1B2C3D": false, // generateRecoveryCodes writes lower case only
+		"0a1b2c3":  false,
+		"0a1b2c3g": false,
+		"":         false,
+	} {
+		if got := looksLikeRecoveryCode(code); got != want {
+			t.Errorf("looksLikeRecoveryCode(%q) = %v, want %v", code, got, want)
+		}
+	}
+}
+
+func TestTempPasswordExpired(t *testing.T) {
+	now := time.Now()
+	past, future := now.Add(-time.Minute), now.Add(time.Minute)
+	for _, tc := range []struct {
+		name    string
+		must    bool
+		expires *time.Time
+		want    bool
+	}{
+		{"a password the user chose", false, nil, false},
+		{"handed out before expiry existed", true, nil, false},
+		{"still in time", true, &future, false},
+		{"past its time", true, &past, true},
+		{"changed, with a stale deadline", false, &past, false},
+	} {
+		u := &User{MustChangePassword: tc.must, TempPasswordExpiresAt: tc.expires}
+		if got := u.TempPasswordExpired(now); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestSecretMatches_NoAccountTakesAsLongAsAWrongPassword(t *testing.T) {
+	user := &User{PasswordHash: mustHash(testAuthKey), AuthVersion: AuthVersionKey}
+	dummyHash() // computed once, up front, as the first real request would
+
+	start := time.Now()
+	if secretMatches(user, Secret{AuthKey: "wrong"}) {
+		t.Fatal("a wrong auth key matched")
+	}
+	wrong := time.Since(start)
+
+	start = time.Now()
+	if secretMatches(nil, Secret{AuthKey: "wrong"}) {
+		t.Fatal("no account matched")
+	}
+	missing := time.Since(start)
+
+	// Both are one bcrypt comparison at the same cost. Skipping it made the
+	// second a hundred times faster; half is far outside that and well
+	// inside scheduling noise.
+	if missing < wrong/2 {
+		t.Errorf("no account took %v, a wrong password %v: the difference tells which addresses exist", missing, wrong)
+	}
+}
+
+// A version 2 account never takes the password itself, so a browser that
+// sent it by mistake fails instead of putting it back on the wire; a version
+// 1 account takes nothing but the password it stored.
+func TestSecretMatches_OnlyInTheAccountsOwnForm(t *testing.T) {
+	v2 := &User{PasswordHash: mustHash(testAuthKey), AuthVersion: AuthVersionKey}
+	if !secretMatches(v2, Secret{AuthKey: testAuthKey}) {
+		t.Error("version 2 refused its auth key")
+	}
+	if secretMatches(v2, Secret{Password: testAuthKey}) {
+		t.Error("version 2 took its secret under the password field")
+	}
+
+	v1 := &User{PasswordHash: mustHash("right-pass-1"), AuthVersion: AuthVersionPassword}
+	if !secretMatches(v1, Secret{Password: "right-pass-1"}) {
+		t.Error("version 1 refused its password")
+	}
+	if secretMatches(v1, Secret{AuthKey: "right-pass-1"}) {
+		t.Error("version 1 took its password under the auth key field")
+	}
+}
+
+func TestConfirmPassword_IsLimitedPerAccount(t *testing.T) {
+	deps := testDeps()
+	deps.PasswordCheckLimiter = NewLoginRateLimiter(2, time.Minute)
+
+	deleteWith := func(password string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodDelete, "/api/auth/account",
+			strings.NewReader(`{"password":"`+password+`"}`))
+		req = req.WithContext(userCtx())
+		w := httptest.NewRecorder()
+		HandleDeleteAccount(deps).ServeHTTP(w, req)
+		return w
+	}
+
+	for i := 0; i < 2; i++ {
+		if w := deleteWith("wrong-pass"); w.Code != http.StatusUnauthorized {
+			t.Fatalf("guess %d = %d, want 401", i+1, w.Code)
+		}
+	}
+	// Refused before the password is looked at, the right one included.
+	w := deleteWith("user1234")
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("third try = %d, want 429 (body: %s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "AUTH-013") {
+		t.Errorf("body %q does not carry AUTH-013", w.Body.String())
+	}
+}
+
+// --- Administrators and 2FA ---
+
+func TestAdminOnly_AnAdminWithout2FAIsRefused(t *testing.T) {
+	list := func(deps *HandlerDeps, totp bool) *httptest.ResponseRecorder {
+		admin := &User{ID: 1, Email: "admin@test.com", Role: RoleAdmin, EmailVerified: true, TOTPEnabled: totp}
+		req := httptest.NewRequest(http.MethodGet, "/api/auth/lockouts", nil)
+		req = req.WithContext(ContextWithUser(context.Background(), admin))
+		w := httptest.NewRecorder()
+		HandleListLockouts(deps).ServeHTTP(w, req)
+		return w
+	}
+
+	if w := list(testDepsWithKey(), false); w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "AUTH-043") {
+		t.Errorf("admin without 2FA = %d %s, want 403 AUTH-043", w.Code, w.Body.String())
+	}
+	if w := list(testDepsWithKey(), true); w.Code != http.StatusOK {
+		t.Errorf("admin with 2FA = %d %s, want 200", w.Code, w.Body.String())
+	}
+	// Where 2FA cannot be enabled at all, requiring it would lock every
+	// admin out of everything.
+	if w := list(testDeps(), false); w.Code != http.StatusOK {
+		t.Errorf("admin without 2FA, none available = %d, want 200", w.Code)
+	}
+}
+
+func TestHandleListLockouts_ListsWhoIsKeptOut(t *testing.T) {
+	deps := testDeps()
+	deps.LoginEmailLimiter = NewLoginRateLimiter(1, time.Hour)
+	deps.LoginEmailLimiter.Reserve("anna@example.ch")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/lockouts", nil).WithContext(adminCtx())
+	w := httptest.NewRecorder()
+	HandleListLockouts(deps).ServeHTTP(w, req)
+
+	var body struct {
+		Lockouts []LockoutEntry `json:"lockouts"`
+	}
+	json.NewDecoder(w.Body).Decode(&body)
+	if len(body.Lockouts) != 1 || body.Lockouts[0].Kind != "address" || body.Lockouts[0].Key != "anna@example.ch" {
+		t.Errorf("lockouts = %+v, want the one address", body.Lockouts)
+	}
+}
+
+func TestHandleListLockouts_NotForUsers(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/lockouts", nil).WithContext(userCtx())
+	w := httptest.NewRecorder()
+	HandleListLockouts(testDeps()).ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("a user = %d, want 403", w.Code)
 	}
 }

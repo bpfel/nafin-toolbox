@@ -1,6 +1,6 @@
 <script lang="ts">
   import { setOnUnauthorized } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
+  import { checkAuth, getAuthState, logout, getSettings, confirmKeyChange, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
   import { getVaultState, sessionEndedElsewhere } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
@@ -84,7 +84,12 @@
   async function checkRequire2FA() {
     const settings = await getSettings()
     require2FA = settings.require_2fa
-    if (require2FA && authState.currentUser && !authState.currentUser.totp_enabled) {
+    // An administrator is held to 2FA whatever the setting says: the server
+    // refuses every admin action until it is on. Not where 2FA cannot be
+    // turned on at all — that screen could only fail.
+    const user = authState.currentUser
+    const required = require2FA || user?.role === 'admin'
+    if (required && settings.twofa_available !== false && user && !user.totp_enabled) {
       show2FAEnforcement = true
     }
   }
@@ -115,8 +120,12 @@
     }
   }
 
-  function handleRecoveryKeyDismiss() {
-    clearRecoveryKey()
+
+  // The move to separate keys is stored only now that its new recovery key
+  // has been typed back. A failure keeps the key on screen to try again.
+  let upgradeError = $state<string | null>(null)
+  async function handleUpgradeConfirmed() {
+    upgradeError = await confirmKeyChange()
   }
 
   async function handleUnlock() {
@@ -156,6 +165,7 @@
     gateFor({
       canEncrypt: typeof crypto !== 'undefined' && crypto.subtle !== undefined,
       loading: authState.loading,
+      openingVault: authState.openingVault,
       onVerifyPath: route.screen === 'verify',
       user: authState.currentUser
         ? {
@@ -165,6 +175,7 @@
         : null,
       enforce2FA: show2FAEnforcement,
       recoveryKeyPending: authState.recoveryKeyToShow != null,
+      recoveryKeyRenewalPending: authState.upgradeRecoveryKey != null,
       vaultVersionAhead: vaultState.versionAhead,
       vaultNeedsSetup: authState.vaultNeedsSetup,
       vaultDecryptFailed: authState.vaultDecryptFailed,
@@ -224,7 +235,12 @@
     <div class="enforcement-container">
       <div class="enforcement-card">
         <h1>{t('twofa.requiredTitle')}</h1>
-        <p class="hint">{t('twofa.requiredHint')}</p>
+        <!--
+          An administrator is held here by the design, not by a setting: their
+          account can reset anyone's password. "Your administrator requires" read
+          as if they had imposed it on themselves.
+        -->
+        <p class="hint">{authState.currentUser?.role === 'admin' ? t('twofa.requiredAdminHint') : t('twofa.requiredHint')}</p>
         <TwoFactorSetup onDone={() => { show2FAEnforcement = false; window.location.reload() }} />
       </div>
     </div>
@@ -232,7 +248,15 @@
 {:else if gate === 'recoveryKey' && authState.recoveryKeyToShow}
   <RecoveryKeyScreen
     recoveryKey={authState.recoveryKeyToShow}
-    onconfirmed={handleRecoveryKeyDismiss}
+    error={upgradeError}
+    onconfirmed={handleUpgradeConfirmed}
+  />
+{:else if gate === 'recoveryKeyRenewal' && authState.upgradeRecoveryKey}
+  <RecoveryKeyScreen
+    recoveryKey={authState.upgradeRecoveryKey}
+    intro={authState.keyChangeKind === 'renewal' ? t('recoveryKey.renewedIntro') : t('recoveryKey.renewalIntro')}
+    error={upgradeError}
+    onconfirmed={handleUpgradeConfirmed}
   />
 {:else if gate === 'vaultAhead'}
   <main>

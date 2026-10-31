@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bpfel/nafin-toolbox/internal/email"
@@ -31,12 +33,35 @@ type HandlerDeps struct {
 	// behind one router, the usual case for an app like this.
 	LoginLimiter        *LoginRateLimiter
 	LoginAccountLimiter *LoginRateLimiter
-	SetupLimiter        *LoginRateLimiter
-	VerifyEmailLimiter  *LoginRateLimiter
-	Verify2FALimiter    *LoginRateLimiter
-	EmailSender         email.Sender
-	EncryptionKey       []byte // 32-byte AES key, nil if 2FA not available
-	AppURL              string
+	// Failures per address, from anywhere. The two above are keyed by client,
+	// so guesses spread over many addresses never filled either; this one is
+	// what they fill instead. Generous, because anybody who knows an address
+	// can fill it on purpose: it shuts that address out of signing in for up
+	// to its window, and touches no session already open.
+	LoginEmailLimiter  *LoginRateLimiter
+	SetupLimiter       *LoginRateLimiter
+	VerifyEmailLimiter *LoginRateLimiter
+	Verify2FALimiter   *LoginRateLimiter
+	// Wrong codes per account, wherever they come from. The password has
+	// already been given by then, and a correct password is never counted
+	// anywhere, so without this one an attacker who has it could fetch a fresh
+	// challenge for every guess from a fresh address.
+	Verify2FAUserLimiter *LoginRateLimiter
+	// Wrong passwords per account behind a session: changing it, turning off
+	// 2FA, new recovery codes, deleting the account. Each of those answers
+	// "is this the password?", and a stolen session cookie must not be a way
+	// to ask it as often as one likes — the password unlocks the vault too.
+	PasswordCheckLimiter *LoginRateLimiter
+	// Failures from one trusted device, which are counted here instead of
+	// against the address and the client. See device.go.
+	DeviceLimiter *LoginRateLimiter
+	// Prelogin answers per client. It checks nothing and costs one query, so
+	// it is generous; it exists so that the endpoint cannot be used to read
+	// out every account's version at full speed.
+	PreloginLimiter *LoginRateLimiter
+	EmailSender     email.Sender
+	EncryptionKey   []byte // 32-byte AES key, nil if 2FA not available
+	AppURL          string
 }
 
 func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
@@ -47,34 +72,65 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if req.Email == "" || req.Password == "" {
+		if req.Email == "" || req.Secret.Empty() {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "email and password required")
 			return
 		}
-
-		client := deps.LoginLimiter.ClientIP(r)
-		account := client + "|" + strings.ToLower(strings.TrimSpace(req.Email))
-		if !deps.LoginLimiter.CheckKey(client) || !deps.LoginAccountLimiter.CheckKey(account) {
-			w.Header().Set("Retry-After", "900")
-			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
+		if len(req.Email) > MaxEmailLength {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid email address")
 			return
 		}
 
+		// Looked up first, because which limits apply depends on it: a device
+		// this account has signed in on before is counted on its own, and not
+		// against the address and the client — see device.go. The lookup is
+		// one indexed query; the bcrypt it guards is what the limits protect.
 		user, err := deps.Store.GetUserByEmail(r.Context(), req.Email)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
-		if user == nil || !CheckPassword(user.PasswordHash, req.Password) {
-			deps.LoginLimiter.RecordFailureKey(client)
-			deps.LoginAccountLimiter.RecordFailureKey(account)
+		device := deps.trustedDevice(r, user)
+
+		client := deps.LoginLimiter.ClientIP(r)
+		address := strings.ToLower(strings.TrimSpace(req.Email))
+		account := client + "|" + address
+		slots := []Slot{
+			{deps.LoginLimiter, client},
+			{deps.LoginAccountLimiter, account},
+			{deps.LoginEmailLimiter, address},
+		}
+		if device != nil {
+			slots = []Slot{{deps.DeviceLimiter, device.Nonce}}
+		}
+		attempt, ok := ReserveAll(slots...)
+		if !ok {
+			w.Header().Set("Retry-After", "900")
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many login attempts")
+			return
+		}
+
+		if !secretMatches(user, req.Secret) {
 			uid := userIDPtr(user)
-			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, map[string]any{"email": req.Email})
+			deps.Store.LogAudit(r.Context(), uid, AuditLoginFailed, r, deviceAudit(device, map[string]any{"email": req.Email}))
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
 
+		// The right password is not a failure. The client-and-account run is
+		// cleared outright, as a typo before it should not count against the
+		// next; the others give back only this attempt, because the failures
+		// in them may be somebody else's.
+		attempt.Release()
 		deps.LoginAccountLimiter.Forget(account)
+
+		// A temporary password an admin handed out works for a while, not for
+		// ever. See SetMustChangePassword.
+		if user.TempPasswordExpired(time.Now()) {
+			deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginFailed, r, map[string]any{"email": req.Email, "reason": "temporary password expired"})
+			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "temporary password expired")
+			return
+		}
 
 		// Reject unverified email users
 		if !user.EmailVerified {
@@ -104,8 +160,9 @@ func HandleLogin(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginSuccess, r, nil)
+		deps.Store.LogAudit(r.Context(), &user.ID, AuditLoginSuccess, r, deviceAudit(device, nil))
 		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
+		deps.rememberDevice(w, r, user)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
 	}
@@ -137,6 +194,11 @@ func HandleLogoutEverywhere(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if err := deps.Store.DeleteUserSessions(r.Context(), user.ID); err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		// A lost phone should not stay a trusted device either.
+		if err := deps.Store.ForgetDevices(r.Context(), user.ID); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -199,8 +261,7 @@ func HandleMe(w http.ResponseWriter, r *http.Request) {
 func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -227,14 +288,16 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 
 		smtpAvailable := emailEnabled(deps)
 
-		// Validate password early in fallback mode (before DB lookup)
+		// Without email, the admin sets a first password — which the admin's
+		// browser has already turned into the invitee's auth key, so the
+		// server never sees it. Its rules were checked there.
 		if !smtpAvailable {
-			if req.Password == "" {
+			if req.AuthKey == "" {
 				apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required (email not configured)")
 				return
 			}
-			if err := ValidatePassword(req.Password); err != nil {
-				apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
+			if !ValidAuthKey(req.AuthKey) {
+				apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid auth key")
 				return
 			}
 		}
@@ -288,8 +351,8 @@ func HandleInvite(deps *HandlerDeps) http.HandlerFunc {
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(user)
 		} else {
-			// Fallback: admin sets password (already validated above)
-			hash, err := HashPassword(req.Password)
+			// Fallback: the admin's first password, as an auth key (checked above)
+			hash, err := HashPassword(req.AuthKey)
 			if err != nil {
 				apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 				return
@@ -326,8 +389,7 @@ func emailEnabled(deps *HandlerDeps) bool {
 func HandleListUsers(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -360,33 +422,30 @@ func HandleChangePassword(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if req.CurrentPassword == "" || req.NewPassword == "" {
+		if req.Current().Empty() || req.NewAuthKey == "" {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "current and new password required")
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.CurrentPassword) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "current password is incorrect")
+		// The current password in the account's own form; the new one always
+		// as an auth key, so changing a password also makes a version 1
+		// account version 2. The new password's rules were the browser's.
+		if !confirmPassword(w, deps, user, req.Current(), "current password is incorrect") {
 			return
 		}
 
-		if err := ValidatePassword(req.NewPassword); err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
+		if !ValidAuthKey(req.NewAuthKey) {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid auth key")
 			return
 		}
 
-		newHash, err := HashPassword(req.NewPassword)
+		newHash, err := HashPassword(req.NewAuthKey)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
-		if err := deps.Store.UpdatePassword(r.Context(), user.ID, newHash); err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
-
-		if err := deps.Store.ClearMustChangePassword(r.Context(), user.ID); err != nil {
+		if err := deps.Store.ChangePassword(r.Context(), user.ID, newHash, req.EncryptedMEK); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -411,13 +470,15 @@ func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		var req LoginRequest
+		// The first administrator is version 2 from the start: the browser
+		// sends the auth key, and the column's default records it.
+		var req SetupRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
-		if req.Email == "" || req.Password == "" {
+		if req.Email == "" || req.AuthKey == "" {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "email and password required")
 			return
 		}
@@ -426,12 +487,12 @@ func HandleSetup(deps *HandlerDeps) http.HandlerFunc {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
 			return
 		}
-		if err := ValidatePassword(req.Password); err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
+		if !ValidAuthKey(req.AuthKey) {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid auth key")
 			return
 		}
 
-		hash, err := HashPassword(req.Password)
+		hash, err := HashPassword(req.AuthKey)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
@@ -478,11 +539,22 @@ func HandleNeedsSetup(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerifyEmail accepts a verification token + password, verifies email, sets password, auto-logs in.
 func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.VerifyEmailLimiter.Check(r) {
+		attempt, ok := deps.VerifyEmailLimiter.Reserve(deps.VerifyEmailLimiter.ClientIP(r))
+		if !ok {
 			w.Header().Set("Retry-After", "900")
 			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
+		// Only a token that does not exist is a guess. Everything else this
+		// handler refuses — a malformed body, a short password — gives the
+		// attempt back, as the check that came before the reservation did not
+		// count them either.
+		guessed := false
+		defer func() {
+			if !guessed {
+				attempt.Release()
+			}
+		}()
 
 		var req VerifyEmailRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -490,13 +562,14 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if req.Token == "" || req.Password == "" {
+		if req.Token == "" || req.AuthKey == "" {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "token and password required")
 			return
 		}
 
-		if err := ValidatePassword(req.Password); err != nil {
-			apierror.Write(w, apierror.Auth, http.StatusBadRequest, err.Error())
+		// The invitee's first password, as the auth key their browser derived.
+		if !ValidAuthKey(req.AuthKey) {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid auth key")
 			return
 		}
 
@@ -506,12 +579,12 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 		if userID == 0 {
-			deps.VerifyEmailLimiter.RecordFailure(r)
+			guessed = true
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid or expired token")
 			return
 		}
 
-		hash, err := HashPassword(req.Password)
+		hash, err := HashPassword(req.AuthKey)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
@@ -553,11 +626,21 @@ func HandleVerifyEmail(deps *HandlerDeps) http.HandlerFunc {
 // HandleVerify2FA validates a TOTP code or recovery code after password authentication.
 func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !deps.Verify2FALimiter.Check(r) {
+		var attempt Reservations
+		clientAttempt, ok := deps.Verify2FALimiter.Reserve(deps.Verify2FALimiter.ClientIP(r))
+		if !ok {
 			w.Header().Set("Retry-After", "900")
 			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
+		attempt = append(attempt, clientAttempt)
+		// Only a wrong code is a guess; see HandleVerifyEmail.
+		guessed := false
+		defer func() {
+			if !guessed {
+				attempt.Release()
+			}
+		}()
 
 		var req Verify2FARequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -580,6 +663,27 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
+		// A device this account has signed in on before is counted on its own
+		// here too: an attacker who has the password could otherwise fill the
+		// account's code limit and keep its owner out at the second step.
+		user, err := deps.Store.GetUserByID(r.Context(), userID)
+		if err != nil || user == nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		device := deps.trustedDevice(r, user)
+		codeLimiter, codeKey := deps.Verify2FAUserLimiter, strconv.Itoa(userID)
+		if device != nil {
+			codeLimiter, codeKey = deps.DeviceLimiter, device.Nonce
+		}
+		userAttempt, ok := codeLimiter.Reserve(codeKey)
+		if !ok {
+			w.Header().Set("Retry-After", "900")
+			apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
+			return
+		}
+		attempt = append(attempt, userAttempt)
+
 		// Try TOTP code first
 		valid, err := validateTOTPCode(r.Context(), deps, userID, req.Code)
 		if err != nil {
@@ -597,27 +701,25 @@ func HandleVerify2FA(deps *HandlerDeps) http.HandlerFunc {
 		}
 
 		if !valid {
-			deps.Verify2FALimiter.RecordFailure(r)
-			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, nil)
+			guessed = true
+			deps.Store.LogAudit(r.Context(), &userID, Audit2FAFailed, r, deviceAudit(device, nil))
 			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "invalid code")
 			return
 		}
 
-		// Loaded before the session, which depends on the role. See startSession.
-		user, err := deps.Store.GetUserByID(r.Context(), userID)
-		if err != nil || user == nil {
-			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
-			return
-		}
-
+		// The user loaded above decides the session, which depends on the
+		// role. See startSession.
 		sess, err := startSession(r.Context(), deps, user)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
-		deps.Store.LogAudit(r.Context(), &userID, AuditLoginSuccess, r, map[string]any{"method": "2fa"})
+		deps.Store.LogAudit(r.Context(), &userID, AuditLoginSuccess, r, deviceAudit(device, map[string]any{"method": "2fa"}))
 		http.SetCookie(w, sessionCookie(sess.Token, sess.ExpiresAt))
+		// Only now, with both factors given, does this browser become one of
+		// the account's devices.
+		deps.rememberDevice(w, r, user)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
 	}
@@ -639,6 +741,19 @@ func HandleSetup2FA(deps *HandlerDeps) http.HandlerFunc {
 
 		if user.TOTPEnabled {
 			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is already enabled")
+			return
+		}
+
+		// The password first. Enrolling a factor locks the account to whoever
+		// holds it, so a session alone — a browser left signed in — could
+		// otherwise lock its owner out. Confirming needs no second proof: the
+		// secret it checks against goes only to whoever passed this one.
+		var req Setup2FARequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Secret.Empty() {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
+			return
+		}
+		if !confirmPassword(w, deps, user, req.Secret, "incorrect password") {
 			return
 		}
 
@@ -746,13 +861,32 @@ func HandleDisable2FA(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if req.Password == "" {
+		if req.Secret.Empty() {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.Password) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
+		if !confirmPassword(w, deps, user, req.Secret, "incorrect password") {
+			return
+		}
+
+		// While the instance requires a second factor, nobody may drop theirs.
+		// The screen that enforces it is the browser's, and the browser is not
+		// where a rule can be kept: anyone holding a session and the password
+		// could otherwise take the second factor away, and from then on the
+		// password alone would let them in.
+		require2fa, err := deps.Store.GetSetting(r.Context(), "require_2fa")
+		if err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if require2fa == "true" {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is required on this instance")
+			return
+		}
+		// And an administrator never may. See AdminReady.
+		if user.IsAdmin() {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "administrators must keep 2FA")
 			return
 		}
 
@@ -790,13 +924,12 @@ func HandleRegenerateRecoveryCodes(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if req.Password == "" {
+		if req.Secret.Empty() {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.Password) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
+		if !confirmPassword(w, deps, user, req.Secret, "incorrect password") {
 			return
 		}
 
@@ -831,13 +964,12 @@ func HandleDeleteAccount(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if req.Password == "" {
+		if req.Secret.Empty() {
 			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "password required")
 			return
 		}
 
-		if !CheckPassword(user.PasswordHash, req.Password) {
-			apierror.Write(w, apierror.Auth, http.StatusUnauthorized, "incorrect password")
+		if !confirmPassword(w, deps, user, req.Secret, "incorrect password") {
 			return
 		}
 
@@ -876,8 +1008,7 @@ func HandleDeleteAccount(deps *HandlerDeps) http.HandlerFunc {
 func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -907,22 +1038,76 @@ func HandleAdminDeleteUser(deps *HandlerDeps) http.HandlerFunc {
 
 		// After the fact: the caller survives their own request, so the audit
 		// row keeps them, and it no longer records a deletion that was refused.
-		deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserDeleted, r, map[string]any{
-			"deleted_user_id": targetID,
-		})
+		// Without the deleted account's id, which would name the person whose
+		// entries were just anonymised (see redactAuditMetadata).
+		deps.Store.LogAudit(r.Context(), &caller.ID, AuditUserDeleted, r, nil)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
 }
 
+// HandleAdminRemove2FA takes a user's second factor away, for the user who has
+// lost theirs — or who did not enrol it. Before this the way back was SQL on
+// the server. Their sessions and trusted devices go with it, since whoever
+// enrolled a factor they did not may still hold one; if the instance requires
+// 2FA, they are asked to set it up again at their next sign-in.
+//
+// Not for administrators, whose factor is what AdminReady stands on: removing
+// one admin's would let another sign in as them after a password reset.
+func HandleAdminRemove2FA(deps *HandlerDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		caller := UserFromContext(r.Context())
+		if !adminOnly(w, deps, caller) {
+			return
+		}
+
+		targetID, err := strconv.Atoi(chi.URLParam(r, "id"))
+		if err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusBadRequest, "invalid user ID")
+			return
+		}
+		target, err := deps.Store.GetUserByID(r.Context(), targetID)
+		if err != nil || target == nil {
+			apierror.Write(w, apierror.Auth, http.StatusNotFound, "user not found")
+			return
+		}
+		if target.IsAdmin() {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "administrators must keep 2FA")
+			return
+		}
+		if !target.TOTPEnabled {
+			apierror.Write(w, apierror.Auth, http.StatusConflict, "2FA is not enabled")
+			return
+		}
+
+		if err := deps.Store.RemoveSecondFactor(r.Context(), targetID); err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		deps.Store.LogAudit(r.Context(), &caller.ID, Audit2FARemoved, r, map[string]any{
+			"target_user_id": targetID,
+			"target_email":   target.Email,
+		})
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// TempPasswordLifetime is how long a password from an admin reset works. Three
+// days covers a weekend between the admin sending it and the person reading
+// it; past that, the admin is asked for another rather than the first one
+// lying in a chat history for good.
+const TempPasswordLifetime = 72 * time.Hour
+
 // HandleAdminResetPassword lets an admin reset another user's password.
-// Generates a random temporary password, sets must_change_password = true.
+// Generates a random temporary password, which the user must change at their
+// next sign-in and which stops working after TempPasswordLifetime.
 func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -952,13 +1137,24 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 		}
 		tempPassword := hex.EncodeToString(tempBytes)[:16]
 
-		hash, err := HashPassword(tempPassword)
+		// The one password the server makes itself. It stores what the
+		// browser will send for it — the auth key — derived the same way
+		// (kdf.go). The temporary password opens no vault: after a reset the
+		// vault is reached with the recovery key, and the password is changed
+		// at the next sign-in, in the browser.
+		tempAuthKey, err := DeriveAuthKey(tempPassword, target.Email, target.KDFIterations)
+		if err != nil {
+			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
+			return
+		}
+		hash, err := HashPassword(tempAuthKey)
 		if err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
 
-		if err := deps.Store.UpdatePassword(r.Context(), targetID, hash); err != nil {
+		expiresAt := time.Now().Add(TempPasswordLifetime)
+		if err := deps.Store.SetTemporaryPassword(r.Context(), targetID, hash, expiresAt); err != nil {
 			apierror.Write(w, apierror.Auth, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -971,10 +1167,6 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		if err := deps.Store.SetMustChangePassword(r.Context(), targetID); err != nil {
-			log.Printf("setting must_change_password: %v", err)
-		}
-
 		deps.Store.LogAudit(r.Context(), &caller.ID, AuditPasswordReset, r, map[string]any{
 			"target_user_id": targetID,
 			"target_email":   target.Email,
@@ -982,8 +1174,9 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
-			"status":        "ok",
-			"temp_password": tempPassword,
+			"status":          "ok",
+			"temp_password":   tempPassword,
+			"temp_expires_at": expiresAt.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -992,8 +1185,7 @@ func HandleAdminResetPassword(deps *HandlerDeps) http.HandlerFunc {
 func HandleResendVerification(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1044,8 +1236,7 @@ func HandleResendVerification(deps *HandlerDeps) http.HandlerFunc {
 func HandleAdminRequire2FA(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1084,6 +1275,9 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 			// because HandleInvite then requires one. Until it said so, the
 			// form could not invite anybody on an instance without SMTP.
 			"email_enabled": emailEnabled(deps),
+			// Whether 2FA can be turned on here at all. Without it the browser
+			// would hold an admin at a setup screen that can only fail.
+			"twofa_available": deps.EncryptionKey != nil,
 		})
 	}
 }
@@ -1092,8 +1286,7 @@ func HandleGetSettings(deps *HandlerDeps) http.HandlerFunc {
 func HandleListAuditLogs(deps *HandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		caller := UserFromContext(r.Context())
-		if !caller.IsAdmin() {
-			apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		if !adminOnly(w, deps, caller) {
 			return
 		}
 
@@ -1153,7 +1346,16 @@ func ValidatePassword(pw string) error {
 }
 
 // ValidateEmail checks that the email has a basic valid format.
+// MaxEmailLength is the longest address SMTP can carry (RFC 5321). Anything
+// longer is refused before it is looked up, counted or logged: an address is
+// a key in the sign-in limiters and a value in the audit log, and neither
+// should hold a megabyte a stranger chose.
+const MaxEmailLength = 254
+
 func ValidateEmail(email string) error {
+	if len(email) > MaxEmailLength {
+		return errInvalidEmail
+	}
 	at := strings.Index(email, "@")
 	if at < 1 {
 		return errInvalidEmail
@@ -1185,7 +1387,108 @@ func userIDPtr(u *User) *int {
 	return &u.ID
 }
 
-// validateTOTPCode decrypts the stored secret and validates a TOTP code.
+// dummyHash is compared against when nobody has the address that was typed,
+// so that answering "no such account" takes as long as "wrong password".
+// Skipping bcrypt made the first a quarter of a second faster, which told
+// anyone timing the answer which addresses have accounts.
+var dummyHash = sync.OnceValue(func() string {
+	h, err := HashPassword("no account has this password")
+	if err != nil {
+		panic(err)
+	}
+	return h
+})
+
+// secretMatches reports whether user exists and s proves its password, taking
+// the same time either way.
+//
+// The form must be the account's own: an auth key for version 2, the password
+// for version 1. A version 2 account never accepts the password itself, so a
+// browser that sent it by mistake fails rather than putting the password back
+// on the wire; a version 1 account cannot be signed into with an auth key it
+// has never stored.
+func secretMatches(user *User, s Secret) bool {
+	if user == nil {
+		CheckPassword(dummyHash(), s.Password+s.AuthKey)
+		return false
+	}
+	given := s.Password
+	if user.AuthVersion >= AuthVersionKey {
+		given = s.AuthKey
+	}
+	if given == "" {
+		CheckPassword(dummyHash(), s.Password+s.AuthKey)
+		return false
+	}
+	return CheckPassword(user.PasswordHash, given)
+}
+
+// AdminReady reports whether u may act as an administrator: an admin, with a
+// second factor whenever this instance can offer one.
+//
+// An admin session can reset anybody's password, read the audit log and turn
+// the instance's defences on and off, so it is the one account a stolen
+// password must not be enough for. Users are held to 2FA only when an admin
+// asks for it; admins always are.
+//
+// Where no ENCRYPTION_KEY is set, 2FA cannot be enabled at all, and requiring
+// it would lock every admin out of everything. The server says so at start
+// instead; see server.New.
+func (d *HandlerDeps) AdminReady(u *User) bool {
+	if u == nil || !u.IsAdmin() {
+		return false
+	}
+	return u.TOTPEnabled || d.EncryptionKey == nil
+}
+
+// adminOnly lets an administrator through, writing the refusal itself when the
+// caller is not one, or is one who has not turned on 2FA yet.
+func adminOnly(w http.ResponseWriter, deps *HandlerDeps, caller *User) bool {
+	if caller == nil || !caller.IsAdmin() {
+		apierror.Write(w, apierror.Auth, http.StatusForbidden, "admin access required")
+		return false
+	}
+	if !deps.AdminReady(caller) {
+		apierror.Write(w, apierror.Auth, http.StatusForbidden, "administrators must enable 2FA")
+		return false
+	}
+	return true
+}
+
+// confirmPassword asks the signed-in user for their password again, before
+// something that should not rest on a session alone. It writes the refusal
+// itself — failMessage for a wrong password, a 429 when there have been too
+// many — and reports whether to go on.
+func confirmPassword(w http.ResponseWriter, deps *HandlerDeps, user *User, secret Secret, failMessage string) bool {
+	attempt, ok := deps.PasswordCheckLimiter.Reserve(strconv.Itoa(user.ID))
+	if !ok {
+		w.Header().Set("Retry-After", "900")
+		apierror.Write(w, apierror.Auth, http.StatusTooManyRequests, "too many attempts")
+		return false
+	}
+	if !secretMatches(user, secret) {
+		apierror.Write(w, apierror.Auth, http.StatusUnauthorized, failMessage)
+		return false
+	}
+	attempt.Release()
+	return true
+}
+
+// The TOTP parameters every authenticator app assumes, and totp.Validate
+// uses: six digits, SHA-1, thirty seconds, one step of drift either way.
+const (
+	totpPeriod = 30
+	totpSkew   = 1
+)
+
+// validateTOTPCode decrypts the stored secret, checks a TOTP code against it,
+// and spends the code: a code that worked once is refused after.
+//
+// Without that, a code read over a shoulder or relayed by a phishing page
+// went on working for the minute and a half the drift window keeps it valid.
+// The step each accepted code belongs to is recorded, and only a later step
+// is accepted next — claimed in one statement, so two requests racing with
+// the same code cannot both have it.
 func validateTOTPCode(ctx context.Context, deps *HandlerDeps, userID int, code string) (bool, error) {
 	if deps.EncryptionKey == nil {
 		return false, nil
@@ -1204,11 +1507,54 @@ func validateTOTPCode(ctx context.Context, deps *HandlerDeps, userID int, code s
 		return false, fmt.Errorf("decrypting TOTP secret: %w", err)
 	}
 
-	return totp.Validate(code, string(secret)), nil
+	step, ok := totpStep(string(secret), code, time.Now())
+	if !ok {
+		return false, nil
+	}
+	return deps.Store.ClaimTOTPStep(ctx, userID, step)
+}
+
+// totpStep finds the time step, inside the drift window around now, whose
+// code is code — what totp.Validate checks, with the step it matched.
+func totpStep(secret, code string, now time.Time) (int64, bool) {
+	if len(code) != 6 {
+		return 0, false
+	}
+	current := now.Unix() / totpPeriod
+	for step := current - totpSkew; step <= current+totpSkew; step++ {
+		want, err := totp.GenerateCode(secret, time.Unix(step*totpPeriod, 0))
+		if err != nil {
+			return 0, false
+		}
+		if subtle.ConstantTimeCompare([]byte(want), []byte(code)) == 1 {
+			return step, true
+		}
+	}
+	return 0, false
+}
+
+// looksLikeRecoveryCode is the shape generateRecoveryCodes makes: eight
+// lower-case hex digits. Anything else cannot match one, and is turned away
+// before ten bcrypt comparisons — two and a half seconds of CPU a wrong
+// six-digit code used to cost on every attempt.
+func looksLikeRecoveryCode(code string) bool {
+	if len(code) != 8 {
+		return false
+	}
+	for _, c := range code {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // tryRecoveryCode checks if the code matches any unused recovery code.
 func tryRecoveryCode(ctx context.Context, deps *HandlerDeps, userID int, code string) (bool, error) {
+	if !looksLikeRecoveryCode(code) {
+		return false, nil
+	}
+
 	codes, err := deps.Store.GetRecoveryCodes(ctx, userID)
 	if err != nil {
 		return false, err
@@ -1219,7 +1565,10 @@ func tryRecoveryCode(ctx context.Context, deps *HandlerDeps, userID int, code st
 			continue
 		}
 		if CheckPassword(rc.CodeHash, code) {
-			if err := deps.Store.MarkRecoveryCodeUsed(ctx, rc.ID); err != nil {
+			// Claimed, not just marked: two requests with the same code both
+			// found it unused above, and only one of them may sign in.
+			claimed, err := deps.Store.ClaimRecoveryCode(ctx, rc.ID)
+			if err != nil || !claimed {
 				return false, err
 			}
 			deps.Store.LogAudit(ctx, &userID, AuditRecoveryCodeUsed, nil, nil)

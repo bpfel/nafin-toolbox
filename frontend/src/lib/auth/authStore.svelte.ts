@@ -1,6 +1,7 @@
 import { withCode } from '../api/client'
-import { passwordChangeProblem } from './rules'
-import { initializeVault, setupKeys, clearVault, reEncryptMEK, recoverVault, tryRestoreVault, saveVault, getVaultState } from '../crypto/vaultStore.svelte'
+import { passwordChangeProblem, passwordProblem } from './rules'
+import { initializeVault, prepareSetup, clearVault, wrapMEKFor, recoverVault, tryRestoreVault, saveVault, getVaultState, prepareUpgrade, recoveryNeedsRenewal, upgradeStored, prepareRenewal, renewalStored, opensVault } from '../crypto/vaultStore.svelte'
+import { derivePasswordKeys, type PasswordKeys } from '../crypto/keys'
 
 export interface User {
   id: number
@@ -10,6 +11,12 @@ export interface User {
   email_verified: boolean
   totp_enabled: boolean
   created_at: string
+  /**
+   * 1: signs in with the password itself, which also derived the vault key;
+   * 2: with an auth key derived from it here. Absent from a server before key
+   * separation, which is version 1 by definition.
+   */
+  auth_version?: number
 }
 
 export interface AppSettings {
@@ -20,6 +27,12 @@ export interface AppSettings {
    * server from before it was reported does not send it.
    */
   email_enabled?: boolean
+  /**
+   * Whether 2FA can be turned on here at all (the server has an encryption
+   * key). Optional for the same reason as email_enabled; absent is read as
+   * yes, which is every server that ever offered 2FA.
+   */
+  twofa_available?: boolean
 }
 
 const API_BASE = '/api'
@@ -28,30 +41,74 @@ let currentUser = $state<User | null>(null)
 let loading = $state(true)
 let needsSetup = $state(false)
 
-// Held credentials for vault initialization (cleared after use)
+// Held between steps (2FA, vault setup, recovery), and cleared after use: the
+// keys a password stands for, never the password — except for a version 1
+// account, whose password is the proof its one upgrade needs.
+let heldKeys: PasswordKeys | null = null
+/**
+ * A sign-in waiting for a second factor: the instance requires one and this
+ * account has none yet. The server refuses the vault until it is set up
+ * (RequireEnrolment), so the vault is opened afterwards, by confirm2FA, with
+ * what is held here.
+ */
+let heldForEnrolment: { keys: PasswordKeys; password: string | null; email: string } | null = null
 let heldPassword = $state<string | null>(null)
 let heldEmail = $state<string | null>(null)
+
+// A change of keys waiting for its new recovery key to be written down: the
+// move to separate keys (offerUpgrade) or a renewal (renewKeys). Nothing is
+// sent until it has been typed back; `commit` then sends it.
+interface PendingKeyChange {
+  /**
+   * `setup`: a new vault's first keys. `upgrade`: the move to separate keys.
+   * `renewal`: Renew keys. In each, nothing is stored until the recovery key
+   * has been typed back, so a reload on its screen stores nothing either.
+   */
+  kind: 'setup' | 'upgrade' | 'renewal'
+  recoveryKey: string
+  commit: () => Promise<string | null>
+}
+let pendingKeyChange = $state<PendingKeyChange | null>(null)
+
+/** What a new account's keys are derived with; prelogin answers the same for unknown addresses. */
+const DEFAULT_ITERATIONS = 600000
 
 // Vault state exposed to UI
 let vaultNeedsSetup = $state(false)
 let vaultDecryptFailed = $state(false)
-let recoveryKeyToShow = $state<string | null>(null)
 let vaultLocked = $state(false)
+/**
+ * The vault is being opened and its keys checked. Opening it makes the budget
+ * visible, and a new recovery key, when one is due, takes a second more to
+ * prepare; the gate shows loading in between (gate.ts), or the budget flashed
+ * up before the screen that has to come first.
+ */
+let openingVault = $state(false)
+
+async function whileOpening<T>(open: () => Promise<T>): Promise<T> {
+  openingVault = true
+  try {
+    return await open()
+  } finally {
+    openingVault = false
+  }
+}
 
 export function getAuthState() {
   return {
     get currentUser() { return currentUser },
     get loading() { return loading },
+    get openingVault() { return openingVault },
     get needsSetup() { return needsSetup },
     get vaultNeedsSetup() { return vaultNeedsSetup },
     get vaultDecryptFailed() { return vaultDecryptFailed },
     get vaultLocked() { return vaultLocked },
-    get recoveryKeyToShow() { return recoveryKeyToShow },
+    // A new vault's first key, and the key of a move or a renewal, on screens
+    // with different words; both are confirmed through confirmKeyChange.
+    get recoveryKeyToShow() { return pendingKeyChange?.kind === 'setup' ? pendingKeyChange.recoveryKey : null },
+    get upgradeRecoveryKey() { return pendingKeyChange && pendingKeyChange.kind !== 'setup' ? pendingKeyChange.recoveryKey : null },
+    get keyChangeKind() { return pendingKeyChange?.kind ?? null },
   }
-}
-
-export function clearRecoveryKey() {
-  recoveryKeyToShow = null
 }
 
 export async function checkAuth() {
@@ -73,8 +130,17 @@ export async function checkAuth() {
       // Admin users skip vault entirely — they don't use encrypted modules
       if (currentUser && currentUser.role !== 'admin') {
         // Try to restore vault from sessionStorage (survives page refresh)
-        const restored = await tryRestoreVault(currentUser.id)
-        if (!restored) {
+        // — unless the account has yet to move to separate keys. That move
+        // needs the password and shows a new recovery key; restored from the
+        // cache, the reload skipped both, and a reload on the recovery-key
+        // screen put the move off for good. Asked for the password instead,
+        // the unlock offers the move again (offerUpgrade).
+        if (versionOf(currentUser) < 2) {
+          vaultLocked = true
+        } else if (!(await tryRestoreVault(currentUser.id))) {
+          vaultLocked = true
+        } else if (recoveryNeedsRenewal()) {
+          clearVault()
           vaultLocked = true
         }
       }
@@ -88,19 +154,66 @@ export async function checkAuth() {
   }
 }
 
+// --- Keys instead of passwords (see plans/key-separation-plan.md) ---
+//
+// The password never leaves this tab for a version 2 account: the server gets
+// the auth key derived from it, and the vault is unwrapped with a sibling key
+// it never sees. A version 1 account still sends its password, once more, and
+// is upgraded right after.
+
+async function prelogin(email: string): Promise<{ auth_version: number; iterations: number }> {
+  const res = await fetch(`${API_BASE}/auth/prelogin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: 'Login failed' }))
+    throw new Error(withCode(data) || 'Login failed')
+  }
+  return res.json()
+}
+
+function versionOf(user: User | null): number {
+  return user?.auth_version ?? 1
+}
+
+/**
+ * The proof of a password in the signed-in account's own form — as the server
+ * knows it now, not as this tab last heard. A tab left open since before the
+ * account moved on another device still holds version 1, and sending the
+ * password itself would be refused.
+ */
+async function proofFor(password: string): Promise<{ password: string } | { auth_key: string }> {
+  if (!currentUser) throw new Error('Not logged in')
+  const { auth_version, iterations } = await prelogin(currentUser.email)
+  if (auth_version < 2) return { password }
+  return { auth_key: (await derivePasswordKeys(password, currentUser.email, iterations)).authKey }
+}
+
 export async function login(email: string, password: string): Promise<string | { requires_2fa: true; mfa_token: string } | null> {
+  let pre: { auth_version: number; iterations: number }
+  try {
+    pre = await prelogin(email)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Login failed'
+  }
+  const keys = await derivePasswordKeys(password, email, pre.iterations)
+
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(pre.auth_version >= 2 ? { email, auth_key: keys.authKey } : { email, password }),
   })
 
   if (res.ok) {
     const data = await res.json()
     if (data.requires_2fa) {
-      // Hold password for vault init after 2FA
-      heldPassword = password
+      // Held for the vault and the upgrade, after the second factor.
+      heldKeys = keys
+      heldPassword = pre.auth_version >= 2 ? null : password
       heldEmail = email
       return { requires_2fa: true, mfa_token: data.mfa_token }
     }
@@ -111,29 +224,175 @@ export async function login(email: string, password: string): Promise<string | {
     // and a stale true would skip re-wrapping a vault that has them.
     vaultNeedsSetup = false
     vaultDecryptFailed = false
-
-    // Admin users skip vault entirely — they don't use encrypted modules
-    if (data.role !== 'admin') {
-      // Initialize vault
-      const vaultResult = await initializeVault(password, email, data.id)
-      if (vaultResult === 'no-keys') {
-        // Keys don't exist yet — need setup
-        heldPassword = password
-        heldEmail = email
-        vaultNeedsSetup = true
-      } else if (vaultResult === 'decrypt-failed') {
-        // Keys exist but can't decrypt — need recovery
-        heldPassword = password
-        heldEmail = email
-        vaultDecryptFailed = true
-      }
-    }
-
+    await afterSignIn(keys, password, email)
     return null
   }
 
   const data = await res.json().catch(() => ({ error: 'Login failed' }))
   return withCode(data) || 'Login failed'
+}
+
+/**
+ * Open the vault after signing in, and move a version 1 account to version 2.
+ * `password` is needed only as that upgrade's proof.
+ */
+async function afterSignIn(keys: PasswordKeys, password: string | null, email: string): Promise<void> {
+  if (!currentUser) return
+  const version = versionOf(currentUser)
+
+  // An administrator has no vault, so only the password moves.
+  if (currentUser.role === 'admin') {
+    if (version < 2 && password) await upgradeNow({ password, new_auth_key: keys.authKey })
+    return
+  }
+
+  if (!currentUser.totp_enabled) {
+    const settings = await getSettings()
+    if (settings.require_2fa && settings.twofa_available !== false) {
+      heldForEnrolment = { keys, password, email }
+      return
+    }
+  }
+
+  await whileOpening(() => openAfterSignIn(keys, password, email, version))
+}
+
+async function openAfterSignIn(keys: PasswordKeys, password: string | null, email: string, version: number): Promise<void> {
+  if (!currentUser) return
+  const vaultResult = await initializeVault(keys, currentUser.id, version)
+  if (vaultResult === 'no-keys') {
+    // No vault yet: the password moves now, and the vault is set up under
+    // the version 2 key.
+    if (version < 2 && password) await upgradeNow({ password, new_auth_key: keys.authKey })
+    heldKeys = keys
+    heldEmail = email
+    vaultNeedsSetup = true
+  } else if (vaultResult === 'decrypt-failed') {
+    // Keys exist but this password does not open them — need recovery.
+    heldKeys = keys
+    heldPassword = version < 2 ? password : null
+    heldEmail = email
+    vaultDecryptFailed = true
+  } else if (vaultResult === 'ok') {
+    await offerUpgrade(keys, password)
+  } else if (vaultResult === 'unavailable') {
+    // Signed in, but the vault could not be read just now. Locked rather than
+    // started empty: unlocking again reads it once the server answers.
+    vaultLocked = true
+  }
+}
+
+/**
+ * Upgrade what this account still lacks of version 2, now that its vault is
+ * open. A new recovery key is involved whenever the old one is one the server
+ * received; then nothing is sent until it has been written down and typed back
+ * (confirmKeyChange). Otherwise the upgrade goes at once.
+ */
+async function offerUpgrade(keys: PasswordKeys, password: string | null): Promise<void> {
+  if (!currentUser) return
+  const needsAuth = versionOf(currentUser) < 2
+  const needsRecovery = recoveryNeedsRenewal()
+  if (!needsAuth && !needsRecovery) return
+  if (needsAuth && !password) return
+
+  const prepared = await prepareUpgrade(keys, needsAuth, needsRecovery)
+  const body: Record<string, string> = needsAuth
+    ? { password: password!, new_auth_key: keys.authKey }
+    : { auth_key: keys.authKey }
+  if (prepared.encrypted_mek) body.encrypted_mek = prepared.encrypted_mek
+  if (prepared.recovery_auth && prepared.encrypted_mek_recovery) {
+    body.recovery_auth = prepared.recovery_auth
+    body.encrypted_mek_recovery = prepared.encrypted_mek_recovery
+  }
+  if (prepared.recoveryKey) {
+    pendingKeyChange = { kind: 'upgrade', recoveryKey: prepared.recoveryKey, commit: () => upgradeNow(body) }
+    return
+  }
+  await upgradeNow(body)
+}
+
+/** Send an upgrade. A failure leaves the account as it was; the next sign-in tries again. */
+async function upgradeNow(body: Record<string, string>): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/auth/upgrade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  if (res.ok) {
+    currentUser = await res.json()
+    upgradeStored(body.recovery_auth !== undefined)
+    return null
+  }
+  const data = await res.json().catch(() => ({ error: 'Upgrade failed' }))
+  return withCode(data) || 'Upgrade failed'
+}
+
+/**
+ * The new recovery key has been written down and typed back: send what was
+ * waiting for it. If another tab moved the account first (AUTH-063), this
+ * one's recovery key was never stored — so it is not kept, and the account is
+ * read again. A renewal refused because the account moved under it (AUTH-065)
+ * is dropped too, to be started again from Profile.
+ */
+export async function confirmKeyChange(): Promise<string | null> {
+  if (!pendingKeyChange) return null
+  const problem = await pendingKeyChange.commit()
+  if (problem && !problem.includes('AUTH-063') && !problem.includes('AUTH-065')) return problem
+  pendingKeyChange = null
+  if (problem?.includes('AUTH-063')) await checkAuth()
+  return problem?.includes('AUTH-065') ? problem : null
+}
+
+/**
+ * Renew every key: a new password, a new vault key with everything sealed
+ * under it again, and a new recovery key. For whoever does not trust what a
+ * server might have kept from before the move to separate keys. Prepared now;
+ * sent once the new recovery key has been typed back (confirmKeyChange).
+ */
+export async function renewKeys(currentPassword: string, newPassword: string): Promise<string | null> {
+  if (!currentUser) return 'Not logged in'
+  const problem = passwordChangeProblem(currentPassword, newPassword)
+  if (problem) return problem
+  if (currentPassword === newPassword) {
+    return withCode({ error: 'the new password must differ from the current one', code: 'AUTH-066' })
+  }
+  let iterations: number
+  try {
+    const pre = await prelogin(currentUser.email)
+    if (pre.auth_version < 2) return withCode({ error: 'upgrade before renewing', code: 'AUTH-064' })
+    iterations = pre.iterations
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Renewal failed'
+  }
+  const current = await derivePasswordKeys(currentPassword, currentUser.email, iterations)
+  if (!(await opensVault(current, 2))) return withCode({ error: 'incorrect password', code: 'AUTH-015' })
+  const next = await derivePasswordKeys(newPassword, currentUser.email, iterations)
+
+  let prepared: Awaited<ReturnType<typeof prepareRenewal>>
+  try {
+    prepared = await prepareRenewal(next)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Renewal failed'
+  }
+
+  pendingKeyChange = {
+    kind: 'renewal',
+    recoveryKey: prepared.recoveryKey,
+    commit: async () => {
+      const res = await fetch(`${API_BASE}/auth/renew-keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ auth_key: current.authKey, ...prepared.body }),
+      })
+      const data = await res.json().catch(() => ({ error: 'Renewal failed' }))
+      if (!res.ok) return withCode(data) || 'Renewal failed'
+      await renewalStored(prepared, data.vault_updated_at ?? null)
+      return null
+    },
+  }
+  return null
 }
 
 export async function verify2FA(mfaToken: string, code: string): Promise<string | null> {
@@ -151,24 +410,13 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
     vaultNeedsSetup = false
     vaultDecryptFailed = false
 
-    // Admin users skip vault entirely
-    if (currentUser && currentUser.role !== 'admin') {
-      // Initialize vault using held credentials
-      if (heldPassword && heldEmail) {
-        const vaultResult = await initializeVault(heldPassword, heldEmail, currentUser.id)
-        if (vaultResult === 'no-keys') {
-          vaultNeedsSetup = true
-        } else if (vaultResult === 'decrypt-failed') {
-          vaultDecryptFailed = true
-        }
-      }
-    }
-    // Clear held credentials if vault is ready
-    if (!vaultNeedsSetup && !vaultDecryptFailed) {
-      heldPassword = null
-      heldEmail = null
-    }
-
+    const keys = heldKeys
+    const password = heldPassword
+    const email = heldEmail
+    heldKeys = null
+    heldPassword = null
+    heldEmail = null
+    if (keys && email) await afterSignIn(keys, password, email)
     return null
   }
 
@@ -181,22 +429,39 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
  * Returns error string or null on success.
  */
 export async function unlockVault(password: string): Promise<string | null> {
+  return whileOpening(() => unlockVaultWith(password))
+}
+
+async function unlockVaultWith(password: string): Promise<string | null> {
   if (!currentUser) return 'Not logged in'
 
-  const vaultResult = await initializeVault(password, currentUser.email, currentUser.id)
+  let iterations: number
+  try {
+    iterations = (await prelogin(currentUser.email)).iterations
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Unlock failed'
+  }
+  const keys = await derivePasswordKeys(password, currentUser.email, iterations)
+  const version = versionOf(currentUser)
+  const vaultResult = await initializeVault(keys, currentUser.id, version)
   if (vaultResult === 'ok') {
     vaultLocked = false
+    // The one moment a still-open version 1 session has the password.
+    await offerUpgrade(keys, password)
     return null
+  } else if (vaultResult === 'unavailable') {
+    return 'The vault could not be loaded. Try again in a moment.'
   } else if (vaultResult === 'no-keys') {
     // Keys don't exist yet — need setup
-    heldPassword = password
+    heldKeys = keys
     heldEmail = currentUser.email
     vaultNeedsSetup = true
     vaultLocked = false
     return null
   } else {
     // decrypt-failed — need recovery
-    heldPassword = password
+    heldKeys = keys
+    heldPassword = version < 2 ? password : null
     heldEmail = currentUser.email
     vaultDecryptFailed = true
     vaultLocked = false
@@ -208,15 +473,31 @@ export async function unlockVault(password: string): Promise<string | null> {
  * Complete vault key setup (after login when keys don't exist yet).
  * Returns the recovery key to show to the user.
  */
-export async function completeVaultSetup(): Promise<string | null> {
-  if (!heldPassword || !heldEmail || !currentUser) return null
+export async function completeVaultSetup(): Promise<void> {
+  if (!heldKeys || !currentUser) return
 
-  const recoveryKey = await setupKeys(heldPassword, heldEmail, currentUser.id)
+  const prepared = await prepareSetup(heldKeys, currentUser.id)
+  heldKeys = null
   heldPassword = null
   heldEmail = null
   vaultNeedsSetup = false
-  recoveryKeyToShow = recoveryKey
-  return recoveryKey
+  offerSetup(prepared)
+}
+
+/** Show a new vault's recovery key; store the vault once it is typed back. */
+function offerSetup(prepared: { recoveryKey: string; store: () => Promise<void> }): void {
+  pendingKeyChange = {
+    kind: 'setup',
+    recoveryKey: prepared.recoveryKey,
+    commit: async () => {
+      try {
+        await prepared.store()
+        return null
+      } catch (e) {
+        return e instanceof Error ? e.message : 'Failed to set up encryption'
+      }
+    },
+  }
 }
 
 let loggingOut = false
@@ -232,12 +513,14 @@ export async function logout() {
     })
   } finally {
     currentUser = null
+    heldKeys = null
+    heldForEnrolment = null
     heldPassword = null
     heldEmail = null
+    pendingKeyChange = null
     vaultNeedsSetup = false
     vaultDecryptFailed = false
     vaultLocked = false
-    recoveryKeyToShow = null
     loggingOut = false
   }
 }
@@ -271,16 +554,42 @@ export async function changePassword(currentPassword: string, newPassword: strin
   // re-encrypt, and the vault is set up afterwards under the new password.
   // Without this, that change failed with "Vault not unlocked" and the account
   // could never get past it.
-  // Before anything else: the vault key is re-wrapped under the new password
-  // first, and a password the server then refused would leave it there.
+  // Before anything else: a password the server would refuse is better caught
+  // here, before any key is derived for it.
   const problem = passwordChangeProblem(currentPassword, newPassword)
   if (problem) return problem
 
-  if (currentUser && currentUser.role !== 'admin') {
+  if (!currentUser) return 'Not logged in'
+
+  // Both passwords become keys here; neither is sent. The current one as the
+  // account's own proof, the new one always as an auth key, which makes a
+  // version 1 account version 2.
+  // The account's version as the server knows it now: see proofFor.
+  let iterations: number
+  let version: number
+  try {
+    ;({ iterations, auth_version: version } = await prelogin(currentUser.email))
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Password change failed'
+  }
+  const newKeys = await derivePasswordKeys(newPassword, currentUser.email, iterations)
+  const current = version < 2
+    ? { current_password: currentPassword }
+    : { current_auth_key: (await derivePasswordKeys(currentPassword, currentUser.email, iterations)).authKey }
+
+  // The vault key, wrapped under the new password, travels with the change
+  // and is stored with it — only once the current password is proven. Stored
+  // ahead of that, a refused change left the vault opening with a password
+  // the account did not have.
+  let rewrapped: { encrypted_mek?: string } = {}
+  if (currentUser.role !== 'admin') {
     const mustChangeWithLockedVault = currentUser.must_change_password && vaultDecryptFailed
-    if (!mustChangeWithLockedVault && !vaultNeedsSetup) {
+    // Waiting for a second factor, the vault was never opened: there is no
+    // key in memory to re-wrap, and it is opened under the new password once
+    // the factor is set up.
+    if (!mustChangeWithLockedVault && !vaultNeedsSetup && !heldForEnrolment) {
       try {
-        await reEncryptMEK(currentPassword, newPassword, currentUser.email)
+        rewrapped = { encrypted_mek: await wrapMEKFor(newKeys) }
       } catch (e) {
         return e instanceof Error ? e.message : 'Failed to re-encrypt vault keys'
       }
@@ -291,7 +600,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    body: JSON.stringify({ ...current, new_auth_key: newKeys.authKey, ...rewrapped }),
   })
 
   if (res.ok) {
@@ -299,6 +608,8 @@ export async function changePassword(currentPassword: string, newPassword: strin
     // password must not stay held for a vault setup, nor the flags outlive
     // the session they described.
     currentUser = null
+    heldKeys = null
+    heldForEnrolment = null
     heldPassword = null
     heldEmail = null
     vaultNeedsSetup = false
@@ -318,13 +629,10 @@ export async function changePassword(currentPassword: string, newPassword: strin
  */
 export async function recoverAccount(recoveryKey: string): Promise<string | null> {
   if (!currentUser) return 'Not logged in'
-  if (!heldPassword || !heldEmail) return 'Password not available for re-encryption'
+  if (!heldKeys) return 'Password not available for re-encryption'
 
   try {
-    await recoverVault(recoveryKey, heldPassword, heldEmail, currentUser.id)
-    heldPassword = null
-    heldEmail = null
-    vaultDecryptFailed = false
+    await whileOpening(() => recoverAndRenew(recoveryKey))
   } catch (e) {
     return e instanceof Error ? e.message : 'Recovery failed'
   }
@@ -332,9 +640,27 @@ export async function recoverAccount(recoveryKey: string): Promise<string | null
   return null
 }
 
+async function recoverAndRenew(recoveryKey: string): Promise<void> {
+  if (!currentUser || !heldKeys) return
+  await recoverVault(recoveryKey, heldKeys, versionOf(currentUser), currentUser.id)
+  const keys = heldKeys
+  const password = heldPassword
+  heldKeys = null
+  heldPassword = null
+  heldEmail = null
+  vaultDecryptFailed = false
+  // A recovery key the server once received is replaced now, while the
+  // vault is open: shown, typed back, then stored.
+  await offerUpgrade(keys, password)
+}
+
 export async function inviteUser(email: string, role: 'admin' | 'user' = 'user', password?: string): Promise<{ user?: User; error?: string }> {
-  const body: any = { email, role }
-  if (password) body.password = password
+  const body: Record<string, string> = { email, role }
+  // A first password, without email: sent as the invitee's auth key, derived
+  // here for their address, so the server never sees it.
+  const problem = password ? passwordProblem(password) : null
+  if (problem) return { error: problem }
+  if (password) body.auth_key = (await derivePasswordKeys(password, email, DEFAULT_ITERATIONS)).authKey
 
   const res = await fetch(`${API_BASE}/auth/invite`, {
     method: 'POST',
@@ -360,11 +686,14 @@ export async function listUsers(): Promise<User[]> {
 }
 
 export async function setup(email: string, password: string): Promise<string | null> {
+  const problem = passwordProblem(password)
+  if (problem) return problem
+  const keys = await derivePasswordKeys(password, email, DEFAULT_ITERATIONS)
   const res = await fetch(`${API_BASE}/auth/setup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, auth_key: keys.authKey }),
   })
 
   if (res.ok) {
@@ -375,8 +704,7 @@ export async function setup(email: string, password: string): Promise<string | n
     if (currentUser && currentUser.role !== 'admin') {
       // Set up vault keys for the new user
       try {
-        const recoveryKey = await setupKeys(password, email, currentUser.id)
-        recoveryKeyToShow = recoveryKey
+        offerSetup(await prepareSetup(keys, currentUser.id))
       } catch {
         // If key setup fails, user can still unlock later via the vault lock screen
         vaultLocked = true
@@ -390,11 +718,28 @@ export async function setup(email: string, password: string): Promise<string | n
 }
 
 export async function verifyEmail(token: string, password: string): Promise<string | null> {
+  const problem = passwordProblem(password)
+  if (problem) return problem
+  // The keys are derived from the invitee's address, which the link does not
+  // carry: asked for first, by token.
+  const who = await fetch(`${API_BASE}/auth/invitation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ token }),
+  })
+  if (!who.ok) {
+    const data = await who.json().catch(() => ({ error: 'Verification failed' }))
+    return withCode(data) || 'Verification failed'
+  }
+  const { email, iterations } = await who.json()
+  const keys = await derivePasswordKeys(password, email, iterations ?? DEFAULT_ITERATIONS)
+
   const res = await fetch(`${API_BASE}/auth/verify-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ token, password }),
+    body: JSON.stringify({ token, auth_key: keys.authKey }),
   })
 
   if (res.ok) {
@@ -403,8 +748,7 @@ export async function verifyEmail(token: string, password: string): Promise<stri
     // Set up vault keys for the invited user (admin users skip vault)
     if (currentUser && currentUser.role !== 'admin') {
       try {
-        const recoveryKey = await setupKeys(password, currentUser.email, currentUser.id)
-        recoveryKeyToShow = recoveryKey
+        offerSetup(await prepareSetup(keys, currentUser.id))
       } catch {
         vaultLocked = true
       }
@@ -416,10 +760,20 @@ export async function verifyEmail(token: string, password: string): Promise<stri
   return withCode(data) || 'Verification failed'
 }
 
-export async function setup2FA(): Promise<{ secret: string; url: string } | { error: string }> {
+export async function setup2FA(password: string): Promise<{ secret: string; url: string } | { error: string }> {
+  // The password first, as for turning 2FA off: whoever enrols a factor
+  // decides who can sign in from then on.
+  let proof: { password: string } | { auth_key: string }
+  try {
+    proof = await proofFor(password)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : '2FA setup failed' }
+  }
   const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
+    body: JSON.stringify(proof),
   })
 
   if (res.ok) {
@@ -439,7 +793,14 @@ export async function confirm2FA(code: string): Promise<{ recovery_codes: string
   })
 
   if (res.ok) {
-    return res.json()
+    const confirmed = await res.json()
+    const held = heldForEnrolment
+    if (held && currentUser) {
+      heldForEnrolment = null
+      currentUser = { ...currentUser, totp_enabled: true }
+      await afterSignIn(held.keys, held.password, held.email)
+    }
+    return confirmed
   }
 
   const data = await res.json().catch(() => ({ error: 'Confirmation failed' }))
@@ -447,11 +808,17 @@ export async function confirm2FA(code: string): Promise<{ recovery_codes: string
 }
 
 export async function disable2FA(password: string): Promise<string | null> {
+  let proof: { password: string } | { auth_key: string }
+  try {
+    proof = await proofFor(password)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Failed'
+  }
   const res = await fetch(`${API_BASE}/auth/2fa`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(proof),
   })
 
   if (res.ok) return null
@@ -461,11 +828,17 @@ export async function disable2FA(password: string): Promise<string | null> {
 }
 
 export async function regenerateRecoveryCodes(password: string): Promise<{ recovery_codes: string[] } | { error: string }> {
+  let proof: { password: string } | { auth_key: string }
+  try {
+    proof = await proofFor(password)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Failed' }
+  }
   const res = await fetch(`${API_BASE}/auth/2fa/recovery-codes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(proof),
   })
 
   if (res.ok) {
@@ -477,11 +850,17 @@ export async function regenerateRecoveryCodes(password: string): Promise<{ recov
 }
 
 export async function deleteAccount(password: string): Promise<string | null> {
+  let proof: { password: string } | { auth_key: string }
+  try {
+    proof = await proofFor(password)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Failed'
+  }
   const res = await fetch(`${API_BASE}/auth/account`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(proof),
   })
 
   if (res.ok) {
@@ -506,15 +885,28 @@ export async function deleteUser(id: number): Promise<string | null> {
   return withCode(data) || 'Failed to delete user'
 }
 
-export async function adminResetPassword(id: number): Promise<{ temp_password: string } | { error: string }> {
+export async function adminResetPassword(id: number): Promise<{ temp_password: string; temp_expires_at: string } | { error: string }> {
   const res = await fetch(`${API_BASE}/auth/users/${id}/reset-password`, {
     method: 'POST',
     credentials: 'include',
   })
 
   const data = await res.json().catch(() => ({ error: 'Failed to reset password' }))
-  if (res.ok) return { temp_password: data.temp_password }
+  if (res.ok) return { temp_password: data.temp_password, temp_expires_at: data.temp_expires_at }
   return { error: withCode(data) || 'Failed to reset password' }
+}
+
+/** Take a user's second factor away, for one who lost it or did not enrol it. */
+export async function adminRemove2FA(id: number): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/auth/users/${id}/2fa`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  if (res.ok) return null
+
+  const data = await res.json().catch(() => ({ error: 'Failed to remove 2FA' }))
+  return withCode(data) || 'Failed to remove 2FA'
 }
 
 export async function resendVerification(id: number): Promise<string | null> {
@@ -543,6 +935,33 @@ export interface AuditLogEntry {
 export interface AuditLogResponse {
   entries: AuditLogEntry[]
   total: number
+}
+
+export interface Lockout {
+  kind: string
+  key: string
+  attempts: number
+  until: string
+  email?: string
+}
+
+export async function listLockouts(): Promise<{ lockouts: Lockout[] } | { error: string }> {
+  const res = await fetch(`${API_BASE}/auth/lockouts`, { credentials: 'include' })
+  const data = await res.json().catch(() => ({ error: 'Failed to load lockouts' }))
+  if (res.ok) return { lockouts: data.lockouts ?? [] }
+  return { error: withCode(data) || 'Failed to load lockouts' }
+}
+
+export async function clearLockouts(request: { kind: string; key: string } | { all: true }): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/auth/lockouts/clear`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  })
+  if (res.ok) return null
+  const data = await res.json().catch(() => ({ error: 'Failed to clear lockouts' }))
+  return withCode(data) || 'Failed to clear lockouts'
 }
 
 export async function fetchAuditLogs(params: {

@@ -13,6 +13,7 @@ import (
 	"github.com/bpfel/nafin-toolbox/internal/auth"
 	"github.com/bpfel/nafin-toolbox/internal/database"
 	"github.com/bpfel/nafin-toolbox/internal/email"
+	"github.com/bpfel/nafin-toolbox/internal/household"
 	"github.com/bpfel/nafin-toolbox/internal/server"
 )
 
@@ -54,17 +55,16 @@ func main() {
 		log.Println("SMTP not configured — invite emails will be logged only")
 	}
 
-	// Parse encryption key for 2FA
-	var encryptionKey []byte
-	if keyHex := os.Getenv("ENCRYPTION_KEY"); keyHex != "" {
-		key, err := auth.ParseEncryptionKey(keyHex)
-		if err != nil {
-			log.Fatalf("invalid ENCRYPTION_KEY: %v", err)
-		}
-		encryptionKey = key
-		log.Println("Encryption key loaded — 2FA available")
+	// The server's own secret: it encrypts 2FA secrets at rest. See
+	// auth.LoadEncryptionKey for where it may come from.
+	encryptionKey, keySource, err := auth.LoadEncryptionKey(os.Getenv, os.ReadFile)
+	if err != nil {
+		log.Fatalf("encryption key: %v", err)
+	}
+	if encryptionKey != nil {
+		log.Printf("Encryption key loaded from %s — 2FA available", keySource)
 	} else {
-		log.Println("ENCRYPTION_KEY not set — 2FA will not be available")
+		log.Println("Neither ENCRYPTION_KEY nor ENCRYPTION_KEY_FILE set — 2FA will not be available")
 	}
 
 	appURL := os.Getenv("APP_URL")
@@ -74,6 +74,7 @@ func main() {
 
 	// Start background cleanup (every hour)
 	authStore := auth.NewStore(db)
+	householdStore := household.NewStore(db)
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -87,6 +88,9 @@ func main() {
 			}
 			if err := authStore.DeleteExpiredMFAChallenges(ctx); err != nil {
 				log.Printf("MFA challenge cleanup error: %v", err)
+			}
+			if err := householdStore.DeleteExpiredInvites(ctx); err != nil {
+				log.Printf("household invite cleanup error: %v", err)
 			}
 			log.Println("expired tokens cleaned up")
 		}

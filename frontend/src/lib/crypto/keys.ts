@@ -1,4 +1,4 @@
-import { splitNonce, withNonce } from './bytes'
+import { splitNonce, toBase64, withNonce } from './bytes'
 
 const PBKDF2_HASH = 'SHA-256'
 const AES_ALGO = 'AES-GCM'
@@ -142,3 +142,107 @@ export async function wrapMEKWithRecovery(mek: CryptoKey, recoveryKey: string): 
 export async function unwrapMEKWithRecovery(encryptedMEK: string, recoveryKey: string): Promise<CryptoKey> {
   return unwrapMEK(encryptedMEK, await recoveryKEK(recoveryKey, 'unwrapKey'))
 }
+
+// --- Version 2: one key to sign in with, another for the vault ---
+//
+// A version 1 account wrapped its MEK under PBKDF2(password, email) and sent
+// the password itself to sign in, so the server received everything that
+// opened the vault. Version 2 derives both from the password here, and only
+// the first leaves the browser:
+//
+//   masterKey = PBKDF2-SHA256(password, lower-case email, iterations)
+//   authKey   = HKDF-SHA256(masterKey, "nafin v2 auth")   sent instead of the password
+//   vaultKEK  = HKDF-SHA256(masterKey, "nafin v2 vault")  wraps the MEK
+//
+// HKDF is one-way, so the auth key leads nowhere near the vault key. The same
+// split applies to the recovery key. backend/internal/auth/kdf.go derives the
+// auth key the same way, and both are tested against vectors computed apart
+// from either. See plans/key-separation-plan.md.
+
+const HKDF_SALT = new Uint8Array(0)
+
+async function pbkdf2Bits(secret: string, salt: string, iterations: number): Promise<ArrayBuffer> {
+  const enc = new TextEncoder()
+  const material = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveBits'])
+  return crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode(salt), iterations, hash: PBKDF2_HASH }, material, 256)
+}
+
+async function hkdfMaterial(master: ArrayBuffer): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', master, 'HKDF', false, ['deriveBits', 'deriveKey'])
+}
+
+async function hkdfBase64(material: CryptoKey, info: string): Promise<string> {
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: HKDF_SALT, info: new TextEncoder().encode(info) },
+    material,
+    256,
+  )
+  return toBase64(new Uint8Array(bits))
+}
+
+async function hkdfWrappingKey(material: CryptoKey, info: string): Promise<CryptoKey> {
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: HKDF_SALT, info: new TextEncoder().encode(info) },
+    material,
+    { name: AES_ALGO, length: KEK_KEY_LENGTH },
+    false,
+    ['wrapKey', 'unwrapKey'],
+  )
+}
+
+/** The master key itself as an AES key: exactly the KEK a version 1 account used. */
+async function legacyWrappingKey(master: ArrayBuffer): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', master, { name: AES_ALGO }, false, ['wrapKey', 'unwrapKey'])
+}
+
+/** What a password stands for. Held instead of the password once it has been typed. */
+export interface PasswordKeys {
+  /** Sent to the server in place of the password. Base64, 32 bytes. */
+  authKey: string
+  /** Wraps the MEK of a version 2 account. Never leaves the browser. */
+  vaultKEK: CryptoKey
+  /** The KEK of a version 1 account, which equals the master key. Used to migrate it, once. */
+  legacyKEK: CryptoKey
+}
+
+/** Derive a password's keys. The PBKDF2 runs once, for all three. */
+export async function derivePasswordKeys(password: string, email: string, iterations: number): Promise<PasswordKeys> {
+  const master = await pbkdf2Bits(password, email.toLowerCase(), iterations)
+  const material = await hkdfMaterial(master)
+  return {
+    authKey: await hkdfBase64(material, 'nafin v2 auth'),
+    vaultKEK: await hkdfWrappingKey(material, 'nafin v2 vault'),
+    legacyKEK: await legacyWrappingKey(master),
+  }
+}
+
+/** What a recovery key stands for, split the same way. */
+export interface RecoveryKeys {
+  /** Sent to the server to prove the recovery key. Base64, 32 bytes. */
+  recoveryAuth: string
+  /** Wraps the MEK for recovery, version 2. Never leaves the browser. */
+  recoveryKEK: CryptoKey
+}
+
+/** The recovery key's own PBKDF2 parameters, as version 1 used them. */
+const RECOVERY_SALT = 'nafin-recovery'
+const RECOVERY_ITERATIONS = 600000
+
+export async function deriveRecoveryKeys(recoveryKey: string, iterations = RECOVERY_ITERATIONS): Promise<RecoveryKeys> {
+  const material = await hkdfMaterial(await pbkdf2Bits(recoveryKey, RECOVERY_SALT, iterations))
+  return {
+    recoveryAuth: await hkdfBase64(material, 'nafin v2 recovery auth'),
+    recoveryKEK: await hkdfWrappingKey(material, 'nafin v2 recovery wrap'),
+  }
+}
+
+/** Only for the vectors in keys.test.ts: the master key, which nothing else needs to see. */
+export async function masterKeyForTest(secret: string, salt: string, iterations: number): Promise<string> {
+  return toBase64(new Uint8Array(await pbkdf2Bits(secret, salt, iterations)))
+}
+
+/** Only for the vectors in keys.test.ts. */
+export async function recoveryAuthForTest(recoveryKey: string, iterations: number): Promise<string> {
+  return (await deriveRecoveryKeys(recoveryKey, iterations)).recoveryAuth
+}
+

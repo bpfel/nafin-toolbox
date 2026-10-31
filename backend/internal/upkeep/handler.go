@@ -68,6 +68,10 @@ func Handle(deps *auth.HandlerDeps, limiter *auth.LoginRateLimiter) http.Handler
 			apierror.Write(w, apierror.Upkeep, http.StatusForbidden, "admin access required")
 			return
 		}
+		if !deps.AdminReady(caller) {
+			apierror.Write(w, apierror.Upkeep, http.StatusForbidden, "administrators must enable 2FA")
+			return
+		}
 
 		if !limiter.Allow(r) {
 			w.Header().Set("Retry-After", "3600")

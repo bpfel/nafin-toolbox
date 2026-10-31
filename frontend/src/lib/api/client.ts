@@ -83,6 +83,12 @@ export interface VaultKeysResponse {
   encrypted_mek: string
   iterations: number
   /**
+   * How the recovery copy of the MEK is wrapped: 1 under PBKDF2 of the
+   * recovery key itself, which the server once received; 2 under a recovery
+   * KEK it never sees. Absent from a server before key separation.
+   */
+  recovery_version?: number
+  /**
    * The user's two keypairs, flat on the same object.
    *
    * Every field is absent for anyone who set their vault up before identities
@@ -174,7 +180,8 @@ export async function setupIdentity(body: {
 
 export async function setupVaultKeys(body: {
   encrypted_mek: string
-  recovery_key_hash: string
+  /** Derived from the recovery key; the key itself never leaves the browser. */
+  recovery_auth: string
   encrypted_mek_recovery: string
   public_key: string
   encrypted_private_key: string
@@ -194,12 +201,39 @@ export async function updateVaultKeys(encryptedMEK: string): Promise<void> {
   })
 }
 
-export async function fetchVault(): Promise<VaultPayloadResponse | null> {
-  try {
-    return await request<VaultPayloadResponse>('/vault')
-  } catch {
-    return null
+/**
+ * The vault could not be read: the server is restarting, the connection
+ * dropped, the database did not answer. Not the same as having none.
+ */
+export class VaultUnavailableError extends Error {
+  constructor(message = 'The vault could not be loaded. Try again in a moment.') {
+    super(message)
+    this.name = 'VaultUnavailableError'
   }
+}
+
+/**
+ * The stored vault, or null when the account has none yet.
+ *
+ * Null only for a 404. Every caller answers null by starting an empty vault
+ * and saving it, so a failed read taken for "no vault" once put an empty
+ * vault over the real one — after a redeploy, say, when nginx answers 502 for
+ * a few seconds. Anything but a 404 throws instead.
+ */
+export async function fetchVault(): Promise<VaultPayloadResponse | null> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/vault`, { credentials: 'include' })
+  } catch {
+    throw new VaultUnavailableError()
+  }
+  if (res.status === 404) return null
+  if (res.status === 401) {
+    onUnauthorized?.()
+    throw new SessionEndedError()
+  }
+  if (!res.ok) throw new VaultUnavailableError()
+  return res.json()
 }
 
 export async function putVault(body: {
@@ -240,6 +274,8 @@ export async function putVault(body: {
 
 export interface VaultRecoveryResponse {
   encrypted_mek_recovery: string
+  /** 1: wrapped under PBKDF2 of the recovery key itself; 2: under its recovery KEK. */
+  recovery_version?: number
   /** As on VaultKeysResponse: absent for a vault created before identities. */
   public_key?: string
   encrypted_private_key?: string
@@ -247,11 +283,15 @@ export interface VaultRecoveryResponse {
   encrypted_signing_key?: string
 }
 
-export async function recoverVaultKeys(recoveryKey: string): Promise<VaultRecoveryResponse | null> {
+/**
+ * Prove the recovery key, in the form the account's recovery was stored in:
+ * the key itself for version 1, its recovery auth key for version 2.
+ */
+export async function recoverVaultKeys(proof: { recovery_key: string } | { recovery_auth: string }): Promise<VaultRecoveryResponse | null> {
   try {
     return await request<VaultRecoveryResponse>('/vault/recovery', {
       method: 'POST',
-      body: JSON.stringify({ recovery_key: recoveryKey }),
+      body: JSON.stringify(proof),
     })
   } catch {
     return null

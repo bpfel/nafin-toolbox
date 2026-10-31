@@ -3,6 +3,7 @@ package vault
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -22,6 +23,7 @@ type mockStore struct {
 	encryptedMEK       string
 	iterations         int
 	recoveryKeyHash    string
+	recoveryVersion    int
 	encryptedMEKRecov  string
 	getVaultErr        error
 	putVaultErr        error
@@ -87,6 +89,7 @@ func (m *mockStore) SetEncryptedMEK(ctx context.Context, userID int, encryptedME
 	}
 	m.encryptedMEK = encryptedMEK
 	m.recoveryKeyHash = recoveryKeyHash
+	m.recoveryVersion = 2
 	m.encryptedMEKRecov = encryptedMEKRecovery
 	m.identity = identity
 	return nil
@@ -112,11 +115,11 @@ func (m *mockStore) UpdateEncryptedMEK(ctx context.Context, userID int, encrypte
 	return nil
 }
 
-func (m *mockStore) GetRecoveryData(ctx context.Context, userID int) (string, string, error) {
+func (m *mockStore) GetRecoveryData(ctx context.Context, userID int) (RecoveryData, error) {
 	if m.getRecoveryDataErr != nil {
-		return "", "", m.getRecoveryDataErr
+		return RecoveryData{}, m.getRecoveryDataErr
 	}
-	return m.recoveryKeyHash, m.encryptedMEKRecov, nil
+	return RecoveryData{Hash: m.recoveryKeyHash, EncryptedMEK: m.encryptedMEKRecov, Version: m.recoveryVersion}, nil
 }
 
 func userCtx(userID int) context.Context {
@@ -145,7 +148,7 @@ func TestHandleGetVault_RequiresAuth(t *testing.T) {
 
 func TestHandleGetVault_NoVaultFound(t *testing.T) {
 	store := &mockStore{
-		getVaultErr: context.DeadlineExceeded, // Simulate "not found" error
+		getVaultErr: sql.ErrNoRows,
 	}
 	handler := handleGetVault(store)
 
@@ -160,6 +163,24 @@ func TestHandleGetVault_NoVaultFound(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "no vault found") {
 		t.Errorf("body %q does not contain 'no vault found'", w.Body.String())
+	}
+}
+
+// A failed read is not an absent vault. The client starts an empty vault on
+// 404, so a database error answered that way would have it saved over the
+// real one.
+func TestHandleGetVault_StoreErrorIsNotNotFound(t *testing.T) {
+	store := &mockStore{getVaultErr: context.DeadlineExceeded}
+	handler := handleGetVault(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/vault", nil)
+	req = req.WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusInternalServerError)
 	}
 }
 
@@ -541,7 +562,7 @@ func TestHandleSetupKeys_RequiresAuth(t *testing.T) {
 	handler := handleSetupKeys(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys",
-		strings.NewReader(`{"encrypted_mek":"test","recovery_key_hash":"test","encrypted_mek_recovery":"test"}`))
+		strings.NewReader(`{"encrypted_mek":"test","recovery_auth":"test","encrypted_mek_recovery":"test"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -559,7 +580,7 @@ func TestHandleSetupKeys_AlreadySetup(t *testing.T) {
 	handler := handleSetupKeys(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys",
-		strings.NewReader(`{"encrypted_mek":"new","recovery_key_hash":"hash","encrypted_mek_recovery":"rec"}`))
+		strings.NewReader(`{"encrypted_mek":"new","recovery_auth":"hash","encrypted_mek_recovery":"rec"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx(1))
 	w := httptest.NewRecorder()
@@ -603,31 +624,31 @@ func TestHandleSetupKeys_MissingFields(t *testing.T) {
 	}{
 		{
 			name: "missing encrypted_mek",
-			body: `{"recovery_key_hash":"hash","encrypted_mek_recovery":"rec"}`,
+			body: `{"recovery_auth":"hash","encrypted_mek_recovery":"rec"}`,
 		},
 		{
-			name: "missing recovery_key_hash",
+			name: "missing recovery_auth",
 			body: `{"encrypted_mek":"mek","encrypted_mek_recovery":"rec"}`,
 		},
 		{
 			name: "missing encrypted_mek_recovery",
-			body: `{"encrypted_mek":"mek","recovery_key_hash":"hash"}`,
+			body: `{"encrypted_mek":"mek","recovery_auth":"hash"}`,
 		},
 		{
 			name: "empty encrypted_mek",
-			body: `{"encrypted_mek":"","recovery_key_hash":"hash","encrypted_mek_recovery":"rec"}`,
+			body: `{"encrypted_mek":"","recovery_auth":"hash","encrypted_mek_recovery":"rec"}`,
 		},
 		{
-			name: "empty recovery_key_hash",
-			body: `{"encrypted_mek":"mek","recovery_key_hash":"","encrypted_mek_recovery":"rec"}`,
+			name: "empty recovery_auth",
+			body: `{"encrypted_mek":"mek","recovery_auth":"","encrypted_mek_recovery":"rec"}`,
 		},
 		{
 			name: "empty encrypted_mek_recovery",
-			body: `{"encrypted_mek":"mek","recovery_key_hash":"hash","encrypted_mek_recovery":""}`,
+			body: `{"encrypted_mek":"mek","recovery_auth":"hash","encrypted_mek_recovery":""}`,
 		},
 		{
 			name: "all empty",
-			body: `{"encrypted_mek":"","recovery_key_hash":"","encrypted_mek_recovery":""}`,
+			body: `{"encrypted_mek":"","recovery_auth":"","encrypted_mek_recovery":""}`,
 		},
 		{
 			name: "empty object",
@@ -658,9 +679,9 @@ func TestHandleSetupKeys_Success(t *testing.T) {
 	store := &mockStore{}
 	handler := handleSetupKeys(store)
 
-	recoveryKey := "my-recovery-key-12345"
+	recoveryKey := "9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="
 	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys",
-		strings.NewReader(`{"encrypted_mek":"test-mek","recovery_key_hash":"my-recovery-key-12345","encrypted_mek_recovery":"rec-mek"}`))
+		strings.NewReader(`{"encrypted_mek":"test-mek","recovery_auth":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo=","encrypted_mek_recovery":"rec-mek"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx(1))
 	w := httptest.NewRecorder()
@@ -692,8 +713,8 @@ func TestHandleSetupKeys_BcryptHashDifferentEachTime(t *testing.T) {
 	handler1 := handleSetupKeys(store1)
 	handler2 := handleSetupKeys(store2)
 
-	sameRecoveryKey := "identical-recovery-key"
-	body := `{"encrypted_mek":"mek","recovery_key_hash":"identical-recovery-key","encrypted_mek_recovery":"rec"}`
+	sameRecoveryKey := "l1vKXKm/itMumYomXdESJZ7V0wydUfu1pN0tFbVbn/k="
+	body := `{"encrypted_mek":"mek","recovery_auth":"l1vKXKm/itMumYomXdESJZ7V0wydUfu1pN0tFbVbn/k=","encrypted_mek_recovery":"rec"}`
 
 	req1 := httptest.NewRequest(http.MethodPost, "/api/vault/keys", strings.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
@@ -963,7 +984,7 @@ func TestHandleRecovery_InvalidRecoveryKey(t *testing.T) {
 }
 
 func TestHandleRecovery_Success(t *testing.T) {
-	correctKey := "my-recovery-key-12345"
+	correctKey := "9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="
 	hash, _ := bcrypt.GenerateFromPassword([]byte(correctKey), bcrypt.DefaultCost)
 
 	store := &mockStore{
@@ -973,7 +994,7 @@ func TestHandleRecovery_Success(t *testing.T) {
 	handler := handleRecovery(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/vault/recovery",
-		strings.NewReader(`{"recovery_key":"my-recovery-key-12345"}`))
+		strings.NewReader(`{"recovery_key":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo="}`))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx(1))
 	w := httptest.NewRecorder()
@@ -1318,7 +1339,7 @@ func TestHandleSetupKeys_StoresIdentity(t *testing.T) {
 	store := &mockStore{}
 	handler := handleSetupKeys(store)
 
-	body := `{"encrypted_mek":"bWVr","recovery_key_hash":"cms=","encrypted_mek_recovery":"cmVj",
+	body := `{"encrypted_mek":"bWVr","recovery_auth":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo=","encrypted_mek_recovery":"cmVj",
 	          "public_key":"cHVibGlj","encrypted_private_key":"cHJpdmF0ZQ==",
 	          "verifying_key":"dmVyaWZ5","encrypted_signing_key":"c2lnbg=="}`
 	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", strings.NewReader(body))
@@ -1350,7 +1371,7 @@ func TestHandleSetupKeys_RejectsPartialIdentity(t *testing.T) {
 		t.Run("without "+omitted, func(t *testing.T) {
 			fields := map[string]string{
 				"encrypted_mek":          "bWVr",
-				"recovery_key_hash":      "cms=",
+				"recovery_auth":          "cms=",
 				"encrypted_mek_recovery": "cmVj",
 			}
 			for k, v := range full {
@@ -1388,7 +1409,7 @@ func TestHandleSetupKeys_AllowsAbsentIdentity(t *testing.T) {
 	store := &mockStore{}
 	handler := handleSetupKeys(store)
 
-	body := `{"encrypted_mek":"bWVr","recovery_key_hash":"cms=","encrypted_mek_recovery":"cmVj"}`
+	body := `{"encrypted_mek":"bWVr","recovery_auth":"9Zfg+s4rJYaiivhdlz/u8GOazhAx/PispqJSaPQalfo=","encrypted_mek_recovery":"cmVj"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/vault/keys", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(userCtx(1))
@@ -1460,5 +1481,50 @@ func TestHandleSetupIdentity_RequiresAuth(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
+// --- Recovery keys the server never received (version 2) ---
+
+func recoverWith(t *testing.T, store *mockStore, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/vault/recovery", strings.NewReader(body)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+	handleRecovery(store).ServeHTTP(w, req)
+	return w
+}
+
+func TestHandleRecovery_Version2TakesTheRecoveryAuthOnly(t *testing.T) {
+	recoveryAuth := "l1vKXKm/itMumYomXdESJZ7V0wydUfu1pN0tFbVbn/k="
+	hash, _ := bcrypt.GenerateFromPassword([]byte(recoveryAuth), bcrypt.MinCost)
+	store := &mockStore{recoveryKeyHash: string(hash), encryptedMEKRecov: "wrapped", recoveryVersion: 2}
+
+	if w := recoverWith(t, store, `{"recovery_auth":"`+recoveryAuth+`"}`); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"recovery_version":2`) {
+		t.Errorf("recovery_auth = %d %s, want 200 with recovery_version 2", w.Code, w.Body.String())
+	}
+	// The same value under the old field must not do: a version 2 recovery
+	// never takes the raw key, so a browser cannot put it back on the wire.
+	if w := recoverWith(t, store, `{"recovery_key":"`+recoveryAuth+`"}`); w.Code != http.StatusUnauthorized {
+		t.Errorf("raw recovery_key on version 2 = %d, want 401", w.Code)
+	}
+}
+
+func TestHandleRecovery_Version1StillTakesTheRawKey(t *testing.T) {
+	hash, _ := bcrypt.GenerateFromPassword([]byte("ABCD-EFGH"), bcrypt.MinCost)
+	store := &mockStore{recoveryKeyHash: string(hash), encryptedMEKRecov: "wrapped", recoveryVersion: 1}
+
+	if w := recoverWith(t, store, `{"recovery_key":"ABCD-EFGH"}`); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"recovery_version":1`) {
+		t.Errorf("raw key on version 1 = %d %s, want 200 with recovery_version 1", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleSetupKeys_RefusesAMalformedRecoveryAuth(t *testing.T) {
+	store := &mockStore{}
+	req := httptest.NewRequest(http.MethodPost, "/vault/keys",
+		strings.NewReader(`{"encrypted_mek":"m","recovery_auth":"ABCD-EFGH-the-raw-key","encrypted_mek_recovery":"r"}`)).WithContext(userCtx(1))
+	w := httptest.NewRecorder()
+	handleSetupKeys(store).ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("a raw recovery key as recovery_auth = %d, want 400", w.Code)
 	}
 }

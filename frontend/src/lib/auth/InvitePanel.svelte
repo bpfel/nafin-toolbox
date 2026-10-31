@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { formatDate } from '../util/calendar'
-  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, getSettings, type User, getAuthState } from './authStore.svelte'
+  import { formatDate, formatDateTime } from '../util/calendar'
+  import { inviteUser, listUsers, deleteUser, resendVerification, adminResetPassword, adminRemove2FA, getSettings, type User, getAuthState } from './authStore.svelte'
   import DeleteUserModal from './DeleteUserModal.svelte'
 
   let { onDone }: { onDone?: () => void } = $props()
@@ -45,7 +45,7 @@
   let deleteError = $state<string | null>(null)
   let confirmingReset = $state<number | null>(null)
   let resettingPassword = $state<number | null>(null)
-  let tempPassword = $state<{ email: string; password: string } | null>(null)
+  let tempPassword = $state<{ email: string; password: string; expiresAt: string } | null>(null)
 
   async function loadUsers() {
     users = await listUsers()
@@ -101,7 +101,23 @@
     } else {
       // The email is captured here rather than looked up while rendering: the box
       // has to keep naming the right person across the reload on the next line.
-      tempPassword = { email: user.email, password: result.temp_password }
+      tempPassword = { email: user.email, password: result.temp_password, expiresAt: result.temp_expires_at }
+      await loadUsers()
+    }
+  }
+
+  let confirmingRemove2FA = $state<number | null>(null)
+  let removing2FA = $state<number | null>(null)
+
+  async function handleRemove2FA(user: User) {
+    removing2FA = user.id
+    const result = await adminRemove2FA(user.id)
+    removing2FA = null
+    confirmingRemove2FA = null
+    if (result) {
+      error = result
+    } else {
+      success = `2FA removed for ${user.email}. They are signed out everywhere.`
       await loadUsers()
     }
   }
@@ -204,6 +220,34 @@
                     </button>
                   {/if}
                 {/if}
+                {#if u.totp_enabled && u.role !== 'admin'}
+                  {#if confirmingRemove2FA === u.id}
+                    <span class="confirm-reset">
+                      <span class="confirm-label">Remove 2FA?</span>
+                      <button
+                        class="btn-small btn-danger-small"
+                        onclick={() => handleRemove2FA(u)}
+                        disabled={removing2FA === u.id}
+                      >
+                        {removing2FA === u.id ? 'Removing...' : 'Confirm'}
+                      </button>
+                      <button
+                        class="btn-small"
+                        onclick={() => confirmingRemove2FA = null}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  {:else}
+                    <button
+                      class="btn-small"
+                      onclick={() => confirmingRemove2FA = u.id}
+                      title="For a user who lost their authenticator, or did not set it up themselves"
+                    >
+                      Remove 2FA
+                    </button>
+                  {/if}
+                {/if}
                 {#if u.id !== authState.currentUser?.id}
                   <button
                     class="btn-small btn-danger-small"
@@ -238,7 +282,7 @@
     <div class="temp-password-box">
       <p><strong>Temporary password for {tempPassword.email}:</strong></p>
       <code class="temp-password">{tempPassword.password}</code>
-      <p class="temp-password-hint">Share this with the user securely. They will be asked to set a new password on next login.</p>
+      <p class="temp-password-hint">Share this with the user securely. They will be asked to set a new password on next login. It stops working on {formatDateTime(tempPassword.expiresAt)}; after that, reset it again.</p>
       <button class="btn-small" onclick={() => tempPassword = null}>Dismiss</button>
     </div>
   {/if}

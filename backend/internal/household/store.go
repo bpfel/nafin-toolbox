@@ -39,6 +39,22 @@ func (s *Store) Create(ctx context.Context, userID int, req CreateRequest, ciphe
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op once committed
 
+	// The user's row is locked so that two creates at once count one after
+	// the other, and cannot both find room for the last one.
+	if _, err := tx.ExecContext(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID); err != nil {
+		return 0, time.Time{}, err
+	}
+	var owned int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT count(*) FROM shared_vault_members WHERE user_id = $1 AND role = $2`,
+		userID, RoleOwner,
+	).Scan(&owned); err != nil {
+		return 0, time.Time{}, err
+	}
+	if owned >= MaxOwnedHouseholds {
+		return 0, time.Time{}, ErrTooManyHouseholds
+	}
+
 	var id int
 	var updatedAt time.Time
 	err = tx.QueryRowContext(ctx,
@@ -66,6 +82,23 @@ func (s *Store) Create(ctx context.Context, userID int, req CreateRequest, ciphe
 		return 0, time.Time{}, err
 	}
 	return id, updatedAt, nil
+}
+
+// MaxOwnedHouseholds is how many households one person may own. A household
+// is a row of up to a megabyte on the database every account shares, and
+// nothing else bounded how many one account could make. Ten is far past what
+// a family needs and far short of filling a disk.
+const MaxOwnedHouseholds = 10
+
+// ErrTooManyHouseholds says the user already owns MaxOwnedHouseholds.
+var ErrTooManyHouseholds = errors.New("household limit reached")
+
+// DeleteExpiredInvites removes invitations past their expiry. Nothing reads
+// them any more — every query on invites asks for unexpired ones — and each
+// holds a sealed secret of the inviter's choosing.
+func (s *Store) DeleteExpiredInvites(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM shared_vault_invites WHERE expires_at <= NOW()`)
+	return err
 }
 
 // ListForUser returns every household the user belongs to, newest first.

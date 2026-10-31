@@ -31,6 +31,7 @@ export type Gate =
   | 'mustChangePassword'
   | 'enforce2FA'
   | 'recoveryKey'
+  | 'recoveryKeyRenewal'
   | 'vaultAhead'
   | 'vaultSetup'
   | 'vaultDecryptFailed'
@@ -51,12 +52,19 @@ export interface GateState {
   enforce2FA: boolean
   /** A freshly minted recovery key is waiting to be written down. */
   recoveryKeyPending: boolean
+  /**
+   * The account is moving to separate keys and its new recovery key waits to
+   * be written down; nothing is stored until it has been. See confirmUpgrade.
+   */
+  recoveryKeyRenewalPending?: boolean
   /** The stored vault is newer than this build knows how to read. */
   vaultVersionAhead: boolean
   vaultNeedsSetup: boolean
   vaultDecryptFailed: boolean
   vaultLocked: boolean
   vaultUnlocked: boolean
+  /** The vault is open, and whether a new recovery key is due is still being worked out. */
+  openingVault?: boolean
 }
 
 export function gateFor(state: GateState): Gate | null {
@@ -87,6 +95,7 @@ export function gateFor(state: GateState): Gate | null {
   if (state.user.role === 'admin') return null
 
   if (state.recoveryKeyPending) return 'recoveryKey'
+  if (state.recoveryKeyRenewalPending) return 'recoveryKeyRenewal'
 
   // Before every other vault state: a vault this build cannot read will also
   // fail to decrypt and report itself locked, and those screens would invite
@@ -101,6 +110,11 @@ export function gateFor(state: GateState): Gate | null {
   // `!vaultUnlocked` covers the moment before the first unlock has happened at
   // all. Either way the key is not in memory and no figure can be shown.
   if (state.vaultLocked || !state.vaultUnlocked) return 'vaultLocked'
+
+  // Last, so it never takes the place of a form that is still being filled
+  // in: only an open vault waits here, for the recovery-key screen that may be
+  // due before the budget is shown.
+  if (state.openingVault) return 'loading'
 
   return null
 }

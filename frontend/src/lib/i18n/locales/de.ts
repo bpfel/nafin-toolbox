@@ -62,6 +62,7 @@ export const de: Messages = {
   // --- Two-factor enforcement ---
   'twofa.requiredTitle': 'Zwei-Faktor-Authentifizierung erforderlich',
   'twofa.requiredHint': 'Dein Administrator verlangt, dass alle Benutzer vor dem Fortfahren die Zwei-Faktor-Authentifizierung aktivieren.',
+  'twofa.requiredAdminHint': 'Administratorkonten verwenden immer die Zwei-Faktor-Authentifizierung: Mit ihnen lässt sich jedes Passwort zurücksetzen, deshalb darf ein Passwort allein nicht genügen. Richte sie ein, um fortzufahren.',
 
   // --- Common fields and actions ---
   'field.password': 'Passwort',
@@ -205,6 +206,7 @@ export const de: Messages = {
   'household.personal': 'Persönlich',
   'household.needsKeys': 'Richte zuerst die Verschlüsselung ein.',
   'household.failed': 'Das hat nicht geklappt. Bitte erneut versuchen.',
+  'household.limitReached': 'Du besitzt schon zehn Haushalte, das Maximum pro Person.',
 
   'security.twofaTitle': 'Zwei-Faktor-Authentifizierung',
   'security.currentPasswordPlaceholder': 'Aktuelles Passwort',
@@ -219,6 +221,9 @@ export const de: Messages = {
   'security.regenerateCodes': 'Wiederherstellungscodes neu erzeugen',
   'security.newCodesWarning': 'Bewahr diese neuen Wiederherstellungscodes auf. Die alten Codes sind jetzt ungültig.',
   'security.passwordTitle': 'Passwort',
+  'security.keysTitle': 'Verschlüsselungsschlüssel',
+  'security.keysHint': 'Nutze dies, wenn du dein Passwort oder deinen Wiederherstellungsschlüssel versehentlich weitergegeben haben könntest. Du erhältst ein neues Passwort, neue Schlüssel und einen neuen Wiederherstellungsschlüssel; deine anderen Geräte werden abgemeldet.',
+  'security.renewKeys': 'Schlüssel erneuern',
   'security.deleteAccountTitle': 'Konto löschen',
   'security.deleteAccountHint': 'Löscht dein Konto und alle zugehörigen Daten dauerhaft. Dies kann nicht rückgängig gemacht werden.',
   'security.deletePrompt': 'Gib dein Passwort ein, um die Kontolöschung zu bestätigen:',
@@ -246,6 +251,8 @@ export const de: Messages = {
 
   // --- Recovery key ---
   'recoveryKey.title': 'Wiederherstellungsschlüssel sichern',
+  'recoveryKey.renewalIntro': 'Dein Konto hält den Schlüssel zu deinem Budget jetzt getrennt von allem, was an den Server geht. Dazu gehört ein neuer Wiederherstellungsschlüssel. Der alte gilt nicht mehr, sobald du diesen bestätigst.',
+  'recoveryKey.renewedIntro': 'Dein Passwort und alle Schlüssel zu deinem Budget sind neu. Hier ist der Wiederherstellungsschlüssel dazu. Der alte gilt nicht mehr, sobald du diesen bestätigst, und deine anderen Geräte werden abgemeldet.',
   'recoveryKey.copy': 'Schlüssel kopieren',
   'recoveryKey.confirmTitle': 'Prüf, ob du ihn wirklich hast',
   'recoveryKey.label': 'Wiederherstellungsschlüssel',
@@ -498,6 +505,7 @@ export const de: Messages = {
   'error.createEntry': 'Eintrag konnte nicht erstellt werden',
 
   'security.twofaEnabled': '2FA ist aktiviert',
+  'security.twofaRequired': 'Hier vorgeschrieben – sie lässt sich nicht ausschalten.',
   'security.twofaNotEnabled': '2FA ist nicht aktiviert',
   'twofa.enterCode.label': 'Code eingeben',
   'accountForm.qrIbanNote': 'eine QR-IBAN — Rechnungen verwenden eine QR-Referenz (QRR)',

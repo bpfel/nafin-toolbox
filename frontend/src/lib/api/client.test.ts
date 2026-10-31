@@ -6,6 +6,7 @@ import {
   setupVaultKeys,
   updateVaultKeys,
   fetchVault,
+  VaultUnavailableError,
   putVault,
   recoverVaultKeys,
   setOnUnauthorized,
@@ -178,7 +179,7 @@ describe('setupVaultKeys', () => {
   test('sets up vault keys successfully', async () => {
     const body = {
       encrypted_mek: 'base64encodedmek',
-      recovery_key_hash: 'hash123',
+      recovery_auth: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
       public_key: 'base64spki',
       encrypted_private_key: 'base64sealedprivate',
@@ -205,7 +206,7 @@ describe('setupVaultKeys', () => {
   test('handles empty strings in body', async () => {
     const body = {
       encrypted_mek: '',
-      recovery_key_hash: '',
+      recovery_auth: '',
       encrypted_mek_recovery: '',
       public_key: 'base64spki',
       encrypted_private_key: 'base64sealedprivate',
@@ -232,7 +233,7 @@ describe('setupVaultKeys', () => {
   test('throws error on conflict', async () => {
     const body = {
       encrypted_mek: 'base64encodedmek',
-      recovery_key_hash: 'hash123',
+      recovery_auth: 'hash123',
       encrypted_mek_recovery: 'base64recovery',
       public_key: 'base64spki',
       encrypted_private_key: 'base64sealedprivate',
@@ -324,27 +325,16 @@ describe('fetchVault', () => {
     const result = await fetchVault()
 
     expect(result).toEqual(payload)
-    expect(mockFetch).toHaveBeenCalledWith('/api/vault', {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    })
+    expect(mockFetch).toHaveBeenCalledWith('/api/vault', { credentials: 'include' })
   })
 
-  test('returns null on error', async () => {
+  test('returns null when there is no vault', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 404,
       statusText: 'Not Found',
       json: async () => ({ error: 'Vault not found' }),
     })
-
-    const result = await fetchVault()
-
-    expect(result).toBeNull()
-  })
-
-  test('returns null on network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
     const result = await fetchVault()
 
@@ -406,6 +396,20 @@ describe('fetchVault', () => {
     const result = await fetchVault()
 
     expect(result).toEqual(payload)
+  })
+
+  // Every caller starts an empty vault on null and saves it. A failed read
+  // taken for "no vault" once put that empty vault over the real one.
+  test('throws, rather than reporting no vault, when the server fails', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 502, statusText: 'Bad Gateway', json: async () => ({}) })
+
+    await expect(fetchVault()).rejects.toBeInstanceOf(VaultUnavailableError)
+  })
+
+  test('throws, rather than reporting no vault, when the network fails', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    await expect(fetchVault()).rejects.toBeInstanceOf(VaultUnavailableError)
   })
 })
 
@@ -518,7 +522,7 @@ describe('recoverVaultKeys', () => {
       json: async () => response,
     })
 
-    const result = await recoverVaultKeys('recovery-key-123')
+    const result = await recoverVaultKeys({ recovery_key: 'recovery-key-123' })
 
     expect(result).toEqual(response)
     expect(mockFetch).toHaveBeenCalledWith('/api/vault/recovery', {
@@ -537,7 +541,7 @@ describe('recoverVaultKeys', () => {
       json: async () => ({ error: 'Invalid recovery key' }),
     })
 
-    const result = await recoverVaultKeys('invalid-key')
+    const result = await recoverVaultKeys({ recovery_key: 'invalid-key' })
 
     expect(result).toBeNull()
   })
@@ -545,7 +549,7 @@ describe('recoverVaultKeys', () => {
   test('returns null on network error', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
-    const result = await recoverVaultKeys('recovery-key-123')
+    const result = await recoverVaultKeys({ recovery_key: 'recovery-key-123' })
 
     expect(result).toBeNull()
   })
@@ -558,7 +562,7 @@ describe('recoverVaultKeys', () => {
       json: async () => ({ error: 'Empty recovery key' }),
     })
 
-    const result = await recoverVaultKeys('')
+    const result = await recoverVaultKeys({ recovery_key: '' })
 
     expect(result).toBeNull()
   })
@@ -572,7 +576,7 @@ describe('recoverVaultKeys', () => {
       json: async () => response,
     })
 
-    const result = await recoverVaultKeys('AAAA-BBBB-CCCC-DDDD')
+    const result = await recoverVaultKeys({ recovery_key: 'AAAA-BBBB-CCCC-DDDD' })
 
     expect(result).toEqual(response)
     expect(mockFetch).toHaveBeenCalledWith('/api/vault/recovery', {
@@ -593,7 +597,7 @@ describe('recoverVaultKeys', () => {
       json: async () => response,
     })
 
-    const result = await recoverVaultKeys(longKey)
+    const result = await recoverVaultKeys({ recovery_key: longKey })
 
     expect(result).toEqual(response)
   })
@@ -606,7 +610,7 @@ describe('recoverVaultKeys', () => {
       json: async () => ({ error: 'Invalid recovery key format' }),
     })
 
-    const result = await recoverVaultKeys('密码🔑émoji')
+    const result = await recoverVaultKeys({ recovery_key: '密码🔑émoji' })
 
     expect(result).toBeNull()
   })

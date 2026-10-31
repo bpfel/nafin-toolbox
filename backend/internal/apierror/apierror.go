@@ -57,6 +57,8 @@ var codes = map[string]string{
 	Auth + "|password required":                 "AUTH-017",
 	Auth + "|current and new password required": "AUTH-018",
 	Auth + "|email required":                    "AUTH-019",
+	// An admin reset's password, past TempPasswordLifetime: ask for another.
+	Auth + "|temporary password expired": "AUTH-037",
 
 	// --- Invitations and verification ---
 	Auth + "|invalid or expired token":                 "AUTH-020",
@@ -78,11 +80,15 @@ var codes = map[string]string{
 	Auth + "|2FA is already enabled":                            "AUTH-034",
 	Auth + "|2FA is not enabled":                                "AUTH-035",
 	Auth + "|2FA not available (encryption key not configured)": "AUTH-036",
+	Auth + "|2FA is required on this instance":                  "AUTH-038",
 
 	// --- Administering other users ---
 	Auth + "|cannot delete yourself via admin endpoint":         "AUTH-040",
 	Auth + "|cannot reset your own password via admin endpoint": "AUTH-041",
 	Auth + "|cannot delete the last administrator":              "AUTH-042",
+	Auth + "|administrators must enable 2FA":                    "AUTH-043",
+	Auth + "|administrators must keep 2FA":                      "AUTH-044",
+	Auth + "|kind and key, or all, required":                    "AUTH-045",
 
 	// --- Validation of what was typed ---
 	// AUTH-050 is retired. It stood for every rule at once, so a user reading
@@ -92,6 +98,23 @@ var codes = map[string]string{
 	Auth + "|validation":                             "AUTH-050",
 	Auth + "|password must be at least 8 characters": "AUTH-051",
 	Auth + "|invalid email address":                  "AUTH-052",
+	// An auth key that is not 32 bytes of base64: a browser that sent the
+	// password itself, or something that is not this app's browser at all.
+	Auth + "|invalid auth key": "AUTH-053",
+
+	// --- Moving an account to separate keys (key separation) ---
+	Auth + "|nothing to upgrade":             "AUTH-060",
+	Auth + "|rewrapped vault key required":   "AUTH-061",
+	Auth + "|new recovery key required":      "AUTH-062",
+	Auth + "|account was upgraded meanwhile": "AUTH-063",
+	Auth + "|upgrade before renewing":        "AUTH-064",
+	// A save from another device, or a household joined, between reading
+	// and renewing. The browser reads again and repeats.
+	Auth + "|changed while renewing":                            "AUTH-065",
+	Auth + "|the new password must differ from the current one": "AUTH-066",
+	// The instance requires 2FA and this account has none yet: everything
+	// but enrolling is refused until it does (RequireEnrolment).
+	Auth + "|2FA setup required": "AUTH-067",
 
 	// --- The vault ---
 	Vault + "|invalid JSON":                "VAULT-010",
@@ -99,6 +122,9 @@ var codes = map[string]string{
 	Vault + "|failed to save keys":         "VAULT-012",
 	Vault + "|failed to update keys":       "VAULT-013",
 	Vault + "|failed to hash recovery key": "VAULT-014",
+	// Not a 404: the vault may well be there, the server just could not
+	// read it, and the browser must not start an empty one in its place.
+	Vault + "|failed to load vault": "VAULT-015",
 
 	// --- Households, which are vaults with more than one person in them ---
 	Vault + "|failed to list households":  "VAULT-020",
@@ -107,6 +133,8 @@ var codes = map[string]string{
 	Vault + "|failed to save household":   "VAULT-023",
 	Vault + "|failed to rename household": "VAULT-024",
 	Vault + "|failed to delete household": "VAULT-025",
+	// Ten owned households per person: see household.MaxOwnedHouseholds.
+	Vault + "|household limit reached": "VAULT-026",
 
 	// --- Inviting somebody into a household ---
 	Vault + "|failed to create invitation":   "VAULT-030",
@@ -121,13 +149,14 @@ var codes = map[string]string{
 	Vault + "|failed to save identity":       "VAULT-039",
 
 	// --- Upkeep reminders ---
-	Upkeep + "|invalid request body":    "UPK-001",
-	Upkeep + "|admin access required":   "UPK-002",
-	Upkeep + "|nothing to remind about": "UPK-003",
-	Upkeep + "|too many entries":        "UPK-004",
-	Upkeep + "|an entry has no subject": "UPK-005",
-	Upkeep + "|failed to send reminder": "UPK-006",
-	Upkeep + "|too many reminders":      "UPK-007",
+	Upkeep + "|invalid request body":           "UPK-001",
+	Upkeep + "|admin access required":          "UPK-002",
+	Upkeep + "|nothing to remind about":        "UPK-003",
+	Upkeep + "|too many entries":               "UPK-004",
+	Upkeep + "|an entry has no subject":        "UPK-005",
+	Upkeep + "|failed to send reminder":        "UPK-006",
+	Upkeep + "|too many reminders":             "UPK-007",
+	Upkeep + "|administrators must enable 2FA": "UPK-008",
 
 	// --- Request handling ---
 	Server + "|origin not allowed": "SRV-001",

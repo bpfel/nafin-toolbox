@@ -39,12 +39,22 @@ services:
     environment:
       DATABASE_URL: postgres://finance:finance@db:5432/finance?sslmode=disable
       PORT: "8080"
-      TRUSTED_PROXIES: "172.16.0.0/12,192.168.0.0/16,10.0.0.0/8"
+      # Whose X-Forwarded-For the API believes: this stack's own network and
+      # nothing else. Its gateway is how a reverse proxy on the same host
+      # reaches the frontend, and the frontend's nginx is how every request
+      # reaches the API. It used to be every private range, which believed any
+      # visitor on a LAN or a VPN about where they came from — and let them
+      # take a fresh rate-limit bucket with every request. A proxy on another
+      # machine goes in TRUSTED_PROXIES_EXTRA. See readmore/self-hosting.md.
+      TRUSTED_PROXIES: "${NAFIN_SUBNET:-172.31.250.0/24},${TRUSTED_PROXIES_EXTRA:-}"
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_FROM: "noreply@nafin.local"
       APP_URL: "http://localhost:3000"
-      ENCRYPTION_KEY: "bcbb68dd891f7a97bf3370ff8800ab3eb3cc4226efbb09fcc519791cb8a76174"
+      # No ENCRYPTION_KEY here. A key written in this file is a key everyone
+      # can read: it once was, and the API now refuses that one by name (see
+      # internal/auth/encryptionkey.go). Production sets its own from .env;
+      # development generates one per machine (docker-compose.override.yml).
     depends_on:
       db:
         condition: service_healthy
@@ -60,3 +70,13 @@ services:
 
 volumes:
   pgdata:
+
+# Pinned, so that TRUSTED_PROXIES above can name it. Docker would otherwise pick
+# a different subnet on every host, and the only way to trust "whichever it
+# picked" was to trust every private range. Change NAFIN_SUBNET in .env if it
+# collides with a network the host already has.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${NAFIN_SUBNET:-172.31.250.0/24}

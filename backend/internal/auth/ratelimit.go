@@ -15,6 +15,8 @@ type LoginRateLimiter struct {
 	max            int
 	window         time.Duration
 	trustedProxies []*net.IPNet
+	// When every key was last pruned. See sweep.
+	swept time.Time
 }
 
 func NewLoginRateLimiter(max int, window time.Duration) *LoginRateLimiter {
@@ -38,42 +40,16 @@ func (rl *LoginRateLimiter) Allow(r *http.Request) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	pruned := rl.recent(key, time.Now())
+	now := time.Now()
+	rl.sweep(now)
+	pruned := rl.recent(key, now)
 	if len(pruned) >= rl.max {
 		rl.attempts[key] = pruned
 		return false
 	}
 
-	rl.attempts[key] = append(pruned, time.Now())
+	rl.attempts[key] = append(pruned, now)
 	return true
-}
-
-// Check returns true if under the limit without recording an attempt.
-func (rl *LoginRateLimiter) Check(r *http.Request) bool {
-	return rl.CheckKey(rl.ClientIP(r))
-}
-
-// RecordFailure records a failed attempt for the request's client IP.
-func (rl *LoginRateLimiter) RecordFailure(r *http.Request) {
-	rl.RecordFailureKey(rl.ClientIP(r))
-}
-
-// CheckKey is Check for a key the caller builds — a client and an account
-// together, for one.
-func (rl *LoginRateLimiter) CheckKey(key string) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	return len(rl.recent(key, time.Now())) < rl.max
-}
-
-// RecordFailureKey is RecordFailure for a key the caller builds.
-func (rl *LoginRateLimiter) RecordFailureKey(key string) {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	now := time.Now()
-	rl.attempts[key] = append(rl.recent(key, now), now)
 }
 
 // Forget clears a key's attempts: the right password ends the run of wrong
@@ -83,6 +59,153 @@ func (rl *LoginRateLimiter) Forget(key string) {
 	defer rl.mu.Unlock()
 
 	delete(rl.attempts, key)
+}
+
+// Reservation is one attempt counted against a key before it was made.
+type Reservation struct {
+	rl  *LoginRateLimiter
+	key string
+	at  time.Time
+}
+
+// Reserve counts an attempt for key before the work it guards is done, and
+// refuses when the window is already full.
+//
+// Check-then-RecordFailure, which the sign-in handlers used before, counted a
+// failure only once a bcrypt comparison had finished, a quarter of a second
+// later. Every request that arrived in that quarter second had passed the
+// check: five hundred parallel guesses at one password all got through a
+// limit of five. A reservation is taken under the same lock as the check, so
+// the sixth request is refused however close behind the fifth it comes.
+//
+// An attempt that turns out not to be a failure — the right password — is
+// given back with Release.
+func (rl *LoginRateLimiter) Reserve(key string) (Reservation, bool) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	rl.sweep(now)
+	pruned := rl.recent(key, now)
+	if len(pruned) >= rl.max {
+		rl.attempts[key] = pruned
+		return Reservation{}, false
+	}
+	rl.attempts[key] = append(pruned, now)
+	return Reservation{rl: rl, key: key, at: now}, true
+}
+
+// Release gives back an attempt that did not fail. It removes this attempt
+// only: failures recorded beside it, by this client or another, still count.
+// Releasing the zero Reservation, or one already released, does nothing.
+func (r Reservation) Release() {
+	if r.rl == nil {
+		return
+	}
+	r.rl.mu.Lock()
+	defer r.rl.mu.Unlock()
+
+	existing := r.rl.attempts[r.key]
+	for i, t := range existing {
+		if t.Equal(r.at) {
+			r.rl.attempts[r.key] = append(existing[:i], existing[i+1:]...)
+			return
+		}
+	}
+}
+
+// Reservations are attempts taken together, against several limiters.
+type Reservations []Reservation
+
+// Release gives every one of them back.
+func (rs Reservations) Release() {
+	for _, r := range rs {
+		r.Release()
+	}
+}
+
+// Slot names one key in one limiter, for ReserveAll.
+type Slot struct {
+	Limiter *LoginRateLimiter
+	Key     string
+}
+
+// ReserveAll reserves an attempt in every slot, or in none: when one is full,
+// those already taken are given back, so a refused request does not count
+// against the limits it was never measured by.
+func ReserveAll(slots ...Slot) (Reservations, bool) {
+	taken := make(Reservations, 0, len(slots))
+	for _, s := range slots {
+		r, ok := s.Limiter.Reserve(s.Key)
+		if !ok {
+			taken.Release()
+			return nil, false
+		}
+		taken = append(taken, r)
+	}
+	return taken, true
+}
+
+// sweep drops every key with nothing left in its window, at most once a
+// window. Callers hold mu.
+//
+// A key used to be pruned only when it was tried again, so a key tried once
+// stayed for good. Somebody cycling through a million addresses, or a million
+// forged clients, filled the map with a million keys nobody would touch again
+// — a way to run the server out of memory with sign-in attempts alone.
+func (rl *LoginRateLimiter) sweep(now time.Time) {
+	if now.Sub(rl.swept) < rl.window {
+		return
+	}
+	rl.swept = now
+	for key := range rl.attempts {
+		if pruned := rl.recent(key, now); len(pruned) == 0 {
+			delete(rl.attempts, key)
+		} else {
+			rl.attempts[key] = pruned
+		}
+	}
+}
+
+// Lockout is a key whose window is full: the next attempt will be refused.
+type Lockout struct {
+	Key      string
+	Attempts int
+	// When the oldest attempt leaves the window, and one more is allowed.
+	Until time.Time
+}
+
+// Lockouts lists the keys that are refused right now, for an administrator
+// deciding whether somebody is being kept out on purpose.
+func (rl *LoginRateLimiter) Lockouts() []Lockout {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	var out []Lockout
+	for key := range rl.attempts {
+		pruned := rl.recent(key, now)
+		rl.attempts[key] = pruned
+		if len(pruned) >= rl.max {
+			out = append(out, Lockout{Key: key, Attempts: len(pruned), Until: pruned[0].Add(rl.window)})
+		}
+	}
+	return out
+}
+
+// ForgetWhere clears every key match accepts, and reports how many it cleared.
+func (rl *LoginRateLimiter) ForgetWhere(match func(key string) bool) int {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	n := 0
+	for key := range rl.attempts {
+		if match(key) {
+			delete(rl.attempts, key)
+			n++
+		}
+	}
+	return n
 }
 
 // recent prunes a key's attempts to those inside the window. Callers hold mu.

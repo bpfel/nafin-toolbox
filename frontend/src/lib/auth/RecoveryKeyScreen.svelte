@@ -7,9 +7,17 @@
     recoveryKey: string
     /** The user has proved they hold the key; it can stop being shown. */
     onconfirmed: () => void
+    /**
+     * Said before everything else, when this is a new key replacing one the
+     * account already had — after the move to separate keys — rather than
+     * its first.
+     */
+    intro?: string
+    /** Why confirming did not go through, when it sends something. */
+    error?: string | null
   }
 
-  let { recoveryKey, onconfirmed }: Props = $props()
+  let { recoveryKey, onconfirmed, intro, error = null }: Props = $props()
 
   let step = $state<'save' | 'confirm'>('save')
   let typed = $state('')
@@ -50,6 +58,10 @@
     <div class="card">
       {#if step === 'save'}
         <h1>{t('recoveryKey.title')}</h1>
+
+        {#if intro}
+          <p class="lead">{intro}</p>
+        {/if}
 
         <div class="stakes">
           <p>
@@ -119,6 +131,9 @@
           <button class="btn secondary" onclick={() => (step = 'save')}>{t('recoveryKey.backToKey')}</button>
           <button class="btn primary" onclick={onconfirmed} disabled={!matches}>{t('recoveryKey.confirm')}</button>
         </div>
+        {#if error}
+          <p class="error" role="alert">{error}</p>
+        {/if}
       {/if}
     </div>
   </div>
@@ -152,6 +167,11 @@
     line-height: 1.5;
     margin: 0 0 1.25rem;
   }
+  .error {
+    color: var(--alarm);
+    margin: 0.75rem 0 0;
+  }
+
   .stakes {
     background: var(--alarm-soft);
     border: 1px solid #f5c6c2;

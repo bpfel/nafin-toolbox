@@ -18,6 +18,29 @@ service accounts: they see **Users**, **Audit**, **Upkeep** and **Profile**, and
 have no vault, no budget and no recovery key. To use the app yourself, invite
 yourself as a regular user.
 
+**Administrators must use two-factor sign-in.** An administrator can reset anyone's
+password and read the audit log, so a stolen password alone must not be enough. An
+administrator without 2FA is asked to set it up at sign-in, and the server refuses
+every administrative action until they have. Once it's on, it can't be turned off
+from the app. The only exception is an instance without `ENCRYPTION_KEY`, where 2FA
+can't be enabled at all. The API warns about that when it starts.
+
+### An administrator who lost their authenticator
+
+If the phone is gone, sign in with one of the recovery codes. If those are gone
+too, remove the second factor in the database; the administrator is then asked to
+set it up again at their next sign-in:
+
+```sh
+dc exec db psql -U finance -d finance -c "
+  DELETE FROM totp_secrets WHERE user_id = (SELECT id FROM users WHERE email = 'admin@example.ch');
+  DELETE FROM recovery_codes WHERE user_id = (SELECT id FROM users WHERE email = 'admin@example.ch');
+  UPDATE users SET totp_enabled = FALSE WHERE email = 'admin@example.ch';"
+```
+
+Anyone with database access can do this, which is why database access must stay
+with whoever runs the server.
+
 Every regular user has an independent vault, so one user's password reset never
 touches another's data.
 
@@ -27,7 +50,29 @@ Under **Users**, an administrator invites people by email, resends verification
 links, resets passwords and deletes accounts. Deleting takes two steps, and the
 last administrator cannot be deleted.
 
+A person owns at most **ten households**; the eleventh is refused. A household is
+stored on the server like a vault, and the limit keeps one account from filling the
+disk everybody shares.
+
+### A user who lost their authenticator
+
+If they still have a recovery code, they sign in with that. Otherwise **Remove 2FA**
+next to their name turns their second factor off, signs them out everywhere and
+forgets their trusted devices. They sign in with their password again, and if the
+instance requires two-factor, they are asked to set it up anew. It is recorded in the
+audit log as `2fa_removed`.
+
+Use it too for an account that has a second factor its owner did not set up: setting
+one up needs the password, but a factor enrolled before that rule was added may not
+be theirs. **Remove 2FA** is not offered for administrators, whose second factor is
+what their powers rest on; see
+[An administrator who lost their authenticator](#an-administrator-who-lost-their-authenticator).
+
 ## Password resets
+
+A reset under **Users** gives a temporary password, shown once, which the user must
+change at their next sign-in. **It stops working after three days**; the box says
+when. Past that, reset again.
 
 ### An administrator's password
 
@@ -85,6 +130,24 @@ curl -b cookies.txt -X POST https://finance.example.ch/api/auth/settings/require
 ```
 
 Users without two-factor then see a mandatory setup screen at their next sign-in.
+The server holds the rule too: until they have set it up, their session can do
+nothing but set it up, change a password they were told to change, delete the
+account or sign out; their budget opens once it is done. That includes sessions
+opened before the setting was turned on. While it's on, nobody can turn their
+two-factor off; the server refuses it, and Profile doesn't offer it. The
+administrator sending this needs 2FA themselves.
+
+## Sign-in lockouts
+
+Failed sign-ins are limited per client, per account and per account from anywhere;
+see [In case of an attack](under-attack.md#what-the-app-already-does-on-its-own).
+**Audit** lists every lockout in force, with when it lifts. **Clear** lets that
+address, client or account try again at once, and **Clear all** lifts every one.
+Clearing is recorded in the audit log as `lockout_cleared`.
+
+Someone who says "it keeps telling me too many attempts" is usually here. If their
+address is listed with attempts from many places, somebody else is trying it, and
+[In case of an attack](under-attack.md) is the page to read.
 
 ## Audit log
 

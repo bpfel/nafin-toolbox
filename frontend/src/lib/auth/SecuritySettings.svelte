@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n/index.svelte'
-  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount } from './authStore.svelte'
+  import { getAuthState, disable2FA, regenerateRecoveryCodes, deleteAccount, getSettings, renewKeys } from './authStore.svelte'
   import TwoFactorSetup from './TwoFactorSetup.svelte'
   import Sheet from '../nav/Sheet.svelte'
   import ChangePasswordForm from './ChangePasswordForm.svelte'
@@ -16,11 +16,20 @@
   let showDeleteAccount = $state(false)
   let showDeleteData = $state(false)
   let showChangePassword = $state(false)
+  let showRenewKeys = $state(false)
 
   let password = $state('')
   let error = $state<string | null>(null)
   let loading = $state(false)
   let recoveryCodes = $state<string[] | null>(null)
+
+  // While the instance requires 2FA the server refuses to turn it off, so the
+  // button that would ask is not offered. Read once: an admin changing the
+  // policy meanwhile only means the server's answer is the one that shows.
+  // An administrator may never turn it off.
+  let policyRequires2FA = $state(false)
+  getSettings().then((s) => { policyRequires2FA = s.require_2fa })
+  let twofaRequired = $derived(policyRequires2FA || authState.currentUser?.role === 'admin')
 
   async function handleDisable2FA() {
     if (!password) return
@@ -164,8 +173,13 @@
       {:else}
         <div class="btn-row">
           <button class="btn-secondary" onclick={() => showRegenCodes = true}>{t('security.regenerateCodes')}</button>
-          <button class="btn-danger-outline" onclick={() => showDisable = true}>{t('security.disable2fa')}</button>
+          {#if !twofaRequired}
+            <button class="btn-danger-outline" onclick={() => showDisable = true}>{t('security.disable2fa')}</button>
+          {/if}
         </div>
+        {#if twofaRequired}
+          <p class="status">{t('security.twofaRequired')}</p>
+        {/if}
       {/if}
     {:else}
       <p class="status">{t('security.twofaNotEnabled')}</p>
@@ -178,6 +192,20 @@
     <h3>{t('security.passwordTitle')}</h3>
     <button class="btn-secondary" onclick={() => showChangePassword = true}>{t('password.changeTitle')}</button>
   </div>
+
+  <!--
+    Renewing every key: a new password, a new vault key, a new recovery key.
+    For whoever does not trust what a server might have kept from before the
+    move to separate keys (plans/key-separation-plan.md). Not for an
+    administrator, who has no vault — changing the password is all there is.
+  -->
+  {#if authState.currentUser?.role !== 'admin'}
+    <div class="settings-card">
+      <h3>{t('security.keysTitle')}</h3>
+      <p class="info">{t('security.keysHint')}</p>
+      <button class="btn-secondary" onclick={() => (showRenewKeys = true)}>{t('security.renewKeys')}</button>
+    </div>
+  {/if}
 
   <!--
     Delete all data: everything in the vault, short of the account itself. It
@@ -243,6 +271,18 @@
 {#if showChangePassword}
   <Sheet label={t('password.changeTitle')} onclose={() => (showChangePassword = false)}>
     <ChangePasswordForm onDone={() => (showChangePassword = false)} />
+  </Sheet>
+{/if}
+
+{#if showRenewKeys}
+  <Sheet label={t('security.renewKeys')} onclose={() => (showRenewKeys = false)}>
+    <ChangePasswordForm
+      action={renewKeys}
+      title={t('security.renewKeys')}
+      submitLabel={t('security.renewKeys')}
+      message={t('security.keysHint')}
+      onDone={() => (showRenewKeys = false)}
+    />
   </Sheet>
 {/if}
 

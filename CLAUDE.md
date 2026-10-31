@@ -212,6 +212,33 @@ is `category.side`.
 
 ## Development Workflow Conventions
 
+### Security fixes update SECURITY.md — every time
+`SECURITY.md` is the public record of what is protected and what is not. A change
+that fixes a vulnerability, or removes or narrows a known limitation, updates it
+**in the same pull request**:
+
+- add the fix under **Security fixes**, in a section for the upcoming release
+  ("Unreleased" until it is cut, then renamed with the version and date);
+- move or reword the matching item under **Known limitations**, so that nothing
+  there is claimed after it stops being true, and nothing fixed is still listed;
+- add a new limitation when a change knowingly introduces one;
+- update `readmore/security.md` too when the behaviour a user or operator sees
+  changes, and the CHANGELOG's *Security* section.
+
+An **exploitable, unfixed** vulnerability is never described in a public issue, pull
+request or commit message: it goes in a private GitHub security advisory until the
+fix ships. Design limitations users should know about belong in `SECURITY.md`
+openly.
+
+### Plans live in the private planning repo
+A new plan, idea or work package is written in the private repo
+`bpfel/nafin-toolbox-planning` (cloned at `~/nafin-toolbox-planning`, under `plans/`),
+never in this one. Its README is the project board. `plans/` here keeps only the
+designs of shipped security features, because `readmore/security.md` and the code
+cite them and a reviewer needs to read them; a plan moves here when its feature
+ships and the public docs depend on it. Anything a plan says is public once it
+lands here, and the history keeps it.
+
 ### Git Worktrees — CRITICAL
 **Always check which worktree you are working in before making any changes.**
 

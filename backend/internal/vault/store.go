@@ -41,8 +41,11 @@ func (s *Store) GetVault(ctx context.Context, userID int) (*Vault, error) {
 // vault is one opaque blob, so there is no partial merge to fall back on;
 // refusing the write is the only way not to lose data.
 //
-// A nil expectedUpdatedAt writes unconditionally, which is what the first save
-// after key setup and the recovery flow need — there is nothing to conflict with.
+// A nil expectedUpdatedAt means the client believes there is no vault yet — the
+// first save after key setup, or a vault that was not there at unlock. That
+// write only creates: if a row exists after all it is refused with
+// ErrVaultConflict, so a client that misread a failed load as "no vault" can
+// never put an empty vault over the real one.
 func (s *Store) PutVault(
 	ctx context.Context,
 	userID int,
@@ -50,12 +53,10 @@ func (s *Store) PutVault(
 	version int,
 	expectedUpdatedAt *time.Time,
 ) (time.Time, error) {
-	const unconditional = `
+	const createOnly = `
 		INSERT INTO user_vaults (user_id, ciphertext, nonce, version, updated_at)
 		VALUES ($1, $2, $3, $4, NOW())
-		ON CONFLICT (user_id) DO UPDATE
-		SET ciphertext = EXCLUDED.ciphertext, nonce = EXCLUDED.nonce,
-		    version = EXCLUDED.version, updated_at = NOW()
+		ON CONFLICT (user_id) DO NOTHING
 		RETURNING updated_at`
 
 	// The WHERE guards the DO UPDATE branch only. With no existing row the INSERT
@@ -74,12 +75,12 @@ func (s *Store) PutVault(
 	var err error
 
 	if expectedUpdatedAt == nil {
-		err = s.db.QueryRowContext(ctx, unconditional, userID, ciphertext, nonce, version).Scan(&updatedAt)
+		err = s.db.QueryRowContext(ctx, createOnly, userID, ciphertext, nonce, version).Scan(&updatedAt)
 	} else {
 		err = s.db.QueryRowContext(ctx, conditional, userID, ciphertext, nonce, version, *expectedUpdatedAt).Scan(&updatedAt)
-		if errors.Is(err, sql.ErrNoRows) {
-			return time.Time{}, ErrVaultConflict
-		}
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, ErrVaultConflict
 	}
 
 	return updatedAt, err
@@ -121,6 +122,7 @@ func (s *Store) SetEncryptedMEK(ctx context.Context, userID int, encryptedMEK, r
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE users
 		 SET encrypted_mek = $2, recovery_key_hash = $3, encrypted_mek_recovery = $4,
+		     recovery_version = 2,
 		     public_key = $5, encrypted_private_key = $6,
 		     verifying_key = $7, encrypted_signing_key = $8
 		 WHERE id = $1`,
@@ -167,10 +169,21 @@ func (s *Store) UpdateEncryptedMEK(ctx context.Context, userID int, encryptedMEK
 	return err
 }
 
-func (s *Store) GetRecoveryData(ctx context.Context, userID int) (recoveryKeyHash, encryptedMEKRecovery string, err error) {
-	err = s.db.QueryRowContext(ctx,
-		`SELECT recovery_key_hash, encrypted_mek_recovery FROM users WHERE id = $1`,
+// RecoveryData is what recovery needs: the hash to check against, the MEK
+// wrapped for recovery, and which scheme both are in (see KeysResponse).
+type RecoveryData struct {
+	Hash         string
+	EncryptedMEK string
+	Version      int
+}
+
+func (s *Store) GetRecoveryData(ctx context.Context, userID int) (RecoveryData, error) {
+	var hash, mek sql.NullString
+	var d RecoveryData
+	err := s.db.QueryRowContext(ctx,
+		`SELECT recovery_key_hash, encrypted_mek_recovery, recovery_version FROM users WHERE id = $1`,
 		userID,
-	).Scan(&recoveryKeyHash, &encryptedMEKRecovery)
-	return
+	).Scan(&hash, &mek, &d.Version)
+	d.Hash, d.EncryptedMEK = hash.String, mek.String
+	return d, err
 }
