@@ -646,6 +646,7 @@ export async function tryRestoreVault(userId: number): Promise<boolean> {
     // this were left out, reloading the page would silently take away the
     // ability to share a household until the next real sign-in.
     const keys = await fetchVaultKeys()
+    recoveryVersion = keys?.recovery_version ?? 1
     identity = await ensureIdentity(keys, cachedMEK)
     await loadHouseholds(cachedMEK)
     unlocked = true
@@ -756,8 +757,19 @@ async function ensureIdentity(
  * Set up encryption keys for the first time.
  * Returns the recovery key that must be shown to the user.
  */
-export async function setupKeys(passwordKeys: PasswordKeys, userId: number): Promise<string> {
-  owner = userId
+/**
+ * A new vault's keys, made but not yet stored, and its recovery key to show.
+ *
+ * Stored by `store`, once the recovery key has been typed back. It used to be
+ * the other way round, and a reload on the screen showing the key stored a
+ * vault whose only way back had never been seen. Until `store` runs nothing is
+ * on the server: a reload leaves the account without a vault, and setting it
+ * up again makes a new key.
+ */
+export async function prepareSetup(
+  passwordKeys: PasswordKeys,
+  userId: number,
+): Promise<{ recoveryKey: string; store: () => Promise<void> }> {
   const newMEK = await generateMEK()
   const encryptedMEK = await wrapMEK(newMEK, passwordKeys.vaultKEK)
 
@@ -774,23 +786,26 @@ export async function setupKeys(passwordKeys: PasswordKeys, userId: number): Pro
   const freshIdentity = await generateIdentity()
   const sealed = await sealIdentity(freshIdentity, newMEK)
 
-  await setupVaultKeys({
-    encrypted_mek: encryptedMEK,
-    recovery_auth: recovery.recoveryAuth,
-    encrypted_mek_recovery: encryptedMEKRecovery,
-    ...sealed,
-  })
+  const store = async () => {
+    owner = userId
+    await setupVaultKeys({
+      encrypted_mek: encryptedMEK,
+      recovery_auth: recovery.recoveryAuth,
+      encrypted_mek_recovery: encryptedMEKRecovery,
+      ...sealed,
+    })
 
-  identity = await openIdentity(sealed, newMEK)
-  recoveryVersion = 2
-  mek = newMEK
-  current.key = newMEK
-  current.data = createEmptyVault(mainAccountName())
-  await saveVault()
-  await cacheMEK(newMEK)
-  unlocked = true
+    identity = await openIdentity(sealed, newMEK)
+    recoveryVersion = 2
+    mek = newMEK
+    current.key = newMEK
+    current.data = createEmptyVault(mainAccountName())
+    await saveVault()
+    await cacheMEK(newMEK)
+    unlocked = true
+  }
 
-  return recoveryKey
+  return { recoveryKey, store }
 }
 
 /**

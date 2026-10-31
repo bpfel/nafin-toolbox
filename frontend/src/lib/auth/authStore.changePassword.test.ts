@@ -7,7 +7,7 @@ const wrapMEKFor = vi.fn()
 vi.mock('../crypto/vaultStore.svelte', () => ({
   initializeVault: (...args: unknown[]) => initializeVault(...args),
   wrapMEKFor: (...args: unknown[]) => wrapMEKFor(...args),
-  setupKeys: vi.fn(),
+  prepareSetup: vi.fn(),
   clearVault: vi.fn(),
   recoverVault: vi.fn(),
   tryRestoreVault: vi.fn(),

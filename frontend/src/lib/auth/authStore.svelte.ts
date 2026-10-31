@@ -1,6 +1,6 @@
 import { withCode } from '../api/client'
 import { passwordChangeProblem, passwordProblem } from './rules'
-import { initializeVault, setupKeys, clearVault, wrapMEKFor, recoverVault, tryRestoreVault, saveVault, getVaultState, prepareUpgrade, recoveryNeedsRenewal, upgradeStored, prepareRenewal, renewalStored, opensVault } from '../crypto/vaultStore.svelte'
+import { initializeVault, prepareSetup, clearVault, wrapMEKFor, recoverVault, tryRestoreVault, saveVault, getVaultState, prepareUpgrade, recoveryNeedsRenewal, upgradeStored, prepareRenewal, renewalStored, opensVault } from '../crypto/vaultStore.svelte'
 import { derivePasswordKeys, type PasswordKeys } from '../crypto/keys'
 
 export interface User {
@@ -59,7 +59,12 @@ let heldEmail = $state<string | null>(null)
 // move to separate keys (offerUpgrade) or a renewal (renewKeys). Nothing is
 // sent until it has been typed back; `commit` then sends it.
 interface PendingKeyChange {
-  kind: 'upgrade' | 'renewal'
+  /**
+   * `setup`: a new vault's first keys. `upgrade`: the move to separate keys.
+   * `renewal`: Renew keys. In each, nothing is stored until the recovery key
+   * has been typed back, so a reload on its screen stores nothing either.
+   */
+  kind: 'setup' | 'upgrade' | 'renewal'
   recoveryKey: string
   commit: () => Promise<string | null>
 }
@@ -71,7 +76,6 @@ const DEFAULT_ITERATIONS = 600000
 // Vault state exposed to UI
 let vaultNeedsSetup = $state(false)
 let vaultDecryptFailed = $state(false)
-let recoveryKeyToShow = $state<string | null>(null)
 let vaultLocked = $state(false)
 /**
  * The vault is being opened and its keys checked. Opening it makes the budget
@@ -99,14 +103,12 @@ export function getAuthState() {
     get vaultNeedsSetup() { return vaultNeedsSetup },
     get vaultDecryptFailed() { return vaultDecryptFailed },
     get vaultLocked() { return vaultLocked },
-    get recoveryKeyToShow() { return recoveryKeyToShow },
-    get upgradeRecoveryKey() { return pendingKeyChange?.recoveryKey ?? null },
+    // A new vault's first key, and the key of a move or a renewal, on screens
+    // with different words; both are confirmed through confirmKeyChange.
+    get recoveryKeyToShow() { return pendingKeyChange?.kind === 'setup' ? pendingKeyChange.recoveryKey : null },
+    get upgradeRecoveryKey() { return pendingKeyChange && pendingKeyChange.kind !== 'setup' ? pendingKeyChange.recoveryKey : null },
     get keyChangeKind() { return pendingKeyChange?.kind ?? null },
   }
-}
-
-export function clearRecoveryKey() {
-  recoveryKeyToShow = null
 }
 
 export async function checkAuth() {
@@ -128,8 +130,17 @@ export async function checkAuth() {
       // Admin users skip vault entirely — they don't use encrypted modules
       if (currentUser && currentUser.role !== 'admin') {
         // Try to restore vault from sessionStorage (survives page refresh)
-        const restored = await tryRestoreVault(currentUser.id)
-        if (!restored) {
+        // — unless the account has yet to move to separate keys. That move
+        // needs the password and shows a new recovery key; restored from the
+        // cache, the reload skipped both, and a reload on the recovery-key
+        // screen put the move off for good. Asked for the password instead,
+        // the unlock offers the move again (offerUpgrade).
+        if (versionOf(currentUser) < 2) {
+          vaultLocked = true
+        } else if (!(await tryRestoreVault(currentUser.id))) {
+          vaultLocked = true
+        } else if (recoveryNeedsRenewal()) {
+          clearVault()
           vaultLocked = true
         }
       }
@@ -462,16 +473,31 @@ async function unlockVaultWith(password: string): Promise<string | null> {
  * Complete vault key setup (after login when keys don't exist yet).
  * Returns the recovery key to show to the user.
  */
-export async function completeVaultSetup(): Promise<string | null> {
-  if (!heldKeys || !currentUser) return null
+export async function completeVaultSetup(): Promise<void> {
+  if (!heldKeys || !currentUser) return
 
-  const recoveryKey = await setupKeys(heldKeys, currentUser.id)
+  const prepared = await prepareSetup(heldKeys, currentUser.id)
   heldKeys = null
   heldPassword = null
   heldEmail = null
   vaultNeedsSetup = false
-  recoveryKeyToShow = recoveryKey
-  return recoveryKey
+  offerSetup(prepared)
+}
+
+/** Show a new vault's recovery key; store the vault once it is typed back. */
+function offerSetup(prepared: { recoveryKey: string; store: () => Promise<void> }): void {
+  pendingKeyChange = {
+    kind: 'setup',
+    recoveryKey: prepared.recoveryKey,
+    commit: async () => {
+      try {
+        await prepared.store()
+        return null
+      } catch (e) {
+        return e instanceof Error ? e.message : 'Failed to set up encryption'
+      }
+    },
+  }
 }
 
 let loggingOut = false
@@ -495,7 +521,6 @@ export async function logout() {
     vaultNeedsSetup = false
     vaultDecryptFailed = false
     vaultLocked = false
-    recoveryKeyToShow = null
     loggingOut = false
   }
 }
@@ -679,8 +704,7 @@ export async function setup(email: string, password: string): Promise<string | n
     if (currentUser && currentUser.role !== 'admin') {
       // Set up vault keys for the new user
       try {
-        const recoveryKey = await setupKeys(keys, currentUser.id)
-        recoveryKeyToShow = recoveryKey
+        offerSetup(await prepareSetup(keys, currentUser.id))
       } catch {
         // If key setup fails, user can still unlock later via the vault lock screen
         vaultLocked = true
@@ -724,8 +748,7 @@ export async function verifyEmail(token: string, password: string): Promise<stri
     // Set up vault keys for the invited user (admin users skip vault)
     if (currentUser && currentUser.role !== 'admin') {
       try {
-        const recoveryKey = await setupKeys(keys, currentUser.id)
-        recoveryKeyToShow = recoveryKey
+        offerSetup(await prepareSetup(keys, currentUser.id))
       } catch {
         vaultLocked = true
       }

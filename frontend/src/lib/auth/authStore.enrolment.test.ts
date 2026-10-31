@@ -6,7 +6,7 @@ const initializeVault = vi.fn(async () => 'ok')
 vi.mock('../crypto/vaultStore.svelte', () => ({
   initializeVault: (...args: unknown[]) => initializeVault(...(args as [])),
   wrapMEKFor: vi.fn(),
-  setupKeys: vi.fn(),
+  prepareSetup: vi.fn(),
   clearVault: vi.fn(),
   recoverVault: vi.fn(),
   tryRestoreVault: vi.fn(),

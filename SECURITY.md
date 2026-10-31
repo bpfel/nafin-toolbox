@@ -131,6 +131,12 @@ What has been fixed, newest first. The upgrade notes for each are in
 
 ### 0.6.0 — 2026-10-30
 
+- **A recovery key can't be skipped by a reload.** A new vault's first recovery
+  key was stored before it was shown, so reloading that screen left the vault
+  with a key nobody had seen. It is now stored only after it has been typed
+  back. An account that had yet to move to separate keys could reload past the
+  new key's screen and keep sending its password at every sign-in; until the
+  move is done, a reload now asks for the password and offers the move again.
 - **Setting up two-factor sign-in needs the password.** A signed-in session
   alone could enrol a second factor, and with it lock the account's owner out;
   an admin password reset left that factor in place, and only SQL removed it.

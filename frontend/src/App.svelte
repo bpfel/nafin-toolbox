@@ -1,6 +1,6 @@
 <script lang="ts">
   import { setOnUnauthorized } from './lib/api/client'
-  import { checkAuth, getAuthState, logout, getSettings, clearRecoveryKey, confirmKeyChange, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
+  import { checkAuth, getAuthState, logout, getSettings, confirmKeyChange, completeVaultSetup, recoverAccount, unlockVault } from './lib/auth/authStore.svelte'
   import { getVaultState, sessionEndedElsewhere } from './lib/crypto/vaultStore.svelte'
   import LoginPage from './lib/auth/LoginPage.svelte'
   import ChangePasswordForm from './lib/auth/ChangePasswordForm.svelte'
@@ -120,9 +120,6 @@
     }
   }
 
-  function handleRecoveryKeyDismiss() {
-    clearRecoveryKey()
-  }
 
   // The move to separate keys is stored only now that its new recovery key
   // has been typed back. A failure keeps the key on screen to try again.
@@ -251,7 +248,8 @@
 {:else if gate === 'recoveryKey' && authState.recoveryKeyToShow}
   <RecoveryKeyScreen
     recoveryKey={authState.recoveryKeyToShow}
-    onconfirmed={handleRecoveryKeyDismiss}
+    error={upgradeError}
+    onconfirmed={handleUpgradeConfirmed}
   />
 {:else if gate === 'recoveryKeyRenewal' && authState.upgradeRecoveryKey}
   <RecoveryKeyScreen

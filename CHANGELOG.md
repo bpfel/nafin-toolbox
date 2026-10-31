@@ -71,6 +71,12 @@ Every user is shown a new recovery key at their next sign-in.
 
 ### Security
 
+- A recovery key can no longer be skipped by reloading its screen. A new
+  vault's first key was stored before it was shown, so a reload left a vault
+  whose recovery key nobody had seen; it is now stored only once it has been
+  typed back. A reload on the new key for the move to separate keys opened the
+  budget from the browser's cache and put the move off; it now asks for the
+  password, and shows a new key.
 - Setting up two-factor sign-in asks for the password. A session alone was
   enough, so a browser left signed in could have a second factor enrolled that
   locks its owner out. Administrators can remove a user's second factor under
