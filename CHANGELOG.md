@@ -8,7 +8,7 @@ Versions follow [semantic versioning](https://semver.org/) — pre-1.0, so a min
 release may change things without a deprecation period. Each release is a tag on
 `main`; see [RELEASING.md](RELEASING.md) for how one is cut.
 
-## [0.6.0] — 2026-10-30
+## [0.6.0] — 2026-10-31
 
 The security release. The server no longer receives anything that opens a
 vault, sign-in is much harder to attack, and the findings of a full security
@@ -161,6 +161,11 @@ Every user is shown a new recovery key at their next sign-in.
   one or all of them.
 - [In case of an attack](readmore/under-attack.md): what the app limits on its
   own, and what to do, step by step, when somebody is trying to get in.
+
+### Fixed
+
+- After signing in, the budget no longer flashes up for a second before the
+  screen with the new recovery key.
 
 ### License
 

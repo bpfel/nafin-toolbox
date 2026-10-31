@@ -129,7 +129,7 @@ key. To recover:
 What has been fixed, newest first. The upgrade notes for each are in
 [CHANGELOG.md](CHANGELOG.md).
 
-### 0.6.0 — 2026-10-30
+### 0.6.0 — 2026-10-31
 
 - **A recovery key can't be skipped by a reload.** A new vault's first recovery
   key was stored before it was shown, so reloading that screen left the vault
