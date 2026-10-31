@@ -73,11 +73,28 @@ let vaultNeedsSetup = $state(false)
 let vaultDecryptFailed = $state(false)
 let recoveryKeyToShow = $state<string | null>(null)
 let vaultLocked = $state(false)
+/**
+ * The vault is being opened and its keys checked. Opening it makes the budget
+ * visible, and a new recovery key, when one is due, takes a second more to
+ * prepare; the gate shows loading in between (gate.ts), or the budget flashed
+ * up before the screen that has to come first.
+ */
+let openingVault = $state(false)
+
+async function whileOpening<T>(open: () => Promise<T>): Promise<T> {
+  openingVault = true
+  try {
+    return await open()
+  } finally {
+    openingVault = false
+  }
+}
 
 export function getAuthState() {
   return {
     get currentUser() { return currentUser },
     get loading() { return loading },
+    get openingVault() { return openingVault },
     get needsSetup() { return needsSetup },
     get vaultNeedsSetup() { return vaultNeedsSetup },
     get vaultDecryptFailed() { return vaultDecryptFailed },
@@ -226,6 +243,11 @@ async function afterSignIn(keys: PasswordKeys, password: string | null, email: s
     }
   }
 
+  await whileOpening(() => openAfterSignIn(keys, password, email, version))
+}
+
+async function openAfterSignIn(keys: PasswordKeys, password: string | null, email: string, version: number): Promise<void> {
+  if (!currentUser) return
   const vaultResult = await initializeVault(keys, currentUser.id, version)
   if (vaultResult === 'no-keys') {
     // No vault yet: the password moves now, and the vault is set up under
@@ -396,6 +418,10 @@ export async function verify2FA(mfaToken: string, code: string): Promise<string 
  * Returns error string or null on success.
  */
 export async function unlockVault(password: string): Promise<string | null> {
+  return whileOpening(() => unlockVaultWith(password))
+}
+
+async function unlockVaultWith(password: string): Promise<string | null> {
   if (!currentUser) return 'Not logged in'
 
   let iterations: number
@@ -581,21 +607,26 @@ export async function recoverAccount(recoveryKey: string): Promise<string | null
   if (!heldKeys) return 'Password not available for re-encryption'
 
   try {
-    await recoverVault(recoveryKey, heldKeys, versionOf(currentUser), currentUser.id)
-    const keys = heldKeys
-    const password = heldPassword
-    heldKeys = null
-    heldPassword = null
-    heldEmail = null
-    vaultDecryptFailed = false
-    // A recovery key the server once received is replaced now, while the
-    // vault is open: shown, typed back, then stored.
-    await offerUpgrade(keys, password)
+    await whileOpening(() => recoverAndRenew(recoveryKey))
   } catch (e) {
     return e instanceof Error ? e.message : 'Recovery failed'
   }
 
   return null
+}
+
+async function recoverAndRenew(recoveryKey: string): Promise<void> {
+  if (!currentUser || !heldKeys) return
+  await recoverVault(recoveryKey, heldKeys, versionOf(currentUser), currentUser.id)
+  const keys = heldKeys
+  const password = heldPassword
+  heldKeys = null
+  heldPassword = null
+  heldEmail = null
+  vaultDecryptFailed = false
+  // A recovery key the server once received is replaced now, while the
+  // vault is open: shown, typed back, then stored.
+  await offerUpgrade(keys, password)
 }
 
 export async function inviteUser(email: string, role: 'admin' | 'user' = 'user', password?: string): Promise<{ user?: User; error?: string }> {

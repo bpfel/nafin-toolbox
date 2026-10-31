@@ -63,6 +63,8 @@ export interface GateState {
   vaultDecryptFailed: boolean
   vaultLocked: boolean
   vaultUnlocked: boolean
+  /** The vault is open, and whether a new recovery key is due is still being worked out. */
+  openingVault?: boolean
 }
 
 export function gateFor(state: GateState): Gate | null {
@@ -108,6 +110,11 @@ export function gateFor(state: GateState): Gate | null {
   // `!vaultUnlocked` covers the moment before the first unlock has happened at
   // all. Either way the key is not in memory and no figure can be shown.
   if (state.vaultLocked || !state.vaultUnlocked) return 'vaultLocked'
+
+  // Last, so it never takes the place of a form that is still being filled
+  // in: only an open vault waits here, for the recovery-key screen that may be
+  // due before the budget is shown.
+  if (state.openingVault) return 'loading'
 
   return null
 }

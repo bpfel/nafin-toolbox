@@ -168,6 +168,7 @@
     gateFor({
       canEncrypt: typeof crypto !== 'undefined' && crypto.subtle !== undefined,
       loading: authState.loading,
+      openingVault: authState.openingVault,
       onVerifyPath: route.screen === 'verify',
       user: authState.currentUser
         ? {
